@@ -135,7 +135,7 @@ enum status Channel::lock(double start_time, double duration, Event &event)
 
 	/* just schedule if table is empty */
 	if(timings.size() == 0)
-		sched_time = start_time;
+		sched_time = start_time + event.get_time_taken();
 
 	/* check if can schedule before or in between before just scheduling
 	 * after all other events */
@@ -158,7 +158,7 @@ enum status Channel::lock(double start_time, double duration, Event &event)
 				if (it + 1 != timings.end())
 				{
 					/* enough time to schedule in between next two events */
-					if((*it).unlock_time >= start_time  && (*(it+1)).lock_time - (*it).unlock_time >= duration)
+					if((*it).unlock_time >= start_time + event.get_time_taken() && (*(it+1)).lock_time - (*it).unlock_time >= duration)
 					{
 						sched_time = (*it).unlock_time;
 						break;
@@ -169,8 +169,13 @@ enum status Channel::lock(double start_time, double duration, Event &event)
 		}
 
 		/* schedule after all events in table */
-		if(sched_time == BUS_CHANNEL_FREE_FLAG)
-			sched_time = timings.back().unlock_time;
+		if(sched_time == BUS_CHANNEL_FREE_FLAG) {
+			if (start_time + event.get_time_taken() > timings.back().unlock_time) {
+				sched_time = start_time + event.get_time_taken();
+			} else {
+				sched_time = timings.back().unlock_time;
+			}
+		}
 	}
 
 	/* write scheduling info in free table slot */
@@ -179,12 +184,18 @@ enum status Channel::lock(double start_time, double duration, Event &event)
 	lt.unlock_time = sched_time + duration;
 	timings.push_back(lt);
 
+	/*std::vector<lock_times>::iterator it = timings.begin();
+	for (; it < timings.end(); it++) {
+		printf("%f   %f\n", (*it).lock_time, (*it).unlock_time);
+	}
+	printf("\n");*/
+
 	if (lt.unlock_time > ready_at)
 		ready_at = lt.unlock_time;
 
 	/* update event times for bus wait and time taken */
-	event.incr_bus_wait_time(sched_time - start_time);
-	event.incr_time_taken(sched_time - start_time + duration);
+	event.incr_bus_wait_time(sched_time - start_time - event.get_time_taken());
+	event.incr_time_taken(sched_time - start_time + duration - event.get_time_taken());
 
 	return SUCCESS;
 }
