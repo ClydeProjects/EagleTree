@@ -182,14 +182,15 @@ enum status Channel::lock(double start_time, double duration, Event &event)
 	lock_times lt;
 	lt.lock_time = sched_time;
 	lt.unlock_time = sched_time + duration;
+	lt.event_id = event.get_id();
 	timings.push_back(lt);
 
 	/*std::vector<lock_times>::iterator it = timings.begin();
 	for (; it < timings.end(); it++) {
-		printf("%f   %f\n", (*it).lock_time, (*it).unlock_time);
+		printf("%f\t%f\t%d\n", (*it).lock_time, (*it).unlock_time, (*it).event_id);
 	}
-	printf("\n");*/
-
+	printf("\n");
+	 */
 	if (lt.unlock_time > ready_at)
 		ready_at = lt.unlock_time;
 

@@ -379,6 +379,7 @@ public:
 	double get_time_taken(void) const;
 	double get_bus_wait_time(void) const;
 	bool get_noop(void) const;
+	uint get_id(void) const;
 	Event *get_next(void) const;
 	void set_address(const Address &address);
 	void set_merge_address(const Address &address);
@@ -407,6 +408,9 @@ private:
 	void *payload;
 	Event *next;
 	bool noop;
+
+	static uint id_generator;
+	uint id;
 };
 
 /* Single bus channel
@@ -433,6 +437,7 @@ private:
 	struct lock_times {
 		double lock_time;
 		double unlock_time;
+		int event_id;
 	};
 
 	static bool timings_sorter(lock_times const& lhs, lock_times const& rhs);
@@ -918,6 +923,11 @@ protected:
 	// Current storage
 	long currentDataPage;
 	long currentTranslationPage;
+
+	// Translation blocks, and mapping from logical translation pages to physical translation pages
+	//std::vector<Address> translationBlocks;
+	//std::map<ulong, Address> logicalToPhysicalTranslationPageMapping;
+	//Address compute_logical_translation_page(long logical_page_address);
 };
 
 class FtlImpl_Dftl : public FtlImpl_DftlParent

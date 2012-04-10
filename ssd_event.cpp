@@ -31,6 +31,8 @@
 
 using namespace ssd;
 
+ssd::uint Event::id_generator = 0;
+
 /* see "enum event_type" in ssd.h for details on event types */
 Event::Event(enum event_type type, ulong logical_address, uint size, double start_time):
 	start_time(start_time),
@@ -44,6 +46,7 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	noop(false)
 {
 	assert(start_time >= 0.0);
+	id = Event::id_generator++;
 	return;
 }
 
@@ -86,6 +89,11 @@ void Event::consolidate_metaevent(Event &list)
 ssd::ulong Event::get_logical_address(void) const
 {
 	return logical_address;
+}
+
+ssd::uint Event::get_id(void) const
+{
+	return id;
 }
 
 const Address &Event::get_address(void) const
@@ -221,10 +229,11 @@ void Event::print(FILE *stream)
 		fprintf(stream, "Merge");
 	else
 		fprintf(stream, "Unknown event type: ");
+	fprintf(stream, "ID: %d ", id);
 	address.print(stream);
 	if(type == MERGE)
 		merge_address.print(stream);
-	fprintf(stream, " Time[%f, %f) Bus_wait: %f\n", start_time, start_time + time_taken, bus_wait_time);
+	fprintf(stream, "Time[%f, %f) Bus_wait: %f\n", start_time, start_time + time_taken, bus_wait_time);
 	return;
 }
 
