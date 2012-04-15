@@ -109,6 +109,8 @@ Ssd::Ssd(uint ssd_size):
 	assert(VIRTUAL_BLOCK_SIZE > 0);
 	assert(VIRTUAL_PAGE_SIZE > 0);
 
+	IOScheduler::instance_initialize(controller);
+
 	return;
 }
 

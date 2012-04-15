@@ -238,6 +238,7 @@ class Package;
 class Garbage_Collector;
 class Wear_Leveler;
 class Block_manager;
+class IOScheduler;
 class FtlParent;
 class FtlImpl_Page;
 class FtlImpl_Bast;
@@ -377,6 +378,7 @@ public:
 	enum event_type get_event_type(void) const;
 	double get_start_time(void) const;
 	double get_time_taken(void) const;
+	uint get_application_io_id(void) const;
 	double get_bus_wait_time(void) const;
 	bool get_noop(void) const;
 	uint get_id(void) const;
@@ -386,9 +388,11 @@ public:
 	void set_log_address(const Address &address);
 	void set_replace_address(const Address &address);
 	void set_next(Event &next);
+	void set_start_time(double start_time);
 	void set_payload(void *payload);
 	void set_event_type(const enum event_type &type);
 	void set_noop(bool value);
+	void set_application_io_id(uint application_io_id);
 	void *get_payload(void) const;
 	double incr_bus_wait_time(double time);
 	double incr_time_taken(double time_incr);
@@ -411,6 +415,7 @@ private:
 
 	static uint id_generator;
 	uint id;
+	uint application_io_id;
 };
 
 /* Single bus channel
@@ -754,6 +759,36 @@ private:
 	bool out_of_blocks;
 };
 
+class IOScheduler {
+public:
+	void schedule_independent_event(Event& event);
+	void schedule_dependency(Event& event);
+	void launch_dependency(uint application_io_id);
+	void finish();
+	// Singleton
+	static IOScheduler *instance();
+	static void instance_initialize(Controller& controller);
+	static IOScheduler *inst;
+private:
+	IOScheduler(Controller &controller);
+	~IOScheduler(void);
+	// IO Queue sorting all incoming events by start_time
+	struct EventStartTimeComparator{
+	    bool operator()(Event& p1, Event& p2) const {
+	        return p1.get_start_time() > p2.get_start_time();
+	    }
+	};
+	typedef std::priority_queue<Event, std::vector<Event>, EventStartTimeComparator> EventStartTimeHeap;
+	EventStartTimeHeap io_schedule;
+
+	// dependency map. Each event can have max 1 dependency
+	std::map<uint, std::queue<Event> > dependencies;
+
+	Controller &controller;
+
+	void execute_next();
+};
+
 class FtlParent
 {
 public:
@@ -924,6 +959,7 @@ protected:
 	long currentDataPage;
 	long currentTranslationPage;
 
+	uint application_io_id;
 	// Translation blocks, and mapping from logical translation pages to physical translation pages
 	//std::vector<Address> translationBlocks;
 	//std::map<ulong, Address> logicalToPhysicalTranslationPageMapping;
@@ -1009,6 +1045,7 @@ public:
 	friend class FtlImpl_Dftl;
 	friend class FtlImpl_BDftl;
 	friend class Block_manager;
+	friend class IOScheduler;
 
 	Stats stats;
 	void print_ftl_statistics();
