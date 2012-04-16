@@ -181,13 +181,15 @@ enum page_state{EMPTY, VALID, INVALID};
 enum block_state{FREE, ACTIVE, INACTIVE};
 
 /* I/O request event types
- * 	read  - read data from address
+ * 	read  - read data from address. Performs both read_command and read_transfer. Kept here for legacy purposes
+ * 	read_command - the first part of a read with the command and actual read on the chip
+ * 	read_transfer - transfer read data back to the controller
  * 	write - write data to address (page state set to valid)
  * 	erase - erase block at address (all pages in block are erased - 
  * 	                                page states set to empty)
  * 	merge - move valid pages from block at address (page state set to invalid)
  * 	           to free pages in block at merge_address */
-enum event_type{READ, WRITE, ERASE, MERGE, TRIM};
+enum event_type{READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, MERGE, TRIM};
 
 /* General return status
  * return status for simulator operations that only need to provide general
@@ -761,7 +763,7 @@ private:
 
 class IOScheduler {
 public:
-	void schedule_independent_event(Event& event);
+
 	void schedule_dependency(Event& event);
 	void launch_dependency(uint application_io_id);
 	void finish();
@@ -785,7 +787,7 @@ private:
 	std::map<uint, std::queue<Event> > dependencies;
 
 	Controller &controller;
-
+	void schedule_independent_event(Event& event);
 	void execute_next();
 };
 

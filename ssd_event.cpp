@@ -235,6 +235,10 @@ void Event::print(FILE *stream)
 {
 	if(type == READ)
 		fprintf(stream, "Read ");
+	else if(type == READ_COMMAND)
+		fprintf(stream, "Read command ");
+	else if(type == READ_TRANSFER)
+		fprintf(stream, "Read transfer ");
 	else if(type == WRITE)
 		fprintf(stream, "Write");
 	else if(type == ERASE)

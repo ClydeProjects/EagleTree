@@ -104,6 +104,21 @@ enum status Controller::issue(Event &event_list)
 				|| ssd.replace(*cur) == FAILURE)
 				return FAILURE;
 		}
+		else if(cur -> get_event_type() == READ_COMMAND)
+		{
+			assert(cur -> get_address().valid > NONE);
+			if(ssd.bus.lock(cur -> get_address().package, cur -> get_start_time(), BUS_CTRL_DELAY, *cur) == FAILURE
+				|| ssd.read(*cur) == FAILURE)
+				return FAILURE;
+		}
+		else if(cur -> get_event_type() == READ_TRANSFER)
+		{
+			assert(cur -> get_address().valid > NONE);
+			if(ssd.bus.lock(cur -> get_address().package, cur -> get_start_time(), BUS_CTRL_DELAY + BUS_DATA_DELAY, *cur) == FAILURE
+				|| ssd.ram.write(*cur) == FAILURE
+				|| ssd.ram.read(*cur) == FAILURE)
+				return FAILURE;
+		}
 		else if(cur -> get_event_type() == WRITE)
 		{
 			assert(cur -> get_address().valid > NONE);
