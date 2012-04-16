@@ -788,7 +788,9 @@ private:
 
 	Controller &controller;
 	void schedule_independent_event(Event& event);
-	void execute_next();
+	void execute_next(Event& event);
+	std::vector<Event> gather_current_waiting_ios();
+	void execute_current_waiting_ios();
 };
 
 class FtlParent

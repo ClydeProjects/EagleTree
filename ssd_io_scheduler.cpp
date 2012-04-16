@@ -34,7 +34,7 @@ void IOScheduler::schedule_independent_event(Event& event) {
 	//printf("new id: %d   start time: %f\n", event.get_id(), event.get_start_time());
 
 	while (io_schedule.top().get_start_time() + 2 < event.get_start_time()) {
-		execute_next();
+		execute_current_waiting_ios();
 	}
 }
 
@@ -52,9 +52,8 @@ void IOScheduler::schedule_dependency(Event& event) {
 		read_command->set_application_io_id(application_io_id);
 		dependencies[application_io_id].push(*read_command);
 	}
-	//printf("count: %d ", (int)dependencies[application_io_id].size());
 	dependencies[application_io_id].push(event);
-	fprintf(stdout, "count: %d \n", (int)dependencies[application_io_id].size());
+	//fprintf(stdout, "count: %d \n", (int)dependencies[application_io_id].size());
 }
 
 void IOScheduler::launch_dependency(uint application_io_id) {
@@ -65,29 +64,46 @@ void IOScheduler::launch_dependency(uint application_io_id) {
 
 void IOScheduler::finish() {
 	while (io_schedule.size() > 0) {
-		execute_next();
+		execute_current_waiting_ios();
 	}
 }
 
-void IOScheduler::execute_next() {
+std::vector<Event> IOScheduler::gather_current_waiting_ios() {
 	Event top = io_schedule.top();
 	io_schedule.pop();
-	enum status result = controller.issue(top);
+	double start_time = top.get_start_time();
+	std::vector<Event> current_ios;
+	current_ios.push_back(top);
+	while (start_time + 1 < io_schedule.top().get_start_time()) {
+		Event current_top = io_schedule.top();
+		io_schedule.pop();
+		current_ios.push_back(current_top);
+	}
+	return current_ios;
+}
+
+void IOScheduler::execute_current_waiting_ios() {
+	std::vector<Event> current_ios = gather_current_waiting_ios();
+	for(uint i = 0; i < current_ios.size(); i++) {
+		execute_next(current_ios[i]);
+	}
+}
+
+void IOScheduler::execute_next(Event& event) {
+	enum status result = controller.issue(event);
 	if (result == SUCCESS) {
-		int application_io_id = top.get_application_io_id();
+		int application_io_id = event.get_application_io_id();
 		if (dependencies[application_io_id].size() > 0) {
 			Event dependent = dependencies[application_io_id].front();
-			dependent.set_start_time(top.get_start_time() + top.get_time_taken());
+			dependent.set_start_time(event.get_start_time() + event.get_time_taken());
 			dependencies[application_io_id].pop();
 			io_schedule.push(dependent);
 		}
 	} else {
-		dependencies.erase(top.get_application_io_id());
+		dependencies.erase(event.get_application_io_id());
 	}
-	top.print();
+	event.print();
 }
-
-
 
 
 
