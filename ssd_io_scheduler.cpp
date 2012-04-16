@@ -74,7 +74,7 @@ std::vector<Event> IOScheduler::gather_current_waiting_ios() {
 	double start_time = top.get_start_time();
 	std::vector<Event> current_ios;
 	current_ios.push_back(top);
-	while (start_time + 1 < io_schedule.top().get_start_time()) {
+	while (io_schedule.size() > 0 && start_time + 1 > io_schedule.top().get_start_time()) {
 		Event current_top = io_schedule.top();
 		io_schedule.pop();
 		current_ios.push_back(current_top);
