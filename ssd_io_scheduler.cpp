@@ -85,7 +85,15 @@ std::vector<Event> IOScheduler::gather_current_waiting_ios() {
 void IOScheduler::execute_current_waiting_ios() {
 	std::vector<Event> current_ios = gather_current_waiting_ios();
 	for(uint i = 0; i < current_ios.size(); i++) {
-		execute_next(current_ios[i]);
+		Event event = current_ios[i];
+		double time = controller.in_how_long_can_this_event_be_scheduled(event);
+		if (time <= 0) {
+			execute_next(event);
+		} else {
+			event.incr_bus_wait_time(time);
+			event.incr_time_taken(time);
+			io_schedule.push(event);
+		}
 	}
 }
 

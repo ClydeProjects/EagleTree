@@ -30,6 +30,7 @@
 #include <vector>
 #include <queue>
 #include <map>
+#include <algorithm>
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/identity.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -435,6 +436,7 @@ public:
 	Channel(double ctrl_delay = BUS_CTRL_DELAY, double data_delay = BUS_DATA_DELAY, uint table_size = BUS_TABLE_SIZE, uint max_connections = BUS_MAX_CONNECT);
 	~Channel(void);
 	enum status lock(double start_time, double duration, Event &event);
+	double get_currently_executing_operation_finish_time();
 	enum status connect(void);
 	enum status disconnect(void);
 	double ready_time(void);
@@ -459,6 +461,8 @@ private:
 
 	// Stores the highest unlock_time in the vector timings list.
 	double ready_at;
+
+	double currently_executing_operation_finish_time;
 };
 
 /* Multi-channel bus comprised of Channel class objects
@@ -606,6 +610,7 @@ public:
 	double get_last_erase_time(const Address &address) const;
 	ulong get_erases_remaining(const Address &address) const;
 	void get_least_worn(Address &address) const;
+	double get_currently_executing_io_finish_time();
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
 	void get_free_page(Address &address) const;
@@ -622,6 +627,7 @@ private:
 	uint least_worn;
 	ulong erases_remaining;
 	double last_erase_time;
+	double currently_executing_io_finish_time;
 };
 
 /* The package is the highest level data storage hardware unit.  While the
@@ -649,6 +655,7 @@ public:
 	ssd::uint get_num_valid(const Address &address) const;
 	ssd::uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
+	double get_currently_executing_IO_finish_time_for_spesific_die(Event& event);
 private:
 	void update_wear_stats (const Address &address);
 	uint size;
@@ -777,7 +784,7 @@ private:
 	// IO Queue sorting all incoming events by start_time
 	struct EventStartTimeComparator{
 	    bool operator()(Event& p1, Event& p2) const {
-	        return p1.get_start_time() > p2.get_start_time();
+	        return p1.get_start_time() + p1.get_bus_wait_time() > p2.get_start_time() + p2.get_bus_wait_time() ;
 	    }
 	};
 	typedef std::priority_queue<Event, std::vector<Event>, EventStartTimeComparator> EventStartTimeHeap;
@@ -1067,6 +1074,7 @@ private:
 	ssd::uint get_num_valid(const Address &address) const;
 	ssd::uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
+	double in_how_long_can_this_event_be_scheduled(Event& event);
 	Ssd &ssd;
 	FtlParent *ftl;
 };
@@ -1110,6 +1118,7 @@ private:
 	ssd::uint get_num_valid(const Address &address) const;
 	ssd::uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
+	double get_currently_executing_IO_finish_time_for_spesific_die(Event& event);
 
 	uint size;
 	Controller controller;

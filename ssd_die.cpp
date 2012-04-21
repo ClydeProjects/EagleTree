@@ -48,7 +48,8 @@ Die::Die(const Package &parent, Channel &channel, uint die_size, long physical_a
 	erases_remaining(BLOCK_ERASES),
 
 	/* assume hardware created at time 0 and had an implied free erasure */
-	last_erase_time(0.0)
+	last_erase_time(0.0),
+	currently_executing_io_finish_time(0.0)
 {
 	uint i;
 
@@ -92,14 +93,24 @@ enum status Die::read(Event &event)
 {
 	assert(data != NULL);
 	assert(event.get_address().plane < size && event.get_address().valid > DIE);
-	return data[event.get_address().plane].read(event);
+	if (event.get_start_time() + event.get_time_taken() < currently_executing_io_finish_time) {
+		return FAILURE;
+	}
+	enum status result = data[event.get_address().plane].read(event);
+	currently_executing_io_finish_time = event.get_start_time() + event.get_time_taken();
+	return result;
 }
 
 enum status Die::write(Event &event)
 {
 	assert(data != NULL);
 	assert(event.get_address().plane < size && event.get_address().valid > DIE);
-	return data[event.get_address().plane].write(event);
+	if (event.get_start_time() + event.get_time_taken() < currently_executing_io_finish_time) {
+		return FAILURE;
+	}
+	enum status result = data[event.get_address().plane].write(event);
+	currently_executing_io_finish_time = event.get_start_time() + event.get_time_taken();
+	return result;
 }
 
 enum status Die::replace(Event &event)
@@ -117,8 +128,12 @@ enum status Die::erase(Event &event)
 {
 	assert(data != NULL);
 	assert(event.get_address().plane < size && event.get_address().valid > DIE);
-	enum status status = data[event.get_address().plane].erase(event);
 
+	if (event.get_start_time() + event.get_time_taken() < currently_executing_io_finish_time) {
+		return FAILURE;
+	}
+	enum status status = data[event.get_address().plane].erase(event);
+	currently_executing_io_finish_time = event.get_start_time() + event.get_time_taken();
 	/* update values if no errors */
 	if(status == SUCCESS)
 		update_wear_stats(event.get_address());
@@ -144,6 +159,10 @@ enum status Die::_merge(Event &event)
 	assert(event.get_address().plane < size && event.get_address().valid > DIE && event.get_merge_address().plane < size && event.get_merge_address().valid > DIE);
 	assert(event.get_address().plane != event.get_merge_address().plane);
 	return SUCCESS;
+}
+
+double Die::get_currently_executing_io_finish_time() {
+	return currently_executing_io_finish_time;
 }
 
 const Package &Die::get_parent(void) const

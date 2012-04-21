@@ -192,6 +192,7 @@ void Package::get_free_page(Address &address) const
 	data[address.die].get_free_page(address);
 	return;
 }
+
 ssd::uint Package::get_num_free(const Address &address) const
 {
 	assert(address.valid >= DIE);
@@ -208,4 +209,8 @@ Block *Package::get_block_pointer(const Address & address)
 {
 	assert(address.valid >= DIE);
 	return data[address.die].get_block_pointer(address);
+}
+
+double Package::get_currently_executing_IO_finish_time_for_spesific_die(Event& event) {
+	return data[event.get_address().die].get_currently_executing_io_finish_time();
 }

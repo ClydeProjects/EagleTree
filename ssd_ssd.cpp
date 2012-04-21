@@ -371,3 +371,7 @@ double Ssd::ready_at(void)
 	else
 		return next_ready_time;
 }
+
+double Ssd::get_currently_executing_IO_finish_time_for_spesific_die(Event& event) {
+	return data[event.get_address().package].get_currently_executing_IO_finish_time_for_spesific_die(event);
+}

@@ -120,6 +120,7 @@ enum status Channel::disconnect(void)
  * event is sent across bus as soon as bus channel is available
  * event may fail if bus channel is saturated so check return value
  */
+/*
 enum status Channel::lock(double start_time, double duration, Event &event)
 {
 	assert(num_connected <= max_connections);
@@ -128,36 +129,36 @@ enum status Channel::lock(double start_time, double duration, Event &event)
 	assert(start_time >= 0.0);
 	assert(duration >= 0.0);
 
-	/* free up any table slots and sort existing ones */
+	// free up any table slots and sort existing ones
 	unlock(start_time);
 
 	double sched_time = BUS_CHANNEL_FREE_FLAG;
 
-	/* just schedule if table is empty */
+	// just schedule if table is empty
 	if(timings.size() == 0)
 		sched_time = start_time + event.get_time_taken();
 
-	/* check if can schedule before or in between before just scheduling
-	 * after all other events */
+	// check if can schedule before or in between before just scheduling
+	// after all other events
 	else
 	{
-		/* skip over empty table entries
-		 * empty table entries will be first from sorting (in unlock method)
-		 * because the flag is a negative value */
+		// skip over empty table entries
+		// empty table entries will be first from sorting (in unlock method)
+		// because the flag is a negative value
 		std::vector<lock_times>::iterator it = timings.begin();
 
-		/* schedule before first event in table */
+		// schedule before first event in table
 		if((*it).lock_time > start_time && (*it).lock_time - start_time >= duration)
 			sched_time = start_time;
 
-		/* schedule in between other events in table */
+		// schedule in between other events in table
 		if(sched_time == BUS_CHANNEL_FREE_FLAG)
 		{
 			for(; it < timings.end(); it++)
 			{
 				if (it + 1 != timings.end())
 				{
-					/* enough time to schedule in between next two events */
+					//enough time to schedule in between next two events
 					if((*it).unlock_time >= start_time + event.get_time_taken() && (*(it+1)).lock_time - (*it).unlock_time >= duration)
 					{
 						sched_time = (*it).unlock_time;
@@ -168,7 +169,7 @@ enum status Channel::lock(double start_time, double duration, Event &event)
 			}
 		}
 
-		/* schedule after all events in table */
+		// schedule after all events in table
 		if(sched_time == BUS_CHANNEL_FREE_FLAG) {
 			if (start_time + event.get_time_taken() > timings.back().unlock_time) {
 				sched_time = start_time + event.get_time_taken();
@@ -178,27 +179,49 @@ enum status Channel::lock(double start_time, double duration, Event &event)
 		}
 	}
 
-	/* write scheduling info in free table slot */
+	// write scheduling info in free table slot
 	lock_times lt;
 	lt.lock_time = sched_time;
 	lt.unlock_time = sched_time + duration;
 	lt.event_id = event.get_id();
 	timings.push_back(lt);
 
-	/*std::vector<lock_times>::iterator it = timings.begin();
+	std::vector<lock_times>::iterator it = timings.begin();
 	for (; it < timings.end(); it++) {
 		printf("%f\t%f\t%d\n", (*it).lock_time, (*it).unlock_time, (*it).event_id);
 	}
 	printf("\n");
-	 */
+
 	if (lt.unlock_time > ready_at)
 		ready_at = lt.unlock_time;
 
-	/* update event times for bus wait and time taken */
+	// update event times for bus wait and time taken
 	event.incr_bus_wait_time(sched_time - start_time - event.get_time_taken());
 	event.incr_time_taken(sched_time - start_time + duration - event.get_time_taken());
 
 	return SUCCESS;
+}*/
+
+
+enum status Channel::lock(double start_time, double duration, Event& event) {
+	assert(num_connected <= max_connections);
+	assert(ctrl_delay >= 0.0);
+	assert(data_delay >= 0.0);
+	assert(start_time >= 0.0);
+	assert(duration >= 0.0);
+
+	if (currently_executing_operation_finish_time > event.get_start_time() + event.get_time_taken()) {
+		return FAILURE;
+	}
+	currently_executing_operation_finish_time = event.get_start_time() + event.get_time_taken() + duration;
+
+	event.incr_time_taken(duration);
+
+	return SUCCESS;
+}
+
+double Channel::get_currently_executing_operation_finish_time() {
+	return currently_executing_operation_finish_time;
 }
 
 /* remove all expired entries (finish time is less than provided time)
