@@ -217,7 +217,6 @@ enum block_type {LOG, DATA, LOG_SEQ};
  */
 enum ftl_implementation {IMPL_PAGE, IMPL_BAST, IMPL_FAST, IMPL_DFTL, IMPL_BIMODAL};
 
-
 #define BOOST_MULTI_INDEX_ENABLE_SAFE_MODE 1
 
 /* List classes up front for classes that have references to their "parent"
@@ -782,9 +781,32 @@ private:
 	IOScheduler(Controller &controller);
 	~IOScheduler(void);
 	// IO Queue sorting all incoming events by start_time
+
 	struct EventStartTimeComparator{
+		static double const deadline = 100;
+		// returns false if p1 should be scheduled before p2
 	    bool operator()(Event& p1, Event& p2) const {
-	        return p1.get_start_time() + p1.get_bus_wait_time() > p2.get_start_time() + p2.get_bus_wait_time() ;
+	    	if (p1.get_bus_wait_time() >= deadline && p2.get_bus_wait_time() < deadline ) {
+	    		return false;
+	    	}
+	    	else if (p1.get_bus_wait_time() < deadline && p2.get_bus_wait_time() >= deadline ) {
+	    		return true;
+	    	}
+	    	else if (p1.get_event_type() == READ_COMMAND && p2.get_event_type() != READ_COMMAND) {
+	    		return false;
+	    	}
+	    	else if (p1.get_event_type() != READ_COMMAND && p2.get_event_type() == READ_COMMAND) {
+	    		return true;
+	    	}
+	    	else if (p1.get_event_type() == READ_TRANSFER && p2.get_event_type() != READ_TRANSFER) {
+	    		return false;
+	    	}
+	    	else if (p1.get_event_type() != READ_TRANSFER && p2.get_event_type() == READ_TRANSFER) {
+	    		return true;
+	    	} else
+	    	{
+	    		return p1.get_start_time() + p1.get_bus_wait_time() > p2.get_start_time() + p2.get_bus_wait_time() ;
+	    	}
 	    }
 	};
 	typedef std::priority_queue<Event, std::vector<Event>, EventStartTimeComparator> EventStartTimeHeap;
@@ -824,6 +846,7 @@ public:
 	Address resolve_logical_address(unsigned int logicalAddress);
 protected:
 	Controller &controller;
+	uint application_io_id;
 };
 
 class FtlImpl_Page : public FtlParent
@@ -970,7 +993,6 @@ protected:
 	long currentDataPage;
 	long currentTranslationPage;
 
-	uint application_io_id;
 	// Translation blocks, and mapping from logical translation pages to physical translation pages
 	//std::vector<Address> translationBlocks;
 	//std::map<ulong, Address> logicalToPhysicalTranslationPageMapping;
