@@ -783,32 +783,18 @@ private:
 	// IO Queue sorting all incoming events by start_time
 
 	struct EventStartTimeComparator{
-		static double const deadline = 100;
 		// returns false if p1 should be scheduled before p2
 	    bool operator()(Event& p1, Event& p2) const {
-	    	if (p1.get_bus_wait_time() >= deadline && p2.get_bus_wait_time() < deadline ) {
-	    		return false;
-	    	}
-	    	else if (p1.get_bus_wait_time() < deadline && p2.get_bus_wait_time() >= deadline ) {
-	    		return true;
-	    	}
-	    	else if (p1.get_event_type() == READ_COMMAND && p2.get_event_type() != READ_COMMAND) {
-	    		return false;
-	    	}
-	    	else if (p1.get_event_type() != READ_COMMAND && p2.get_event_type() == READ_COMMAND) {
-	    		return true;
-	    	}
-	    	else if (p1.get_event_type() == READ_TRANSFER && p2.get_event_type() != READ_TRANSFER) {
-	    		return false;
-	    	}
-	    	else if (p1.get_event_type() != READ_TRANSFER && p2.get_event_type() == READ_TRANSFER) {
-	    		return true;
-	    	} else
-	    	{
-	    		return p1.get_start_time() + p1.get_bus_wait_time() > p2.get_start_time() + p2.get_bus_wait_time() ;
-	    	}
+	    	return p1.get_start_time() + p1.get_bus_wait_time() > p2.get_start_time() + p2.get_bus_wait_time() ;
 	    }
 	};
+	/*struct LeastBusyChannelComparator{
+		// returns false if c1 should be scheduled before c2
+	    bool operator()(Channel& c1, Channel& c2) const {
+	    	return c1. + p1.get_bus_wait_time() > p2.get_start_time() + p2.get_bus_wait_time();
+	    }
+	};*/
+
 	typedef std::priority_queue<Event, std::vector<Event>, EventStartTimeComparator> EventStartTimeHeap;
 	EventStartTimeHeap io_schedule;
 
@@ -820,6 +806,8 @@ private:
 	void execute_next(Event& event);
 	std::vector<Event> gather_current_waiting_ios();
 	void execute_current_waiting_ios();
+	void execute_next_batch(std::vector<Event>& events);
+	void handle_overdue_events(std::vector<Event>& events);
 };
 
 class FtlParent

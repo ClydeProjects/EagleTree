@@ -84,8 +84,43 @@ std::vector<Event> IOScheduler::gather_current_waiting_ios() {
 
 void IOScheduler::execute_current_waiting_ios() {
 	std::vector<Event> current_ios = gather_current_waiting_ios();
+	std::vector<Event> overdue_events;
+	std::vector<Event> read_commands;
+	std::vector<Event> read_transfers;
+	std::vector<Event> writes;
 	for(uint i = 0; i < current_ios.size(); i++) {
-		Event event = current_ios[i];
+		if (current_ios[i].get_bus_wait_time() > 100) {
+			overdue_events.push_back(current_ios[i]);
+		}
+		else if (current_ios[i].get_event_type() == READ_COMMAND) {
+			read_commands.push_back(current_ios[i]);
+		}
+		else if (current_ios[i].get_event_type() == READ_TRANSFER) {
+			read_transfers.push_back(current_ios[i]);
+		}
+		else if (current_ios[i].get_event_type() == WRITE) {
+			read_transfers.push_back(current_ios[i]);
+		}
+	}
+	handle_overdue_events(overdue_events);
+	execute_next_batch(read_commands);
+	execute_next_batch(read_transfers);
+	execute_next_batch(writes);
+}
+
+void IOScheduler::handle_overdue_events(std::vector<Event>& events) {
+	for (uint i = 0; i < events.size(); i++) {
+		Event event = events[i];
+		double time = controller.in_how_long_can_this_event_be_scheduled(event);
+		event.incr_bus_wait_time(time);
+		event.incr_time_taken(time);
+		execute_next(event);
+	}
+}
+
+void IOScheduler::execute_next_batch(std::vector<Event>& events) {
+	for(uint i = 0; i < events.size(); i++) {
+		Event event = events[i];
 		double time = controller.in_how_long_can_this_event_be_scheduled(event);
 		if (time <= 0) {
 			execute_next(event);
@@ -96,6 +131,7 @@ void IOScheduler::execute_current_waiting_ios() {
 		}
 	}
 }
+
 
 void IOScheduler::execute_next(Event& event) {
 	enum status result = controller.issue(event);
