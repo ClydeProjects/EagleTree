@@ -57,7 +57,8 @@ Channel::Channel(double ctrl_delay, double data_delay, uint table_size, uint max
 	num_connected(0),
 	max_connections(max_connections),
 	ctrl_delay(ctrl_delay),
-	data_delay(data_delay)
+	data_delay(data_delay),
+	currently_executing_operation_finish_time(0.0)
 {
 	if(ctrl_delay < 0.0){
 		fprintf(stderr, "Bus channel warning: %s: constructor received negative control delay value\n\tsetting control delay to 0.0\n", __func__);

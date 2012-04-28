@@ -124,10 +124,10 @@ enum status Plane::write(Event &event)
 
 	status s = data[event.get_address().block].write(event);
 
-	if(event.get_address().block == next_page.block)
+	//if(event.get_address().block == next_page.block)
 		/* if all blocks in the plane are full and this function fails,
 		 * the next_page address valid field will be set to PLANE */
-		(void) get_next_page();
+		//(void) get_next_page();
 
 	if(prev == FREE && data[event.get_address().block].get_state() != FREE)
 		free_blocks--;
@@ -403,3 +403,8 @@ Block *Plane::get_block_pointer(const Address & address)
 	assert(address.valid >= PLANE);
 	return data[address.block].get_pointer();
 }
+
+Block *Plane::getBlocks() {
+	return data;
+}
+

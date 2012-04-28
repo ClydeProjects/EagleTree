@@ -214,3 +214,7 @@ Block *Package::get_block_pointer(const Address & address)
 double Package::get_currently_executing_IO_finish_time_for_spesific_die(Event& event) {
 	return data[event.get_address().die].get_currently_executing_io_finish_time();
 }
+
+Die *Package::getDies() {
+	return data;
+}

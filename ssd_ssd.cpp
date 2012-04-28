@@ -60,7 +60,8 @@ Ssd::Ssd(uint ssd_size):
 	least_worn(0), 
 
 	/* assume hardware created at time 0 and had an implied free erasure */
-	last_erase_time(0.0)
+	last_erase_time(0.0),
+	last_io_submission_time(0.0)
 {
 	uint i;
 
@@ -109,7 +110,8 @@ Ssd::Ssd(uint ssd_size):
 	assert(VIRTUAL_BLOCK_SIZE > 0);
 	assert(VIRTUAL_PAGE_SIZE > 0);
 
-	IOScheduler::instance_initialize(controller);
+	Block_manager_parallel::instance_initialize(*this);
+	IOScheduler::instance_initialize(*this);
 
 	return;
 }
@@ -143,6 +145,8 @@ double Ssd::event_arrive(enum event_type type, ulong logical_address, uint size,
 double Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, double start_time, void *buffer)
 {
 	assert(start_time >= 0.0);
+	assert(start_time >= last_io_submission_time);
+	last_io_submission_time = start_time;
 
 	if (VIRTUAL_PAGE_SIZE == 1)
 		assert((long long int) logical_address <= (long long int) SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE);
@@ -161,7 +165,7 @@ double Ssd::event_arrive(enum event_type type, ulong logical_address, uint size,
 
 	event->set_payload(buffer);
 
-	if(controller.event_arrive(*event) != SUCCESS)
+	if(controller.event_arrive(event) != SUCCESS)
 	{
 		fprintf(stderr, "Ssd error: %s: request failed:\n", __func__);
 		event -> print(stderr);
@@ -374,4 +378,8 @@ double Ssd::ready_at(void)
 
 double Ssd::get_currently_executing_IO_finish_time_for_spesific_die(Event& event) {
 	return data[event.get_address().package].get_currently_executing_IO_finish_time_for_spesific_die(event);
+}
+
+Package* Ssd::getPackages() {
+	return data;
 }

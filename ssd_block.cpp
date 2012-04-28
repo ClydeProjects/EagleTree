@@ -277,3 +277,7 @@ void Block::set_block_type(block_type value)
 {
 	this->btype = value;
 }
+
+Page *Block::getPages() {
+	return data;
+}

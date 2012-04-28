@@ -262,3 +262,7 @@ Block *Die::get_block_pointer(const Address & address)
 	assert(address.valid >= PLANE);
 	return data[address.plane].get_block_pointer(address);
 }
+
+Plane *Die::getPlanes() {
+	return data;
+}

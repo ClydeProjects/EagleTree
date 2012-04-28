@@ -32,11 +32,11 @@
 using namespace ssd;
 
 ssd::uint Event::id_generator = 0;
+ssd::uint Event::application_io_id_generator = 0;
 
 /* see "enum event_type" in ssd.h for details on event types */
 Event::Event(enum event_type type, ulong logical_address, uint size, double start_time):
 	start_time(start_time),
-	application_io_id(0),
 	time_taken(0.0),
 	bus_wait_time(0.0),
 	type(type),
@@ -44,12 +44,21 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	size(size),
 	payload(NULL),
 	next(NULL),
-	noop(false)
+	noop(false),
+	id(id_generator++),
+	application_io_id(application_io_id_generator++)
 {
 	assert(start_time >= 0.0);
-	id = Event::id_generator++;
 	return;
 }
+/*
+Event::Event(enum event_type type, ulong logical_address, uint size, double start_time, uint hi)
+{
+	Event(type, logical_address, size, start_time);
+	application_io_id = hi;
+	assert(start_time >= 0.0);
+	return;
+}*/
 
 Event::~Event(void)
 {

@@ -240,6 +240,7 @@ class Package;
 class Garbage_Collector;
 class Wear_Leveler;
 class Block_manager;
+class Block_manager_parallel;
 class IOScheduler;
 class FtlParent;
 class FtlImpl_Page;
@@ -369,6 +370,7 @@ class Event
 {
 public:
 	Event(enum event_type type, ulong logical_address, uint size, double start_time);
+	//Event(enum event_type type, ulong logical_address, uint size, double start_time, uint application_io_id);
 	~Event(void);
 	void consolidate_metaevent(Event &list);
 	ulong get_logical_address(void) const;
@@ -415,9 +417,13 @@ private:
 	Event *next;
 	bool noop;
 
+	// an ID for a single IO to the chip. This is not actually used for any logical purpose
 	static uint id_generator;
 	uint id;
+
+	// an ID to manage dependencies in the scheduler.
 	uint application_io_id;
+	static uint application_io_id_generator;
 };
 
 /* Single bus channel
@@ -537,7 +543,7 @@ public:
 	Block *get_pointer(void);
 	block_type get_block_type(void) const;
 	void set_block_type(block_type value);
-
+	Page *getPages();
 private:
 	uint size;
 	Page * const data;
@@ -577,6 +583,7 @@ public:
 	ssd::uint get_num_valid(const Address &address) const;
 	ssd::uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
+	Block *getBlocks();
 private:
 	void update_wear_stats(void);
 	enum status get_next_page(void);
@@ -617,6 +624,7 @@ public:
 	ssd::uint get_num_valid(const Address &address) const;
 	ssd::uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
+	Plane *getPlanes();
 private:
 	void update_wear_stats(const Address &address);
 	uint size;
@@ -655,6 +663,7 @@ public:
 	ssd::uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
 	double get_currently_executing_IO_finish_time_for_spesific_die(Event& event);
+	Die *getDies();
 private:
 	void update_wear_stats (const Address &address);
 	uint size;
@@ -682,6 +691,35 @@ public:
 	Wear_leveler(FtlParent &FTL);
 	~Wear_leveler(void);
 	enum status insert(const Address &address);
+};
+
+
+class Block_manager_parallel {
+public:
+	// Singleton
+	static Block_manager_parallel *instance();
+	static void instance_initialize(Ssd& ssd);
+
+	// new methods
+	void register_write_outcome(Event& event, enum status status);
+	void register_erase_outcome(Event& event, enum status status);
+	Address get_next_free_page(uint package_id, uint die_id);
+	bool has_free_pages(uint package_id, uint die_id);
+	bool space_exists_for_next_write();
+private:
+	static Block_manager_parallel *inst;
+	Block_manager_parallel(Ssd& ssd);
+	~Block_manager_parallel(void);
+
+	// performs GC in the target die, and returns the address of a new free pointer
+	void Garbage_Collect(uint package_id, uint die_id);
+	uint get_num_currently_free_pages();
+	// map from package number to a vector of dies. Cost benefit is kept per die.
+	std::vector<std::vector<std::vector<Block*> > > blocks;
+	//std::vector<Block*> all_blocks;
+	std::vector<std::vector<Address> > free_block_pointers;
+	uint num_pages_occupied;
+	uint num_free_block_pointers;
 };
 
 class Block_manager
@@ -769,45 +807,48 @@ private:
 
 class IOScheduler {
 public:
-
 	void schedule_dependency(Event& event);
 	void launch_dependency(uint application_io_id);
+
+	void execute_erase(Event& erase);
+
 	void finish();
+	Address get_die_with_shortest_queue();
 	// Singleton
 	static IOScheduler *instance();
-	static void instance_initialize(Controller& controller);
+	static void instance_initialize(Ssd& ssd);
 	static IOScheduler *inst;
 private:
-	IOScheduler(Controller &controller);
+	IOScheduler(Ssd& ssd);
 	~IOScheduler(void);
 	// IO Queue sorting all incoming events by start_time
 
-	struct EventStartTimeComparator{
+	/*struct EventStartTimeComparator{
 		// returns false if p1 should be scheduled before p2
 	    bool operator()(Event& p1, Event& p2) const {
 	    	return p1.get_start_time() + p1.get_bus_wait_time() > p2.get_start_time() + p2.get_bus_wait_time() ;
 	    }
-	};
-	/*struct LeastBusyChannelComparator{
-		// returns false if c1 should be scheduled before c2
-	    bool operator()(Channel& c1, Channel& c2) const {
-	    	return c1. + p1.get_bus_wait_time() > p2.get_start_time() + p2.get_bus_wait_time();
-	    }
 	};*/
 
-	typedef std::priority_queue<Event, std::vector<Event>, EventStartTimeComparator> EventStartTimeHeap;
-	EventStartTimeHeap io_schedule;
+	//typedef std::priority_queue<Event, std::vector<Event>, EventStartTimeComparator> EventStartTimeHeap;
+	//EventStartTimeHeap io_schedule;
+
+	std::vector<Event> io_schedule;
 
 	// dependency map. Each event can have max 1 dependency
 	std::map<uint, std::queue<Event> > dependencies;
 
-	Controller &controller;
+	Ssd& ssd;
 	void schedule_independent_event(Event& event);
-	void execute_next(Event& event);
+	enum status execute_next(Event& event);
 	std::vector<Event> gather_current_waiting_ios();
 	void execute_current_waiting_ios();
 	void execute_next_batch(std::vector<Event>& events);
 	void handle_overdue_events(std::vector<Event>& events);
+	void handle_writes(std::vector<Event>& events);
+	double in_how_long_can_this_event_be_scheduled(Event& event);
+	Address get_LUN_with_shortest_queue();
+
 };
 
 class FtlParent
@@ -824,6 +865,7 @@ public:
 	virtual void print_ftl_statistics();
 
 	friend class Block_manager;
+	friend class Block_manager_parallel;
 
 	ulong get_erases_remaining(const Address &address) const;
 	void get_least_worn(Address &address) const;
@@ -834,7 +876,6 @@ public:
 	Address resolve_logical_address(unsigned int logicalAddress);
 protected:
 	Controller &controller;
-	uint application_io_id;
 };
 
 class FtlImpl_Page : public FtlParent
@@ -1057,7 +1098,7 @@ class Controller
 public:
 	Controller(Ssd &parent);
 	~Controller(void);
-	enum status event_arrive(Event &event);
+	enum status event_arrive(Event *event);
 	friend class FtlParent;
 	friend class FtlImpl_Page;
 	friend class FtlImpl_Bast;
@@ -1066,6 +1107,7 @@ public:
 	friend class FtlImpl_Dftl;
 	friend class FtlImpl_BDftl;
 	friend class Block_manager;
+	friend class Block_manager_parallel;
 	friend class IOScheduler;
 
 	Stats stats;
@@ -1084,7 +1126,6 @@ private:
 	ssd::uint get_num_valid(const Address &address) const;
 	ssd::uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
-	double in_how_long_can_this_event_be_scheduled(Event& event);
 	Ssd &ssd;
 	FtlParent *ftl;
 };
@@ -1101,6 +1142,7 @@ public:
 	double event_arrive(enum event_type type, ulong logical_address, uint size, double start_time, void *buffer);
 	void *get_result_buffer();
 	friend class Controller;
+	friend class IOScheduler;
 	void print_statistics();
 	void reset_statistics();
 	void write_statistics(FILE *stream);
@@ -1109,6 +1151,7 @@ public:
 
 	void print_ftl_statistics();
 	double ready_at(void);
+	Package* getPackages();
 private:
 	enum status read(Event &event);
 	enum status write(Event &event);
@@ -1138,6 +1181,7 @@ private:
 	ulong erases_remaining;
 	ulong least_worn;
 	double last_erase_time;
+	double last_io_submission_time;
 };
 
 class RaidSsd

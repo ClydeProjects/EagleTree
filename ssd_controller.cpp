@@ -68,14 +68,14 @@ Controller::~Controller(void)
 	return;
 }
 
-enum status Controller::event_arrive(Event &event)
+enum status Controller::event_arrive(Event *event)
 {
-	if(event.get_event_type() == READ)
-		return ftl->read(event);
-	else if(event.get_event_type() == WRITE)
-		return ftl->write(event);
-	else if(event.get_event_type() == TRIM)
-		return ftl->trim(event);
+	if(event->get_event_type() == READ)
+		return ftl->read(*event);
+	else if(event->get_event_type() == WRITE)
+		return ftl->write(*event);
+	else if(event->get_event_type() == TRIM)
+		return ftl->trim(*event);
 	else
 		fprintf(stderr, "Controller: %s: Invalid event type\n", __func__);
 	return FAILURE;
@@ -231,15 +231,4 @@ const FtlParent &Controller::get_ftl(void) const
 void Controller::print_ftl_statistics()
 {
 	ftl->print_ftl_statistics();
-}
-
-double Controller::in_how_long_can_this_event_be_scheduled(Event& event) {
-	double channel_finish_time = ssd.bus.get_channel(event.get_address().package).get_currently_executing_operation_finish_time();
-	double die_finish_time = ssd.data[event.get_address().package].get_currently_executing_IO_finish_time_for_spesific_die(event);
-	/*if (event.get_event_type() == READ_COMMAND && die_finish_time > channel_finish_time) {
-		return std::max(channel_finish_time, die_finish_time - BUS_CTRL_DELAY);
-	}*/
-	double max = std::max(channel_finish_time, die_finish_time);
-	return max - event.get_start_time() - event.get_time_taken();
-
 }
