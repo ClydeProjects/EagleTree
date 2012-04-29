@@ -45,7 +45,7 @@ Ssd::Ssd(uint ssd_size):
 	size(ssd_size), 
 	controller(*this), 
 	ram(RAM_READ_DELAY, RAM_WRITE_DELAY), 
-	bus(size, BUS_CTRL_DELAY, BUS_DATA_DELAY, BUS_TABLE_SIZE, BUS_MAX_CONNECT), 
+	bus(this, size, BUS_CTRL_DELAY, BUS_DATA_DELAY, BUS_TABLE_SIZE, BUS_MAX_CONNECT),
 
 	/* use a const pointer (Package * const data) to use as an array
 	 * but like a reference, we cannot reseat the pointer */

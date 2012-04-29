@@ -49,7 +49,8 @@ Die::Die(const Package &parent, Channel &channel, uint die_size, long physical_a
 
 	/* assume hardware created at time 0 and had an implied free erasure */
 	last_erase_time(0.0),
-	currently_executing_io_finish_time(0.0)
+	currently_executing_io_finish_time(0.0),
+	last_read_io(-1)
 {
 	uint i;
 
@@ -96,6 +97,7 @@ enum status Die::read(Event &event)
 	if (event.get_start_time() + event.get_time_taken() < currently_executing_io_finish_time) {
 		return FAILURE;
 	}
+	last_read_io = event.get_application_io_id();
 	enum status result = data[event.get_address().plane].read(event);
 	currently_executing_io_finish_time = event.get_start_time() + event.get_time_taken();
 	return result;
@@ -265,4 +267,16 @@ Block *Die::get_block_pointer(const Address & address)
 
 Plane *Die::getPlanes() {
 	return data;
+}
+
+int Die::get_last_read_application_io() {
+	return last_read_io;
+}
+
+bool Die::register_is_busy() {
+	return last_read_io != -1;
+}
+
+void Die::clear_register() {
+	last_read_io = -1;
 }

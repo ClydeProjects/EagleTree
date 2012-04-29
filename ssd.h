@@ -438,7 +438,7 @@ private:
 class Channel
 {
 public:
-	Channel(double ctrl_delay = BUS_CTRL_DELAY, double data_delay = BUS_DATA_DELAY, uint table_size = BUS_TABLE_SIZE, uint max_connections = BUS_MAX_CONNECT);
+	Channel(Ssd* ssd, double ctrl_delay = BUS_CTRL_DELAY, double data_delay = BUS_DATA_DELAY, uint table_size = BUS_TABLE_SIZE, uint max_connections = BUS_MAX_CONNECT);
 	~Channel(void);
 	enum status lock(double start_time, double duration, Event &event);
 	double get_currently_executing_operation_finish_time();
@@ -468,6 +468,7 @@ private:
 	double ready_at;
 
 	double currently_executing_operation_finish_time;
+	Ssd* ssd;
 };
 
 /* Multi-channel bus comprised of Channel class objects
@@ -481,7 +482,7 @@ private:
 class Bus
 {
 public:
-	Bus(uint num_channels = SSD_SIZE, double ctrl_delay = BUS_CTRL_DELAY, double data_delay = BUS_DATA_DELAY, uint table_size = BUS_TABLE_SIZE, uint max_connections = BUS_MAX_CONNECT);
+	Bus(Ssd* ssd, uint num_channels = SSD_SIZE, double ctrl_delay = BUS_CTRL_DELAY, double data_delay = BUS_DATA_DELAY, uint table_size = BUS_TABLE_SIZE, uint max_connections = BUS_MAX_CONNECT);
 	~Bus(void);
 	enum status lock(uint channel, double start_time, double duration, Event &event);
 	enum status connect(uint channel);
@@ -625,6 +626,10 @@ public:
 	ssd::uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
 	Plane *getPlanes();
+	void clear_register();
+	int get_last_read_application_io();
+	bool register_is_busy();
+
 private:
 	void update_wear_stats(const Address &address);
 	uint size;
@@ -635,6 +640,7 @@ private:
 	ulong erases_remaining;
 	double last_erase_time;
 	double currently_executing_io_finish_time;
+	uint last_read_io;
 };
 
 /* The package is the highest level data storage hardware unit.  While the
@@ -720,6 +726,7 @@ private:
 	std::vector<std::vector<Address> > free_block_pointers;
 	uint num_pages_occupied;
 	uint num_free_block_pointers;
+	Ssd& ssd;
 };
 
 class Block_manager
@@ -848,7 +855,7 @@ private:
 	void handle_writes(std::vector<Event>& events);
 	double in_how_long_can_this_event_be_scheduled(Event& event);
 	Address get_LUN_with_shortest_queue();
-
+	bool can_schedule_on_die(Event& event);
 };
 
 class FtlParent

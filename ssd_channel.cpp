@@ -47,7 +47,7 @@ using namespace ssd;
  * the table size is synonymous to the queue size for the channel
  * it is not necessary to use the max connections properly, but it is provided
  * 	to help ensure correctness */
-Channel::Channel(double ctrl_delay, double data_delay, uint table_size, uint max_connections):
+Channel::Channel(Ssd* ssd, double ctrl_delay, double data_delay, uint table_size, uint max_connections):
 	//table_size(table_size),
 
 	/* use a const pointer (double * const) for the scheduling table arrays
@@ -58,7 +58,8 @@ Channel::Channel(double ctrl_delay, double data_delay, uint table_size, uint max
 	max_connections(max_connections),
 	ctrl_delay(ctrl_delay),
 	data_delay(data_delay),
-	currently_executing_operation_finish_time(0.0)
+	currently_executing_operation_finish_time(0.0),
+	ssd(ssd)
 {
 	if(ctrl_delay < 0.0){
 		fprintf(stderr, "Bus channel warning: %s: constructor received negative control delay value\n\tsetting control delay to 0.0\n", __func__);
@@ -215,6 +216,17 @@ enum status Channel::lock(double start_time, double duration, Event& event) {
 		return FAILURE;
 	}
 	currently_executing_operation_finish_time = event.get_start_time() + event.get_time_taken() + duration;
+
+	if (event.get_event_type() == READ_TRANSFER) {
+		Address adr = event.get_address();
+		uint last_read_application_io = ssd->getPackages()[adr.package].getDies()[adr.die].get_last_read_application_io();
+		if (last_read_application_io != event.get_application_io_id()) {
+			fprintf(stderr, "Data belonging to a different read was in the register\n", __func__);
+			return FAILURE;
+		} else {
+			ssd->getPackages()[adr.package].getDies()[adr.die].clear_register();
+		}
+	}
 
 	event.incr_time_taken(duration);
 

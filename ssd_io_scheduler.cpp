@@ -76,10 +76,11 @@ void IOScheduler::finish() {
 std::vector<Event> IOScheduler::gather_current_waiting_ios() {
 	Event top = io_schedule.back();
 	io_schedule.pop_back();
-	double start_time = top.get_start_time();
+	Event top2 = io_schedule.back();
+	double start_time = top.get_start_time() + top.get_time_taken();
 	std::vector<Event> current_ios;
 	current_ios.push_back(top);
-	while (io_schedule.size() > 0 && start_time + 1 > io_schedule.back().get_start_time()) {
+	while (io_schedule.size() > 0 && start_time + 1 > io_schedule.back().get_start_time() + io_schedule.back().get_time_taken()) {
 		Event current_top = io_schedule.back();
 		io_schedule.pop_back();
 		current_ios.push_back(current_top);
@@ -113,8 +114,8 @@ void IOScheduler::execute_current_waiting_ios() {
 	}
 	handle_overdue_events(overdue_events);
 	execute_next_batch(erases);
-	execute_next_batch(read_commands);
 	execute_next_batch(read_transfers);
+	execute_next_batch(read_commands);
 	handle_writes(writes);
 }
 
@@ -186,19 +187,25 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 		}
 	}
 	// in case we ran out of free space, put any leftover writes back into the io_schedule for later scheduling
-	for (int i = 0; i < events.size(); i++) {
+	for (uint i = 0; i < events.size(); i++) {
 		io_schedule.push_back(events[i]);
 	}
 }
 
-// Returns the address of the die with the shortest queue that has free space
+
+
+// Returns the address of the die with the shortest queue that has free space.
+// This is to expoit parallelism for writes.
+// TODO: handle case in which there is no free die
 Address IOScheduler::get_LUN_with_shortest_queue() {
 	uint package_id;
 	uint die_id;
 	double shortest_time = std::numeric_limits<double>::max( );
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			if (Block_manager_parallel::instance()->has_free_pages(i, j)) {
+			bool die_has_free_pages = Block_manager_parallel::instance()->has_free_pages(i, j);
+			bool die_register_is_busy = ssd.getPackages()[i].getDies()[j].register_is_busy();
+			if (die_has_free_pages && !die_register_is_busy) {
 				double channel_finish_time = ssd.bus.get_channel(i).get_currently_executing_operation_finish_time();
 				double die_finish_time = ssd.getPackages()[i].getDies()[j].get_currently_executing_io_finish_time();
 				double max = std::max(channel_finish_time,die_finish_time);
@@ -219,16 +226,21 @@ void IOScheduler::execute_next_batch(std::vector<Event>& events) {
 		Event event = events[i];
 		assert(event.get_event_type() != WRITE);
 		double time = in_how_long_can_this_event_be_scheduled(event);
-
-		if (time <= 0) {
+		bool can_schedule = can_schedule_on_die(event);
+		if (can_schedule && time <= 0) {
 			execute_next(event);
 		}
 		else {
-			event.incr_bus_wait_time(time);
-			event.incr_time_taken(time);
+			double bus_wait_time;
+			if (time > 0) {
+				bus_wait_time = time;
+			} else {
+				bus_wait_time = BUS_CTRL_DELAY + BUS_DATA_DELAY;
+			}
+			event.incr_bus_wait_time(bus_wait_time);
+			event.incr_time_taken(bus_wait_time);
 			io_schedule.push_back(event);
 		}
-
 	}
 }
 
@@ -253,12 +265,41 @@ enum status IOScheduler::execute_next(Event& event) {
 	return result;
 }
 
+// gives time until both the channel and die are clear
 double IOScheduler::in_how_long_can_this_event_be_scheduled(Event& event) {
-	double channel_finish_time = ssd.bus.get_channel(event.get_address().package).get_currently_executing_operation_finish_time();
-	double die_finish_time = ssd.data[event.get_address().package].get_currently_executing_IO_finish_time_for_spesific_die(event);
+	uint package_id = event.get_address().package;
+	uint die_id = event.get_address().die;
+	double channel_finish_time = ssd.bus.get_channel(package_id).get_currently_executing_operation_finish_time();
+	double die_finish_time = ssd.data[package_id].get_currently_executing_IO_finish_time_for_spesific_die(event);
 	double max = std::max(channel_finish_time, die_finish_time);
 	double time = max - event.get_start_time() - event.get_time_taken();
 	return time <= 0 ? 0 : time;
+	/*if (time > 0) {
+		return time;
+	}
+
+	bool busy = ssd.getPackages()[package_id].getDies()[die_id].register_is_busy();
+	if (!busy) {
+		return 0;
+	}
+
+	uint application_io = ssd.getPackages()[package_id].getDies()[die_id].get_last_read_application_io();
+	if (event.get_event_type() == READ_TRANSFER && application_io == event.get_application_io_id()) {
+		return 0;
+	}
+	return BUS_CTRL_DELAY + BUS_DATA_DELAY;
+*/
+}
+
+bool IOScheduler::can_schedule_on_die(Event& event) {
+	uint package_id = event.get_address().package;
+	uint die_id = event.get_address().die;
+	bool busy = ssd.getPackages()[package_id].getDies()[die_id].register_is_busy();
+	if (!busy) {
+		return true;
+	}
+	uint application_io = ssd.getPackages()[package_id].getDies()[die_id].get_last_read_application_io();
+	return event.get_event_type() == READ_TRANSFER && application_io == event.get_application_io_id();
 }
 
 /*Address IOScheduler::get_LUN_with_shortest_queue() {

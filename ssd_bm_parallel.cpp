@@ -31,7 +31,8 @@ Block_manager_parallel::Block_manager_parallel(Ssd& ssd)
 : blocks(SSD_SIZE, std::vector<std::vector<Block*> >(PACKAGE_SIZE, std::vector<Block*>(0) )),
   free_block_pointers(SSD_SIZE, std::vector<Address>(PACKAGE_SIZE)),
   num_pages_occupied(0),
-  num_free_block_pointers(SSD_SIZE * PACKAGE_SIZE)
+  num_free_block_pointers(SSD_SIZE * PACKAGE_SIZE),
+  ssd(ssd)
   //all_blocks(0)
 {
 	for (uint i = 0; i < SSD_SIZE; i++) {
@@ -106,8 +107,19 @@ bool Block_manager_parallel::has_free_pages(uint package_id, uint die_id) {
 	return free_block_pointers[package_id][die_id].page < BLOCK_SIZE;
 }
 
+/* makes sure that there is at least 1 non-busy die with free space
+ */
 bool Block_manager_parallel::space_exists_for_next_write() {
-	return num_free_block_pointers > 0 && num_pages_occupied < SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE;
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			bool has_space = has_free_pages(i, j);
+			bool non_busy = !ssd.getPackages()[i].getDies()[j].register_is_busy();
+			if (has_space && non_busy) {
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 struct block_valid_pages_comparator {
@@ -163,6 +175,7 @@ void Block_manager_parallel::Garbage_Collect(uint package_id, uint die_id) {
 	IOScheduler::instance()->launch_dependency(erase.get_application_io_id());
 }
 
+// should include in this count free blocks that have not been written to yet
 ssd::uint Block_manager_parallel::get_num_currently_free_pages() {
 	uint free_page_count = 0;
 	for (uint i = 0; i < SSD_SIZE; i++) {

@@ -41,7 +41,7 @@ using namespace ssd;
  * the table size is synonymous to the queue size for each separate channel
  * it is not necessary to use the max connections properly, but it is provided
  * 	to help ensure correctness */
-Bus::Bus(uint num_channels, double ctrl_delay, double data_delay, uint table_size, uint max_connections):
+Bus::Bus(Ssd* ssd, uint num_channels, double ctrl_delay, double data_delay, uint table_size, uint max_connections):
 	num_channels(num_channels),
 
 	/* use a const pointer (Channel * const channels) to use as an array
@@ -73,7 +73,7 @@ Bus::Bus(uint num_channels, double ctrl_delay, double data_delay, uint table_siz
 		exit(MEM_ERR);
 	}
 	for(i = 0; i < num_channels; i++)
-		(void) new (&channels[i]) Channel(ctrl_delay, data_delay, table_size, max_connections);
+		(void) new (&channels[i]) Channel(ssd, ctrl_delay, data_delay, table_size, max_connections);
 
 	return;
 }
