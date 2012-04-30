@@ -36,18 +36,6 @@ bool bus_wait_time_comparator (const Event& i, const Event& j) {
 	return i.get_bus_wait_time() > j.get_bus_wait_time();
 }
 
-void IOScheduler::schedule_independent_event(Event& event) {
-	io_schedule.push_back(event);
-	std::sort(io_schedule.begin(), io_schedule.end(), myfunction);
-
-	//printf("top id: %d   start time: %f\n", io_schedule.back().get_id(), io_schedule.back().get_start_time());
-	//printf("new id: %d   start time: %f\n", event.get_id(), event.get_start_time());
-
-	while (io_schedule.back().get_start_time() + 1 <= event.get_start_time()) {
-		execute_current_waiting_ios();
-	}
-}
-
 void IOScheduler::schedule_dependency(Event& event) {
 	int application_io_id = event.get_application_io_id();
 
@@ -64,7 +52,13 @@ void IOScheduler::schedule_dependency(Event& event) {
 void IOScheduler::launch_dependency(uint application_io_id) {
 	Event first = dependencies[application_io_id].front();
 	dependencies[application_io_id].pop();
-	schedule_independent_event(first);
+
+	io_schedule.push_back(first);
+	std::sort(io_schedule.begin(), io_schedule.end(), myfunction);
+
+	while (io_schedule.back().get_start_time() + 1 <= first.get_start_time()) {
+		execute_current_waiting_ios();
+	}
 }
 
 void IOScheduler::finish() {
@@ -197,7 +191,7 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 // Returns the address of the die with the shortest queue that has free space.
 // This is to expoit parallelism for writes.
 // TODO: handle case in which there is no free die
-Address IOScheduler::get_LUN_with_shortest_queue() {
+Address IOScheduler::get_LUN_with_shortest_queue() const {
 	uint package_id;
 	uint die_id;
 	double shortest_time = std::numeric_limits<double>::max( );
@@ -266,32 +260,17 @@ enum status IOScheduler::execute_next(Event& event) {
 }
 
 // gives time until both the channel and die are clear
-double IOScheduler::in_how_long_can_this_event_be_scheduled(Event& event) {
+double IOScheduler::in_how_long_can_this_event_be_scheduled(Event const& event) const {
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;
 	double channel_finish_time = ssd.bus.get_channel(package_id).get_currently_executing_operation_finish_time();
-	double die_finish_time = ssd.data[package_id].get_currently_executing_IO_finish_time_for_spesific_die(event);
+	double die_finish_time = ssd.getPackages()[package_id].getDies()[die_id].get_currently_executing_io_finish_time();
 	double max = std::max(channel_finish_time, die_finish_time);
 	double time = max - event.get_start_time() - event.get_time_taken();
 	return time <= 0 ? 0 : time;
-	/*if (time > 0) {
-		return time;
-	}
-
-	bool busy = ssd.getPackages()[package_id].getDies()[die_id].register_is_busy();
-	if (!busy) {
-		return 0;
-	}
-
-	uint application_io = ssd.getPackages()[package_id].getDies()[die_id].get_last_read_application_io();
-	if (event.get_event_type() == READ_TRANSFER && application_io == event.get_application_io_id()) {
-		return 0;
-	}
-	return BUS_CTRL_DELAY + BUS_DATA_DELAY;
-*/
 }
 
-bool IOScheduler::can_schedule_on_die(Event& event) {
+bool IOScheduler::can_schedule_on_die(Event const& event) const {
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;
 	bool busy = ssd.getPackages()[package_id].getDies()[die_id].register_is_busy();

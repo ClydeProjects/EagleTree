@@ -362,7 +362,7 @@ double Ssd::ready_at(void)
 {
 	double next_ready_time = std::numeric_limits<double>::max();
 
-	for (int i=0;i<size;i++)
+	for (uint i=0;i<size;i++)
 	{
 		double ready_time = bus.get_channel(i).ready_time();
 
@@ -374,10 +374,6 @@ double Ssd::ready_at(void)
 		return -1;
 	else
 		return next_ready_time;
-}
-
-double Ssd::get_currently_executing_IO_finish_time_for_spesific_die(Event& event) {
-	return data[event.get_address().package].get_currently_executing_IO_finish_time_for_spesific_die(event);
 }
 
 Package* Ssd::getPackages() {

@@ -99,17 +99,17 @@ void Block_manager_parallel::register_erase_outcome(Event& event, enum status st
 	num_free_block_pointers++;
 }
 
-Address Block_manager_parallel::get_next_free_page(uint package_id, uint die_id) {
+Address Block_manager_parallel::get_next_free_page(uint package_id, uint die_id) const {
 	return free_block_pointers[package_id][die_id];
 }
 
-bool Block_manager_parallel::has_free_pages(uint package_id, uint die_id) {
+bool Block_manager_parallel::has_free_pages(uint package_id, uint die_id) const {
 	return free_block_pointers[package_id][die_id].page < BLOCK_SIZE;
 }
 
 /* makes sure that there is at least 1 non-busy die with free space
  */
-bool Block_manager_parallel::space_exists_for_next_write() {
+bool Block_manager_parallel::space_exists_for_next_write() const {
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			bool has_space = has_free_pages(i, j);
@@ -176,7 +176,7 @@ void Block_manager_parallel::Garbage_Collect(uint package_id, uint die_id) {
 }
 
 // should include in this count free blocks that have not been written to yet
-ssd::uint Block_manager_parallel::get_num_currently_free_pages() {
+ssd::uint Block_manager_parallel::get_num_currently_free_pages() const {
 	uint free_page_count = 0;
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {

@@ -640,7 +640,7 @@ private:
 	ulong erases_remaining;
 	double last_erase_time;
 	double currently_executing_io_finish_time;
-	uint last_read_io;
+	int last_read_io;
 };
 
 /* The package is the highest level data storage hardware unit.  While the
@@ -668,7 +668,6 @@ public:
 	ssd::uint get_num_valid(const Address &address) const;
 	ssd::uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
-	double get_currently_executing_IO_finish_time_for_spesific_die(Event& event);
 	Die *getDies();
 private:
 	void update_wear_stats (const Address &address);
@@ -702,27 +701,20 @@ public:
 
 class Block_manager_parallel {
 public:
-	// Singleton
 	static Block_manager_parallel *instance();
 	static void instance_initialize(Ssd& ssd);
-
-	// new methods
 	void register_write_outcome(Event& event, enum status status);
 	void register_erase_outcome(Event& event, enum status status);
-	Address get_next_free_page(uint package_id, uint die_id);
-	bool has_free_pages(uint package_id, uint die_id);
-	bool space_exists_for_next_write();
+	Address get_next_free_page(uint package_id, uint die_id) const;
+	bool has_free_pages(uint package_id, uint die_id) const;
+	bool space_exists_for_next_write() const;
 private:
 	static Block_manager_parallel *inst;
 	Block_manager_parallel(Ssd& ssd);
 	~Block_manager_parallel(void);
-
-	// performs GC in the target die, and returns the address of a new free pointer
 	void Garbage_Collect(uint package_id, uint die_id);
-	uint get_num_currently_free_pages();
-	// map from package number to a vector of dies. Cost benefit is kept per die.
+	uint get_num_currently_free_pages() const;
 	std::vector<std::vector<std::vector<Block*> > > blocks;
-	//std::vector<Block*> all_blocks;
 	std::vector<std::vector<Address> > free_block_pointers;
 	uint num_pages_occupied;
 	uint num_free_block_pointers;
@@ -816,46 +808,28 @@ class IOScheduler {
 public:
 	void schedule_dependency(Event& event);
 	void launch_dependency(uint application_io_id);
-
-	void execute_erase(Event& erase);
-
 	void finish();
-	Address get_die_with_shortest_queue();
-	// Singleton
 	static IOScheduler *instance();
 	static void instance_initialize(Ssd& ssd);
-	static IOScheduler *inst;
 private:
 	IOScheduler(Ssd& ssd);
-	~IOScheduler(void);
-	// IO Queue sorting all incoming events by start_time
-
-	/*struct EventStartTimeComparator{
-		// returns false if p1 should be scheduled before p2
-	    bool operator()(Event& p1, Event& p2) const {
-	    	return p1.get_start_time() + p1.get_bus_wait_time() > p2.get_start_time() + p2.get_bus_wait_time() ;
-	    }
-	};*/
-
-	//typedef std::priority_queue<Event, std::vector<Event>, EventStartTimeComparator> EventStartTimeHeap;
-	//EventStartTimeHeap io_schedule;
-
-	std::vector<Event> io_schedule;
-
-	// dependency map. Each event can have max 1 dependency
-	std::map<uint, std::queue<Event> > dependencies;
-
-	Ssd& ssd;
-	void schedule_independent_event(Event& event);
+	~IOScheduler();
 	enum status execute_next(Event& event);
 	std::vector<Event> gather_current_waiting_ios();
 	void execute_current_waiting_ios();
 	void execute_next_batch(std::vector<Event>& events);
 	void handle_overdue_events(std::vector<Event>& events);
 	void handle_writes(std::vector<Event>& events);
-	double in_how_long_can_this_event_be_scheduled(Event& event);
-	Address get_LUN_with_shortest_queue();
-	bool can_schedule_on_die(Event& event);
+
+	double in_how_long_can_this_event_be_scheduled(Event const& event) const;
+	Address get_LUN_with_shortest_queue() const;
+	bool can_schedule_on_die(Event const& event) const;
+
+	std::vector<Event> io_schedule;
+	std::map<uint, std::queue<Event> > dependencies;
+
+	static IOScheduler *inst;
+	Ssd& ssd;
 };
 
 class FtlParent
@@ -1178,7 +1152,6 @@ private:
 	ssd::uint get_num_valid(const Address &address) const;
 	ssd::uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
-	double get_currently_executing_IO_finish_time_for_spesific_die(Event& event);
 
 	uint size;
 	Controller controller;
