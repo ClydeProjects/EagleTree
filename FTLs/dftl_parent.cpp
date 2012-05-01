@@ -90,13 +90,13 @@ FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
 void FtlImpl_DftlParent::consult_GTD(long dlpn, Event &event)
 {
 	// Simulate that we goto translation map and read the mapping page.
-	Event readEvent = Event(READ, event.get_logical_address(), 1, event.get_start_time());
-	readEvent.set_address(Address(0, PAGE));
-	readEvent.set_noop(true);
+	Event* readEvent = new Event(READ, event.get_logical_address(), 1, event.get_start_time());
+	readEvent->set_address(Address(0, PAGE));
+	readEvent->set_noop(true);
+	current_dependent_events.push_back(readEvent);
 
-	if (controller.issue(readEvent) == FAILURE) { assert(false);}
 	//event.consolidate_metaevent(readEvent);
-	event.incr_time_taken(readEvent.get_time_taken());
+	//event.incr_time_taken(readEvent.get_time_taken());
 	controller.stats.numFTLRead++;
 }
 
@@ -122,7 +122,7 @@ long FtlImpl_DftlParent::get_free_data_page(Event &event)
 	return get_free_data_page(event, true);
 }
 
-long FtlImpl_DftlParent::get_free_data_page(Event &event, bool insert_events)
+/*long FtlImpl_DftlParent::get_free_data_page(Event &event, bool insert_events)
 {
 	if (currentDataPage == -1 || (currentDataPage % BLOCK_SIZE == BLOCK_SIZE -1 && insert_events))
 		Block_manager::instance()->insert_events(event);
@@ -131,6 +131,15 @@ long FtlImpl_DftlParent::get_free_data_page(Event &event, bool insert_events)
 		currentDataPage = Block_manager::instance()->get_free_block(DATA, event).get_linear_address();
 	else
 		currentDataPage++;
+
+	return currentDataPage;
+}*/
+
+long FtlImpl_DftlParent::get_free_data_page(Event &event, bool insert_events)
+{
+
+
+	//Block_manager_parallel::instance()->get_free_page();
 
 	return currentDataPage;
 }

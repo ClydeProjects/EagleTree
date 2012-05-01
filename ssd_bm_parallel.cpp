@@ -69,7 +69,7 @@ Block_manager_parallel *Block_manager_parallel::instance()
 	return Block_manager_parallel::inst;
 }
 
-void Block_manager_parallel::register_write_outcome(Event& event, enum status status) {
+void Block_manager_parallel::register_write_outcome(Event const& event, enum status status) {
 	assert(event.get_event_type() == WRITE);
 	if (status == FAILURE) {
 		return;
@@ -88,7 +88,7 @@ void Block_manager_parallel::register_write_outcome(Event& event, enum status st
 	num_pages_occupied++;
 }
 
-void Block_manager_parallel::register_erase_outcome(Event& event, enum status status) {
+void Block_manager_parallel::register_erase_outcome(Event const& event, enum status status) {
 	assert(event.get_event_type() == ERASE);
 	if (status == FAILURE) {
 		return;
@@ -171,8 +171,7 @@ void Block_manager_parallel::Garbage_Collect(uint package_id, uint die_id) {
 		}
 	}*/
 
-	IOScheduler::instance()->schedule_dependency(erase);
-	IOScheduler::instance()->launch_dependency(erase.get_application_io_id());
+	IOScheduler::instance()->schedule_independent_event(erase);
 }
 
 // should include in this count free blocks that have not been written to yet

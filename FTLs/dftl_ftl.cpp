@@ -58,6 +58,8 @@ enum status FtlImpl_Dftl::read(Event &event)
 {
 	uint dlpn = event.get_logical_address();
 
+	current_dependent_events.push_back(&event);
+
 	resolve_mapping(event, false);
 	MPage current = trans_map[dlpn];
 	if (current.ppn == -1)
@@ -65,18 +67,22 @@ enum status FtlImpl_Dftl::read(Event &event)
 		event.set_address(Address(0, PAGE));
 		event.set_noop(true);
 	}
-	else
+	else {
 		event.set_address(Address(current.ppn, PAGE));
-
+	}
 
 	controller.stats.numFTLRead++;
-
-	return controller.issue(event);
+	//controller.issue(event);
+	IOScheduler::instance()->schedule_dependent_events(current_dependent_events);
+	current_dependent_events.clear();
+	return SUCCESS;
 }
 
 enum status FtlImpl_Dftl::write(Event &event)
 {
 	uint dlpn = event.get_logical_address();
+
+	current_dependent_events.push_back(&event);
 
 	resolve_mapping(event, true);
 
@@ -97,7 +103,10 @@ enum status FtlImpl_Dftl::write(Event &event)
 
 	controller.stats.numFTLWrite++;
 
-	return controller.issue(event);
+	IOScheduler::instance()->schedule_dependent_events(current_dependent_events);
+	current_dependent_events.clear();
+
+	return SUCCESS;
 }
 
 enum status FtlImpl_Dftl::trim(Event &event)
@@ -142,6 +151,8 @@ void FtlImpl_Dftl::cleanup_block(Event &event, Block *block)
 		if (block->get_state(i) == VALID)
 		{
 			// Set up events.
+			// Niv comment: I don't think it makes sense to give the logical address of the triggering event to
+			//				GC events. Perhaps it doesn't matter, but it's confusing.
 			Event readEvent = Event(READ, event.get_logical_address(), 1, event.get_start_time());
 			readEvent.set_address(Address(block->get_physical_address()+i, PAGE));
 

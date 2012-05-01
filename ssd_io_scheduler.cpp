@@ -36,22 +36,23 @@ bool bus_wait_time_comparator (const Event& i, const Event& j) {
 	return i.get_bus_wait_time() > j.get_bus_wait_time();
 }
 
-void IOScheduler::schedule_dependency(Event& event) {
-	int application_io_id = event.get_application_io_id();
-
-	if (event.get_event_type() == READ) {
-		event.set_event_type(READ_TRANSFER);
-		Event* read_command = new Event(READ_COMMAND, event.get_logical_address(), event.get_size(), event.get_start_time());
-		read_command->set_address(event.get_address());
-		read_command->set_application_io_id(application_io_id);
-		dependencies[application_io_id].push(*read_command);
+void IOScheduler::schedule_dependent_events(std::vector<Event*> events) {
+	std::queue<Event> preprocessed_queue;
+	uint dependency_code = events[0]->get_application_io_id();
+	for (uint i = 0; i < events.size(); i++) {
+		Event event = *events[i];
+		event.set_application_io_id(dependency_code);
+		if (event.get_event_type() == READ) {
+			event.set_event_type(READ_TRANSFER);
+			Event* read_command = new Event(READ_COMMAND, event.get_logical_address(), event.get_size(), event.get_start_time());
+			read_command->set_address(event.get_address());
+			read_command->set_application_io_id(dependency_code);
+			dependencies[dependency_code].push(*read_command);
+		}
+		dependencies[dependency_code].push(event);
 	}
-	dependencies[application_io_id].push(event);
-}
-
-void IOScheduler::launch_dependency(uint application_io_id) {
-	Event first = dependencies[application_io_id].front();
-	dependencies[application_io_id].pop();
+	Event first = dependencies[dependency_code].front();
+	dependencies[dependency_code].pop();
 
 	io_schedule.push_back(first);
 	std::sort(io_schedule.begin(), io_schedule.end(), myfunction);
@@ -60,6 +61,13 @@ void IOScheduler::launch_dependency(uint application_io_id) {
 		execute_current_waiting_ios();
 	}
 }
+
+void IOScheduler::schedule_independent_event(Event& event) {
+	std::vector<Event*> eventVec;
+	eventVec.push_back(&event);
+	schedule_dependent_events(eventVec);
+}
+
 
 void IOScheduler::finish() {
 	while (io_schedule.size() > 0) {

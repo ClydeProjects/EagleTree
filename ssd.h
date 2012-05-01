@@ -703,13 +703,12 @@ class Block_manager_parallel {
 public:
 	static Block_manager_parallel *instance();
 	static void instance_initialize(Ssd& ssd);
-	void register_write_outcome(Event& event, enum status status);
-	void register_erase_outcome(Event& event, enum status status);
+	void register_write_outcome(Event const& event, enum status status);
+	void register_erase_outcome(Event const& event, enum status status);
 	Address get_next_free_page(uint package_id, uint die_id) const;
 	bool has_free_pages(uint package_id, uint die_id) const;
 	bool space_exists_for_next_write() const;
 private:
-	static Block_manager_parallel *inst;
 	Block_manager_parallel(Ssd& ssd);
 	~Block_manager_parallel(void);
 	void Garbage_Collect(uint package_id, uint die_id);
@@ -719,6 +718,7 @@ private:
 	uint num_pages_occupied;
 	uint num_free_block_pointers;
 	Ssd& ssd;
+	static Block_manager_parallel *inst;
 };
 
 class Block_manager
@@ -806,8 +806,8 @@ private:
 
 class IOScheduler {
 public:
-	void schedule_dependency(Event& event);
-	void launch_dependency(uint application_io_id);
+	void schedule_dependent_events(std::vector<Event*> events);
+	void schedule_independent_event(Event& events);
 	void finish();
 	static IOScheduler *instance();
 	static void instance_initialize(Ssd& ssd);
@@ -1003,6 +1003,7 @@ protected:
 	long currentDataPage;
 	long currentTranslationPage;
 
+	std::vector<Event*> current_dependent_events;
 	// Translation blocks, and mapping from logical translation pages to physical translation pages
 	//std::vector<Address> translationBlocks;
 	//std::map<ulong, Address> logicalToPhysicalTranslationPageMapping;
