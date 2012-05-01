@@ -39,8 +39,9 @@ bool bus_wait_time_comparator (const Event& i, const Event& j) {
 void IOScheduler::schedule_dependent_events(std::vector<Event*> events) {
 	std::queue<Event> preprocessed_queue;
 	uint dependency_code = events[0]->get_application_io_id();
-	for (uint i = 0; i < events.size(); i++) {
-		Event event = *events[i];
+	while (events.size() > 0) {
+		Event event = *events.back();
+		events.pop_back();
 		event.set_application_io_id(dependency_code);
 		if (event.get_event_type() == READ) {
 			event.set_event_type(READ_TRANSFER);
