@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <vector>
+#include <stack>
 #include <queue>
 #include <map>
 #include <algorithm>
@@ -806,7 +807,7 @@ private:
 
 class IOScheduler {
 public:
-	void schedule_dependent_events(std::vector<Event*> events);
+	void schedule_dependent_events(std::queue<Event*> events);
 	void schedule_independent_event(Event& events);
 	void finish();
 	static IOScheduler *instance();
@@ -1003,7 +1004,7 @@ protected:
 	long currentDataPage;
 	long currentTranslationPage;
 
-	std::vector<Event*> current_dependent_events;
+	std::queue<Event*> current_dependent_events;
 	// Translation blocks, and mapping from logical translation pages to physical translation pages
 	//std::vector<Address> translationBlocks;
 	//std::map<ulong, Address> logicalToPhysicalTranslationPageMapping;

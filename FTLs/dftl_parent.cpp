@@ -93,7 +93,9 @@ void FtlImpl_DftlParent::consult_GTD(long dlpn, Event &event)
 	Event* readEvent = new Event(READ, event.get_logical_address(), 1, event.get_start_time());
 	readEvent->set_address(Address(0, PAGE));
 	readEvent->set_noop(true);
-	current_dependent_events.push_back(readEvent);
+	current_dependent_events.push(readEvent);
+
+	Event aa = *current_dependent_events.back();
 
 	//event.consolidate_metaevent(readEvent);
 	//event.incr_time_taken(readEvent.get_time_taken());

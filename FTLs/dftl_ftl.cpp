@@ -58,8 +58,6 @@ enum status FtlImpl_Dftl::read(Event &event)
 {
 	uint dlpn = event.get_logical_address();
 
-	current_dependent_events.push_back(&event);
-
 	resolve_mapping(event, false);
 	MPage current = trans_map[dlpn];
 	if (current.ppn == -1)
@@ -72,17 +70,15 @@ enum status FtlImpl_Dftl::read(Event &event)
 	}
 
 	controller.stats.numFTLRead++;
-	//controller.issue(event);
+	current_dependent_events.push(&event);
 	IOScheduler::instance()->schedule_dependent_events(current_dependent_events);
-	current_dependent_events.clear();
+	current_dependent_events.empty();
 	return SUCCESS;
 }
 
 enum status FtlImpl_Dftl::write(Event &event)
 {
 	uint dlpn = event.get_logical_address();
-
-	current_dependent_events.push_back(&event);
 
 	resolve_mapping(event, true);
 
@@ -103,9 +99,8 @@ enum status FtlImpl_Dftl::write(Event &event)
 
 	controller.stats.numFTLWrite++;
 
+	current_dependent_events.push(&event);
 	IOScheduler::instance()->schedule_dependent_events(current_dependent_events);
-	current_dependent_events.clear();
-
 	return SUCCESS;
 }
 

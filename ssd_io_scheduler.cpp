@@ -36,12 +36,11 @@ bool bus_wait_time_comparator (const Event& i, const Event& j) {
 	return i.get_bus_wait_time() > j.get_bus_wait_time();
 }
 
-void IOScheduler::schedule_dependent_events(std::vector<Event*> events) {
-	std::queue<Event> preprocessed_queue;
-	uint dependency_code = events[0]->get_application_io_id();
-	while (events.size() > 0) {
-		Event event = *events.back();
-		events.pop_back();
+void IOScheduler::schedule_dependent_events(std::queue<Event*> events) {
+	uint dependency_code = events.back()->get_application_io_id();
+	while (!events.empty()) {
+		Event event = *events.front();
+		events.pop();
 		event.set_application_io_id(dependency_code);
 		if (event.get_event_type() == READ) {
 			event.set_event_type(READ_TRANSFER);
@@ -64,8 +63,8 @@ void IOScheduler::schedule_dependent_events(std::vector<Event*> events) {
 }
 
 void IOScheduler::schedule_independent_event(Event& event) {
-	std::vector<Event*> eventVec;
-	eventVec.push_back(&event);
+	std::queue<Event*> eventVec;
+	eventVec.push(&event);
 	schedule_dependent_events(eventVec);
 }
 
