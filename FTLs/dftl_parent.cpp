@@ -95,8 +95,6 @@ void FtlImpl_DftlParent::consult_GTD(long dlpn, Event &event)
 	readEvent->set_noop(true);
 	current_dependent_events.push(readEvent);
 
-	Event aa = *current_dependent_events.back();
-
 	//event.consolidate_metaevent(readEvent);
 	//event.incr_time_taken(readEvent.get_time_taken());
 	controller.stats.numFTLRead++;

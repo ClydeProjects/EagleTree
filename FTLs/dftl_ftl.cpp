@@ -72,7 +72,6 @@ enum status FtlImpl_Dftl::read(Event &event)
 	controller.stats.numFTLRead++;
 	current_dependent_events.push(&event);
 	IOScheduler::instance()->schedule_dependent_events(current_dependent_events);
-	current_dependent_events.empty();
 	return SUCCESS;
 }
 

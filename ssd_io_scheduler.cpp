@@ -36,7 +36,7 @@ bool bus_wait_time_comparator (const Event& i, const Event& j) {
 	return i.get_bus_wait_time() > j.get_bus_wait_time();
 }
 
-void IOScheduler::schedule_dependent_events(std::queue<Event*> events) {
+void IOScheduler::schedule_dependent_events(std::queue<Event*>& events) {
 	uint dependency_code = events.back()->get_application_io_id();
 	while (!events.empty()) {
 		Event event = *events.front();
@@ -60,6 +60,7 @@ void IOScheduler::schedule_dependent_events(std::queue<Event*> events) {
 	while (io_schedule.back().get_start_time() + 1 <= first.get_start_time()) {
 		execute_current_waiting_ios();
 	}
+	assert(events.empty());
 }
 
 void IOScheduler::schedule_independent_event(Event& event) {
@@ -92,16 +93,13 @@ std::vector<Event> IOScheduler::gather_current_waiting_ios() {
 
 void IOScheduler::execute_current_waiting_ios() {
 	std::vector<Event> current_ios = gather_current_waiting_ios();
-	std::vector<Event> overdue_events;
+	//std::vector<Event> overdue_events;
 	std::vector<Event> read_commands;
 	std::vector<Event> read_transfers;
 	std::vector<Event> writes;
 	std::vector<Event> erases;
 	for(uint i = 0; i < current_ios.size(); i++) {
-		if (current_ios[i].get_bus_wait_time() > 100) {
-			overdue_events.push_back(current_ios[i]);
-		}
-		else if (current_ios[i].get_event_type() == READ_COMMAND) {
+		if (current_ios[i].get_event_type() == READ_COMMAND) {
 			read_commands.push_back(current_ios[i]);
 		}
 		else if (current_ios[i].get_event_type() == READ_TRANSFER) {
@@ -114,61 +112,26 @@ void IOScheduler::execute_current_waiting_ios() {
 			erases.push_back(current_ios[i]);
 		}
 	}
-	handle_overdue_events(overdue_events);
 	execute_next_batch(erases);
 	execute_next_batch(read_transfers);
 	execute_next_batch(read_commands);
 	handle_writes(writes);
 }
 
-void IOScheduler::handle_overdue_events(std::vector<Event>& events) {
-	for (uint i = 0; i < events.size(); i++) {
-		Event event = events[i];
-		double time = in_how_long_can_this_event_be_scheduled(event);
-		event.incr_bus_wait_time(time);
-		event.incr_time_taken(time);
-		execute_next(event);
-	}
-}
-
-// Looks for an idle LUN and schedules writes in it. Works in O(events + LUNs)
-/*void IOScheduler::handle_writes(std::vector<Event>& events) {
-	if (events.size() == 0) {
-		return;
-	}
-	std::sort(events.begin(), events.end(), bus_wait_time_comparator);
-	double start_time = events.back().get_start_time() + events.back().get_bus_wait_time();
-	for (uint i = 0; i < SSD_SIZE; i++) {
-		double channel_finish_time = ssd.bus.get_channel(i).get_currently_executing_operation_finish_time();
-		if (start_time < channel_finish_time) {
-			continue;
-		}
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			double die_finish_time = ssd.getPackages()[i].getDies()[j].get_currently_executing_io_finish_time();
-			if (start_time >= die_finish_time && events.size() > 0) {
-				Address free_page = Block_manager_parallel::instance()->get_free_page(i, j);
-				Event write = events.back();
-				events.pop_back();
-				write.set_address(free_page);
-				execute_next(write);
-			}
-		}
-	}
-	for (uint i = 0; i < events.size(); i++) {
-		events[i].incr_bus_wait_time(1);
-		events[i].incr_time_taken(1);
-		io_schedule.push_back(events[i]);
-	}
-}*/
-
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_writes(std::vector<Event>& events) {
 	std::sort(events.begin(), events.end(), bus_wait_time_comparator);
-	while (events.size() > 0 && Block_manager_parallel::instance()->space_exists_for_next_write()) {
-		Address die_with_shortest_queue = get_LUN_with_shortest_queue();
-		Address free_page = Block_manager_parallel::instance()->get_next_free_page(die_with_shortest_queue.package, die_with_shortest_queue.die);
+	while (events.size() > 0) {
 		Event event = events.back();
 		events.pop_back();
+		if (!Block_manager_parallel::instance()->can_write(event)) {
+			io_schedule.push_back(event);
+			continue;
+		}
+
+		Address die_with_shortest_queue = get_LUN_with_shortest_queue();
+		Address free_page = Block_manager_parallel::instance()->get_next_free_page(die_with_shortest_queue.package, die_with_shortest_queue.die);
+
 		event.set_address(free_page);
 		event.set_noop(false);
 		double time = in_how_long_can_this_event_be_scheduled(event);
@@ -187,10 +150,6 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 			event.incr_time_taken(time);
 			io_schedule.push_back(event);
 		}
-	}
-	// in case we ran out of free space, put any leftover writes back into the io_schedule for later scheduling
-	for (uint i = 0; i < events.size(); i++) {
-		io_schedule.push_back(events[i]);
 	}
 }
 
@@ -224,6 +183,7 @@ Address IOScheduler::get_LUN_with_shortest_queue() const {
 
 // executes read_commands, read_transfers and erases
 void IOScheduler::execute_next_batch(std::vector<Event>& events) {
+	std::sort(events.begin(), events.end(), bus_wait_time_comparator);
 	for(uint i = 0; i < events.size(); i++) {
 		Event event = events[i];
 		assert(event.get_event_type() != WRITE);
@@ -256,7 +216,6 @@ enum status IOScheduler::execute_next(Event& event) {
 			dependent.set_start_time(event.get_start_time() + event.get_time_taken());
 			dependencies[application_io_id].pop();
 			io_schedule.push_back(dependent);
-
 		}
 		printf("success ");
 	} else {
@@ -341,3 +300,32 @@ bool IOScheduler::can_schedule_on_die(Event const& event) const {
 	return Address(package_id_with_shortest_queue, die_id_with_shortest_queue, 0, 0 ,0, DIE);
 }*/
 
+// Looks for an idle LUN and schedules writes in it. Works in O(events + LUNs)
+/*void IOScheduler::handle_writes(std::vector<Event>& events) {
+	if (events.size() == 0) {
+		return;
+	}
+	std::sort(events.begin(), events.end(), bus_wait_time_comparator);
+	double start_time = events.back().get_start_time() + events.back().get_bus_wait_time();
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		double channel_finish_time = ssd.bus.get_channel(i).get_currently_executing_operation_finish_time();
+		if (start_time < channel_finish_time) {
+			continue;
+		}
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			double die_finish_time = ssd.getPackages()[i].getDies()[j].get_currently_executing_io_finish_time();
+			if (start_time >= die_finish_time && events.size() > 0) {
+				Address free_page = Block_manager_parallel::instance()->get_free_page(i, j);
+				Event write = events.back();
+				events.pop_back();
+				write.set_address(free_page);
+				execute_next(write);
+			}
+		}
+	}
+	for (uint i = 0; i < events.size(); i++) {
+		events[i].incr_bus_wait_time(1);
+		events[i].incr_time_taken(1);
+		io_schedule.push_back(events[i]);
+	}
+}*/

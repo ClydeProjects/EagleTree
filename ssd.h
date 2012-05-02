@@ -398,6 +398,8 @@ public:
 	void set_event_type(const enum event_type &type);
 	void set_noop(bool value);
 	void set_application_io_id(uint application_io_id);
+	void set_garbage_collection_op(bool value);
+	bool is_garbage_collection_op() const;
 	void *get_payload(void) const;
 	double incr_bus_wait_time(double time);
 	double incr_time_taken(double time_incr);
@@ -417,6 +419,8 @@ private:
 	void *payload;
 	Event *next;
 	bool noop;
+
+	bool garbage_collection_op;
 
 	// an ID for a single IO to the chip. This is not actually used for any logical purpose
 	static uint id_generator;
@@ -708,7 +712,7 @@ public:
 	void register_erase_outcome(Event const& event, enum status status);
 	Address get_next_free_page(uint package_id, uint die_id) const;
 	bool has_free_pages(uint package_id, uint die_id) const;
-	bool space_exists_for_next_write() const;
+	bool can_write(Event const& write) const;
 private:
 	Block_manager_parallel(Ssd& ssd);
 	~Block_manager_parallel(void);
@@ -716,10 +720,12 @@ private:
 	uint get_num_currently_free_pages() const;
 	std::vector<std::vector<std::vector<Block*> > > blocks;
 	std::vector<std::vector<Address> > free_block_pointers;
-	uint num_pages_occupied;
+	uint num_free_pages;
+	uint num_available_pages_for_new_writes;
 	uint num_free_block_pointers;
 	Ssd& ssd;
 	static Block_manager_parallel *inst;
+
 };
 
 class Block_manager
@@ -807,7 +813,7 @@ private:
 
 class IOScheduler {
 public:
-	void schedule_dependent_events(std::queue<Event*> events);
+	void schedule_dependent_events(std::queue<Event*>& events);
 	void schedule_independent_event(Event& events);
 	void finish();
 	static IOScheduler *instance();
@@ -819,7 +825,6 @@ private:
 	std::vector<Event> gather_current_waiting_ios();
 	void execute_current_waiting_ios();
 	void execute_next_batch(std::vector<Event>& events);
-	void handle_overdue_events(std::vector<Event>& events);
 	void handle_writes(std::vector<Event>& events);
 
 	double in_how_long_can_this_event_be_scheduled(Event const& event) const;

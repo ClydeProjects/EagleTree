@@ -46,7 +46,8 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	next(NULL),
 	noop(false),
 	id(id_generator++),
-	application_io_id(application_io_id_generator++)
+	application_io_id(application_io_id_generator++),
+	garbage_collection_op(false)
 {
 	assert(start_time >= 0.0);
 	return;
@@ -214,6 +215,15 @@ void Event::set_noop(bool value)
 void Event::set_application_io_id(uint value) {
 	application_io_id = value;
 }
+
+void Event::set_garbage_collection_op(bool value) {
+	garbage_collection_op = value;
+}
+
+bool Event::is_garbage_collection_op() const {
+	return garbage_collection_op;
+}
+
 
 void Event::set_start_time(double value) {
 	assert(value > 0);
