@@ -140,7 +140,7 @@ enum address_valid Address::compare(const Address &address) const
 }
 
 /* default stream is stdout */
-void Address::print(FILE *stream)
+void Address::print(FILE *stream) const
 {
 	fprintf(stream, "(%d, %d, %d, %d, %d, %d)", package, die, plane, block, page, (int) valid);
 	return;
@@ -169,7 +169,12 @@ void Address::set_linear_address(ulong address, enum address_valid valid)
 
 unsigned long Address::get_linear_address() const
 {
-	return real_address;
+	unsigned long address = page;
+	address += BLOCK_SIZE * block;
+	address += BLOCK_SIZE * PLANE_SIZE * plane;
+	address += BLOCK_SIZE * PLANE_SIZE * DIE_SIZE * die;
+	address += BLOCK_SIZE * PLANE_SIZE * DIE_SIZE * PACKAGE_SIZE * package;
+	return address;
 }
 
 void Address::operator+(int i)

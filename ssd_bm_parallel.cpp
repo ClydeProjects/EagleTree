@@ -45,7 +45,7 @@ Block_manager_parallel::Block_manager_parallel(Ssd& ssd)
 				for (uint b = 0; b < PLANE_SIZE; b++) {
 					Block& block = plane.getBlocks()[b];
 					blocks[i][j].push_back(&block);
-					//all_blocks.push_back(&block);
+					all_blocks.push_back(&block);
 				}
 			}
 			free_block_pointers[i][j] = Address(blocks[i][j][0]->get_physical_address(), PAGE);
@@ -81,12 +81,16 @@ void Block_manager_parallel::register_write_outcome(Event const& event, enum sta
 	blockPointer.page = blockPointer.page + 1;
 	free_block_pointers[package_id][die_id] = blockPointer;
 
-	if (blockPointer.page == BLOCK_SIZE) {
+	num_free_pages--;
+
+	if (num_free_pages <= BLOCK_SIZE) {
+		Garbage_Collect();
+	}
+	else if (blockPointer.page == BLOCK_SIZE) {
 		num_free_block_pointers--;
 		Garbage_Collect(package_id, die_id);
 	}
 
-	num_free_pages--;
 	num_available_pages_for_new_writes--;
 }
 
@@ -97,8 +101,18 @@ void Block_manager_parallel::register_erase_outcome(Event const& event, enum sta
 	}
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;
-	free_block_pointers[package_id][die_id] = event.get_address();
-	num_free_block_pointers++;
+
+	// if there is no free pointer for this block, set it to this one.
+	if (!has_free_pages(package_id, die_id)) {
+		free_block_pointers[package_id][die_id] = event.get_address();
+	}
+
+	// update num_free_pages
+	num_free_pages += BLOCK_SIZE;
+
+	// check if there are any dies on which there are no free pointers. Trigger GC on them.
+
+
 	num_available_pages_for_new_writes += BLOCK_SIZE;
 }
 
@@ -137,10 +151,54 @@ struct block_valid_pages_comparator {
 		if (i->get_state() == FREE){
 			return true;
 		}
-		return i->get_pages_invalid() < j->get_pages_invalid();
+		return i->get_pages_invalid() > j->get_pages_invalid();
 	}
 };
 
+// GC from the cheapest block in the device.
+void Block_manager_parallel::Garbage_Collect() {
+	// first, find the cheapest block
+	std::sort(all_blocks.begin(), all_blocks.end(), block_valid_pages_comparator());
+
+	Block *target = all_blocks[0];
+
+	// For now, the design is that this GC method should not be called if there are free blocks
+	assert(target->get_state() != FREE);
+
+	migrate(target);
+}
+
+void Block_manager_parallel::migrate(Block const* const block) const {
+	Event* erase = new Event(ERASE, 0, 1, 0); // TODO: set start_time and copy any valid pages
+	erase->set_address(Address(block->physical_address, BLOCK));
+	uint dependency_code = erase->get_application_io_id();
+
+	// must also change the mapping here. Will eventually do that.
+	std::queue<Event*> events;
+	for (uint i = 0; i < BLOCK_SIZE; i++) {
+		block->getPages()[0];
+		Page const& page = block->getPages()[i];
+		enum page_state state = page.get_state();
+		if (state == VALID) {
+			Event* read = new Event(READ, 0, 1, 0);
+			Address addr = Address(block->physical_address, PAGE);
+			addr.page = i;
+			read->set_address(addr);
+			read->set_application_io_id(dependency_code);
+			read->set_garbage_collection_op(true);
+			Event* write = new Event(WRITE, 0, 1, 0);
+			write->set_application_io_id(dependency_code);
+			write->set_garbage_collection_op(true);
+			events.push(read);
+			events.push(write);
+		}
+	}
+
+	events.push(erase);
+	IOScheduler::instance()->schedule_dependent_events(events);
+}
+
+// GC from the cheapest block in a particular die
 void Block_manager_parallel::Garbage_Collect(uint package_id, uint die_id) {
 
 	std::sort(blocks[package_id][die_id].begin(), blocks[package_id][die_id].end(), block_valid_pages_comparator());
@@ -156,32 +214,8 @@ void Block_manager_parallel::Garbage_Collect(uint package_id, uint die_id) {
 	assert(num_available_pages_for_new_writes >= target->get_pages_valid());
 	num_available_pages_for_new_writes -= target->get_pages_valid();
 
-	Event* erase = new Event(ERASE, 0, 1, 0); // TODO: set start_time and copy any valid pages
-	erase->set_address(Address(target->physical_address, BLOCK));
-	uint dependency_code = erase->get_application_io_id();
+	migrate(target);
 
-	// must also change the mapping here. Will eventually do that.
-	std::queue<Event*> events;
-	for (uint i = 0; i < BLOCK_SIZE; i++) {
-		Page& page = target->getPages()[i];
-		enum page_state state = page.get_state();
-		if (state == VALID) {
-			Event* read = new Event(READ, 0, 1, 0);
-			Address addr = Address(target->physical_address, PAGE);
-			addr.page = i;
-			read->set_address(addr);
-			read->set_application_io_id(dependency_code);
-			read->set_garbage_collection_op(true);
-			Event* write = new Event(WRITE, 0, 1, 0);
-			write->set_application_io_id(dependency_code);
-			write->set_garbage_collection_op(true);
-			events.push(read);
-			events.push(write);
-		}
-	}
-
-	events.push(erase);
-	IOScheduler::instance()->schedule_dependent_events(events);
 }
 
 // should include in this count free blocks that have not been written to yet

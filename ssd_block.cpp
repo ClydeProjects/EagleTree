@@ -222,6 +222,7 @@ void Block::invalidate_page(uint page)
 	data[page].set_state(INVALID);
 
 	pages_invalid++;
+	pages_valid--;
 
 	Block_manager::instance()->update_block(this);
 
@@ -278,6 +279,6 @@ void Block::set_block_type(block_type value)
 	this->btype = value;
 }
 
-Page *Block::getPages() {
+const Page *Block::getPages() const {
 	return data;
 }

@@ -138,8 +138,6 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 		double time = in_how_long_can_this_event_be_scheduled(event);
 		if (time == 0) {
 			enum status result = execute_next(event);
-			Block_manager_parallel::instance()->register_write_outcome(event, result);
-			ftl.register_write_completion(event, result);
 		}
 		else if (event.get_bus_wait_time() > 50) {
 			event.incr_bus_wait_time(time);
@@ -194,6 +192,7 @@ void IOScheduler::execute_next_batch(std::vector<Event>& events) {
 		bool can_schedule = can_schedule_on_die(event);
 		if (can_schedule && time <= 0) {
 			execute_next(event);
+
 		}
 		else {
 			double bus_wait_time;
@@ -226,6 +225,7 @@ enum status IOScheduler::execute_next(Event& event) {
 		dependencies.erase(event.get_application_io_id());
 	}
 	event.print();
+	handle_finished_event(event, result);
 	return result;
 }
 
@@ -249,6 +249,18 @@ bool IOScheduler::can_schedule_on_die(Event const& event) const {
 	}
 	uint application_io = ssd.getPackages()[package_id].getDies()[die_id].get_last_read_application_io();
 	return event.get_event_type() == READ_TRANSFER && application_io == event.get_application_io_id();
+}
+
+void IOScheduler::handle_finished_event(Event const&event, enum status outcome) {
+	if (outcome == FAILURE) {
+		return;
+	}
+	if (event.get_event_type() == WRITE) {
+		Block_manager_parallel::instance()->register_write_outcome(event, outcome);
+		ftl.register_write_completion(event, outcome);
+	} else if (event.get_event_type() == ERASE) {
+		Block_manager_parallel::instance()->register_erase_outcome(event, outcome);
+	}
 }
 
 /*Address IOScheduler::get_LUN_with_shortest_queue() {

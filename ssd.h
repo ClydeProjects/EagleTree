@@ -279,7 +279,7 @@ public:
 	~Address();
 	enum address_valid check_valid(uint ssd_size = SSD_SIZE, uint package_size = PACKAGE_SIZE, uint die_size = DIE_SIZE, uint plane_size = PLANE_SIZE, uint block_size = BLOCK_SIZE);
 	enum address_valid compare(const Address &address) const;
-	void print(FILE *stream = stdout);
+	void print(FILE *stream = stdout) const;
 
 	void operator+(int);
 	void operator+(uint);
@@ -403,7 +403,7 @@ public:
 	void *get_payload(void) const;
 	double incr_bus_wait_time(double time);
 	double incr_time_taken(double time_incr);
-	void print(FILE *stream = stdout);
+	void print(FILE *stream = stdout) const;
 private:
 	double start_time;
 	double time_taken;
@@ -549,7 +549,7 @@ public:
 	Block *get_pointer(void);
 	block_type get_block_type(void) const;
 	void set_block_type(block_type value);
-	Page *getPages();
+	const Page *getPages() const;
 private:
 	uint size;
 	Page * const data;
@@ -717,8 +717,11 @@ private:
 	Block_manager_parallel(Ssd& ssd);
 	~Block_manager_parallel(void);
 	void Garbage_Collect(uint package_id, uint die_id);
+	void Garbage_Collect();
+	void migrate(Block const* const block) const;
 	uint get_num_currently_free_pages() const;
 	std::vector<std::vector<std::vector<Block*> > > blocks;
+	std::vector<Block*> all_blocks;
 	std::vector<std::vector<Address> > free_block_pointers;
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
@@ -830,6 +833,7 @@ private:
 	double in_how_long_can_this_event_be_scheduled(Event const& event) const;
 	Address get_LUN_with_shortest_queue() const;
 	bool can_schedule_on_die(Event const& event) const;
+	void handle_finished_event(Event const&event, enum status outcome);
 
 	std::vector<Event> io_schedule;
 	std::map<uint, std::queue<Event> > dependencies;

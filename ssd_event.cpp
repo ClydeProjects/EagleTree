@@ -250,7 +250,7 @@ double Event::incr_time_taken(double time_incr)
 	return time_taken;
 }
 
-void Event::print(FILE *stream)
+void Event::print(FILE *stream) const
 {
 	if(type == READ)
 		fprintf(stream, "Read ");
