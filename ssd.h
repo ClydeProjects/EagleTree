@@ -815,11 +815,11 @@ class IOScheduler {
 public:
 	void schedule_dependent_events(std::queue<Event*>& events);
 	void schedule_independent_event(Event& events);
-	void finish();
+	void finish(double start_time);
 	static IOScheduler *instance();
-	static void instance_initialize(Ssd& ssd);
+	static void instance_initialize(Ssd& ssd, FtlParent& ftl);
 private:
-	IOScheduler(Ssd& ssd);
+	IOScheduler(Ssd& ssd, FtlParent& ftl);
 	~IOScheduler();
 	enum status execute_next(Event& event);
 	std::vector<Event> gather_current_waiting_ios();
@@ -836,6 +836,7 @@ private:
 
 	static IOScheduler *inst;
 	Ssd& ssd;
+	FtlParent& ftl;
 };
 
 class FtlParent
@@ -859,8 +860,10 @@ public:
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
-
 	Address resolve_logical_address(unsigned int logicalAddress);
+	// TODO: this method should be abstract, but I am not making it so because
+	// I dont't want to implement it in BAST and FAST yet
+	virtual void register_write_completion(Event const& event, enum status result);
 protected:
 	Controller &controller;
 };
@@ -1026,6 +1029,7 @@ public:
 	enum status trim(Event &event);
 	void cleanup_block(Event &event, Block *block);
 	void print_ftl_statistics();
+	virtual void register_write_completion(Event const& event, enum status result);
 };
 
 class FtlImpl_BDftl : public FtlImpl_DftlParent
@@ -1100,7 +1104,7 @@ public:
 
 	Stats stats;
 	void print_ftl_statistics();
-	const FtlParent &get_ftl(void) const;
+	FtlParent &get_ftl(void) const;
 private:
 	enum status issue(Event &event_list);
 	void translate_address(Address &address);
@@ -1135,7 +1139,7 @@ public:
 	void reset_statistics();
 	void write_statistics(FILE *stream);
 	void write_header(FILE *stream);
-	const Controller &get_controller(void) const;
+	const Controller &get_controller(void);
 
 	void print_ftl_statistics();
 	double ready_at(void);

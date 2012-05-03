@@ -10,17 +10,18 @@
 
 using namespace ssd;
 
-IOScheduler::IOScheduler(Ssd& ssd) :
-	ssd(ssd)
+IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
+	ssd(ssd),
+	ftl(ftl)
 {}
 
 IOScheduler::~IOScheduler(){}
 
 IOScheduler *IOScheduler::inst = NULL;
 
-void IOScheduler::instance_initialize(Ssd& ssd)
+void IOScheduler::instance_initialize(Ssd& ssd, FtlParent& ftl)
 {
-	IOScheduler::inst = new IOScheduler(ssd);
+	IOScheduler::inst = new IOScheduler(ssd, ftl);
 }
 
 IOScheduler *IOScheduler::instance()
@@ -69,9 +70,8 @@ void IOScheduler::schedule_independent_event(Event& event) {
 	schedule_dependent_events(eventVec);
 }
 
-
-void IOScheduler::finish() {
-	while (io_schedule.size() > 0) {
+void IOScheduler::finish(double start_time) {
+	while (!io_schedule.empty() && io_schedule.back().get_start_time() + 1 < start_time) {
 		execute_current_waiting_ios();
 	}
 }
@@ -92,6 +92,7 @@ std::vector<Event> IOScheduler::gather_current_waiting_ios() {
 }
 
 void IOScheduler::execute_current_waiting_ios() {
+	assert(!io_schedule.empty());
 	std::vector<Event> current_ios = gather_current_waiting_ios();
 	//std::vector<Event> overdue_events;
 	std::vector<Event> read_commands;
@@ -138,12 +139,14 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 		if (time == 0) {
 			enum status result = execute_next(event);
 			Block_manager_parallel::instance()->register_write_outcome(event, result);
+			ftl.register_write_completion(event, result);
 		}
 		else if (event.get_bus_wait_time() > 50) {
 			event.incr_bus_wait_time(time);
 			event.incr_time_taken(time);
 			enum status result = execute_next(event);
 			Block_manager_parallel::instance()->register_write_outcome(event, result);
+			ftl.register_write_completion(event, result);
 		}
 		else {
 			event.incr_bus_wait_time(time);

@@ -82,7 +82,7 @@ enum status FtlImpl_Dftl::write(Event &event)
 	resolve_mapping(event, true);
 
 	// Important order. As get_free_data_page might change current.
-	long free_page = get_free_data_page(event);
+	//long free_page = get_free_data_page(event);
 
 	MPage current = trans_map[dlpn];
 
@@ -90,11 +90,11 @@ enum status FtlImpl_Dftl::write(Event &event)
 	if (current.ppn != -1)
 		event.set_replace_address(a);
 
-	update_translation_map(current, free_page);
-	trans_map.replace(trans_map.begin()+dlpn, current);
+	//update_translation_map(current, free_page);
+	//trans_map.replace(trans_map.begin()+dlpn, current);
 
-	Address b = Address(free_page, PAGE);
-	event.set_address(b);
+	//Address b = Address(free_page, PAGE);
+	//event.set_address(b);
 
 	controller.stats.numFTLWrite++;
 
@@ -223,4 +223,18 @@ void FtlImpl_Dftl::cleanup_block(Event &event, Block *block)
 void FtlImpl_Dftl::print_ftl_statistics()
 {
 	Block_manager::instance()->print_statistics();
+}
+
+void FtlImpl_Dftl::register_write_completion(Event const& event, enum status result) {
+	if (result == FAILURE) {
+		return;
+	}
+	uint logical = event.get_logical_address();
+	uint physical = event.get_address().get_linear_address();
+
+	MPage current = trans_map[logical];
+
+	update_translation_map(current, physical);
+
+	trans_map.replace(trans_map.begin() + logical, current);
 }

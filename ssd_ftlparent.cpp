@@ -28,6 +28,7 @@ using namespace ssd;
 // Initialization of the block layer.
 Block_manager *Block_manager::inst = NULL;
 
+
 FtlParent::FtlParent(Controller &controller) : controller(controller)
 {
 	Block_manager::instance_initialize(this);
@@ -71,5 +72,9 @@ void FtlParent::cleanup_block(Event &event, Block *block)
 
 void FtlParent::print_ftl_statistics()
 {
+	return;
+}
+
+void FtlParent::register_write_completion(Event const& event, enum status result) {
 	return;
 }

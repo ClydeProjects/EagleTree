@@ -111,13 +111,15 @@ Ssd::Ssd(uint ssd_size):
 	assert(VIRTUAL_PAGE_SIZE > 0);
 
 	Block_manager_parallel::instance_initialize(*this);
-	IOScheduler::instance_initialize(*this);
+	IOScheduler::instance_initialize(*this, controller.get_ftl());
 
 	return;
 }
 
 Ssd::~Ssd(void)
 {
+	IOScheduler::instance()->finish(10000000);
+
 	/* explicitly call destructors and use free
 	 * since we used malloc and placement new */
 	for (uint i = 0; i < size; i++)
@@ -164,6 +166,8 @@ double Ssd::event_arrive(enum event_type type, ulong logical_address, uint size,
 	}
 
 	event->set_payload(buffer);
+
+	IOScheduler::instance()->finish(event->get_start_time());
 
 	if(controller.event_arrive(event) != SUCCESS)
 	{
@@ -350,7 +354,7 @@ Block *Ssd::get_block_pointer(const Address & address)
 	return data[address.package].get_block_pointer(address);
 }
 
-const Controller &Ssd::get_controller(void) const
+const Controller &Ssd::get_controller(void)
 {
 	return controller;
 }

@@ -223,7 +223,7 @@ Block *Controller::get_block_pointer(const Address & address)
 	return ssd.get_block_pointer(address);
 }
 
-const FtlParent &Controller::get_ftl(void) const
+FtlParent &Controller::get_ftl(void) const
 {
 	return (*ftl);
 }
