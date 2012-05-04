@@ -41,7 +41,8 @@
 using namespace ssd;
 
 FtlImpl_Dftl::FtlImpl_Dftl(Controller &controller):
-	FtlImpl_DftlParent(controller)
+	FtlImpl_DftlParent(controller),
+	over_provisioning_percentage(0.2)
 {
 	uint ssdSize = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
 	printf("Total size to map: %uKB\n", ssdSize * PAGE_SIZE / 1024);
@@ -56,6 +57,8 @@ FtlImpl_Dftl::~FtlImpl_Dftl(void)
 
 enum status FtlImpl_Dftl::read(Event &event)
 {
+	assert(event.get_logical_address() < NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * (1 - over_provisioning_percentage));
+
 	uint dlpn = event.get_logical_address();
 
 	resolve_mapping(event, false);
@@ -77,6 +80,7 @@ enum status FtlImpl_Dftl::read(Event &event)
 
 enum status FtlImpl_Dftl::write(Event &event)
 {
+	assert(event.get_logical_address() < NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * (1 - over_provisioning_percentage));
 	uint dlpn = event.get_logical_address();
 
 	resolve_mapping(event, true);
@@ -105,6 +109,7 @@ enum status FtlImpl_Dftl::write(Event &event)
 
 enum status FtlImpl_Dftl::trim(Event &event)
 {
+	assert(event.get_logical_address() < NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * (1 - over_provisioning_percentage));
 	uint dlpn = event.get_logical_address();
 
 	event.set_address(Address(0, PAGE));

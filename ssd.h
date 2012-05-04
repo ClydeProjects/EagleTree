@@ -1008,6 +1008,8 @@ protected:
 	void evict_page_from_cache(Event &event);
 	void evict_specific_page_from_cache(Event &event, long lba);
 
+	long get_logical_address(uint physical_address) const;
+
 	// Mapping information
 	int addressPerPage;
 	int addressSize;
@@ -1018,8 +1020,6 @@ protected:
 	long currentTranslationPage;
 
 	std::queue<Event*> current_dependent_events;
-
-	long get_logical_address(uint physical_address) const;
 
 	// Translation blocks, and mapping from logical translation pages to physical translation pages
 	//std::vector<Address> translationBlocks;
@@ -1038,6 +1038,8 @@ public:
 	void cleanup_block(Event &event, Block *block);
 	void print_ftl_statistics();
 	virtual void register_write_completion(Event const& event, enum status result);
+private:
+	const double over_provisioning_percentage;
 };
 
 class FtlImpl_BDftl : public FtlImpl_DftlParent
