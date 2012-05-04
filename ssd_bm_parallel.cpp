@@ -161,8 +161,9 @@ void Block_manager_parallel::Garbage_Collect(double start_time) {
 	std::sort(all_blocks.begin(), all_blocks.end(), block_valid_pages_comparator());
 
 	Block *target = all_blocks[0];
-
-	// For now, the design is that this GC method should not be called if there are free blocks
+	if (target->get_state() == FREE) {
+		target = all_blocks[1];
+	}
 	assert(target->get_state() != FREE);
 
 	num_available_pages_for_new_writes -= target->get_pages_valid();
@@ -225,11 +226,11 @@ void Block_manager_parallel::Garbage_Collect(uint package_id, uint die_id, doubl
 		return;
 	}
 
-	if (num_available_pages_for_new_writes >= target->get_pages_valid()) {
+	if (num_available_pages_for_new_writes < target->get_pages_valid()) {
 		printf("tried to GC from die (%d %d), but not enough free pages to migrate all valid pages\n", package_id, die_id);
 		return;
 	}
-
+	printf("triggering GC in die (%d %d)\n", package_id, die_id);
 	num_available_pages_for_new_writes -= target->get_pages_valid();
 
 	migrate(target, start_time);
