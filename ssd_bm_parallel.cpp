@@ -32,7 +32,6 @@ Block_manager_parallel::Block_manager_parallel(Ssd& ssd, FtlParent& ftl)
   free_block_pointers(SSD_SIZE, std::vector<Address>(PACKAGE_SIZE)),
   num_free_pages(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
   num_available_pages_for_new_writes(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
-  num_free_block_pointers(SSD_SIZE * PACKAGE_SIZE),
   ssd(ssd),
   ftl(ftl),
   all_blocks(0)
@@ -88,7 +87,6 @@ void Block_manager_parallel::register_write_outcome(Event const& event, enum sta
 		Garbage_Collect(event.get_start_time() + event.get_time_taken());
 	}
 	else if (blockPointer.page == BLOCK_SIZE) {
-		num_free_block_pointers--;
 		Garbage_Collect(package_id, die_id, event.get_start_time() + event.get_time_taken());
 	}
 
@@ -113,8 +111,9 @@ void Block_manager_parallel::register_erase_outcome(Event const& event, enum sta
 
 	// check if there are any dies on which there are no free pointers. Trigger GC on them.
 
-
 	num_available_pages_for_new_writes += BLOCK_SIZE;
+
+	check_if_should_trigger_more_GC(event.get_start_time() + event.get_time_taken());
 }
 
 Address Block_manager_parallel::get_next_free_page(uint package_id, uint die_id) const {
@@ -166,7 +165,19 @@ void Block_manager_parallel::Garbage_Collect(double start_time) {
 	// For now, the design is that this GC method should not be called if there are free blocks
 	assert(target->get_state() != FREE);
 
+	num_available_pages_for_new_writes -= target->get_pages_valid();
+
 	migrate(target, start_time);
+}
+
+void Block_manager_parallel::check_if_should_trigger_more_GC(double start_time) {
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			if (has_free_pages(i, j)) {
+				Garbage_Collect(i, j, start_time);
+			}
+		}
+	}
 }
 
 void Block_manager_parallel::migrate(Block const* const block, double start_time) const {
@@ -209,27 +220,16 @@ void Block_manager_parallel::Garbage_Collect(uint package_id, uint die_id, doubl
 
 	if (target->get_state() == FREE) {
 		free_block_pointers[package_id][die_id] = Address(target->physical_address, PAGE);
-		num_free_block_pointers++;
 		return;
 	}
 
-	assert(num_available_pages_for_new_writes >= target->get_pages_valid());
+	if (num_available_pages_for_new_writes >= target->get_pages_valid()) {
+		printf("tried to GC from die (%d %d), but not enough free pages to migrate all valid pages", package_id, die_id);
+		return;
+	}
+
 	num_available_pages_for_new_writes -= target->get_pages_valid();
 
 	migrate(target, start_time);
 
 }
-
-// should include in this count free blocks that have not been written to yet
-/*ssd::uint Block_manager_parallel::get_num_currently_free_pages() const {
-	uint free_page_count = 0;
-	for (uint i = 0; i < SSD_SIZE; i++) {
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			uint num_free = BLOCK_SIZE - free_block_pointers[i][j].page;
-			if (num_free > 0) {
-				free_page_count += num_free;
-			}
-		}
-	}
-	return free_page_count;
-}*/

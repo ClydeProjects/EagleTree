@@ -719,13 +719,12 @@ private:
 	void Garbage_Collect(uint package_id, uint die_id, double start_time);
 	void Garbage_Collect(double start_time);
 	void migrate(Block const* const block, double start_time) const;
-	uint get_num_currently_free_pages() const;
+	void check_if_should_trigger_more_GC(double start_time);
 	std::vector<std::vector<std::vector<Block*> > > blocks;
 	std::vector<Block*> all_blocks;
 	std::vector<std::vector<Address> > free_block_pointers;
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
-	uint num_free_block_pointers;
 	Ssd& ssd;
 	FtlParent& ftl;
 	static Block_manager_parallel *inst;
