@@ -237,4 +237,8 @@ void FtlImpl_Dftl::register_write_completion(Event const& event, enum status res
 	update_translation_map(current, physical);
 
 	trans_map.replace(trans_map.begin() + logical, current);
+
+	/*MPage current1 = trans_map[logical];
+	update_translation_map(current1, physical);
+	printf("f");*/
 }

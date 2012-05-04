@@ -27,14 +27,15 @@ using namespace ssd;
 
 Block_manager_parallel *Block_manager_parallel::inst = NULL;
 
-Block_manager_parallel::Block_manager_parallel(Ssd& ssd)
+Block_manager_parallel::Block_manager_parallel(Ssd& ssd, FtlParent& ftl)
 : blocks(SSD_SIZE, std::vector<std::vector<Block*> >(PACKAGE_SIZE, std::vector<Block*>(0) )),
   free_block_pointers(SSD_SIZE, std::vector<Address>(PACKAGE_SIZE)),
   num_free_pages(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
   num_available_pages_for_new_writes(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
   num_free_block_pointers(SSD_SIZE * PACKAGE_SIZE),
-  ssd(ssd)
-  //all_blocks(0)
+  ssd(ssd),
+  ftl(ftl),
+  all_blocks(0)
 {
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		Package& package = ssd.getPackages()[i];
@@ -58,10 +59,10 @@ Block_manager_parallel::~Block_manager_parallel(void)
 	return;
 }
 
-void Block_manager_parallel::instance_initialize(Ssd& ssd)
+void Block_manager_parallel::instance_initialize(Ssd& ssd, FtlParent& ftl)
 {
 	if (Block_manager_parallel::inst == NULL) {
-		Block_manager_parallel::inst = new Block_manager_parallel(ssd);
+		Block_manager_parallel::inst = new Block_manager_parallel(ssd, ftl);
 	}
 }
 
@@ -84,11 +85,11 @@ void Block_manager_parallel::register_write_outcome(Event const& event, enum sta
 	num_free_pages--;
 
 	if (num_free_pages <= BLOCK_SIZE) {
-		Garbage_Collect();
+		Garbage_Collect(event.get_start_time() + event.get_time_taken());
 	}
 	else if (blockPointer.page == BLOCK_SIZE) {
 		num_free_block_pointers--;
-		Garbage_Collect(package_id, die_id);
+		Garbage_Collect(package_id, die_id, event.get_start_time() + event.get_time_taken());
 	}
 
 	num_available_pages_for_new_writes--;
@@ -156,7 +157,7 @@ struct block_valid_pages_comparator {
 };
 
 // GC from the cheapest block in the device.
-void Block_manager_parallel::Garbage_Collect() {
+void Block_manager_parallel::Garbage_Collect(double start_time) {
 	// first, find the cheapest block
 	std::sort(all_blocks.begin(), all_blocks.end(), block_valid_pages_comparator());
 
@@ -165,11 +166,11 @@ void Block_manager_parallel::Garbage_Collect() {
 	// For now, the design is that this GC method should not be called if there are free blocks
 	assert(target->get_state() != FREE);
 
-	migrate(target);
+	migrate(target, start_time);
 }
 
-void Block_manager_parallel::migrate(Block const* const block) const {
-	Event* erase = new Event(ERASE, 0, 1, 0); // TODO: set start_time and copy any valid pages
+void Block_manager_parallel::migrate(Block const* const block, double start_time) const {
+	Event* erase = new Event(ERASE, 0, 1, start_time); // TODO: set start_time and copy any valid pages
 	erase->set_address(Address(block->physical_address, BLOCK));
 	uint dependency_code = erase->get_application_io_id();
 
@@ -180,13 +181,14 @@ void Block_manager_parallel::migrate(Block const* const block) const {
 		Page const& page = block->getPages()[i];
 		enum page_state state = page.get_state();
 		if (state == VALID) {
-			Event* read = new Event(READ, 0, 1, 0);
+			Event* read = new Event(READ, 0, 1, start_time);
 			Address addr = Address(block->physical_address, PAGE);
 			addr.page = i;
 			read->set_address(addr);
 			read->set_application_io_id(dependency_code);
 			read->set_garbage_collection_op(true);
-			Event* write = new Event(WRITE, 0, 1, 0);
+			long logical_address = ftl.get_logical_address(addr.get_linear_address());
+			Event* write = new Event(WRITE, logical_address, 1, start_time);
 			write->set_application_io_id(dependency_code);
 			write->set_garbage_collection_op(true);
 			events.push(read);
@@ -199,7 +201,7 @@ void Block_manager_parallel::migrate(Block const* const block) const {
 }
 
 // GC from the cheapest block in a particular die
-void Block_manager_parallel::Garbage_Collect(uint package_id, uint die_id) {
+void Block_manager_parallel::Garbage_Collect(uint package_id, uint die_id, double start_time) {
 
 	std::sort(blocks[package_id][die_id].begin(), blocks[package_id][die_id].end(), block_valid_pages_comparator());
 
@@ -214,7 +216,7 @@ void Block_manager_parallel::Garbage_Collect(uint package_id, uint die_id) {
 	assert(num_available_pages_for_new_writes >= target->get_pages_valid());
 	num_available_pages_for_new_writes -= target->get_pages_valid();
 
-	migrate(target);
+	migrate(target, start_time);
 
 }
 

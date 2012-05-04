@@ -707,18 +707,18 @@ public:
 class Block_manager_parallel {
 public:
 	static Block_manager_parallel *instance();
-	static void instance_initialize(Ssd& ssd);
+	static void instance_initialize(Ssd& ssd, FtlParent& ftl);
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
 	Address get_next_free_page(uint package_id, uint die_id) const;
 	bool has_free_pages(uint package_id, uint die_id) const;
 	bool can_write(Event const& write) const;
 private:
-	Block_manager_parallel(Ssd& ssd);
+	Block_manager_parallel(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel(void);
-	void Garbage_Collect(uint package_id, uint die_id);
-	void Garbage_Collect();
-	void migrate(Block const* const block) const;
+	void Garbage_Collect(uint package_id, uint die_id, double start_time);
+	void Garbage_Collect(double start_time);
+	void migrate(Block const* const block, double start_time) const;
 	uint get_num_currently_free_pages() const;
 	std::vector<std::vector<std::vector<Block*> > > blocks;
 	std::vector<Block*> all_blocks;
@@ -727,6 +727,7 @@ private:
 	uint num_available_pages_for_new_writes;
 	uint num_free_block_pointers;
 	Ssd& ssd;
+	FtlParent& ftl;
 	static Block_manager_parallel *inst;
 
 };
@@ -868,6 +869,7 @@ public:
 	// TODO: this method should be abstract, but I am not making it so because
 	// I dont't want to implement it in BAST and FAST yet
 	virtual void register_write_completion(Event const& event, enum status result);
+	virtual long get_logical_address(uint physical_address) const;
 protected:
 	Controller &controller;
 };
@@ -1017,6 +1019,9 @@ protected:
 	long currentTranslationPage;
 
 	std::queue<Event*> current_dependent_events;
+
+	long get_logical_address(uint physical_address) const;
+
 	// Translation blocks, and mapping from logical translation pages to physical translation pages
 	//std::vector<Address> translationBlocks;
 	//std::map<ulong, Address> logicalToPhysicalTranslationPageMapping;

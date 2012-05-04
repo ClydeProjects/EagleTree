@@ -76,5 +76,11 @@ void FtlParent::print_ftl_statistics()
 }
 
 void FtlParent::register_write_completion(Event const& event, enum status result) {
+	assert(false);
 	return;
+}
+
+long FtlParent::get_logical_address(uint physical_address) const {
+	assert(false);
+	return 0;
 }

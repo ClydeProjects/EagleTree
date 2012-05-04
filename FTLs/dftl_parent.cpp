@@ -291,3 +291,7 @@ void FtlImpl_DftlParent::update_translation_map(FtlImpl_DftlParent::MPage &mpage
 	mpage.ppn = ppn;
 	reverse_trans_map[ppn] = mpage.vpn;
 }
+
+long FtlImpl_DftlParent::get_logical_address(uint physical_address) const {
+	return reverse_trans_map[physical_address];
+}
