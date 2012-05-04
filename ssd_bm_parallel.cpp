@@ -167,13 +167,15 @@ void Block_manager_parallel::Garbage_Collect(double start_time) {
 
 	num_available_pages_for_new_writes -= target->get_pages_valid();
 
+	printf("Triggering emergency GC. Only %d free pages left\n", num_free_pages);
+
 	migrate(target, start_time);
 }
 
 void Block_manager_parallel::check_if_should_trigger_more_GC(double start_time) {
-	for (int i = 0; i < SSD_SIZE; i++) {
-		for (int j = 0; j < PACKAGE_SIZE; j++) {
-			if (has_free_pages(i, j)) {
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			if (!has_free_pages(i, j)) {
 				Garbage_Collect(i, j, start_time);
 			}
 		}
@@ -224,7 +226,7 @@ void Block_manager_parallel::Garbage_Collect(uint package_id, uint die_id, doubl
 	}
 
 	if (num_available_pages_for_new_writes >= target->get_pages_valid()) {
-		printf("tried to GC from die (%d %d), but not enough free pages to migrate all valid pages", package_id, die_id);
+		printf("tried to GC from die (%d %d), but not enough free pages to migrate all valid pages\n", package_id, die_id);
 		return;
 	}
 
