@@ -34,7 +34,8 @@ Block_manager_parallel::Block_manager_parallel(Ssd& ssd, FtlParent& ftl)
   num_available_pages_for_new_writes(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
   ssd(ssd),
   ftl(ftl),
-  all_blocks(0)
+  all_blocks(0),
+  page_hotness_measurer()
 {
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		Package& package = ssd.getPackages()[i];
@@ -75,6 +76,9 @@ void Block_manager_parallel::register_write_outcome(Event const& event, enum sta
 	if (status == FAILURE) {
 		return;
 	}
+
+	page_hotness_measurer.register_event(event);
+
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;
 	Address blockPointer = free_block_pointers[package_id][die_id];

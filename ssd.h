@@ -218,6 +218,12 @@ enum block_type {LOG, DATA, LOG_SEQ};
  */
 enum ftl_implementation {IMPL_PAGE, IMPL_BAST, IMPL_FAST, IMPL_DFTL, IMPL_BIMODAL};
 
+/*
+ * Enumeration of page access patterns
+ */
+enum write_hotness {WRITE_HOT, WRITE_COLD};
+enum read_hotness {READ_HOT, READ_COLD};
+
 #define BOOST_MULTI_INDEX_ENABLE_SAFE_MODE 1
 
 /* List classes up front for classes that have references to their "parent"
@@ -242,6 +248,7 @@ class Garbage_Collector;
 class Wear_Leveler;
 class Block_manager;
 class Block_manager_parallel;
+class Page_Hotness_Measurer;
 class IOScheduler;
 class FtlParent;
 class FtlImpl_Page;
@@ -703,6 +710,23 @@ public:
 	enum status insert(const Address &address);
 };
 
+class Page_Hotness_Measurer {
+public:
+	Page_Hotness_Measurer();
+	~Page_Hotness_Measurer(void);
+	void register_event(Event const& event);
+	enum write_hotness get_write_hotness(Address const& page_address);
+	enum read_hotness get_read_hotness(Address const& page_address);
+private:
+	void check_if_new_interval(double time);
+	std::map<ulong, uint> write_current_count;
+	std::vector<double> write_moving_average;
+	std::map<ulong, uint> read_current_count;
+	std::vector<double> read_moving_average;
+	ssd::uint current_interval;
+	double average_write_hotness;
+	double average_read_hotness;
+};
 
 class Block_manager_parallel {
 public:
@@ -728,7 +752,7 @@ private:
 	Ssd& ssd;
 	FtlParent& ftl;
 	static Block_manager_parallel *inst;
-
+	Page_Hotness_Measurer page_hotness_measurer;
 };
 
 class Block_manager
