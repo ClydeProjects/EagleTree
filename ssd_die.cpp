@@ -110,6 +110,7 @@ enum status Die::write(Event &event)
 	if (event.get_start_time() + event.get_time_taken() < currently_executing_io_finish_time) {
 		return FAILURE;
 	}
+	last_read_io = event.get_application_io_id();
 	enum status result = data[event.get_address().plane].write(event);
 	currently_executing_io_finish_time = event.get_start_time() + event.get_time_taken();
 	return result;
@@ -134,6 +135,7 @@ enum status Die::erase(Event &event)
 	if (event.get_start_time() + event.get_time_taken() < currently_executing_io_finish_time) {
 		return FAILURE;
 	}
+	last_read_io = event.get_application_io_id();
 	enum status status = data[event.get_address().plane].erase(event);
 	currently_executing_io_finish_time = event.get_start_time() + event.get_time_taken();
 	/* update values if no errors */
