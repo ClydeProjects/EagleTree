@@ -17,6 +17,10 @@ Block_manager_parallel_wearwolf::Block_manager_parallel_wearwolf(Ssd& ssd, FtlPa
 		wcrh_pointer = Address(0,0,0,1,0, PAGE);
 		wcrc_pointer = Address(0,0,0,2,0, PAGE);
 	}
+	wcrh_pointer.print();
+	printf("\n");
+	wcrc_pointer.print();
+	printf("\n");
 }
 
 Block_manager_parallel_wearwolf::~Block_manager_parallel_wearwolf(void) {}
@@ -154,8 +158,8 @@ bool Block_manager_parallel_wearwolf::can_write(Event const& write) const {
 	}
 
 	// left with norm
-	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_address().get_linear_address());
-	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(write.get_address().get_linear_address());
+	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
+	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(write.get_logical_address());
 
 	if (w_hotness == WRITE_HOT) {
 		return wh_available;
@@ -199,14 +203,14 @@ void Block_manager_parallel_wearwolf::check_if_should_trigger_more_GC(double sta
 Address Block_manager_parallel_wearwolf::choose_write_location(Event const& event) const {
 	// if GC, try writing in appropriate pointer. If that doesn't work, write anywhere free.
 	// if not
-	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(event.get_address().get_linear_address());
+	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(event.get_logical_address());
 	bool wh_available = at_least_one_available_write_hot_pointer();
 
 	if (wh_available && w_hotness == WRITE_HOT) {
 		return Block_manager_parallel::choose_write_location(event);
 	}
 
-	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(event.get_address().get_linear_address());
+	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(event.get_logical_address());
 	bool wcrc_available = pointer_can_be_written_to(wcrc_pointer);
 
 	if (wcrc_available && w_hotness == WRITE_COLD && r_hotness == READ_COLD ) {
@@ -237,7 +241,7 @@ Address Block_manager_parallel_wearwolf::choose_write_location(Event const& even
 }
 
 // puts free blocks at the very end of the queue
-struct block_valid_pages_comparator {
+struct block_valid_pages_comparator_wearwolf {
 	bool operator () (const Block * i, const Block * j)
 	{
 		if (i->get_state() == FREE){
@@ -251,7 +255,7 @@ struct block_valid_pages_comparator {
 };
 
 void Block_manager_parallel_wearwolf::Garbage_Collect(uint package_id, uint die_id, double start_time) {
-	std::sort(blocks[package_id][die_id].begin(), blocks[package_id][die_id].end(), block_valid_pages_comparator());
+	std::sort(blocks[package_id][die_id].begin(), blocks[package_id][die_id].end(), block_valid_pages_comparator_wearwolf());
 
 	Block *target = blocks[package_id][die_id][0];
 	assert(target->get_state() != FREE && target->get_state() != PARTIALLY_FREE);
@@ -260,7 +264,10 @@ void Block_manager_parallel_wearwolf::Garbage_Collect(uint package_id, uint die_
 		printf("tried to GC from die (%d %d), but not enough free pages to migrate all valid pages\n", package_id, die_id);
 		return;
 	}
-	printf("triggering GC in die (%d %d)\n", package_id, die_id);
+	printf("triggering GC in ");
+	Address a = Address(target->get_physical_address(), BLOCK);
+	a.print();
+	printf("\n");
 	num_available_pages_for_new_writes -= target->get_pages_valid();
 
 	migrate(target, start_time);
@@ -268,18 +275,26 @@ void Block_manager_parallel_wearwolf::Garbage_Collect(uint package_id, uint die_
 }
 
 Address Block_manager_parallel_wearwolf::find_free_unused_block(uint package_id, uint die_id) {
-	std::sort(blocks[package_id][die_id].begin(), blocks[package_id][die_id].end(), block_valid_pages_comparator());
+	std::sort(blocks[package_id][die_id].begin(), blocks[package_id][die_id].end(), block_valid_pages_comparator_wearwolf());
 	int i = blocks[package_id][die_id].size() - 1;
 	Block *target = blocks[package_id][die_id][i];
-	while (target->get_state() == FREE) {
+	/*free_block_pointers[package_id][die_id].print(); printf("\n");
+	wcrh_pointer.print(); printf("\n");
+	wcrc_pointer.print(); printf("\n");printf("\n");*/
+	while (target->get_state() == FREE && i >= 0) {
 		Address ba = new Address(target->get_physical_address(), BLOCK);
-		if (!ba.compare(free_block_pointers[package_id][die_id]) &&
-			!ba.compare(wcrh_pointer) &&
-			!ba.compare(wcrc_pointer))
+		//ba.print();printf("\n");
+		/*bool a = ba.compare(free_block_pointers[package_id][die_id]) == BLOCK;
+		bool b = ba.compare(wcrh_pointer) == BLOCK;
+		bool c = ba.compare(wcrc_pointer) == BLOCK;*/
+		if (ba.compare(free_block_pointers[package_id][die_id]) != BLOCK &&
+			ba.compare(wcrh_pointer) != BLOCK &&
+			ba.compare(wcrc_pointer) != BLOCK)
 		{
 			return ba;
 		}
 		i--;
+		target = blocks[package_id][die_id][i];
 	}
 	return Address(0, NONE);
 }

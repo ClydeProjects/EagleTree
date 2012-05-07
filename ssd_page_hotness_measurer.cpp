@@ -73,7 +73,7 @@ void Page_Hotness_Measurer::register_event(Event const& event) {
 	assert(type == WRITE || type == READ_COMMAND);
 	double time = event.get_start_time() + event.get_time_taken();
 	check_if_new_interval(time);
-	ulong page_address = event.get_address().get_linear_address();
+	ulong page_address = event.get_logical_address();
 	if (type == WRITE) {
 		write_current_count[page_address]++;
 	} else if (type == READ_COMMAND) {
@@ -88,6 +88,7 @@ void Page_Hotness_Measurer::check_if_new_interval(double time) {
 	if (how_many_intervals_into_the_future == 0) {
 		return;
 	}
+	current_interval++;
 
 	average_write_hotness = 0;
 	average_read_hotness = 0;

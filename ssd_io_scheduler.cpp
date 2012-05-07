@@ -187,9 +187,9 @@ enum status IOScheduler::execute_next(Event& event) {
 			dependencies[application_io_id].pop();
 			io_schedule.push_back(dependent);
 		}
-		printf("success ");
+		printf("S ");
 	} else {
-		printf("fail ");
+		printf("F ");
 		dependencies.erase(event.get_application_io_id());
 	}
 	event.print();
