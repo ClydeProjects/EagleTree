@@ -110,7 +110,6 @@ Ssd::Ssd(uint ssd_size):
 	assert(VIRTUAL_BLOCK_SIZE > 0);
 	assert(VIRTUAL_PAGE_SIZE > 0);
 
-	Block_manager_parallel::instance_initialize(*this, controller.get_ftl());
 	IOScheduler::instance_initialize(*this, controller.get_ftl());
 
 	return;
