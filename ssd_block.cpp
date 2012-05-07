@@ -111,7 +111,11 @@ enum status Block::write(Event &event)
 	if(event.get_noop() == false)
 	{
 		pages_valid++;
-		state = ACTIVE;
+		if (pages_valid + pages_valid < BLOCK_SIZE) {
+			state = PARTIALLY_FREE;
+		} else {
+			state = ACTIVE;
+		}
 		modification_time = event.get_start_time();
 
 		Block_manager::instance()->update_block(this);
@@ -227,12 +231,10 @@ void Block::invalidate_page(uint page)
 	Block_manager::instance()->update_block(this);
 
 	/* update block state */
-	if(pages_invalid >= size)
+	if(pages_invalid == size)
 		state = INACTIVE;
-	else if(pages_valid > 0 || pages_invalid > 0)
+	else if(pages_valid + pages_invalid == size)
 		state = ACTIVE;
-	else
-		state = FREE;
 
 	return;
 }

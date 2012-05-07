@@ -17,15 +17,11 @@
 #include <new>
 #include <assert.h>
 #include <stdio.h>
-#include <vector>
 #include <stdexcept>
 #include <algorithm>
-#include <queue>
 #include "ssd.h"
 
 using namespace ssd;
-
-Block_manager_parallel *Block_manager_parallel::inst = NULL;
 
 Block_manager_parallel::Block_manager_parallel(Ssd& ssd, FtlParent& ftl)
 : blocks(SSD_SIZE, std::vector<std::vector<Block*> >(PACKAGE_SIZE, std::vector<Block*>(0) )),
@@ -34,8 +30,7 @@ Block_manager_parallel::Block_manager_parallel(Ssd& ssd, FtlParent& ftl)
   num_available_pages_for_new_writes(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
   ssd(ssd),
   ftl(ftl),
-  all_blocks(0),
-  page_hotness_measurer()
+  all_blocks(0)
 {
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		Package& package = ssd.getPackages()[i];
@@ -59,25 +54,11 @@ Block_manager_parallel::~Block_manager_parallel(void)
 	return;
 }
 
-void Block_manager_parallel::instance_initialize(Ssd& ssd, FtlParent& ftl)
-{
-	if (Block_manager_parallel::inst == NULL) {
-		Block_manager_parallel::inst = new Block_manager_parallel(ssd, ftl);
-	}
-}
-
-Block_manager_parallel *Block_manager_parallel::instance()
-{
-	return Block_manager_parallel::inst;
-}
-
 void Block_manager_parallel::register_write_outcome(Event const& event, enum status status) {
 	assert(event.get_event_type() == WRITE);
 	if (status == FAILURE) {
 		return;
 	}
-
-	page_hotness_measurer.register_event(event);
 
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;
@@ -86,6 +67,7 @@ void Block_manager_parallel::register_write_outcome(Event const& event, enum sta
 	free_block_pointers[package_id][die_id] = blockPointer;
 
 	num_free_pages--;
+	num_available_pages_for_new_writes--;
 
 	if (num_free_pages <= BLOCK_SIZE) {
 		Garbage_Collect(event.get_start_time() + event.get_time_taken());
@@ -94,7 +76,14 @@ void Block_manager_parallel::register_write_outcome(Event const& event, enum sta
 		Garbage_Collect(package_id, die_id, event.get_start_time() + event.get_time_taken());
 	}
 
-	num_available_pages_for_new_writes--;
+
+}
+
+void Block_manager_parallel::register_read_outcome(Event const& event, enum status status) {
+	assert(event.get_event_type() == READ_COMMAND);
+	if (status == FAILURE) {
+		return;
+	}
 }
 
 void Block_manager_parallel::register_erase_outcome(Event const& event, enum status status) {
@@ -120,7 +109,30 @@ void Block_manager_parallel::register_erase_outcome(Event const& event, enum sta
 	check_if_should_trigger_more_GC(event.get_start_time() + event.get_time_taken());
 }
 
-Address Block_manager_parallel::get_next_free_page(uint package_id, uint die_id) const {
+// Returns the address of the die with the shortest queue that has free space.
+// This is to expoit parallelism for writes.
+// TODO: handle case in which there is no free die
+Address Block_manager_parallel::choose_write_location(Event const& event) const {
+	assert(event.get_event_type() == WRITE);
+	uint package_id;
+	uint die_id;
+	double shortest_time = std::numeric_limits<double>::max( );
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			bool die_has_free_pages = has_free_pages(i, j);
+			bool die_register_is_busy = ssd.getPackages()[i].getDies()[j].register_is_busy();
+			if (die_has_free_pages && !die_register_is_busy) {
+				double channel_finish_time = ssd.bus.get_channel(i).get_currently_executing_operation_finish_time();
+				double die_finish_time = ssd.getPackages()[i].getDies()[j].get_currently_executing_io_finish_time();
+				double max = std::max(channel_finish_time,die_finish_time);
+				if (max < shortest_time) {
+					package_id = i;
+					die_id = j;
+					shortest_time = max;
+				}
+			}
+		}
+	}
 	return free_block_pointers[package_id][die_id];
 }
 
@@ -128,15 +140,28 @@ bool Block_manager_parallel::has_free_pages(uint package_id, uint die_id) const 
 	return free_block_pointers[package_id][die_id].page < BLOCK_SIZE;
 }
 
-/* makes sure that there is at least 1 non-busy die with free space
+struct block_valid_pages_comparator {
+	bool operator () (const Block * i, const Block * j)
+	{
+		if (i->get_state() == FREE){
+			return true;
+		}
+		else if (i->get_state() == PARTIALLY_FREE){
+			return false;
+		}
+		return i->get_pages_invalid() > j->get_pages_invalid();
+	}
+};
+
+/*
+ * makes sure that there is at least 1 non-busy die with free space
+ * and that the die is not waiting for an impending read transfer
  */
 bool Block_manager_parallel::can_write(Event const& write) const {
-	if (write.is_garbage_collection_op()) {
-		return true;
-	}
-	if (num_available_pages_for_new_writes == 0) {
+	if (num_available_pages_for_new_writes == 0 && !write.is_garbage_collection_op()) {
 		return false;
 	}
+
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			bool has_space = has_free_pages(i, j);
@@ -149,15 +174,6 @@ bool Block_manager_parallel::can_write(Event const& write) const {
 	return false;
 }
 
-struct block_valid_pages_comparator {
-	bool operator () (const Block * i, const Block * j)
-	{
-		if (i->get_state() == FREE){
-			return true;
-		}
-		return i->get_pages_invalid() > j->get_pages_invalid();
-	}
-};
 
 // GC from the cheapest block in the device.
 void Block_manager_parallel::Garbage_Collect(double start_time) {
@@ -168,8 +184,9 @@ void Block_manager_parallel::Garbage_Collect(double start_time) {
 	if (target->get_state() == FREE) {
 		target = all_blocks[1];
 	}
-	assert(target->get_state() != FREE);
+	assert(target->get_state() != FREE && target->get_state() != PARTIALLY_FREE);
 
+	assert(num_available_pages_for_new_writes >= target->get_pages_valid());
 	num_available_pages_for_new_writes -= target->get_pages_valid();
 
 	printf("Triggering emergency GC. Only %d free pages left\n", num_free_pages);
@@ -229,6 +246,7 @@ void Block_manager_parallel::Garbage_Collect(uint package_id, uint die_id, doubl
 		free_block_pointers[package_id][die_id] = Address(target->physical_address, PAGE);
 		return;
 	}
+	assert(target->get_state() != PARTIALLY_FREE);
 
 	if (num_available_pages_for_new_writes < target->get_pages_valid()) {
 		printf("tried to GC from die (%d %d), but not enough free pages to migrate all valid pages\n", package_id, die_id);
@@ -240,3 +258,4 @@ void Block_manager_parallel::Garbage_Collect(uint package_id, uint die_id, doubl
 	migrate(target, start_time);
 
 }
+

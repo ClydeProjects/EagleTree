@@ -180,7 +180,7 @@ enum page_state{EMPTY, VALID, INVALID};
  * 	free     - all pages in block are empty
  * 	active   - some pages in block are valid, others are empty or invalid
  * 	inactive - all pages in block are invalid */
-enum block_state{FREE, ACTIVE, INACTIVE};
+enum block_state{FREE, PARTIALLY_FREE, ACTIVE, INACTIVE};
 
 /* I/O request event types
  * 	read  - read data from address. Performs both read_command and read_transfer. Kept here for legacy purposes
@@ -248,6 +248,7 @@ class Garbage_Collector;
 class Wear_Leveler;
 class Block_manager;
 class Block_manager_parallel;
+class Block_manager_parallel_wearwolf;
 class Page_Hotness_Measurer;
 class IOScheduler;
 class FtlParent;
@@ -715,8 +716,10 @@ public:
 	Page_Hotness_Measurer();
 	~Page_Hotness_Measurer(void);
 	void register_event(Event const& event);
-	enum write_hotness get_write_hotness(Address const& page_address);
-	enum read_hotness get_read_hotness(Address const& page_address);
+	enum write_hotness get_write_hotness(unsigned long page_address) const;
+	enum read_hotness get_read_hotness(unsigned long page_address) const;
+	Address get_die_with_least_wcrh() const;
+	Address get_die_with_least_wcrc() const;
 private:
 	void check_if_new_interval(double time);
 	std::map<ulong, uint> write_current_count;
@@ -726,24 +729,28 @@ private:
 	ssd::uint current_interval;
 	double average_write_hotness;
 	double average_read_hotness;
+	std::vector<std::vector<uint> > num_wcrh_pages_per_die;
+	std::vector<std::vector<uint> > num_wcrc_pages_per_die;
+
+	std::vector<std::vector<double> > average_reads_per_die;
+	std::vector<std::vector<uint> > current_reads_per_die;
+
 };
 
 class Block_manager_parallel {
 public:
-	static Block_manager_parallel *instance();
-	static void instance_initialize(Ssd& ssd, FtlParent& ftl);
-	void register_write_outcome(Event const& event, enum status status);
-	void register_erase_outcome(Event const& event, enum status status);
-	Address get_next_free_page(uint package_id, uint die_id) const;
-	bool has_free_pages(uint package_id, uint die_id) const;
-	bool can_write(Event const& write) const;
-private:
 	Block_manager_parallel(Ssd& ssd, FtlParent& ftl);
-	~Block_manager_parallel(void);
-	void Garbage_Collect(uint package_id, uint die_id, double start_time);
+	~Block_manager_parallel();
+	virtual void register_write_outcome(Event const& event, enum status status);
+	virtual void register_read_outcome(Event const& event, enum status status);
+	virtual void register_erase_outcome(Event const& event, enum status status);
+	virtual Address choose_write_location(Event const& event) const;
+	virtual bool can_write(Event const& write) const;
+protected:
+	virtual void Garbage_Collect(uint package_id, uint die_id, double start_time);
 	void Garbage_Collect(double start_time);
 	void migrate(Block const* const block, double start_time) const;
-	void check_if_should_trigger_more_GC(double start_time);
+	virtual void check_if_should_trigger_more_GC(double start_time);
 	std::vector<std::vector<std::vector<Block*> > > blocks;
 	std::vector<Block*> all_blocks;
 	std::vector<std::vector<Address> > free_block_pointers;
@@ -751,8 +758,29 @@ private:
 	uint num_available_pages_for_new_writes;
 	Ssd& ssd;
 	FtlParent& ftl;
-	static Block_manager_parallel *inst;
+private:
+	bool has_free_pages(uint package_id, uint die_id) const;
+};
+
+class Block_manager_parallel_wearwolf : Block_manager_parallel {
+public:
+	Block_manager_parallel_wearwolf(Ssd& ssd, FtlParent& ftl);
+	~Block_manager_parallel_wearwolf();
+	virtual void register_write_outcome(Event const& event, enum status status);
+	virtual void register_read_outcome(Event const& event, enum status status);
+	virtual void register_erase_outcome(Event const& event, enum status status);
+	virtual Address choose_write_location(Event const& event) const;
+	virtual bool can_write(Event const& write) const;
+protected:
+	virtual void Garbage_Collect(uint package_id, uint die_id, double start_time);
+	virtual void check_if_should_trigger_more_GC(double start_time);
+private:
+	Address find_free_unused_block(uint package_id, uint die_id) const;
+	bool pointer_can_be_written_to(Address pointer) const;
+	bool at_least_one_available_write_hot_pointer() const;
 	Page_Hotness_Measurer page_hotness_measurer;
+	Address wcrh_pointer;
+	Address wcrc_pointer;
 };
 
 class Block_manager
@@ -781,11 +809,7 @@ public:
 	static Block_manager *inst;
 
 	void cost_insert(Block *b);
-
 	void print_cost_status();
-
-
-
 private:
 	void get_page_block(Address &address, Event &event);
 	static bool block_comparitor_simple (Block const *x,Block const *y);
@@ -813,28 +837,20 @@ private:
 
 	typedef active_set::nth_index<0>::type ActiveBySeq;
 	typedef active_set::nth_index<1>::type ActiveByCost;
-
 	active_set active_cost;
-
 	// Usual block lists
 	std::vector<Block*> active_list;
 	std::vector<Block*> free_list;
 	std::vector<Block*> invalid_list;
-
 	// Counter for returning the next free page.
 	ulong directoryCurrentPage;
 	// Address on the current cached page in SRAM.
 	ulong directoryCachedPage;
-
 	ulong simpleCurrentFree;
-
 	// Counter for handling periodic sort of active_list
 	uint num_insert_events;
-
 	uint current_writing_block;
-
 	bool inited;
-
 	bool out_of_blocks;
 };
 
@@ -855,7 +871,6 @@ private:
 	void handle_writes(std::vector<Event>& events);
 
 	double in_how_long_can_this_event_be_scheduled(Event const& event) const;
-	Address get_LUN_with_shortest_queue() const;
 	bool can_schedule_on_die(Event const& event) const;
 	void handle_finished_event(Event const&event, enum status outcome);
 
@@ -865,6 +880,7 @@ private:
 	static IOScheduler *inst;
 	Ssd& ssd;
 	FtlParent& ftl;
+	Block_manager_parallel_wearwolf bm;
 };
 
 class FtlParent
@@ -1169,6 +1185,7 @@ public:
 	void *get_result_buffer();
 	friend class Controller;
 	friend class IOScheduler;
+	friend class Block_manager_parallel;
 	void print_statistics();
 	void reset_statistics();
 	void write_statistics(FILE *stream);
