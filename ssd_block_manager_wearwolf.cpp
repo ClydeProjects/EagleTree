@@ -251,7 +251,7 @@ struct block_valid_pages_comparator {
 };
 
 void Block_manager_parallel_wearwolf::Garbage_Collect(uint package_id, uint die_id, double start_time) {
-	//std::sort(blocks[package_id][die_id].begin(), blocks[package_id][die_id].end(), block_valid_pages_comparator());
+	std::sort(blocks[package_id][die_id].begin(), blocks[package_id][die_id].end(), block_valid_pages_comparator());
 
 	Block *target = blocks[package_id][die_id][0];
 	assert(target->get_state() != FREE && target->get_state() != PARTIALLY_FREE);
@@ -267,8 +267,8 @@ void Block_manager_parallel_wearwolf::Garbage_Collect(uint package_id, uint die_
 
 }
 
-Address Block_manager_parallel_wearwolf::find_free_unused_block(uint package_id, uint die_id) const {
-	//std::sort(blocks[package_id][die_id].begin(), blocks[package_id][die_id].end(), block_valid_pages_comparator());
+Address Block_manager_parallel_wearwolf::find_free_unused_block(uint package_id, uint die_id) {
+	std::sort(blocks[package_id][die_id].begin(), blocks[package_id][die_id].end(), block_valid_pages_comparator());
 	int i = blocks[package_id][die_id].size() - 1;
 	Block *target = blocks[package_id][die_id][i];
 	while (target->get_state() == FREE) {

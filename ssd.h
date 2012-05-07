@@ -775,7 +775,7 @@ protected:
 	virtual void Garbage_Collect(uint package_id, uint die_id, double start_time);
 	virtual void check_if_should_trigger_more_GC(double start_time);
 private:
-	Address find_free_unused_block(uint package_id, uint die_id) const;
+	Address find_free_unused_block(uint package_id, uint die_id);
 	bool pointer_can_be_written_to(Address pointer) const;
 	bool at_least_one_available_write_hot_pointer() const;
 	Page_Hotness_Measurer page_hotness_measurer;

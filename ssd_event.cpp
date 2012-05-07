@@ -255,18 +255,19 @@ void Event::print(FILE *stream) const
 	if(type == READ)
 		fprintf(stream, "Read ");
 	else if(type == READ_COMMAND)
-		fprintf(stream, "Read command ");
+		fprintf(stream, "ReCo ");
 	else if(type == READ_TRANSFER)
-		fprintf(stream, "Read transfer ");
+		fprintf(stream, "ReTr ");
 	else if(type == WRITE)
-		fprintf(stream, "Write");
+		fprintf(stream, "Writ ");
 	else if(type == ERASE)
-		fprintf(stream, "Erase");
+		fprintf(stream, "Eras ");
 	else if(type == MERGE)
-		fprintf(stream, "Merge");
+		fprintf(stream, "Merg ");
 	else
 		fprintf(stream, "Unknown event type: ");
 	fprintf(stream, "ID: %d ", id);
+	fprintf(stream, "LBA: %d ", logical_address);
 	address.print(stream);
 	if(type == MERGE)
 		merge_address.print(stream);
