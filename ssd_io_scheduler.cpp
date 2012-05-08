@@ -95,7 +95,6 @@ std::vector<Event> IOScheduler::gather_current_waiting_ios() {
 void IOScheduler::execute_current_waiting_ios() {
 	assert(!io_schedule.empty());
 	std::vector<Event> current_ios = gather_current_waiting_ios();
-	//std::vector<Event> overdue_events;
 	std::vector<Event> read_commands;
 	std::vector<Event> read_transfers;
 	std::vector<Event> writes;
@@ -127,6 +126,8 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 		Event event = events.back();
 		events.pop_back();
 		if (!bm.can_write(event)) {
+			event.incr_bus_wait_time(1);
+			event.incr_time_taken(1);
 			io_schedule.push_back(event);
 			continue;
 		}
@@ -229,7 +230,7 @@ void IOScheduler::handle_finished_event(Event const&event, enum status outcome) 
 	} else if (event.get_event_type() == ERASE) {
 		bm.register_erase_outcome(event, outcome);
 	} else if (event.get_event_type() == READ_COMMAND) {
-
+		bm.register_read_outcome(event, outcome);
 	}
 }
 
