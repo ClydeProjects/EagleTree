@@ -272,7 +272,11 @@ void Event::print(FILE *stream) const
 	if(type == MERGE)
 		merge_address.print(stream);
 	fprintf(stream, "Time[%f, %f) Bus_wait: %f", start_time, start_time + time_taken, bus_wait_time);
-	fprintf(stream, " application io ID: %d\n", application_io_id);
+	fprintf(stream, " application io ID: %d", application_io_id);
+	if (garbage_collection_op) {
+		fprintf(stream, " GC");
+	}
+	fprintf(stream, "\n");
 	return;
 }
 

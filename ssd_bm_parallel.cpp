@@ -125,6 +125,7 @@ Address Block_manager_parallel::choose_write_location(Event const& event) const 
 				double channel_finish_time = ssd.bus.get_channel(i).get_currently_executing_operation_finish_time();
 				double die_finish_time = ssd.getPackages()[i].getDies()[j].get_currently_executing_io_finish_time();
 				double max = std::max(channel_finish_time,die_finish_time);
+				// TODO: in case several dies within a channel have the same max, consider making a tie-breaker
 				if (max < shortest_time) {
 					package_id = i;
 					die_id = j;
@@ -207,6 +208,7 @@ void Block_manager_parallel::check_if_should_trigger_more_GC(double start_time) 
 void Block_manager_parallel::migrate(Block const* const block, double start_time) const {
 	Event* erase = new Event(ERASE, 0, 1, start_time); // TODO: set start_time and copy any valid pages
 	erase->set_address(Address(block->physical_address, BLOCK));
+	erase->set_garbage_collection_op(true);
 	uint dependency_code = erase->get_application_io_id();
 
 	// must also change the mapping here. Will eventually do that.
@@ -216,16 +218,20 @@ void Block_manager_parallel::migrate(Block const* const block, double start_time
 		Page const& page = block->getPages()[i];
 		enum page_state state = page.get_state();
 		if (state == VALID) {
-			Event* read = new Event(READ, 0, 1, start_time);
 			Address addr = Address(block->physical_address, PAGE);
 			addr.page = i;
+			long logical_address = ftl.get_logical_address(addr.get_linear_address());
+
+			// TODO: this read should really be done through the FTL. The mapping may not be in cache
+			Event* read = new Event(READ, logical_address, 1, start_time);
 			read->set_address(addr);
 			read->set_application_io_id(dependency_code);
 			read->set_garbage_collection_op(true);
-			long logical_address = ftl.get_logical_address(addr.get_linear_address());
+
 			Event* write = new Event(WRITE, logical_address, 1, start_time);
 			write->set_application_io_id(dependency_code);
 			write->set_garbage_collection_op(true);
+
 			events.push(read);
 			events.push(write);
 		}

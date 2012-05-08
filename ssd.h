@@ -31,6 +31,7 @@
 #include <stack>
 #include <queue>
 #include <map>
+#include <set>
 #include <algorithm>
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/identity.hpp>
@@ -781,6 +782,7 @@ private:
 	Page_Hotness_Measurer page_hotness_measurer;
 	Address wcrh_pointer;
 	Address wcrc_pointer;
+	std::set<long> blocks_currently_undergoing_gc;
 };
 
 class Block_manager

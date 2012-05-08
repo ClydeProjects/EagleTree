@@ -49,6 +49,7 @@ void IOScheduler::schedule_dependent_events(std::queue<Event*>& events) {
 			Event* read_command = new Event(READ_COMMAND, event.get_logical_address(), event.get_size(), event.get_start_time());
 			read_command->set_address(event.get_address());
 			read_command->set_application_io_id(dependency_code);
+			read_command->set_garbage_collection_op(event.is_garbage_collection_op());
 			dependencies[dependency_code].push(*read_command);
 		}
 		dependencies[dependency_code].push(event);

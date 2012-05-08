@@ -42,7 +42,7 @@ Address Page_Hotness_Measurer::get_die_with_least_wcrh() const {
 	double min = PLANE_SIZE * BLOCK_SIZE;
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			if (min < num_wcrh_pages_per_die[i][j]) {
+			if (min >= num_wcrh_pages_per_die[i][j]) {
 				min = num_wcrh_pages_per_die[i][j];
 				package = i;
 				die = j;
@@ -58,7 +58,8 @@ Address Page_Hotness_Measurer::get_die_with_least_wcrc() const {
 	double min = PLANE_SIZE * BLOCK_SIZE;
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			if (min < num_wcrc_pages_per_die[i][j]) {
+			//printf("%d\n", num_wcrc_pages_per_die[i][j]);
+			if (min >= num_wcrc_pages_per_die[i][j]) {
 				min = num_wcrc_pages_per_die[i][j];
 				package = i;
 				die = j;
