@@ -38,16 +38,16 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;
 	Address block_address = Address(event.get_address().get_linear_address(), BLOCK);
-	int num_pages_written = -1;
-	if (block_address.compare(free_block_pointers[package_id][die_id])) {
+	uint num_pages_written = -1;
+	if (block_address.compare(free_block_pointers[package_id][die_id]) == BLOCK) {
 		Address pointer = free_block_pointers[package_id][die_id];
 		pointer.page = num_pages_written = pointer.page + 1;
 		free_block_pointers[package_id][die_id] = pointer;
 	}
-	else if (block_address.compare(wcrh_pointer)) {
+	else if (block_address.compare(wcrh_pointer) == BLOCK) {
 		wcrh_pointer.page = num_pages_written = wcrh_pointer.page + 1;
 	}
-	else if (block_address.compare(wcrc_pointer)) {
+	else if (block_address.compare(wcrc_pointer) == BLOCK) {
 		wcrc_pointer.page = num_pages_written = wcrc_pointer.page + 1;
 	}
 
