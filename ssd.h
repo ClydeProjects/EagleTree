@@ -749,7 +749,7 @@ public:
 	virtual bool can_write(Event const& write) const;
 protected:
 	virtual void Garbage_Collect(uint package_id, uint die_id, double start_time);
-	void Garbage_Collect(double start_time);
+	virtual void Garbage_Collect(double start_time);
 	void migrate(Block const* const block, double start_time) const;
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	std::vector<std::vector<std::vector<Block*> > > blocks;
@@ -774,6 +774,7 @@ public:
 	virtual bool can_write(Event const& write) const;
 protected:
 	virtual void Garbage_Collect(uint package_id, uint die_id, double start_time);
+	virtual void Garbage_Collect(double start_time);
 	virtual void check_if_should_trigger_more_GC(double start_time);
 private:
 	Address find_free_unused_block(uint package_id, uint die_id);
