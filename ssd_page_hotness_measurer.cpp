@@ -10,7 +10,7 @@
 
 using namespace ssd;
 
-#define INTERVAL_LENGTH 1000
+#define INTERVAL_LENGTH 500
 #define WEIGHT 0.5
 
 
@@ -23,7 +23,9 @@ Page_Hotness_Measurer::Page_Hotness_Measurer()
 		num_wcrh_pages_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
 		num_wcrc_pages_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
 		current_reads_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
-		average_reads_per_die(SSD_SIZE, std::vector<double>(PACKAGE_SIZE, 0))
+		average_reads_per_die(SSD_SIZE, std::vector<double>(PACKAGE_SIZE, 0)),
+		writes_counter(0),
+		reads_counter(0)
 {}
 
 Page_Hotness_Measurer::~Page_Hotness_Measurer(void) {}
@@ -73,52 +75,41 @@ void Page_Hotness_Measurer::register_event(Event const& event) {
 	enum event_type type = event.get_event_type();
 	assert(type == WRITE || type == READ_COMMAND);
 	double time = event.get_start_time() + event.get_time_taken();
-	check_if_new_interval(time);
 	ulong page_address = event.get_logical_address();
 	if (type == WRITE) {
 		write_current_count[page_address]++;
+		if (++writes_counter == INTERVAL_LENGTH) {
+			writes_counter = 0;
+			start_new_interval_writes();
+		}
 	} else if (type == READ_COMMAND) {
 		current_reads_per_die[event.get_address().package][event.get_address().die]++;
 		read_current_count[page_address]++;
+		if (++reads_counter == INTERVAL_LENGTH) {
+			reads_counter = 0;
+			start_new_interval_reads();
+		}
 	}
 }
 
-void Page_Hotness_Measurer::check_if_new_interval(double time) {
-	int how_many_intervals_into_the_future = trunc((time - current_interval * INTERVAL_LENGTH) / INTERVAL_LENGTH);
-	assert(how_many_intervals_into_the_future >= 0);
-	if (how_many_intervals_into_the_future == 0) {
-		return;
-	}
-	current_interval++;
-
+void Page_Hotness_Measurer::start_new_interval_writes() {
 	average_write_hotness = 0;
-	average_read_hotness = 0;
-	double p = pow(WEIGHT, how_many_intervals_into_the_future - 1);
-	for( uint addr = 0; addr < write_moving_average.size(); addr++  )
+	for( uint addr = 0; addr < NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE; addr++  )
 	{
 	    uint count = write_current_count[addr];
 	    write_moving_average[addr] = write_moving_average[addr] * WEIGHT + count * (1 - WEIGHT);
-	    write_moving_average[addr] *= p;
 	    average_write_hotness += write_moving_average[addr];
-
-	    count = read_current_count[addr];
-	    read_current_count[addr] = read_current_count[addr] * WEIGHT + count * (1 - WEIGHT);
-	    read_current_count[addr] *= p;
-	    average_read_hotness += read_current_count[addr];
 	}
-	average_write_hotness /= write_moving_average.size();
-	average_read_hotness /= write_moving_average.size();
+	average_write_hotness /= NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
 
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			average_reads_per_die[i][j] = average_reads_per_die[i][j] * WEIGHT + current_reads_per_die[i][j] * (1 - WEIGHT);
-			current_reads_per_die[i][j] = 0;
 			num_wcrc_pages_per_die[i][j] = 0;
 			num_wcrh_pages_per_die[i][j] = 0;
 		}
 	}
 
-	for( uint addr = 0; addr < write_moving_average.size(); addr++  )
+	for( uint addr = 0; addr < NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE; addr++  )
 	{
 		if (get_write_hotness(addr) == WRITE_COLD) {
 			Address a = Address(addr, PAGE);
@@ -129,7 +120,23 @@ void Page_Hotness_Measurer::check_if_new_interval(double time) {
 			}
 		}
 	}
+}
 
+void Page_Hotness_Measurer::start_new_interval_reads() {
+	average_read_hotness = 0;
+	for( uint addr = 0; addr < NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE; addr++  )
+	{
+	    uint count = read_current_count[addr];
+	    read_moving_average[addr] = read_moving_average[addr] * WEIGHT + count * (1 - WEIGHT);
+	    average_read_hotness += read_moving_average[addr];
+	}
+	average_read_hotness /= NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
 
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			average_reads_per_die[i][j] = average_reads_per_die[i][j] * WEIGHT + current_reads_per_die[i][j] * (1 - WEIGHT);
+			current_reads_per_die[i][j] = 0;
+		}
+	}
 }
 

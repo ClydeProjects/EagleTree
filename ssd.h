@@ -722,7 +722,8 @@ public:
 	Address get_die_with_least_wcrh() const;
 	Address get_die_with_least_wcrc() const;
 private:
-	void check_if_new_interval(double time);
+	void start_new_interval_writes();
+	void start_new_interval_reads();
 	std::map<ulong, uint> write_current_count;
 	std::vector<double> write_moving_average;
 	std::map<ulong, uint> read_current_count;
@@ -735,7 +736,8 @@ private:
 
 	std::vector<std::vector<double> > average_reads_per_die;
 	std::vector<std::vector<uint> > current_reads_per_die;
-
+	uint writes_counter;
+	uint reads_counter;
 };
 
 class Block_manager_parallel {
