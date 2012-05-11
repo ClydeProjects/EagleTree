@@ -752,6 +752,7 @@ public:
 protected:
 	virtual void Garbage_Collect(uint package_id, uint die_id, double start_time);
 	virtual void Garbage_Collect(double start_time);
+	virtual void Wear_Level(Event const& event);
 	void migrate(Block const* const block, double start_time) const;
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	std::vector<std::vector<std::vector<Block*> > > blocks;
@@ -761,8 +762,13 @@ protected:
 	uint num_available_pages_for_new_writes;
 	Ssd& ssd;
 	FtlParent& ftl;
+	// WL structures
+	uint max_age;
+	std::set<Block*> blocks_with_min_age;
+	std::queue<Block*> blocks_to_wl;
 private:
 	bool has_free_pages(uint package_id, uint die_id) const;
+	void update_blocks_with_min_age(uint age);
 };
 
 class Block_manager_parallel_wearwolf : Block_manager_parallel {

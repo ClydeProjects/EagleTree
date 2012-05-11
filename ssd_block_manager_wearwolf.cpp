@@ -125,6 +125,7 @@ void Block_manager_parallel_wearwolf::register_erase_outcome(Event const& event,
 	assert(blocks_currently_undergoing_gc.count(phys_addr) == 0);
 
 	check_if_should_trigger_more_GC(event.get_start_time() + event.get_time_taken());
+	Wear_Level(event);
 }
 
 // ensures the pointer has at least 1 free page, and that the die is not busy (waiting for a read)
@@ -217,8 +218,9 @@ Address Block_manager_parallel_wearwolf::choose_write_location(Event const& even
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(event.get_logical_address());
 	bool wh_available = at_least_one_available_write_hot_pointer();
 
+	// TODO: if write-hot, need to assign READ_HOT to non-busy planes and READ_COLD to busy planes. Do this while still trying to write to a die with a short queue
 	if (wh_available && w_hotness == WRITE_HOT) {
-		printf("WRITE_HOT\n");
+		//printf("WRITE_HOT\n");
 		return Block_manager_parallel::choose_write_location(event);
 	}
 

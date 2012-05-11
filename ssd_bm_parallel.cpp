@@ -30,7 +30,9 @@ Block_manager_parallel::Block_manager_parallel(Ssd& ssd, FtlParent& ftl)
   num_available_pages_for_new_writes(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
   ssd(ssd),
   ftl(ftl),
-  all_blocks(0)
+  all_blocks(0),
+  blocks_with_min_age(),
+  blocks_to_wl()
 {
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		Package& package = ssd.getPackages()[i];
@@ -42,6 +44,7 @@ Block_manager_parallel::Block_manager_parallel(Ssd& ssd, FtlParent& ftl)
 					Block& block = plane.getBlocks()[b];
 					blocks[i][j].push_back(&block);
 					all_blocks.push_back(&block);
+					blocks_with_min_age.insert(&block);
 				}
 			}
 			free_block_pointers[i][j] = Address(blocks[i][j][0]->get_physical_address(), PAGE);
@@ -107,6 +110,7 @@ void Block_manager_parallel::register_erase_outcome(Event const& event, enum sta
 	num_available_pages_for_new_writes += BLOCK_SIZE;
 
 	check_if_should_trigger_more_GC(event.get_start_time() + event.get_time_taken());
+	Wear_Level(event);
 }
 
 // Returns the address of the die with the shortest queue that has free space.
@@ -263,5 +267,69 @@ void Block_manager_parallel::Garbage_Collect(uint package_id, uint die_id, doubl
 
 	migrate(target, start_time);
 
+}
+
+/*void Block_manager_parallel::Wear_Level(Event const& event) {
+	Address pba = event.get_address();
+	Block* b = &ssd.getPackages()[pba.package].getDies()[pba.die].getPlanes()[pba.plane].getBlocks()[pba.block];
+	uint age = BLOCK_ERASES - b->get_erases_remaining();
+	uint max_age = BLOCK_ERASES - oldest_block->get_erases_remaining();
+	uint min_age = BLOCK_ERASES - youngest_block->get_erases_remaining();
+	if (age > max_age) {
+		oldest_block = b;
+		if (max_age - min_age > 500) {
+			migrate(youngest_block, event.get_start_time() + event.get_time_taken());
+		}
+	}
+	else if (youngest_block->get_physical_address() == b->get_physical_address()) {
+		for (uint i = 0; i < all_blocks.size(); i++) {
+			uint age_ith_block = BLOCK_ERASES - all_blocks[i]->get_erases_remaining();
+			if (age_ith_block < min_age) {
+				assert(age_ith_block == min_age - 1);
+				youngest_block = all_blocks[i];
+				break;
+			}
+		}
+	}
+}*/
+
+// TODO, at erase registration, there should be a check for WL queue. If not empty, see if can issue a WL operation. If cannot, issue an emergency GC.
+// if the queue is empty, check if should trigger GC.
+void Block_manager_parallel::Wear_Level(Event const& event) {
+	Address pba = event.get_address();
+	Block* b = &ssd.getPackages()[pba.package].getDies()[pba.die].getPlanes()[pba.plane].getBlocks()[pba.block];
+	uint age = BLOCK_ERASES - b->get_erases_remaining();
+	uint min_age = BLOCK_ERASES - (*blocks_with_min_age.begin())->get_erases_remaining();
+	if (age > max_age) {
+		max_age = age;
+		uint age_diff = max_age - min_age;
+		if (age_diff > 500 && blocks_to_wl.size() == 0) {
+			for (std::set<Block*>::const_iterator pos = blocks_with_min_age.begin(); pos != blocks_with_min_age.end(); pos++) {
+				blocks_to_wl.push(*pos);
+			}
+			update_blocks_with_min_age(min_age + 1);
+		}
+	}
+	else if (blocks_with_min_age.count(b) == 1 && blocks_with_min_age.size() > 1) {
+		blocks_with_min_age.erase(b);
+	}
+	else if (blocks_with_min_age.count(b) == 1 && blocks_with_min_age.size() == 1) {
+		update_blocks_with_min_age(min_age);
+	}
+
+	while (!blocks_to_wl.empty() && num_available_pages_for_new_writes > blocks_to_wl.front()->get_pages_valid()) {
+		Block* target = blocks_to_wl.front();
+		num_available_pages_for_new_writes -= blocks_to_wl.front()->get_pages_valid()
+		migrate(target, event.get_start_time() + event.get_time_taken());
+	}
+}
+
+void Block_manager_parallel::update_blocks_with_min_age(uint min_age) {
+	for (uint i = 0; i < all_blocks.size(); i++) {
+		uint age_ith_block = BLOCK_ERASES - all_blocks[i]->get_erases_remaining();
+		if (age_ith_block == min_age) {
+			blocks_with_min_age.insert(all_blocks[i]);
+		}
+	}
 }
 
