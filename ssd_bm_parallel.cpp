@@ -319,7 +319,8 @@ void Block_manager_parallel::Wear_Level(Event const& event) {
 
 	while (!blocks_to_wl.empty() && num_available_pages_for_new_writes > blocks_to_wl.front()->get_pages_valid()) {
 		Block* target = blocks_to_wl.front();
-		num_available_pages_for_new_writes -= blocks_to_wl.front()->get_pages_valid()
+		blocks_to_wl.pop();
+		num_available_pages_for_new_writes -= target->get_pages_valid();
 		migrate(target, event.get_start_time() + event.get_time_taken());
 	}
 }
