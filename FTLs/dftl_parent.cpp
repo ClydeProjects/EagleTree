@@ -59,18 +59,21 @@ double FtlImpl_DftlParent::mpage_modified_ts_compare(const FtlImpl_DftlParent::M
 }
 
 FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
-	FtlParent(controller)
+	FtlParent(controller),
+	addressSize(log(NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE)/log(2)),
+	addressPerPage(PAGE_SIZE/(ceil(addressSize / 8.0) * 2 )),
+	global_translation_directory(1 + (NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE) / addressPerPage, -1)
 {
-	addressPerPage = 0;
+	//addressPerPage = 0;
 	cmt = 0;
 	currentDataPage = -1;
 	currentTranslationPage = -1;
 
 	// Detect required number of bits for logical address size
-	addressSize = log(NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE)/log(2);
+	//addressSize = log(NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE)/log(2);
 
 	// Find required number of bits for block size
-	addressPerPage = (PAGE_SIZE/ceil(addressSize / 8.0)); // 8 bits per byte
+	//addressPerPage = PAGE_SIZE/ceil(addressSize / 8.0); // 8 bits per byte
 
 	printf("Total required bits for representation: Address size: %i Total per page: %i \n", addressSize, addressPerPage);
 
@@ -89,10 +92,20 @@ FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
 
 void FtlImpl_DftlParent::consult_GTD(long dlpn, Event &event)
 {
+	// convert to GTD index
+	long mvpn = dlpn / addressPerPage;
+
+	long g = global_translation_directory[0];
+	long mppn = global_translation_directory[mvpn];
+	if (mppn == -1) {
+		return;
+	}
+	Address mapping_address = Address(mppn, PAGE);
+
 	// Simulate that we goto translation map and read the mapping page.
-	Event* readEvent = new Event(READ, event.get_logical_address(), 1, event.get_start_time());
-	readEvent->set_address(Address(0, PAGE));
-	readEvent->set_noop(true);
+	Event readEvent = Event(READ, event.get_logical_address(), 1, event.get_start_time());
+	readEvent.set_address(mapping_address);
+	//readEvent->set_noop(true);
 	current_dependent_events.push(readEvent);
 
 	//event.consolidate_metaevent(readEvent);
@@ -178,10 +191,11 @@ void FtlImpl_DftlParent::resolve_mapping(Event &event, bool isWrite)
 
 		consult_GTD(dlpn, event);
 
+		// all of this next stuff would actually have to be in call back. But for ease, we might as well make it here.
 		MPage current = trans_map[dlpn];
-		current.modified_ts = event.get_start_time();
+		current.modified_ts = event.get_start_time();  // this should actually be the time at the end of the event, I think.
 		if (isWrite)
-			current.modified_ts++;
+			current.modified_ts++;						// this if statement, I dont get at all. Why increment modified_ts?
 		current.create_ts = event.get_start_time();
 		current.cached = true;
 		trans_map.replace(trans_map.begin()+dlpn, current);
@@ -200,13 +214,12 @@ void FtlImpl_DftlParent::evict_page_from_cache(Event &event)
 
 		assert(evictPage.cached && evictPage.create_ts >= 0 && evictPage.modified_ts >= 0);
 
-		if (evictPage.create_ts != evictPage.modified_ts)
+		bool page_has_been_modified_and_should_be_updated_in_gmt = evictPage.create_ts != evictPage.modified_ts;
+		if (page_has_been_modified_and_should_be_updated_in_gmt)
 		{
-			// Evict page
-			// Inform the ssd model that it should invalidate the previous page.
-			// Calculate the start address of the translation page.
+			// we take the opportunity to also update all cached entries from the same mapping page.
+			// this means that when other entires from the same mapping page are evicted, they will not trigger a write.
 			int vpnBase = evictPage.vpn - evictPage.vpn % addressPerPage;
-
 			for (int i=0;i<addressPerPage;i++)
 			{
 				MPage cur = trans_map[vpnBase+i];
@@ -217,10 +230,11 @@ void FtlImpl_DftlParent::evict_page_from_cache(Event &event)
 				}
 			}
 
-			// Simulate the write to translate page
 			Event write_event = Event(WRITE, event.get_logical_address(), 1, event.get_start_time());
-			write_event.set_address(Address(0, PAGE));
-			write_event.set_noop(true);
+			write_event.set_mapping_op(true);
+			current_dependent_events.push(write_event);
+			//write_event.set_address(Address(0, PAGE));
+			//write_event.set_noop(true);
 
 			if (controller.issue(write_event) == FAILURE) {	assert(false);}
 
@@ -238,6 +252,8 @@ void FtlImpl_DftlParent::evict_page_from_cache(Event &event)
 	}
 }
 
+// I don't understand why a write is needed in this method. Ask Matias.
+// if a page is trimmed, it does
 void FtlImpl_DftlParent::evict_specific_page_from_cache(Event &event, long lba)
 {
 		// Find page to evict
@@ -267,8 +283,9 @@ void FtlImpl_DftlParent::evict_specific_page_from_cache(Event &event, long lba)
 
 			// Simulate the write to translate page
 			Event write_event = Event(WRITE, event.get_logical_address(), 1, event.get_start_time());
-			write_event.set_address(Address(0, PAGE));
-			write_event.set_noop(true);
+			write_event.set_mapping_op(true);
+			//write_event.set_address(Address(0, PAGE));
+			//write_event.set_noop(true);
 
 			if (controller.issue(write_event) == FAILURE) {	assert(false);}
 

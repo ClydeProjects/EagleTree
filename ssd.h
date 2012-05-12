@@ -408,7 +408,9 @@ public:
 	void set_noop(bool value);
 	void set_application_io_id(uint application_io_id);
 	void set_garbage_collection_op(bool value);
+	void set_mapping_op(bool value);
 	bool is_garbage_collection_op() const;
+	bool is_mapping_op() const;
 	void *get_payload(void) const;
 	double incr_bus_wait_time(double time);
 	double incr_time_taken(double time_incr);
@@ -430,6 +432,7 @@ private:
 	bool noop;
 
 	bool garbage_collection_op;
+	bool mapping_op;
 
 	// an ID for a single IO to the chip. This is not actually used for any logical purpose
 	static uint id_generator;
@@ -867,7 +870,7 @@ private:
 
 class IOScheduler {
 public:
-	void schedule_dependent_events(std::queue<Event*>& events);
+	void schedule_dependent_events(std::queue<Event>& events);
 	void schedule_independent_event(Event& events);
 	void finish(double start_time);
 	static IOScheduler *instance();
@@ -920,6 +923,7 @@ public:
 	// I dont't want to implement it in BAST and FAST yet
 	virtual void register_write_completion(Event const& event, enum status result);
 	virtual long get_logical_address(uint physical_address) const;
+	virtual void set_replace_address(Event& event) const;
 protected:
 	Controller &controller;
 };
@@ -1017,8 +1021,8 @@ protected:
 	struct MPage {
 		long vpn;
 		long ppn;
-		double create_ts;
-		double modified_ts;
+		double create_ts;		//when its added to the CTM
+		double modified_ts;		//when its modified within the CTM
 		bool cached;
 
 		MPage(long vpn);
@@ -1056,21 +1060,23 @@ protected:
 	long get_free_data_page(Event &event);
 	long get_free_data_page(Event &event, bool insert_events);
 
-	void evict_page_from_cache(Event &event);
+	virtual void evict_page_from_cache(Event &event);
 	void evict_specific_page_from_cache(Event &event, long lba);
 
 	long get_logical_address(uint physical_address) const;
 
 	// Mapping information
-	int addressPerPage;
 	int addressSize;
+	int addressPerPage;
 	uint totalCMTentries;
 
 	// Current storage
 	long currentDataPage;
 	long currentTranslationPage;
 
-	std::queue<Event*> current_dependent_events;
+	std::queue<Event> current_dependent_events;
+
+	std::vector<long> global_translation_directory;
 
 	// Translation blocks, and mapping from logical translation pages to physical translation pages
 	//std::vector<Address> translationBlocks;
@@ -1088,7 +1094,8 @@ public:
 	enum status trim(Event &event);
 	void cleanup_block(Event &event, Block *block);
 	void print_ftl_statistics();
-	virtual void register_write_completion(Event const& event, enum status result);
+	void register_write_completion(Event const& event, enum status result);
+	virtual void set_replace_address(Event& event) const;
 private:
 	const double over_provisioning_percentage;
 };

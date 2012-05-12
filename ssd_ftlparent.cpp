@@ -84,3 +84,8 @@ long FtlParent::get_logical_address(uint physical_address) const {
 	assert(false);
 	return 0;
 }
+
+void FtlParent::set_replace_address(Event& event) const {
+	assert(false);
+	return;
+}

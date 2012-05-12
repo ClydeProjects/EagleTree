@@ -38,10 +38,10 @@ bool bus_wait_time_comparator (const Event& i, const Event& j) {
 	return i.get_bus_wait_time() > j.get_bus_wait_time();
 }
 
-void IOScheduler::schedule_dependent_events(std::queue<Event*>& events) {
-	uint dependency_code = events.back()->get_application_io_id();
+void IOScheduler::schedule_dependent_events(std::queue<Event>& events) {
+	uint dependency_code = events.back().get_application_io_id();
 	while (!events.empty()) {
-		Event event = *events.front();
+		Event event = events.front();
 		events.pop();
 		event.set_application_io_id(dependency_code);
 		if (event.get_event_type() == READ) {
@@ -67,8 +67,8 @@ void IOScheduler::schedule_dependent_events(std::queue<Event*>& events) {
 }
 
 void IOScheduler::schedule_independent_event(Event& event) {
-	std::queue<Event*> eventVec;
-	eventVec.push(&event);
+	std::queue<Event> eventVec;
+	eventVec.push(event);
 	schedule_dependent_events(eventVec);
 }
 
@@ -137,9 +137,11 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 		event.set_noop(false);
 		double time = in_how_long_can_this_event_be_scheduled(event);
 		if (time == 0) {
+			ftl.set_replace_address(event);
 			execute_next(event);
 		}
 		else if (event.get_bus_wait_time() > 50) {
+			ftl.set_replace_address(event);
 			event.incr_bus_wait_time(time);
 			event.incr_time_taken(time);
 			execute_next(event);

@@ -52,12 +52,16 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 		wcrc_pointer.page = num_pages_written = wcrc_pointer.page + 1;
 	}
 
+	assert(num_free_pages > 0);
 	num_free_pages--;
-	num_available_pages_for_new_writes--;
+	if (!event.is_garbage_collection_op()) {
+		assert(num_available_pages_for_new_writes > 0);
+		num_available_pages_for_new_writes--;
+	}
 
 	// if there are very few pages left, need to trigger emergency GC
 	if (num_free_pages <= BLOCK_SIZE) {
-		Block_manager_parallel::Garbage_Collect(event.get_start_time() + event.get_time_taken());
+		Garbage_Collect(event.get_start_time() + event.get_time_taken());
 		return;
 	}
 
@@ -67,8 +71,10 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 	}
 
 	if (block_address.compare(free_block_pointers[package_id][die_id]) == BLOCK) {
+		printf("hot pointer ");
+		free_block_pointers[package_id][die_id].print();
+		printf(" is out of space\n");
 		Address free_block = find_free_unused_block(package_id, die_id);
-		int page = free_block_pointers[package_id][die_id].page;
 		if (free_block.valid != NONE) {
 			free_block_pointers[package_id][die_id] = free_block;
 		} else {
@@ -101,15 +107,19 @@ void Block_manager_parallel_wearwolf::register_erase_outcome(Event const& event,
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;
 
+	Address addr = event.get_address();
+	addr.valid = PAGE;
+	addr.page = 0;
+
 	// TODO: Need better logic for this assignment. Easiest to remember some state.
 	// when we trigger GC for a cold pointer, remember which block was chosen.
 	if (free_block_pointers[package_id][die_id].page >= BLOCK_SIZE) {
-		free_block_pointers[package_id][die_id] = event.get_address();
+		free_block_pointers[package_id][die_id] = addr;
 	}
 	else if (wcrh_pointer.page >= BLOCK_SIZE) {
-		wcrh_pointer = event.get_address();
+		wcrh_pointer = addr;
 	} else if (wcrc_pointer.page >= BLOCK_SIZE) {
-		wcrc_pointer = event.get_address();
+		wcrc_pointer = addr;
 	}
 
 	// update num_free_pages
@@ -120,6 +130,7 @@ void Block_manager_parallel_wearwolf::register_erase_outcome(Event const& event,
 	num_available_pages_for_new_writes += BLOCK_SIZE;
 
 	long phys_addr = event.get_address().get_linear_address();
+	long how_many = blocks_currently_undergoing_gc.count(phys_addr);
 	assert(blocks_currently_undergoing_gc.count(phys_addr) == 1);
 	blocks_currently_undergoing_gc.erase(phys_addr);
 	assert(blocks_currently_undergoing_gc.count(phys_addr) == 0);
@@ -188,10 +199,16 @@ void Block_manager_parallel_wearwolf::register_read_outcome(Event const& event, 
 
 void Block_manager_parallel_wearwolf::check_if_should_trigger_more_GC(double start_time) {
 	if (num_free_pages <= BLOCK_SIZE) {
-		Block_manager_parallel::Garbage_Collect(start_time);
+		Garbage_Collect(start_time);
 		return;
 	}
-	Block_manager_parallel::check_if_should_trigger_more_GC(start_time);
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			if (free_block_pointers[i][j].page >= BLOCK_SIZE) {
+				Garbage_Collect(i, j, start_time);
+			}
+		}
+	}
 	if (wcrh_pointer.page >= BLOCK_SIZE) {
 		Address addr = page_hotness_measurer.get_die_with_least_wcrh();
 		Address free_block = find_free_unused_block(addr.package, addr.die);
@@ -271,8 +288,13 @@ void Block_manager_parallel_wearwolf::Garbage_Collect(double start_time) {
 	// first, find the cheapest block
 	std::sort(all_blocks.begin(), all_blocks.end(), block_valid_pages_comparator_wearwolf());
 
-	assert(num_free_pages == BLOCK_SIZE);
-	assert(num_available_pages_for_new_writes > 4);
+	assert(num_free_pages <= BLOCK_SIZE);
+
+	if (num_available_pages_for_new_writes < BLOCK_SIZE) {
+		assert(blocks_currently_undergoing_gc.size() > 0);
+		return;
+	}
+	//assert(num_available_pages_for_new_writes == BLOCK_SIZE);
 
 	Block *target;
 	bool found_suitable_block = false;
@@ -291,7 +313,10 @@ void Block_manager_parallel_wearwolf::Garbage_Collect(double start_time) {
 	num_available_pages_for_new_writes -= target->get_pages_valid();
 	blocks_currently_undergoing_gc.insert(target->get_physical_address());
 
-	printf("Triggering emergency GC. Only %d free pages left\n", num_free_pages);
+	printf("Triggering emergency GC. Only %d free pages left.  ", num_free_pages);
+	Address a = Address(target->get_physical_address(), BLOCK);
+	a.print();
+	printf("\n");
 
 	migrate(target, start_time);
 }
@@ -311,25 +336,28 @@ void Block_manager_parallel_wearwolf::Garbage_Collect(uint package_id, uint die_
 			break;
 		}
 	}
-	assert(target->get_state() != FREE);
 	if (!found_suitable_block && blocks_currently_undergoing_gc.size() == 0) {
 		assert(false);
 	}
+	if (!found_suitable_block) {
+		return;
+	}
+
+	assert(target->get_state() != FREE && target->get_state() != PARTIALLY_FREE && target->get_pages_valid() <= num_available_pages_for_new_writes);
 
 	blocks_currently_undergoing_gc.insert(target->get_physical_address());
+	num_available_pages_for_new_writes -= target->get_pages_valid();
 
 	printf("triggering GC in ");
 	Address a = Address(target->get_physical_address(), BLOCK);
 	a.print();
+	printf("  %d invalid,  %d valid", target->get_pages_invalid(), target->get_pages_valid());
 	printf("\n");
-
-	num_available_pages_for_new_writes -= target->get_pages_valid();
 
 	migrate(target, start_time);
 }
 
 Address Block_manager_parallel_wearwolf::find_free_unused_block(uint package_id, uint die_id) {
-	//std::sort(blocks[package_id][die_id].begin(), blocks[package_id][die_id].end(), block_valid_pages_comparator_wearwolf());
 	Block *target;
 	for (uint j = 0; j < blocks[package_id][die_id].size(); j++) {
 		target = blocks[package_id][die_id][j];
@@ -340,6 +368,8 @@ Address Block_manager_parallel_wearwolf::find_free_unused_block(uint package_id,
 				ba.compare(wcrc_pointer) != BLOCK
 			)
 		{
+			ba.valid = PAGE;
+			ba.page = 0;
 			return ba;
 		}
 	}

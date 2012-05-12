@@ -47,7 +47,8 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	noop(false),
 	id(id_generator++),
 	application_io_id(application_io_id_generator++),
-	garbage_collection_op(false)
+	garbage_collection_op(false),
+	mapping_op(false)
 {
 	assert(start_time >= 0.0);
 	return;
@@ -192,6 +193,9 @@ void *Event::get_payload(void) const
 
 void Event::set_address(const Address &address)
 {
+	if (type == WRITE || type == READ || type == READ_COMMAND || type == READ_TRANSFER) {
+		assert(address.valid == PAGE);
+	}
 	this -> address = address;
 	return;
 }
@@ -220,10 +224,17 @@ void Event::set_garbage_collection_op(bool value) {
 	garbage_collection_op = value;
 }
 
+void Event::set_mapping_op(bool value) {
+	mapping_op = value;
+}
+
 bool Event::is_garbage_collection_op() const {
 	return garbage_collection_op;
 }
 
+bool Event::is_mapping_op() const {
+	return mapping_op;
+}
 
 void Event::set_start_time(double value) {
 	assert(value > 0);

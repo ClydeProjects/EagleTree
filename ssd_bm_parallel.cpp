@@ -210,13 +210,13 @@ void Block_manager_parallel::check_if_should_trigger_more_GC(double start_time) 
 }
 
 void Block_manager_parallel::migrate(Block const* const block, double start_time) const {
-	Event* erase = new Event(ERASE, 0, 1, start_time); // TODO: set start_time and copy any valid pages
-	erase->set_address(Address(block->physical_address, BLOCK));
-	erase->set_garbage_collection_op(true);
-	uint dependency_code = erase->get_application_io_id();
+	Event erase = Event(ERASE, 0, 1, start_time); // TODO: set start_time and copy any valid pages
+	erase.set_address(Address(block->physical_address, BLOCK));
+	erase.set_garbage_collection_op(true);
+	uint dependency_code = erase.get_application_io_id();
 
 	// must also change the mapping here. Will eventually do that.
-	std::queue<Event*> events;
+	std::queue<Event> events;
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
 		block->getPages()[0];
 		Page const& page = block->getPages()[i];
@@ -227,14 +227,14 @@ void Block_manager_parallel::migrate(Block const* const block, double start_time
 			long logical_address = ftl.get_logical_address(addr.get_linear_address());
 
 			// TODO: this read should really be done through the FTL. The mapping may not be in cache
-			Event* read = new Event(READ, logical_address, 1, start_time);
-			read->set_address(addr);
-			read->set_application_io_id(dependency_code);
-			read->set_garbage_collection_op(true);
+			Event read = Event(READ, logical_address, 1, start_time);
+			read.set_address(addr);
+			read.set_application_io_id(dependency_code);
+			read.set_garbage_collection_op(true);
 
-			Event* write = new Event(WRITE, logical_address, 1, start_time);
-			write->set_application_io_id(dependency_code);
-			write->set_garbage_collection_op(true);
+			Event write = Event(WRITE, logical_address, 1, start_time);
+			write.set_application_io_id(dependency_code);
+			write.set_garbage_collection_op(true);
 
 			events.push(read);
 			events.push(write);

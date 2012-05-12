@@ -108,5 +108,8 @@ enum page_state Page::get_state(void) const
 
 void Page::set_state(enum page_state state)
 {
+	if (this -> state == EMPTY) {
+		assert(state != INVALID);
+	}
 	this -> state = state;
 }

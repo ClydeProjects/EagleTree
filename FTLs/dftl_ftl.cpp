@@ -73,7 +73,7 @@ enum status FtlImpl_Dftl::read(Event &event)
 	}
 
 	controller.stats.numFTLRead++;
-	current_dependent_events.push(&event);
+	current_dependent_events.push(event);
 	IOScheduler::instance()->schedule_dependent_events(current_dependent_events);
 	return SUCCESS;
 }
@@ -88,11 +88,7 @@ enum status FtlImpl_Dftl::write(Event &event)
 	// Important order. As get_free_data_page might change current.
 	//long free_page = get_free_data_page(event);
 
-	MPage current = trans_map[dlpn];
 
-	Address a = Address(current.ppn, PAGE);
-	if (current.ppn != -1)
-		event.set_replace_address(a);
 
 	//update_translation_map(current, free_page);
 	//trans_map.replace(trans_map.begin()+dlpn, current);
@@ -102,7 +98,7 @@ enum status FtlImpl_Dftl::write(Event &event)
 
 	controller.stats.numFTLWrite++;
 
-	current_dependent_events.push(&event);
+	current_dependent_events.push(event);
 	IOScheduler::instance()->schedule_dependent_events(current_dependent_events);
 	return SUCCESS;
 }
@@ -243,7 +239,34 @@ void FtlImpl_Dftl::register_write_completion(Event const& event, enum status res
 
 	trans_map.replace(trans_map.begin() + logical, current);
 
+	if (event.is_mapping_op()) {
+		long mvpn = logical / 512;
+		long original = global_translation_directory[mvpn];
+
+		Address address = Address(original, PAGE);
+		Block *block = controller.get_block_pointer(address);
+		block->invalidate_page(address.page);
+
+		global_translation_directory[mvpn] = physical;
+	}
+
+	// if mapping write, need to take physical address and logical address, and update global mapping dir.
+	// but how do I know if it's a mapping write? can add state to the event object.
+
+
 	/*MPage current1 = trans_map[logical];
 	update_translation_map(current1, physical);
 	printf("f");*/
+}
+
+// important to execute this immediately before a write is executed
+// to ensure that the replace address has not been changed by GC while this write
+// in the IO scheduler queue
+void FtlImpl_Dftl::set_replace_address(Event& event) const {
+	assert(event.get_event_type() == WRITE);
+	MPage current = trans_map[event.get_logical_address()];
+	Address a = Address(current.ppn, PAGE);
+	if (current.ppn != -1) {
+		event.set_replace_address(a);
+	}
 }
