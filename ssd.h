@@ -30,6 +30,7 @@
 #include <vector>
 #include <stack>
 #include <queue>
+#include <deque>
 #include <map>
 #include <set>
 #include <algorithm>
@@ -888,13 +889,23 @@ private:
 	bool can_schedule_on_die(Event const& event) const;
 	void handle_finished_event(Event const&event, enum status outcome);
 
+	void eliminate_conflict_with_any_incoming_gc(Event const&event);
+	void adjust_conflict_elimination_structures(Event const&event);
+
+	//void consolidate_events(std::vector<Event>& events);
+	//void consolidate(Event& event, uint dependency_code);
+
 	std::vector<Event> io_schedule;
-	std::map<uint, std::queue<Event> > dependencies;
+	std::map<uint, std::deque<Event> > dependencies;
 
 	static IOScheduler *inst;
 	Ssd& ssd;
 	FtlParent& ftl;
 	Block_manager_parallel_wearwolf bm;
+
+
+	std::map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations.
+	std::set<long> pending_writes;	 // contains the LBAs of addresses that are to be rewritten.
 };
 
 class FtlParent
@@ -922,8 +933,10 @@ public:
 	// TODO: this method should be abstract, but I am not making it so because
 	// I dont't want to implement it in BAST and FAST yet
 	virtual void register_write_completion(Event const& event, enum status result);
+	virtual void register_read_completion(Event const& event, enum status result);
 	virtual long get_logical_address(uint physical_address) const;
 	virtual void set_replace_address(Event& event) const;
+	virtual void set_read_address(Event& event) const;
 protected:
 	Controller &controller;
 };
@@ -1060,7 +1073,7 @@ protected:
 	long get_free_data_page(Event &event);
 	long get_free_data_page(Event &event, bool insert_events);
 
-	virtual void evict_page_from_cache(Event &event);
+	void evict_page_from_cache( Event & event);
 	void evict_specific_page_from_cache(Event &event, long lba);
 
 	long get_logical_address(uint physical_address) const;
@@ -1095,7 +1108,9 @@ public:
 	void cleanup_block(Event &event, Block *block);
 	void print_ftl_statistics();
 	void register_write_completion(Event const& event, enum status result);
+	virtual void register_read_completion(Event const& event, enum status result);
 	virtual void set_replace_address(Event& event) const;
+	virtual void set_read_address(Event& event) const;
 private:
 	const double over_provisioning_percentage;
 };

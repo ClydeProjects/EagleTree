@@ -235,6 +235,7 @@ void Block_manager_parallel::migrate(Block const* const block, double start_time
 			Event write = Event(WRITE, logical_address, 1, start_time);
 			write.set_application_io_id(dependency_code);
 			write.set_garbage_collection_op(true);
+			write.set_replace_address(addr);
 
 			events.push(read);
 			events.push(write);

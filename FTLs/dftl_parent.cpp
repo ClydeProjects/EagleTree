@@ -175,32 +175,11 @@ void FtlImpl_DftlParent::resolve_mapping(Event &event, bool isWrite)
 	if (lookup_CMT(event.get_logical_address(), event))
 	{
 		controller.stats.numCacheHits++;
-
-		if (isWrite)
-		{
-			MPage current = trans_map[dlpn];
-			current.modified_ts = event.get_start_time();
-			trans_map.replace(trans_map.begin()+dlpn, current);
-		}
-
 		evict_page_from_cache(event);
 	} else {
 		controller.stats.numCacheFaults++;
-
 		evict_page_from_cache(event);
-
 		consult_GTD(dlpn, event);
-
-		// all of this next stuff would actually have to be in call back. But for ease, we might as well make it here.
-		MPage current = trans_map[dlpn];
-		current.modified_ts = event.get_start_time();  // this should actually be the time at the end of the event, I think.
-		if (isWrite)
-			current.modified_ts++;						// this if statement, I dont get at all. Why increment modified_ts?
-		current.create_ts = event.get_start_time();
-		current.cached = true;
-		trans_map.replace(trans_map.begin()+dlpn, current);
-
-		cmt++;
 	}
 }
 
@@ -238,7 +217,7 @@ void FtlImpl_DftlParent::evict_page_from_cache(Event &event)
 
 			if (controller.issue(write_event) == FAILURE) {	assert(false);}
 
-			event.incr_time_taken(write_event.get_time_taken());
+			//event.incr_time_taken(write_event.get_time_taken());
 			controller.stats.numFTLWrite++;
 			controller.stats.numGCWrite++;
 		}
