@@ -241,7 +241,7 @@ void IOScheduler::execute_next_batch(std::vector<Event>& events) {
 	for(uint i = 0; i < events.size(); i++) {
 		Event event = events[i];
 		assert(event.get_event_type() != WRITE);
-		if (event.get_event_type() == READ_COMMAND) {
+		if (event.get_event_type() == READ_COMMAND || event.get_event_type() == READ_TRANSFER) {
 			ftl.set_read_address(event);
 		}
 		double time = in_how_long_can_this_event_be_scheduled(event);

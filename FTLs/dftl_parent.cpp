@@ -92,24 +92,16 @@ FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
 
 void FtlImpl_DftlParent::consult_GTD(long dlpn, Event &event)
 {
-	// convert to GTD index
 	long mvpn = dlpn / addressPerPage;
-
-	long g = global_translation_directory[0];
 	long mppn = global_translation_directory[mvpn];
 	if (mppn == -1) {
 		return;
 	}
 	Address mapping_address = Address(mppn, PAGE);
-
-	// Simulate that we goto translation map and read the mapping page.
-	Event readEvent = Event(READ, event.get_logical_address(), 1, event.get_start_time());
+	Event readEvent = Event(READ, mvpn, 1, event.get_start_time());
 	readEvent.set_address(mapping_address);
-	//readEvent->set_noop(true);
+	readEvent.set_mapping_op(true);
 	current_dependent_events.push(readEvent);
-
-	//event.consolidate_metaevent(readEvent);
-	//event.incr_time_taken(readEvent.get_time_taken());
 	controller.stats.numFTLRead++;
 }
 
@@ -169,9 +161,7 @@ void FtlImpl_DftlParent::resolve_mapping(Event &event, bool isWrite)
 	 * 2. If, then serve
 	 * 3. If not, then goto GDT, lookup page
 	 * 4. If CMT full, evict a page
-	 * 5. Add mapping to CMT
 	 */
-	//printf("%i\n", cmt);
 	if (lookup_CMT(event.get_logical_address(), event))
 	{
 		controller.stats.numCacheHits++;
@@ -199,6 +189,7 @@ void FtlImpl_DftlParent::evict_page_from_cache(Event &event)
 			// we take the opportunity to also update all cached entries from the same mapping page.
 			// this means that when other entires from the same mapping page are evicted, they will not trigger a write.
 			int vpnBase = evictPage.vpn - evictPage.vpn % addressPerPage;
+			int num_cached_entries_in_mapping_page = 1;
 			for (int i=0;i<addressPerPage;i++)
 			{
 				MPage cur = trans_map[vpnBase+i];
@@ -206,18 +197,25 @@ void FtlImpl_DftlParent::evict_page_from_cache(Event &event)
 				{
 					cur.create_ts = cur.modified_ts;
 					trans_map.replace(trans_map.begin()+vpnBase+i, cur);
+					num_cached_entries_in_mapping_page++;
 				}
 			}
 
-			Event write_event = Event(WRITE, event.get_logical_address(), 1, event.get_start_time());
+			// if not all entries from the mappign page are cached, need to read the page
+			long mvpn = evictPage.vpn / addressPerPage;
+			long mppn = global_translation_directory[mvpn];
+			if (mppn != -1 && num_cached_entries_in_mapping_page < addressPerPage) {
+				Address mapping_address = Address(mppn, PAGE);
+				Event readEvent = Event(READ, mvpn, 1, event.get_start_time());
+				readEvent.set_address(mapping_address);
+				readEvent.set_mapping_op(true);
+				current_dependent_events.push(readEvent);
+			}
+
+			Event write_event = Event(WRITE, mvpn, 1, event.get_start_time());
 			write_event.set_mapping_op(true);
 			current_dependent_events.push(write_event);
-			//write_event.set_address(Address(0, PAGE));
-			//write_event.set_noop(true);
 
-			if (controller.issue(write_event) == FAILURE) {	assert(false);}
-
-			//event.incr_time_taken(write_event.get_time_taken());
 			controller.stats.numFTLWrite++;
 			controller.stats.numGCWrite++;
 		}
@@ -235,6 +233,9 @@ void FtlImpl_DftlParent::evict_page_from_cache(Event &event)
 // if a page is trimmed, it does
 void FtlImpl_DftlParent::evict_specific_page_from_cache(Event &event, long lba)
 {
+		// asserting false because this method still needs work
+		assert(false);
+
 		// Find page to evict
 		MPage evictPage = trans_map[lba];
 

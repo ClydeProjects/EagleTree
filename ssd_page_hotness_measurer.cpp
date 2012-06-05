@@ -13,7 +13,6 @@ using namespace ssd;
 #define INTERVAL_LENGTH 500
 #define WEIGHT 0.5
 
-
 Page_Hotness_Measurer::Page_Hotness_Measurer()
 	:	write_current_count(),
 		write_moving_average(NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE, 0),
@@ -38,7 +37,7 @@ enum read_hotness Page_Hotness_Measurer::get_read_hotness(unsigned long page_add
 	return read_moving_average[page_address] >= average_read_hotness ? READ_HOT : READ_COLD;
 }
 
-Address Page_Hotness_Measurer::get_die_with_least_wcrh() const {
+/*Address Page_Hotness_Measurer::get_die_with_least_wcrh() const {
 	uint package;
 	uint die;
 	double min = PLANE_SIZE * BLOCK_SIZE;
@@ -52,9 +51,9 @@ Address Page_Hotness_Measurer::get_die_with_least_wcrh() const {
 		}
 	}
 	return Address(package, die, 0,0,0, DIE);
-}
+}*/
 
-Address Page_Hotness_Measurer::get_die_with_least_wcrc() const {
+/*Address Page_Hotness_Measurer::get_die_with_least_wcrc() const {
 	uint package;
 	uint die;
 	double min = PLANE_SIZE * BLOCK_SIZE;
@@ -63,6 +62,30 @@ Address Page_Hotness_Measurer::get_die_with_least_wcrc() const {
 			//printf("%d\n", num_wcrc_pages_per_die[i][j]);
 			if (min >= num_wcrc_pages_per_die[i][j]) {
 				min = num_wcrc_pages_per_die[i][j];
+				package = i;
+				die = j;
+			}
+		}
+	}
+	return Address(package, die, 0,0,0, DIE);
+}*/
+
+Address Page_Hotness_Measurer::get_die_with_least_WC(enum read_hotness rh) const {
+	uint package;
+	uint die;
+	std::vector<std::vector<uint> > num_such_pages_per_die;
+	if (rh == READ_COLD) {
+		num_such_pages_per_die = num_wcrc_pages_per_die;
+	} else if (rh == READ_HOT) {
+		num_such_pages_per_die = num_wcrh_pages_per_die;
+	}
+
+	double min = PLANE_SIZE * BLOCK_SIZE;
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			//printf("%d\n", num_wcrc_pages_per_die[i][j]);
+			if (min >= num_such_pages_per_die[i][j]) {
+				min = num_such_pages_per_die[i][j];
 				package = i;
 				die = j;
 			}

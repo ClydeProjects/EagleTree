@@ -298,7 +298,7 @@ void FtlImpl_Dftl::set_replace_address(Event& event) const {
 // important to execute this immediately before a read is executed
 // to ensure that the address has not been changed by GC in the meanwhile
 void FtlImpl_Dftl::set_read_address(Event& event) const {
-	assert(event.get_event_type() == READ_COMMAND);
+	assert(event.get_event_type() == READ_COMMAND || event.get_event_type() == READ_TRANSFER);
 	MPage current = trans_map[event.get_logical_address()];
 	assert(current.cached);
 	assert(current.ppn != -1);

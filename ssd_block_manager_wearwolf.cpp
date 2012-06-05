@@ -6,7 +6,8 @@ using namespace ssd;
 Block_manager_parallel_wearwolf::Block_manager_parallel_wearwolf(Ssd& ssd, FtlParent& ftl)
 	: Block_manager_parallel(ssd, ftl),
 	  page_hotness_measurer(),
-	  blocks_currently_undergoing_gc()
+	  blocks_currently_undergoing_gc(),
+	  enable_cold_data_balancing(true)
 {
 	if (SSD_SIZE > 1) {
 		wcrh_pointer = Address(0,0,0,1,0, PAGE);
@@ -36,6 +37,7 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 		page_hotness_measurer.register_event(event);
 	}
 
+	// Increment block pointer
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;
 	Address block_address = Address(event.get_address().get_linear_address(), BLOCK);
@@ -52,6 +54,7 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 		wcrc_pointer.page = num_pages_written = wcrc_pointer.page + 1;
 	}
 
+	// Update stats about free pages
 	assert(num_free_pages > 0);
 	num_free_pages--;
 	if (!event.is_garbage_collection_op()) {
@@ -65,11 +68,12 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 		return;
 	}
 
-	//there is still more room in this pointer, so no need to trigger GC
+	// there is still more room in this pointer, so no need to trigger GC
 	if (num_pages_written < BLOCK_SIZE) {
 		return;
 	}
 
+	// check if the pointer if full. If it is, find a free block for a new pointer, or trigger GC if there are no free blocks
 	if (block_address.compare(free_block_pointers[package_id][die_id]) == BLOCK) {
 		printf("hot pointer ");
 		free_block_pointers[package_id][die_id].print();
@@ -81,20 +85,29 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 			Garbage_Collect(package_id, die_id, event.get_start_time() + event.get_time_taken());
 		}
 	} else if (block_address.compare(wcrh_pointer) == BLOCK) {
-		Address addr = page_hotness_measurer.get_die_with_least_wcrh();
-		Address free_block = find_free_unused_block(addr.package, addr.die);
-		if (free_block.valid != NONE) {
-			wcrh_pointer = free_block;
-		} else {
-			Garbage_Collect(addr.package, addr.die, event.get_start_time() + event.get_time_taken());
-		}
+		handle_cold_pointer_out_of_space(READ_HOT, event.get_start_time() + event.get_time_taken());
 	} else if (block_address.compare(wcrc_pointer) == BLOCK) {
-		Address addr = page_hotness_measurer.get_die_with_least_wcrc();
+		handle_cold_pointer_out_of_space(READ_COLD, event.get_start_time() + event.get_time_taken());
+	}
+}
+
+void Block_manager_parallel_wearwolf::handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time) {
+	Address addr = page_hotness_measurer.get_die_with_least_WC(rh);
+	Address& pointer = rh == READ_COLD ? wcrc_pointer : wcrh_pointer;
+	if (enable_cold_data_balancing) {
+		Address free_block = find_free_unused_block();
+		if (free_block.valid != NONE) {
+			pointer = free_block;
+		} else {
+			Garbage_Collect(start_time);
+		}
+	}
+	else {
 		Address free_block = find_free_unused_block(addr.package, addr.die);
 		if (free_block.valid != NONE) {
-			wcrc_pointer = free_block;
+			pointer = free_block;
 		} else {
-			Garbage_Collect(addr.package, addr.die, event.get_start_time() + event.get_time_taken());
+			Garbage_Collect(addr.package, addr.die, start_time);
 		}
 	}
 }
@@ -124,13 +137,9 @@ void Block_manager_parallel_wearwolf::register_erase_outcome(Event const& event,
 
 	// update num_free_pages
 	num_free_pages += BLOCK_SIZE;
-
-	// check if there are any dies on which there are no free pointers. Trigger GC on them.
-
 	num_available_pages_for_new_writes += BLOCK_SIZE;
 
 	long phys_addr = event.get_address().get_linear_address();
-	long how_many = blocks_currently_undergoing_gc.count(phys_addr);
 	assert(blocks_currently_undergoing_gc.count(phys_addr) == 1);
 	blocks_currently_undergoing_gc.erase(phys_addr);
 	assert(blocks_currently_undergoing_gc.count(phys_addr) == 0);
@@ -210,22 +219,10 @@ void Block_manager_parallel_wearwolf::check_if_should_trigger_more_GC(double sta
 		}
 	}
 	if (wcrh_pointer.page >= BLOCK_SIZE) {
-		Address addr = page_hotness_measurer.get_die_with_least_wcrh();
-		Address free_block = find_free_unused_block(addr.package, addr.die);
-		if (free_block.valid != NONE) {
-			wcrh_pointer = free_block;
-		} else {
-			Garbage_Collect(addr.package, addr.die, start_time);
-		}
+		handle_cold_pointer_out_of_space(READ_HOT, start_time);
 	}
 	if (wcrc_pointer.page >= BLOCK_SIZE) {
-		Address addr = page_hotness_measurer.get_die_with_least_wcrc();
-		Address free_block = find_free_unused_block(addr.package, addr.die);
-		if (free_block.valid != NONE) {
-			wcrc_pointer = free_block;
-		} else {
-			Garbage_Collect(addr.package, addr.die, start_time);
-		}
+		handle_cold_pointer_out_of_space(READ_COLD, start_time);
 	}
 }
 
@@ -331,14 +328,15 @@ void Block_manager_parallel_wearwolf::Garbage_Collect(uint package_id, uint die_
 		if (blocks_currently_undergoing_gc.count(target->get_physical_address()) == 0 &&
 				target->get_state() != FREE &&
 				target->get_state() != PARTIALLY_FREE &&
+				target->get_pages_valid() < BLOCK_SIZE &&
 				num_available_pages_for_new_writes >= target->get_pages_valid()) {
 			found_suitable_block = true;
 			break;
 		}
 	}
-	if (!found_suitable_block && blocks_currently_undergoing_gc.size() == 0) {
-		assert(false);
-	}
+	//if (!found_suitable_block && blocks_currently_undergoing_gc.size() == 0) {
+	//	assert(false);
+	//}
 	if (!found_suitable_block) {
 		return;
 	}
@@ -357,6 +355,20 @@ void Block_manager_parallel_wearwolf::Garbage_Collect(uint package_id, uint die_
 	migrate(target, start_time);
 }
 
+// finds and returns a free block from anywhere in the SSD. Returns Address(0, NONE) is there is no such block
+Address Block_manager_parallel_wearwolf::find_free_unused_block() {
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			Address address = find_free_unused_block(i, j);
+			if (address.valid != NONE) {
+				return address;
+			}
+		}
+	}
+	return Address(0, NONE);
+}
+
+// finds and returns a free block a spesific die. Returns Address(0, NONE) is there is no such block
 Address Block_manager_parallel_wearwolf::find_free_unused_block(uint package_id, uint die_id) {
 	Block *target;
 	for (uint j = 0; j < blocks[package_id][die_id].size(); j++) {

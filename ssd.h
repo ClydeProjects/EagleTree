@@ -723,8 +723,9 @@ public:
 	void register_event(Event const& event);
 	enum write_hotness get_write_hotness(unsigned long page_address) const;
 	enum read_hotness get_read_hotness(unsigned long page_address) const;
-	Address get_die_with_least_wcrh() const;
-	Address get_die_with_least_wcrc() const;
+	// Address get_die_with_least_wcrh() const;
+	// Address get_die_with_least_wcrc() const;
+	Address get_die_with_least_WC(enum read_hotness rh) const;
 private:
 	void start_new_interval_writes();
 	void start_new_interval_reads();
@@ -737,7 +738,6 @@ private:
 	double average_read_hotness;
 	std::vector<std::vector<uint> > num_wcrh_pages_per_die;
 	std::vector<std::vector<uint> > num_wcrc_pages_per_die;
-
 	std::vector<std::vector<double> > average_reads_per_die;
 	std::vector<std::vector<uint> > current_reads_per_die;
 	uint writes_counter;
@@ -790,12 +790,15 @@ protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 private:
 	Address find_free_unused_block(uint package_id, uint die_id);
+	Address find_free_unused_block();
 	bool pointer_can_be_written_to(Address pointer) const;
 	bool at_least_one_available_write_hot_pointer() const;
+	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
 	Page_Hotness_Measurer page_hotness_measurer;
 	Address wcrh_pointer;
 	Address wcrc_pointer;
 	std::set<long> blocks_currently_undergoing_gc;
+	bool enable_cold_data_balancing;
 };
 
 class Block_manager
@@ -1058,7 +1061,6 @@ protected:
 
 	typedef trans_set::nth_index<0>::type MpageByID;
 	typedef trans_set::nth_index<1>::type MpageByModified;
-
 	trans_set trans_map;
 	long *reverse_trans_map;
 

@@ -286,6 +286,8 @@ void Event::print(FILE *stream) const
 	fprintf(stream, " application io ID: %d", application_io_id);
 	if (garbage_collection_op) {
 		fprintf(stream, " GC");
+	} else if (mapping_op)  {
+		fprintf(stream, " MAPPING");
 	}
 	fprintf(stream, "\n");
 	return;
