@@ -249,8 +249,10 @@ class Package;
 class Garbage_Collector;
 class Wear_Leveler;
 class Block_manager;
+class Block_manager_parent;
 class Block_manager_parallel;
 class Block_manager_parallel_wearwolf;
+class Block_manager_parallel_hot_cold_seperation;
 class Page_Hotness_Measurer;
 class IOScheduler;
 class FtlParent;
@@ -744,38 +746,56 @@ private:
 	uint reads_counter;
 };
 
-class Block_manager_parallel {
+class Block_manager_parent {
 public:
-	Block_manager_parallel(Ssd& ssd, FtlParent& ftl);
-	~Block_manager_parallel();
+	Block_manager_parent(Ssd& ssd, FtlParent& ftl);
+	~Block_manager_parent();
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual Address choose_write_location(Event const& event) const;
+	virtual Address choose_write_location(Event const& event) const = 0;
 	virtual bool can_write(Event const& write) const;
 protected:
 	virtual void Garbage_Collect(uint package_id, uint die_id, double start_time);
-	virtual void Garbage_Collect(double start_time);
-	virtual void Wear_Level(Event const& event);
-	void migrate(Block const* const block, double start_time) const;
+	void perform_emergency_garbage_collection(double start_time);
 	virtual void check_if_should_trigger_more_GC(double start_time);
-	std::vector<std::vector<std::vector<Block*> > > blocks;
-	std::vector<Block*> all_blocks;
-	std::vector<std::vector<Address> > free_block_pointers;
-	uint num_free_pages;
-	uint num_available_pages_for_new_writes;
+	virtual void Wear_Level(Event const& event);
+	virtual Address find_free_unused_block(uint package_id, uint die_id);
+	Address find_free_unused_block();
+	virtual Address get_free_die_with_shortest_IO_queue() const;
 	Ssd& ssd;
 	FtlParent& ftl;
+
+	std::vector<std::vector<Address> > free_block_pointers;
+	std::vector<std::vector<std::vector<Address> > > free_blocks;
+private:
+	void migrate(Block const* const block, double start_time);
+	void update_blocks_with_min_age(uint age);
+	std::vector<std::vector<std::vector<Block*> > > blocks;
+	std::vector<Block*> all_blocks;
 	// WL structures
 	uint max_age;
 	std::set<Block*> blocks_with_min_age;
 	std::queue<Block*> blocks_to_wl;
-private:
-	bool has_free_pages(uint package_id, uint die_id) const;
-	void update_blocks_with_min_age(uint age);
+	uint num_free_pages;
+	uint num_available_pages_for_new_writes;
+	std::set<long> blocks_currently_undergoing_gc;
 };
 
-class Block_manager_parallel_wearwolf : Block_manager_parallel {
+// A BM that assigns each write to the die with the shortest queue. No hot-cold seperation
+class Block_manager_parallel : protected Block_manager_parent {
+public:
+	Block_manager_parallel(Ssd& ssd, FtlParent& ftl);
+	~Block_manager_parallel();
+	virtual void register_write_outcome(Event const& event, enum status status);
+	virtual void register_erase_outcome(Event const& event, enum status status);
+	virtual Address choose_write_location(Event const& event) const;
+	virtual bool can_write(Event const& write) const;
+private:
+	bool has_free_pages(uint package_id, uint die_id) const;
+};
+
+class Block_manager_parallel_wearwolf : protected Block_manager_parent {
 public:
 	Block_manager_parallel_wearwolf(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel_wearwolf();
@@ -785,20 +805,36 @@ public:
 	virtual Address choose_write_location(Event const& event) const;
 	virtual bool can_write(Event const& write) const;
 protected:
-	virtual void Garbage_Collect(uint package_id, uint die_id, double start_time);
-	virtual void Garbage_Collect(double start_time);
 	virtual void check_if_should_trigger_more_GC(double start_time);
 private:
-	Address find_free_unused_block(uint package_id, uint die_id);
-	Address find_free_unused_block();
 	bool pointer_can_be_written_to(Address pointer) const;
 	bool at_least_one_available_write_hot_pointer() const;
 	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
 	Page_Hotness_Measurer page_hotness_measurer;
 	Address wcrh_pointer;
 	Address wcrc_pointer;
-	std::set<long> blocks_currently_undergoing_gc;
-	bool enable_cold_data_balancing;
+
+};
+
+// A BM that assigns each write to the die with the shortest queue, as well as hot-cold seperation
+class Block_manager_parallel_hot_cold_seperation : Block_manager_parent {
+public:
+	Block_manager_parallel_hot_cold_seperation(Ssd& ssd, FtlParent& ftl);
+	~Block_manager_parallel_hot_cold_seperation();
+	virtual void register_write_outcome(Event const& event, enum status status);
+	virtual void register_read_outcome(Event const& event, enum status status);
+	virtual void register_erase_outcome(Event const& event, enum status status);
+	virtual Address choose_write_location(Event const& event) const;
+	virtual bool can_write(Event const& write) const;
+protected:
+	virtual void check_if_should_trigger_more_GC(double start_time);
+private:
+
+	bool pointer_can_be_written_to(Address pointer) const;
+	bool at_least_one_available_write_hot_pointer() const;
+	void handle_cold_pointer_out_of_space(double start_time);
+	Page_Hotness_Measurer page_hotness_measurer;
+	Address cold_pointer;
 };
 
 class Block_manager
@@ -1220,7 +1256,7 @@ public:
 	void *get_result_buffer();
 	friend class Controller;
 	friend class IOScheduler;
-	friend class Block_manager_parallel;
+	friend class Block_manager_parent;
 	void print_statistics();
 	void reset_statistics();
 	void write_statistics(FILE *stream);

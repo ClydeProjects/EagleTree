@@ -21,8 +21,8 @@ Page_Hotness_Measurer::Page_Hotness_Measurer()
 		current_interval(0),
 		num_wcrh_pages_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
 		num_wcrc_pages_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
-		current_reads_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
 		average_reads_per_die(SSD_SIZE, std::vector<double>(PACKAGE_SIZE, 0)),
+		current_reads_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
 		writes_counter(0),
 		reads_counter(0)
 {}
