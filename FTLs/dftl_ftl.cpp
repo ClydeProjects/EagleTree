@@ -226,7 +226,7 @@ void FtlImpl_Dftl::register_write_completion(Event const& event, enum status res
 	uint physical = event.get_address().get_linear_address();
 	MPage current = trans_map[logical];
 
-	// if it's a normal write, we assume its mapping is cahced, and we update the modified ts to indicate change
+	// if it's a normal write, we assume its mapping is cached, and we update the modified ts to indicate change
 	if (!event.is_garbage_collection_op() && !event.is_mapping_op()) {
 		if (current.ppn == -1) {
 			current.modified_ts = event.get_start_time() + event.get_time_taken();
@@ -287,10 +287,11 @@ void FtlImpl_Dftl::register_read_completion(Event const& event, enum status resu
 // to ensure that the replace address has not been changed by GC while this write
 // in the IO scheduler queue
 void FtlImpl_Dftl::set_replace_address(Event& event) const {
-	assert(event.get_event_type() == WRITE);
 	MPage current = trans_map[event.get_logical_address()];
+	assert(event.get_event_type() == WRITE);
 	Address a = Address(current.ppn, PAGE);
 	if (current.ppn != -1) {
+		assert(current.cached);
 		event.set_replace_address(a);
 	}
 }

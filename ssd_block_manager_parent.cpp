@@ -86,10 +86,20 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	// if the block on which a page has been invalidated is now empty, erase it
 	Address ra = event.get_replace_address();
 	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
-	if (block.get_pages_invalid() == BLOCK_SIZE && blocks_currently_undergoing_gc.count(ra.get_linear_address()) == 0) {
+	if (block.get_pages_invalid() == BLOCK_SIZE && blocks_currently_undergoing_gc.count(block.get_physical_address()) == 0) {
 		double start_time = event.get_start_time() + event.get_time_taken();
-		migrate(&block, start_time);
 		printf("block "); ra.print(); printf(" is now invalid. An erase is issued\n");
+		migrate(&block, start_time);
+	}
+}
+
+void Block_manager_parent::register_write_arrival(Event const& event) {
+	assert(event.get_event_type() == WRITE);
+	Address ra = event.get_replace_address();
+	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
+	Page const& page = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block].getPages()[ra.page];
+	if (page.get_state() == VALID) {
+		block.invalidate_page(ra.page);
 	}
 }
 
@@ -245,8 +255,6 @@ void Block_manager_parent::Garbage_Collect(uint package_id, uint die_id, double 
 		a.print();
 		printf("  %d invalid,  %d valid\n", target->get_pages_invalid(), target->get_pages_valid());
 		migrate(target, start_time);
-	} else {
-		assert(blocks_currently_undergoing_gc.size() > 0);
 	}
 }
 

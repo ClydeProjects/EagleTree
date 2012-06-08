@@ -13,8 +13,7 @@ using namespace ssd;
 IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
 	ssd(ssd),
 	ftl(ftl),
-	bm(ssd, ftl),
-	pending_writes()
+	bm(ssd, ftl)
 {}
 
 IOScheduler::~IOScheduler(){}
@@ -46,9 +45,6 @@ void IOScheduler::schedule_dependent_events(std::queue<Event>& events) {
 		Event event = events.front();
 		events.pop();
 		event.set_application_io_id(dependency_code);
-		if (event.is_garbage_collection_op() && pending_writes.count(event.get_logical_address()) == 1) {
-			continue;
-		}
 		if (event.get_event_type() == READ) {
 			event.set_event_type(READ_TRANSFER);
 			Event* read_command = new Event(READ_COMMAND, event.get_logical_address(), event.get_size(), event.get_start_time());
@@ -68,7 +64,7 @@ void IOScheduler::schedule_dependent_events(std::queue<Event>& events) {
 	io_schedule.push_back(first);
 	std::sort(io_schedule.begin(), io_schedule.end(), myfunction);
 
-	while (io_schedule.back().get_start_time() + 1 <= first.get_start_time()) {
+	while (io_schedule.size() > 0 && io_schedule.back().get_start_time() + 1 <= first.get_start_time()) {
 		execute_current_waiting_ios();
 	}
 	assert(events.empty());
@@ -81,7 +77,7 @@ void IOScheduler::schedule_independent_event(Event& event) {
 }
 
 void IOScheduler::finish(double start_time) {
-	while (!io_schedule.empty() && io_schedule.back().get_start_time() + 1 < start_time) {
+	while (io_schedule.size() > 0 && io_schedule.back().get_start_time() + 1 < start_time) {
 		execute_current_waiting_ios();
 	}
 }
@@ -101,34 +97,8 @@ std::vector<Event> IOScheduler::gather_current_waiting_ios() {
 	return current_ios;
 }
 
-/*void IOScheduler::consolidate_events(std::vector<Event>& events) {
-	for (uint i = 0; i < events.size(); i++) {
-		Event event = events[i];
-		uint LBA = event.get_logical_address();
-		if (LBA_to_dependencies.count(LBA) == 1) {
-			std::deque<Event> deque = dependencies[event.get_application_io_id()];
-			std::vector<uint> indicies_with_LBA(0);
-			for (int j = 0; j < deque.size(); j++) {
-				if (deque[j].get_logical_address() == LBA) {
-					indicies_with_LBA.push_back(j);
-				}
-			}
-
-		} else {
-			LBA_to_dependencies[LBA] = event.get_application_io_id();
-		}
-	}
-}
-
-void IOScheduler::consolidate(Event& event, uint dependency_code) {
-	std::deque<Event> deque = dependencies[dependency_code];
-	if (event.get_event_type() == READ_COMMAND) {
-
-	}
-}*/
-
 void IOScheduler::execute_current_waiting_ios() {
-	assert(!io_schedule.empty());
+	assert(io_schedule.size() > 0);
 	std::vector<Event> current_ios = gather_current_waiting_ios();
 	std::vector<Event> read_commands;
 	std::vector<Event> read_transfers;
@@ -160,6 +130,9 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 	while (events.size() > 0) {
 		Event event = events.back();
 		events.pop_back();
+		assert(event.get_event_type() == WRITE);
+		ftl.set_replace_address(event);
+		bm.register_write_arrival(event);
 		if (!event.is_garbage_collection_op()) {
 			eliminate_conflict_with_any_incoming_gc(event);
 		}
@@ -174,14 +147,7 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 		event.set_noop(false);
 		double time = in_how_long_can_this_event_be_scheduled(event);
 		if (time == 0) {
-			ftl.set_replace_address(event);				// this method might now become redundant.
-			adjust_conflict_elimination_structures(event);
-			execute_next(event);
-		}
-		else if (event.get_bus_wait_time() > 50) {
-			ftl.set_replace_address(event);				// this method might now become redundant.
-			event.incr_bus_wait_time(time);
-			event.incr_time_taken(time);
+			ftl.set_replace_address(event);
 			adjust_conflict_elimination_structures(event);
 			execute_next(event);
 		}
@@ -196,42 +162,51 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 // if a write to LBA X arrives, while there is already a pending GC operation
 // to migrate LBA X, the GC operation becomes redundant, so we cancel it.
 void IOScheduler::eliminate_conflict_with_any_incoming_gc(Event const&event) {
-	if (!event.is_garbage_collection_op()) {
-		pending_writes.insert(event.get_logical_address());
+	assert(!event.is_garbage_collection_op());
+	if (LBA_to_dependencies.count(event.get_logical_address()) == 0) {
+		return;
 	}
-	if (LBA_to_dependencies.count(event.get_logical_address()) == 1) {
-		uint dependency_code = LBA_to_dependencies[event.get_logical_address()];
-		std::deque<Event> gc_queue = dependencies[dependency_code];
-		printf("Incoming write making a pending GC operation unnecessary. LBA: %d\n", event.get_logical_address());
-		bool eliminated = false;
-		for (uint i = 0; i < gc_queue.size(); i++) {
-			Event gc_event = gc_queue[i];
-			if (gc_event.get_logical_address() == event.get_logical_address() && gc_event.get_event_type() == WRITE) {
-				gc_queue.erase (gc_queue.begin()+i);
+	uint dependency_code = LBA_to_dependencies[event.get_logical_address()];
+	std::deque<Event> gc_queue = dependencies[dependency_code];
+
+
+	uint num_events_eliminated = 0;
+	for (uint i = 0; i < gc_queue.size(); i++) {
+		Event gc_event = gc_queue[i];
+		if (gc_event.get_logical_address() == event.get_logical_address()) {
+			gc_queue.erase (gc_queue.begin()+i);
+			i--;
+			num_events_eliminated++;
+		}
+	}
+	Address addr_of_original_page;
+	if (num_events_eliminated < 3) {
+		for (uint i = 0; i < io_schedule.size(); i++) {
+			Event some_event = io_schedule[i];
+			if (some_event.is_garbage_collection_op() && some_event.get_logical_address() == event.get_logical_address()) {
+				io_schedule.erase(io_schedule.begin() + i);
 				i--;
-				eliminated = true;
-			}
-		}
-		// if the write was not found in the gc pending queue, then it must be in io_schedule
-		if (!eliminated) {
-			for (uint i = 0; i < io_schedule.size(); i++) {
-				Event some_event = io_schedule[i];
-				if (some_event.is_garbage_collection_op() && some_event.get_logical_address() == event.get_logical_address() && some_event.get_event_type() == WRITE) {
-					io_schedule.erase(io_schedule.begin() + i);
-					i--;
+				num_events_eliminated++;
+				if (some_event.get_event_type() == READ_COMMAND) {
+					addr_of_original_page = some_event.get_address();
 				}
+				break;
 			}
 		}
-		LBA_to_dependencies.erase(event.get_logical_address());
 	}
+	if (num_events_eliminated == 2) {
+		ssd.getPackages()[addr_of_original_page.package].getDies()[addr_of_original_page.die].clear_register();
+	}
+
+	printf("Incoming write making a pending GC operation unnecessary. LBA: %d   removed %d events\n", event.get_logical_address(), num_events_eliminated);
+
+	LBA_to_dependencies.erase(event.get_logical_address());
 }
 
 // invoked upon completion of a write
 void IOScheduler::adjust_conflict_elimination_structures(Event const&event) {
 	if (event.is_garbage_collection_op()) {
 		LBA_to_dependencies.erase(event.get_logical_address());
-	} else {
-		pending_writes.erase(event.get_logical_address());
 	}
 }
 
@@ -313,6 +288,7 @@ void IOScheduler::handle_finished_event(Event const&event, enum status outcome) 
 	if (outcome == FAILURE) {
 		return;
 	}
+	VisualTracer::get_instance()->register_completed_event(event);
 	if (event.get_event_type() == WRITE) {
 		bm.register_write_outcome(event, outcome);
 		ftl.register_write_completion(event, outcome);

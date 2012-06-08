@@ -751,6 +751,7 @@ public:
 	Block_manager_parent(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parent();
 	virtual void register_write_outcome(Event const& event, enum status status);
+	virtual void register_write_arrival(Event const& event);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual Address choose_write_location(Event const& event) const = 0;
@@ -783,7 +784,7 @@ private:
 };
 
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation
-class Block_manager_parallel : protected Block_manager_parent {
+class Block_manager_parallel : public Block_manager_parent {
 public:
 	Block_manager_parallel(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel();
@@ -795,7 +796,7 @@ private:
 	bool has_free_pages(uint package_id, uint die_id) const;
 };
 
-class Block_manager_parallel_wearwolf : protected Block_manager_parent {
+class Block_manager_parallel_wearwolf : public Block_manager_parent {
 public:
 	Block_manager_parallel_wearwolf(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel_wearwolf();
@@ -817,7 +818,7 @@ private:
 };
 
 // A BM that assigns each write to the die with the shortest queue, as well as hot-cold seperation
-class Block_manager_parallel_hot_cold_seperation : Block_manager_parent {
+class Block_manager_parallel_hot_cold_seperation : public Block_manager_parent {
 public:
 	Block_manager_parallel_hot_cold_seperation(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel_hot_cold_seperation();
@@ -931,20 +932,15 @@ private:
 	void eliminate_conflict_with_any_incoming_gc(Event const&event);
 	void adjust_conflict_elimination_structures(Event const&event);
 
-	//void consolidate_events(std::vector<Event>& events);
-	//void consolidate(Event& event, uint dependency_code);
-
 	std::vector<Event> io_schedule;
 	std::map<uint, std::deque<Event> > dependencies;
 
 	static IOScheduler *inst;
 	Ssd& ssd;
 	FtlParent& ftl;
-	Block_manager_parallel_wearwolf bm;
-
+	Block_manager_parallel_hot_cold_seperation bm;
 
 	std::map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations.
-	std::set<long> pending_writes;	 // contains the LBAs of addresses that are to be rewritten.
 };
 
 class FtlParent
@@ -1315,10 +1311,27 @@ public:
 	void print_ftl_statistics();
 private:
 	uint size;
-
 	Ssd *Ssds;
 
 };
+
+class VisualTracer
+{
+public:
+	// Singleton
+	static VisualTracer *get_instance();
+	static void init();
+
+	void register_completed_event(Event const& event);
+	void print();
+private:
+	static VisualTracer *inst;
+	VisualTracer();
+	~VisualTracer();
+	void write(int package, int die, char symbol, int length);
+	std::vector<std::vector<std::vector<char> > > trace;
+};
+
 } /* end namespace ssd */
 
 #endif

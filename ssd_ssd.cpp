@@ -111,6 +111,7 @@ Ssd::Ssd(uint ssd_size):
 	assert(VIRTUAL_PAGE_SIZE > 0);
 
 	IOScheduler::instance_initialize(*this, controller.get_ftl());
+	VisualTracer::init();
 
 	return;
 }

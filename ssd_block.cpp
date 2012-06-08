@@ -108,11 +108,6 @@ enum status Block::write(Event &event)
 	assert(data != NULL);
 	enum status ret = data[event.get_address().page]._write(event);
 
-	if (event.get_id() == 93) {
-		int i = 0;
-		i++;
-	}
-
 	if(event.get_noop() == false)
 	{
 		pages_valid++;
@@ -131,18 +126,7 @@ enum status Block::write(Event &event)
 enum status Block::replace(Event &event)
 {
 	uint page = event.get_replace_address().page;
-
-	if (data[page].get_state() == EMPTY) {
-		int i = 0;
-		event.print();
-		Address ra = event.get_replace_address();
-		ra.print();
-		printf("\n");
-		i++;
-	}
-
 	invalidate_page(event.get_replace_address().page);
-
 	return SUCCESS;
 }
 
