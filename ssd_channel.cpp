@@ -70,7 +70,7 @@ Channel::Channel(Ssd* ssd, double ctrl_delay, double data_delay, uint table_size
 		data_delay = 0.0;
 	}
 
-	timings.reserve(4096);
+	//timings.reserve(4096);
 
 	ready_at = -1;
 }
@@ -116,95 +116,6 @@ enum status Channel::disconnect(void)
 	return FAILURE;
 }
 
-/* lock bus channel for event
- * updates event with bus delay and bus wait time if there is wait time
- * bus will automatically unlock after event is finished using bus
- * event is sent across bus as soon as bus channel is available
- * event may fail if bus channel is saturated so check return value
- */
-/*
-enum status Channel::lock(double start_time, double duration, Event &event)
-{
-	assert(num_connected <= max_connections);
-	assert(ctrl_delay >= 0.0);
-	assert(data_delay >= 0.0);
-	assert(start_time >= 0.0);
-	assert(duration >= 0.0);
-
-	// free up any table slots and sort existing ones
-	unlock(start_time);
-
-	double sched_time = BUS_CHANNEL_FREE_FLAG;
-
-	// just schedule if table is empty
-	if(timings.size() == 0)
-		sched_time = start_time + event.get_time_taken();
-
-	// check if can schedule before or in between before just scheduling
-	// after all other events
-	else
-	{
-		// skip over empty table entries
-		// empty table entries will be first from sorting (in unlock method)
-		// because the flag is a negative value
-		std::vector<lock_times>::iterator it = timings.begin();
-
-		// schedule before first event in table
-		if((*it).lock_time > start_time && (*it).lock_time - start_time >= duration)
-			sched_time = start_time;
-
-		// schedule in between other events in table
-		if(sched_time == BUS_CHANNEL_FREE_FLAG)
-		{
-			for(; it < timings.end(); it++)
-			{
-				if (it + 1 != timings.end())
-				{
-					//enough time to schedule in between next two events
-					if((*it).unlock_time >= start_time + event.get_time_taken() && (*(it+1)).lock_time - (*it).unlock_time >= duration)
-					{
-						sched_time = (*it).unlock_time;
-						break;
-					}
-				}
-
-			}
-		}
-
-		// schedule after all events in table
-		if(sched_time == BUS_CHANNEL_FREE_FLAG) {
-			if (start_time + event.get_time_taken() > timings.back().unlock_time) {
-				sched_time = start_time + event.get_time_taken();
-			} else {
-				sched_time = timings.back().unlock_time;
-			}
-		}
-	}
-
-	// write scheduling info in free table slot
-	lock_times lt;
-	lt.lock_time = sched_time;
-	lt.unlock_time = sched_time + duration;
-	lt.event_id = event.get_id();
-	timings.push_back(lt);
-
-	std::vector<lock_times>::iterator it = timings.begin();
-	for (; it < timings.end(); it++) {
-		printf("%f\t%f\t%d\n", (*it).lock_time, (*it).unlock_time, (*it).event_id);
-	}
-	printf("\n");
-
-	if (lt.unlock_time > ready_at)
-		ready_at = lt.unlock_time;
-
-	// update event times for bus wait and time taken
-	event.incr_bus_wait_time(sched_time - start_time - event.get_time_taken());
-	event.incr_time_taken(sched_time - start_time + duration - event.get_time_taken());
-
-	return SUCCESS;
-}*/
-
-
 enum status Channel::lock(double start_time, double duration, Event& event) {
 	assert(num_connected <= max_connections);
 	assert(ctrl_delay >= 0.0);
@@ -240,9 +151,9 @@ double Channel::get_currently_executing_operation_finish_time() {
 /* remove all expired entries (finish time is less than provided time)
  * update current number of table entries used
  * sort table by finish times (2nd row) */
-void Channel::unlock(double start_time)
+/*void Channel::unlock(double start_time)
 {
-	/* remove expired channel lock entries */
+	// remove expired channel lock entries
 	std::vector<lock_times>::iterator it;
 	for ( it = timings.begin(); it < timings.end(); it++)
 	{
@@ -252,11 +163,11 @@ void Channel::unlock(double start_time)
 			break;
 	}
 	std::sort(timings.begin(), timings.end(), &timings_sorter);
-}
+}*/
 
-bool Channel::timings_sorter(lock_times const& lhs, lock_times const& rhs) {
+/*bool Channel::timings_sorter(lock_times const& lhs, lock_times const& rhs) {
     return lhs.lock_time < rhs.lock_time;
-}
+}*/
 
 double Channel::ready_time(void)
 {

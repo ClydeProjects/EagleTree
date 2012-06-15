@@ -10,7 +10,7 @@
 
 using namespace ssd;
 
-#define INTERVAL_LENGTH 500
+#define INTERVAL_LENGTH 100
 #define WEIGHT 0.5
 
 Page_Hotness_Measurer::Page_Hotness_Measurer()

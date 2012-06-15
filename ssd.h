@@ -466,7 +466,7 @@ public:
 	enum status disconnect(void);
 	double ready_time(void);
 private:
-	void unlock(double current_time);
+	//void unlock(double current_time);
 
 	struct lock_times {
 		double lock_time;
@@ -474,8 +474,8 @@ private:
 		int event_id;
 	};
 
-	static bool timings_sorter(lock_times const& lhs, lock_times const& rhs);
-	std::vector<lock_times> timings;
+	//static bool timings_sorter(lock_times const& lhs, lock_times const& rhs);
+	//std::vector<lock_times> timings;
 
 	uint table_entries;
 	uint selected_entry;

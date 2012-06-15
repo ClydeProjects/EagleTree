@@ -171,6 +171,8 @@ Address Block_manager_parent::get_free_die_with_shortest_IO_queue() const {
 	uint die_id;
 	double shortest_time = std::numeric_limits<double>::max( );
 	for (uint i = 0; i < SSD_SIZE; i++) {
+		double earliest_die_finish_time = std::numeric_limits<double>::max();
+		uint die_with_earliest_finish_time = 0;
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			bool die_has_free_pages = free_block_pointers[i][j].page < BLOCK_SIZE;
 			bool die_register_is_busy = ssd.getPackages()[i].getDies()[j].register_is_busy();
@@ -178,12 +180,19 @@ Address Block_manager_parent::get_free_die_with_shortest_IO_queue() const {
 				double channel_finish_time = ssd.bus.get_channel(i).get_currently_executing_operation_finish_time();
 				double die_finish_time = ssd.getPackages()[i].getDies()[j].get_currently_executing_io_finish_time();
 				double max = std::max(channel_finish_time,die_finish_time);
-				// TODO: in case several dies within a channel have the same max, consider making a tie-breaker
-				if (max < shortest_time) {
+
+				if (die_finish_time < earliest_die_finish_time) {
+					earliest_die_finish_time = die_finish_time;
+					die_with_earliest_finish_time = j;
+				}
+
+				if (max < shortest_time || (max == shortest_time && die_with_earliest_finish_time == j)) {
 					package_id = i;
 					die_id = j;
 					shortest_time = max;
 				}
+
+
 			}
 		}
 	}

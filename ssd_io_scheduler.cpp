@@ -48,7 +48,6 @@ void IOScheduler::schedule_dependent_events(std::queue<Event>& events) {
 		if (event.get_event_type() == READ) {
 			event.set_event_type(READ_TRANSFER);
 			Event* read_command = new Event(READ_COMMAND, event.get_logical_address(), event.get_size(), event.get_start_time());
-			read_command->set_address(event.get_address());
 			read_command->set_application_io_id(dependency_code);
 			read_command->set_garbage_collection_op(event.is_garbage_collection_op());
 			dependencies[dependency_code].push_back(*read_command);
@@ -62,7 +61,7 @@ void IOScheduler::schedule_dependent_events(std::queue<Event>& events) {
 	dependencies[dependency_code].pop_front();
 
 	io_schedule.push_back(first);
-	std::sort(io_schedule.begin(), io_schedule.end(), myfunction);
+	//std::sort(io_schedule.begin(), io_schedule.end(), myfunction);
 
 	while (io_schedule.size() > 0 && io_schedule.back().get_start_time() + 1 <= first.get_start_time()) {
 		execute_current_waiting_ios();
@@ -83,6 +82,7 @@ void IOScheduler::finish(double start_time) {
 }
 
 std::vector<Event> IOScheduler::gather_current_waiting_ios() {
+	std::sort(io_schedule.begin(), io_schedule.end(), myfunction);
 	Event top = io_schedule.back();
 	io_schedule.pop_back();
 	Event top2 = io_schedule.back();
@@ -118,9 +118,10 @@ void IOScheduler::execute_current_waiting_ios() {
 			erases.push_back(current_ios[i]);
 		}
 	}
+	//printf("\n -------------------------------- \n");
 	execute_next_batch(erases);
-	execute_next_batch(read_transfers);
 	execute_next_batch(read_commands);
+	execute_next_batch(read_transfers);
 	handle_writes(writes);
 }
 
@@ -229,7 +230,7 @@ void IOScheduler::execute_next_batch(std::vector<Event>& events) {
 			if (time > 0) {
 				bus_wait_time = time;
 			} else {
-				bus_wait_time = BUS_CTRL_DELAY + BUS_DATA_DELAY;
+				bus_wait_time = 1;
 			}
 			event.incr_bus_wait_time(bus_wait_time);
 			event.incr_time_taken(bus_wait_time);

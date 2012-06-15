@@ -154,14 +154,13 @@ FtlImpl_DftlParent::~FtlImpl_DftlParent(void)
 	delete[] reverse_trans_map;
 }
 
+/* 1. Lookup in CMT if the mapping exist
+ * 2. If, then serve
+ * 3. If not, then goto GDT, lookup page
+ * 4. If CMT full, evict a page
+ */
 void FtlImpl_DftlParent::resolve_mapping(Event &event, bool isWrite)
 {
-	uint dlpn = event.get_logical_address();
-	/* 1. Lookup in CMT if the mapping exist
-	 * 2. If, then serve
-	 * 3. If not, then goto GDT, lookup page
-	 * 4. If CMT full, evict a page
-	 */
 	if (lookup_CMT(event.get_logical_address(), event))
 	{
 		controller.stats.numCacheHits++;
@@ -169,6 +168,7 @@ void FtlImpl_DftlParent::resolve_mapping(Event &event, bool isWrite)
 	} else {
 		controller.stats.numCacheFaults++;
 		evict_page_from_cache(event);
+		uint dlpn = event.get_logical_address();
 		consult_GTD(dlpn, event);
 	}
 }
