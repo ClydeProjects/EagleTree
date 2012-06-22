@@ -40,7 +40,8 @@
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/global_fun.hpp>
 #include <boost/multi_index/random_access_index.hpp>
- 
+#include "bloom_filter.hpp"
+
 #ifndef _SSD_H
 #define _SSD_H
 
@@ -718,10 +719,22 @@ public:
 	enum status insert(const Address &address);
 };
 
+// Interface of page hotness measurer
 class Page_Hotness_Measurer {
 public:
-	Page_Hotness_Measurer();
-	~Page_Hotness_Measurer(void);
+	//virtual Page_Hotness_Measurer() = 0;
+	//virtual ~Page_Hotness_Measurer(void) = 0;
+	virtual void register_event(Event const& event) = 0; // Inform hotness measurer about a read or write event
+	virtual enum write_hotness get_write_hotness(unsigned long page_address) const = 0; // Return write hotness of a given page address
+	virtual enum read_hotness get_read_hotness(unsigned long page_address) const = 0; // Return read hotness of a given page address
+	virtual Address get_die_with_least_WC(enum read_hotness rh) const = 0; // Return address of die with leads WC data (with chosen read hotness)
+};
+
+// Simple (naïve page hotness measurer implementation)
+class Simple_Page_Hotness_Measurer : public Page_Hotness_Measurer {
+public:
+	Simple_Page_Hotness_Measurer();
+	~Simple_Page_Hotness_Measurer(void);
 	void register_event(Event const& event);
 	enum write_hotness get_write_hotness(unsigned long page_address) const;
 	enum read_hotness get_read_hotness(unsigned long page_address) const;
@@ -744,6 +757,72 @@ private:
 	std::vector<std::vector<uint> > current_reads_per_die;
 	uint writes_counter;
 	uint reads_counter;
+};
+
+// BloomFilter hotness
+//typedef std::vector<bool> BloomFilter;
+typedef std::vector< bloom_filter > hot_bloom_filter;
+typedef std::vector< std::vector<unsigned int> > lun_counters;
+
+class Die_Stats {
+public:
+	Die_Stats(bloom_parameters bloomfilter_parameters)
+	:	live_pages(0),
+	 	reads(0),
+	 	reads_targeting_wc_pages(0),
+	 	reads_targeting_wc_pages_previous_window(0),
+	 	writes(0),
+	 	unique_wh_encountered(0),
+	 	unique_wh_encountered_previous_window(0),
+	 	wh_counted_already(bloomfilter_parameters)
+	{}
+
+	// WC = live pages - WH
+	inline unsigned int wc_pages() {
+		return unique_wh_encountered_previous_window == 0 ? live_pages - unique_wh_encountered : live_pages - unique_wh_encountered_previous_window;
+	}
+
+	unsigned int live_pages;
+
+	unsigned int reads;
+	unsigned int reads_targeting_wc_pages;
+	unsigned int reads_targeting_wc_pages_previous_window;
+
+	unsigned int writes;
+	unsigned int unique_wh_encountered;
+	unsigned int unique_wh_encountered_previous_window;
+	bloom_filter wh_counted_already;
+
+	//unsigned int read_counter;
+	//unsigned int read_hot_counter;
+	//unsigned int last_window_hot_count;
+	//bloom_filter counted_already;
+};
+
+class BloomFilter_Page_Hotness_Measurer : public Page_Hotness_Measurer {
+public:
+	BloomFilter_Page_Hotness_Measurer(unsigned int num_bloom_filters = 4, unsigned int bloom_filter_size = 2048, unsigned int decay_time = 512);
+	~BloomFilter_Page_Hotness_Measurer(void);
+	void register_event(Event const& event);
+	enum write_hotness get_write_hotness(unsigned long page_address) const;
+	enum read_hotness get_read_hotness(unsigned long page_address) const;
+	Address get_die_with_least_WC(enum read_hotness rh) const;
+private:
+	double get_hot_data_index(hot_bloom_filter const& filter, unsigned long page_address) const;
+
+	// Parameters
+	unsigned int V, M, /*K,*/ T, hotness_threshold, read_counter_window_size, write_counter_window_size;
+
+	// Bookkeeping variables
+	unsigned int oldest_BF;
+	unsigned int BF_read_pos, BF_write_pos;
+	unsigned int read_counter, write_counter;
+	hot_bloom_filter read_bloom;
+	hot_bloom_filter write_bloom;
+	std::vector< std::vector<Die_Stats> > package_die_stats;
+
+	//	std::vector< std::map<int, bool> > ReadErrorFreeCounter;
+//	std::vector< std::map<int, bool> > WriteErrorFreeCounter;
 };
 
 class Block_manager_parent {
@@ -811,7 +890,7 @@ private:
 	bool pointer_can_be_written_to(Address pointer) const;
 	bool at_least_one_available_write_hot_pointer() const;
 	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
-	Page_Hotness_Measurer page_hotness_measurer;
+	Simple_Page_Hotness_Measurer page_hotness_measurer;
 	Address wcrh_pointer;
 	Address wcrc_pointer;
 
@@ -834,7 +913,7 @@ private:
 	bool pointer_can_be_written_to(Address pointer) const;
 	bool at_least_one_available_write_hot_pointer() const;
 	void handle_cold_pointer_out_of_space(double start_time);
-	Page_Hotness_Measurer page_hotness_measurer;
+	Simple_Page_Hotness_Measurer page_hotness_measurer;
 	Address cold_pointer;
 };
 
