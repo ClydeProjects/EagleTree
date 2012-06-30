@@ -246,15 +246,7 @@ class Block;
 class Plane;
 class Die;
 class Package;
-class Garbage_Collector;
-class Wear_Leveler;
-class Block_manager;
-class Block_manager_parent;
-class Block_manager_parallel;
-class Block_manager_parallel_wearwolf;
-class Block_manager_parallel_hot_cold_seperation;
-class Page_Hotness_Measurer;
-class IOScheduler;
+
 class FtlParent;
 class FtlImpl_Page;
 class FtlImpl_Bast;
@@ -267,7 +259,16 @@ class Ram;
 class Controller;
 class Ssd;
 
+class IOScheduler;
 
+class Block_manager;
+class Block_manager_parent;
+class Block_manager_parallel;
+class Block_manager_parallel_hot_cold_seperation;
+class Block_manager_parallel_wearwolf;
+class Block_manager_parallel_wearwolf_locality;
+
+class Page_Hotness_Measurer;
 
 /* Class to manage physical addresses for the SSD.  It was designed to have
  * public members like a struct for quick access but also have checking,
@@ -699,25 +700,6 @@ private:
 	double last_erase_time;
 };
 
-/* place-holder definitions for GC, WL, FTL, RAM, Controller 
- * please make sure to keep this order when you replace with your definitions */
-class Garbage_collector 
-{
-public:
-	Garbage_collector(FtlParent &ftl);
-	~Garbage_collector(void);
-private:
-	void clean(Address &address);
-};
-
-class Wear_leveler 
-{
-public:
-	Wear_leveler(FtlParent &FTL);
-	~Wear_leveler(void);
-	enum status insert(const Address &address);
-};
-
 class Page_Hotness_Measurer {
 public:
 	Page_Hotness_Measurer();
@@ -796,27 +778,6 @@ private:
 	bool has_free_pages(uint package_id, uint die_id) const;
 };
 
-class Block_manager_parallel_wearwolf : public Block_manager_parent {
-public:
-	Block_manager_parallel_wearwolf(Ssd& ssd, FtlParent& ftl);
-	~Block_manager_parallel_wearwolf();
-	virtual void register_write_outcome(Event const& event, enum status status);
-	virtual void register_read_outcome(Event const& event, enum status status);
-	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual Address choose_write_location(Event const& event) const;
-	virtual bool can_write(Event const& write) const;
-protected:
-	virtual void check_if_should_trigger_more_GC(double start_time);
-private:
-	bool pointer_can_be_written_to(Address pointer) const;
-	bool at_least_one_available_write_hot_pointer() const;
-	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
-	Page_Hotness_Measurer page_hotness_measurer;
-	Address wcrh_pointer;
-	Address wcrc_pointer;
-
-};
-
 // A BM that assigns each write to the die with the shortest queue, as well as hot-cold seperation
 class Block_manager_parallel_hot_cold_seperation : public Block_manager_parent {
 public:
@@ -836,6 +797,47 @@ private:
 	void handle_cold_pointer_out_of_space(double start_time);
 	Page_Hotness_Measurer page_hotness_measurer;
 	Address cold_pointer;
+};
+
+
+class Block_manager_parallel_wearwolf : public Block_manager_parent {
+public:
+	Block_manager_parallel_wearwolf(Ssd& ssd, FtlParent& ftl);
+	~Block_manager_parallel_wearwolf();
+	virtual void register_write_outcome(Event const& event, enum status status);
+	virtual void register_read_outcome(Event const& event, enum status status);
+	virtual void register_erase_outcome(Event const& event, enum status status);
+	virtual Address choose_write_location(Event const& event) const;
+	virtual bool can_write(Event const& write) const;
+protected:
+	virtual void check_if_should_trigger_more_GC(double start_time);
+private:
+	bool pointer_can_be_written_to(Address pointer) const;
+	bool at_least_one_available_write_hot_pointer() const;
+	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
+	Page_Hotness_Measurer page_hotness_measurer;
+	Address wcrh_pointer;
+	Address wcrc_pointer;
+};
+
+class Block_manager_parallel_wearwolf_locality : public Block_manager_parent {
+public:
+	Block_manager_parallel_wearwolf_locality(Ssd& ssd, FtlParent& ftl);
+	~Block_manager_parallel_wearwolf_locality();
+	virtual void register_write_outcome(Event const& event, enum status status);
+	virtual void register_read_outcome(Event const& event, enum status status);
+	virtual void register_erase_outcome(Event const& event, enum status status);
+	virtual Address choose_write_location(Event const& event) const;
+	virtual bool can_write(Event const& write) const;
+protected:
+	virtual void check_if_should_trigger_more_GC(double start_time);
+private:
+	bool pointer_can_be_written_to(Address pointer) const;
+	bool at_least_one_available_write_hot_pointer() const;
+	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
+	Page_Hotness_Measurer page_hotness_measurer;
+	Address wcrh_pointer;
+	Address wcrc_pointer;
 };
 
 class Block_manager
