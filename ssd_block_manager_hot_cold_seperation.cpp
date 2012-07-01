@@ -7,8 +7,7 @@ Block_manager_parallel_hot_cold_seperation::Block_manager_parallel_hot_cold_sepe
 	: Block_manager_parent(ssd, ftl),
 	  page_hotness_measurer()
 {
-	cold_pointer = free_blocks[0][0].back();
-	free_blocks[0][0].pop_back();
+	cold_pointer = find_free_unused_block(0, 0);
 }
 
 Block_manager_parallel_hot_cold_seperation::~Block_manager_parallel_hot_cold_seperation(void) {}
@@ -87,8 +86,6 @@ void Block_manager_parallel_hot_cold_seperation::register_erase_outcome(Event co
 	}
 	else if (cold_pointer.page >= BLOCK_SIZE) {
 		cold_pointer = addr;
-	} else {
-		free_blocks[package_id][die_id].push_back(addr);
 	}
 
 	check_if_should_trigger_more_GC(event.get_start_time() + event.get_time_taken());

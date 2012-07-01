@@ -22,17 +22,17 @@
 #include "ssd.h"
 
 using namespace ssd;
+using namespace std;
 
-Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl)
+Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int classes)
  : ssd(ssd),
    ftl(ftl),
-   free_block_pointers(SSD_SIZE, std::vector<Address>(PACKAGE_SIZE)),
-   free_blocks(SSD_SIZE, std::vector<std::vector<Address> >(PACKAGE_SIZE, std::vector<Address>(0) )),
-   blocks(SSD_SIZE, std::vector<std::vector<Block*> >(PACKAGE_SIZE, std::vector<Block*>(0) )),
+   free_block_pointers(SSD_SIZE, vector<Address>(PACKAGE_SIZE)),
+   free_blocks(SSD_SIZE, vector<vector<vector<Address> > >(PACKAGE_SIZE, vector<vector<Address> >(classes, vector<Address>(0)) )),
+   blocks(SSD_SIZE, vector<vector<Block*> >(PACKAGE_SIZE, vector<Block*>(0) )),
    all_blocks(0),
    max_age(0),
    blocks_with_min_age(),
-   blocks_to_wl(),
    num_free_pages(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
    num_available_pages_for_new_writes(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
    blocks_currently_undergoing_gc()
@@ -46,13 +46,13 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl)
 				for (uint b = 0; b < PLANE_SIZE; b++) {
 					Block& block = plane.getBlocks()[b];
 					blocks[i][j].push_back(&block);
-					free_blocks[i][j].push_back(Address(block.get_physical_address(), PAGE));
+					free_blocks[i][j][0].push_back(Address(block.get_physical_address(), PAGE));
 					all_blocks.push_back(&block);
 					blocks_with_min_age.insert(&block);
 				}
 			}
-			free_block_pointers[i][j] = free_blocks[i][j].back();
-			free_blocks[i][j].pop_back();
+			free_block_pointers[i][j] = free_blocks[i][j][0].back();
+			free_blocks[i][j][0].pop_back();
 		}
 	}
 }
@@ -65,6 +65,9 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	assert(blocks_currently_undergoing_gc.count(phys_addr) == 1);
 	blocks_currently_undergoing_gc.erase(phys_addr);
 	assert(blocks_currently_undergoing_gc.count(phys_addr) == 0);
+
+	Address a = event.get_address();
+	free_blocks[a.package][a.die][0].push_back(a);
 
 	num_free_pages += BLOCK_SIZE;
 	num_available_pages_for_new_writes += BLOCK_SIZE;
@@ -132,6 +135,7 @@ void Block_manager_parent::Wear_Level(Event const& event) {
 	Block* b = &ssd.getPackages()[pba.package].getDies()[pba.die].getPlanes()[pba.plane].getBlocks()[pba.block];
 	uint age = BLOCK_ERASES - b->get_erases_remaining();
 	uint min_age = BLOCK_ERASES - (*blocks_with_min_age.begin())->get_erases_remaining();
+	std::queue<Block*> blocks_to_wl;
 	if (age > max_age) {
 		max_age = age;
 		uint age_diff = max_age - min_age;
@@ -146,6 +150,7 @@ void Block_manager_parent::Wear_Level(Event const& event) {
 		blocks_with_min_age.erase(b);
 	}
 	else if (blocks_with_min_age.count(b) == 1 && blocks_with_min_age.size() == 1) {
+		blocks_with_min_age.erase(b);
 		update_blocks_with_min_age(min_age);
 	}
 
@@ -316,22 +321,44 @@ void Block_manager_parent::migrate(Block const* const block, double start_time) 
 // finds and returns a free block from anywhere in the SSD. Returns Address(0, NONE) is there is no such block
 Address Block_manager_parent::find_free_unused_block() {
 	for (uint i = 0; i < SSD_SIZE; i++) {
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			Address address = find_free_unused_block(i, j);
-			if (address.valid != NONE) {
-				return address;
-			}
+		Address address = find_free_unused_block(i);
+		if (address.valid != NONE) {
+			return address;
 		}
 	}
 	return Address(0, NONE);
 }
 
+Address Block_manager_parent::find_free_unused_block(uint package_id) {
+	for (uint i = 0; i < PACKAGE_SIZE; i++) {
+		Address address = find_free_unused_block(package_id, i);
+		if (address.valid != NONE) {
+			return address;
+		}
+	}
+	return Address(0, NONE);
+}
+
+// finds and returns a free block from a particular die in the SSD
 Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_id) {
-	if (free_blocks[package_id][die_id].size() > 0) {
-		Address a = free_blocks[package_id][die_id].back();
-		free_blocks[package_id][die_id].pop_back();
+	for (uint i = 0; i < free_blocks[package_id][die_id].size(); i++) {
+		Address address = find_free_unused_block(package_id, die_id, i);
+		if (address.valid != NONE) {
+			return address;
+		}
+	}
+	return Address(0, NONE);
+}
+
+Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_id, uint klass) {
+	if (free_blocks[package_id][die_id][klass].size() > 0) {
+		Address a = free_blocks[package_id][die_id][0].back();
+		free_blocks[package_id][die_id][klass].pop_back();
 		return a;
 	} else {
 		return Address(0, NONE);
 	}
 }
+
+
+

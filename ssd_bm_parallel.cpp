@@ -50,8 +50,6 @@ void Block_manager_parallel::register_erase_outcome(Event const& event, enum sta
 	// if there is no free pointer for this block, set it to this one.
 	if (!has_free_pages(package_id, die_id)) {
 		free_block_pointers[package_id][die_id] = event.get_address();
-	} else {
-		free_blocks[package_id][die_id].push_back(event.get_address());
 	}
 
 	check_if_should_trigger_more_GC(event.get_start_time() + event.get_time_taken());

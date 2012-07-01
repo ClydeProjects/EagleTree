@@ -732,7 +732,7 @@ private:
 
 class Block_manager_parent {
 public:
-	Block_manager_parent(Ssd& ssd, FtlParent& ftl);
+	Block_manager_parent(Ssd& ssd, FtlParent& ftl, int classes = 1);
 	~Block_manager_parent();
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_write_arrival(Event const& event);
@@ -745,27 +745,28 @@ protected:
 	void perform_emergency_garbage_collection(double start_time);
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	virtual void Wear_Level(Event const& event);
-	virtual Address find_free_unused_block(uint package_id, uint die_id);
+	Address find_free_unused_block(uint package_id, uint die_id, uint klass);
+	Address find_free_unused_block(uint package_id, uint die_id);
+	Address find_free_unused_block(uint package_id);
 	Address find_free_unused_block();
 	virtual std::pair<uint, uint> get_free_die_with_shortest_IO_queue(std::vector<std::vector<Address> > const& dies) const;
 	virtual Address get_free_die_with_shortest_IO_queue() const;
 	Ssd& ssd;
 	FtlParent& ftl;
-
-	std::vector<std::vector<Address> > free_block_pointers;
-	std::vector<std::vector<std::vector<Address> > > free_blocks;
+	vector<vector<Address> > free_block_pointers;
 private:
 	void migrate(Block const* const block, double start_time);
 	void update_blocks_with_min_age(uint age);
+	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	std::vector<std::vector<std::vector<Block*> > > blocks;
 	std::vector<Block*> all_blocks;
 	// WL structures
 	uint max_age;
 	std::set<Block*> blocks_with_min_age;
-	std::queue<Block*> blocks_to_wl;
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
 	std::set<long> blocks_currently_undergoing_gc;
+
 };
 
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation
@@ -818,6 +819,7 @@ private:
 	bool pointer_can_be_written_to(Address pointer) const;
 	bool at_least_one_available_write_hot_pointer() const;
 	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
+	void reset_any_filled_pointers(Event const& event);
 	Page_Hotness_Measurer page_hotness_measurer;
 	Address wcrh_pointer;
 	Address wcrc_pointer;

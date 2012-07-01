@@ -7,17 +7,13 @@ Block_manager_parallel_wearwolf::Block_manager_parallel_wearwolf(Ssd& ssd, FtlPa
 	: Block_manager_parent(ssd, ftl),
 	  page_hotness_measurer()
 {
-	wcrh_pointer = free_blocks[0][0].back();
-	free_blocks[0][0].pop_back();
+	wcrh_pointer = find_free_unused_block(0, 0);
 	if (SSD_SIZE > 1) {
-		wcrc_pointer = free_blocks[1][0].back();
-		free_blocks[1][0].pop_back();
+		wcrc_pointer = find_free_unused_block(1, 0);
 	} else if (PACKAGE_SIZE > 1) {
-		wcrc_pointer = free_blocks[0][1].back();
-		free_blocks[0][1].pop_back();
+		wcrc_pointer = find_free_unused_block(0, 1);
 	} else {
-		wcrc_pointer = free_blocks[0][0].back();
-		free_blocks[0][0].pop_back();
+		wcrc_pointer = find_free_unused_block(0, 0);
 	}
 	wcrh_pointer.print();
 	printf("\n");
@@ -94,6 +90,13 @@ void Block_manager_parallel_wearwolf::register_erase_outcome(Event const& event,
 		return;
 	}
 	Block_manager_parent::register_erase_outcome(event, status);
+	reset_any_filled_pointers(event);
+	check_if_should_trigger_more_GC(event.get_start_time() + event.get_time_taken());
+	Wear_Level(event);
+}
+
+// must really improve logic in this class. Currently, mistakes are too easy if much GC happens at same time
+void Block_manager_parallel_wearwolf::reset_any_filled_pointers(Event const& event) {
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;
 
@@ -104,18 +107,13 @@ void Block_manager_parallel_wearwolf::register_erase_outcome(Event const& event,
 	// TODO: Need better logic for this assignment. Easiest to remember some state.
 	// when we trigger GC for a cold pointer, remember which block was chosen.
 	if (free_block_pointers[package_id][die_id].page >= BLOCK_SIZE) {
-		free_block_pointers[package_id][die_id] = addr;
+		free_block_pointers[package_id][die_id] = find_free_unused_block(package_id, die_id);
 	}
 	else if (wcrh_pointer.page >= BLOCK_SIZE) {
 		wcrh_pointer = addr;
 	} else if (wcrc_pointer.page >= BLOCK_SIZE) {
 		wcrc_pointer = addr;
-	} else {
-		free_blocks[package_id][die_id].push_back(addr);
 	}
-
-	check_if_should_trigger_more_GC(event.get_start_time() + event.get_time_taken());
-	Wear_Level(event);
 }
 
 // ensures the pointer has at least 1 free page, and that the die is not busy (waiting for a read)
