@@ -166,19 +166,21 @@ void Block_manager_parent::update_blocks_with_min_age(uint min_age) {
 	}
 }
 
-Address Block_manager_parent::get_free_die_with_shortest_IO_queue() const {
-	uint package_id;
-	uint die_id;
+std::pair<uint, uint> Block_manager_parent::get_free_die_with_shortest_IO_queue(std::vector<std::vector<Address> > const& dies) const {
+	uint best_channel_id;
+	uint best_die_id;
 	double shortest_time = std::numeric_limits<double>::max( );
-	for (uint i = 0; i < SSD_SIZE; i++) {
+	for (uint i = 0; i < dies.size(); i++) {
 		double earliest_die_finish_time = std::numeric_limits<double>::max();
 		uint die_with_earliest_finish_time = 0;
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			bool die_has_free_pages = free_block_pointers[i][j].page < BLOCK_SIZE;
-			bool die_register_is_busy = ssd.getPackages()[i].getDies()[j].register_is_busy();
+		for (uint j = 0; j < dies[i].size(); j++) {
+			bool die_has_free_pages = dies[i][j].page < BLOCK_SIZE;
+			uint channel_id = dies[i][j].package;
+			uint die_id = dies[i][j].die;
+			bool die_register_is_busy = ssd.getPackages()[channel_id].getDies()[die_id].register_is_busy();
 			if (die_has_free_pages && !die_register_is_busy) {
-				double channel_finish_time = ssd.bus.get_channel(i).get_currently_executing_operation_finish_time();
-				double die_finish_time = ssd.getPackages()[i].getDies()[j].get_currently_executing_io_finish_time();
+				double channel_finish_time = ssd.bus.get_channel(channel_id).get_currently_executing_operation_finish_time();
+				double die_finish_time = ssd.getPackages()[channel_id].getDies()[die_id].get_currently_executing_io_finish_time();
 				double max = std::max(channel_finish_time,die_finish_time);
 
 				if (die_finish_time < earliest_die_finish_time) {
@@ -187,8 +189,8 @@ Address Block_manager_parent::get_free_die_with_shortest_IO_queue() const {
 				}
 
 				if (max < shortest_time || (max == shortest_time && die_with_earliest_finish_time == j)) {
-					package_id = i;
-					die_id = j;
+					best_channel_id = i;
+					best_die_id = j;
 					shortest_time = max;
 				}
 
@@ -196,7 +198,12 @@ Address Block_manager_parent::get_free_die_with_shortest_IO_queue() const {
 			}
 		}
 	}
-	return free_block_pointers[package_id][die_id];
+	return std::pair<uint, uint>(best_channel_id, best_die_id);
+}
+
+Address Block_manager_parent::get_free_die_with_shortest_IO_queue() const {
+	std::pair<uint, uint> best_die = get_free_die_with_shortest_IO_queue(free_block_pointers);
+	return free_block_pointers[best_die.first][best_die.second];
 }
 
 // puts free blocks at the very end of the queue

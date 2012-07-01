@@ -44,6 +44,8 @@
 #ifndef _SSD_H
 #define _SSD_H
 
+using namespace std;
+
 namespace ssd {
 
 /* define exit codes for errors */
@@ -745,6 +747,7 @@ protected:
 	virtual void Wear_Level(Event const& event);
 	virtual Address find_free_unused_block(uint package_id, uint die_id);
 	Address find_free_unused_block();
+	virtual std::pair<uint, uint> get_free_die_with_shortest_IO_queue(std::vector<std::vector<Address> > const& dies) const;
 	virtual Address get_free_die_with_shortest_IO_queue() const;
 	Ssd& ssd;
 	FtlParent& ftl;
@@ -820,24 +823,36 @@ private:
 	Address wcrc_pointer;
 };
 
-class Block_manager_parallel_wearwolf_locality : public Block_manager_parent {
+class Block_manager_parallel_wearwolf_locality : public Block_manager_parallel_wearwolf {
 public:
 	Block_manager_parallel_wearwolf_locality(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel_wearwolf_locality();
-	virtual void register_write_outcome(Event const& event, enum status status);
-	virtual void register_read_outcome(Event const& event, enum status status);
-	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual Address choose_write_location(Event const& event) const;
-	virtual bool can_write(Event const& write) const;
-protected:
-	virtual void check_if_should_trigger_more_GC(double start_time);
+
+	virtual Address choose_write_location(Event const& event);
 private:
-	bool pointer_can_be_written_to(Address pointer) const;
-	bool at_least_one_available_write_hot_pointer() const;
-	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
-	Page_Hotness_Measurer page_hotness_measurer;
-	Address wcrh_pointer;
-	Address wcrc_pointer;
+	enum parallel_degree_for_sequential_files { ONE, LUN, CHANNEL };
+	parallel_degree_for_sequential_files parallel_degree;
+
+	// map from the next expected sequential write LBA to a counter and timestamp.
+	typedef ulong logical_address;
+	struct sequential_writes_tracking {
+		double last_LBA_timestamp;
+		int counter;
+		std::vector<std::vector<Address> > *pointers;
+		sequential_writes_tracking();
+		~sequential_writes_tracking();
+	};
+	std::map<logical_address, Address> sequential_writes_tracker;	// maps an incoming write belonging to a given sequential pattern to the address in which it should be written
+	std::map<logical_address, logical_address> sequential_writes_key_lookup;  // a map from the next expected LBA in a seqeuntial pattern to the first LBA, which is the key
+	std::map<logical_address, sequential_writes_tracking*> sequential_writes_identification_and_data;	// a map from the first logical write of a sequential pattern to metadata about the pattern
+
+	void set_pointers_for_sequential_write(sequential_writes_tracking swt);
+
+	// if there are less than 2 free blocks in each class, trigger GC for this class
+	int num_age_classes;
+	std::vector<std::vector<Address> > free_blocks_classified_into_age_classes;
+
+	std::vector<std::vector<Address> > candidates_for_GC;
 };
 
 class Block_manager

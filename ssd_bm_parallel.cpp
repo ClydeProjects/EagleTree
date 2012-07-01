@@ -5,15 +5,6 @@
  *      Author: niv
  */
 
-
-/* Copyright 2011 Matias Bjørling */
-
-/* Block Management
- *
- * This class handle allocation of block pools for the FTL
- * algorithms.
- */
-
 #include <new>
 #include <assert.h>
 #include <stdio.h>
