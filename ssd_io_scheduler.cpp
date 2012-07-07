@@ -292,17 +292,6 @@ enum status IOScheduler::execute_next(Event& event) {
 	return result;
 }
 
-// gives time until both the channel and die are clear
-/*double IOScheduler::in_how_long_can_this_event_be_scheduled(Event const& event) const {
-	uint package_id = event.get_address().package;
-	uint die_id = event.get_address().die;
-	double channel_finish_time = ssd.bus.get_channel(package_id).get_currently_executing_operation_finish_time();
-	double die_finish_time = ssd.getPackages()[package_id].getDies()[die_id].get_currently_executing_io_finish_time();
-	double max = std::max(channel_finish_time, die_finish_time);
-	double time = max - event.get_start_time() - event.get_time_taken();
-	return time <= 0 ? 0 : time;
-}*/
-
 bool IOScheduler::can_schedule_on_die(Event const& event) const {
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;

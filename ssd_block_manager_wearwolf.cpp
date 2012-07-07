@@ -131,37 +131,6 @@ bool Block_manager_parallel_wearwolf::at_least_one_available_write_hot_pointer()
 	return false;
 }
 
-
-/*
- * makes sure that there is at least 1 non-busy die with free space
- * and that the die is not waiting for an impending read transfer
- */
-/*bool Block_manager_parallel_wearwolf::can_write(Event const& write) const {
-	if (!Block_manager_parent::can_write(write)) {
-		return false;
-	}
-
-	bool wh_available = at_least_one_available_write_hot_pointer();
-	bool wcrc_available = pointer_can_be_written_to(wcrc_pointer);
-	bool wcrh_available = pointer_can_be_written_to(wcrh_pointer);
-
-	if (write.is_garbage_collection_op()) {
-		return wh_available || wcrc_available || wcrh_available;
-	}
-
-	// left with norm
-	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
-	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(write.get_logical_address());
-
-	if (w_hotness == WRITE_HOT) {
-		return wh_available;
-	} else if (r_hotness == READ_HOT) {
-		return wcrh_available;
-	} else {
-		return wcrc_available;
-	}
-}*/
-
 pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write) const {
 	pair<double, Address> result;
 	bool can_write = Block_manager_parent::can_write(write);
@@ -223,49 +192,3 @@ void Block_manager_parallel_wearwolf::check_if_should_trigger_more_GC(double sta
 		handle_cold_pointer_out_of_space(READ_COLD, start_time);
 	}
 }
-
-/*Address Block_manager_parallel_wearwolf::choose_write_location(Event const& event) const {
-	// if GC, try writing in appropriate pointer. If that doesn't work, write anywhere free.
-	// if not
-	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(event.get_logical_address());
-	bool wh_available = at_least_one_available_write_hot_pointer();
-
-	// TODO: if write-hot, need to assign READ_HOT to non-busy planes and READ_COLD to busy planes. Do this while still trying to write to a die with a short queue
-	if (wh_available && w_hotness == WRITE_HOT) {
-		//printf("WRITE_HOT\n");
-		return get_free_die_with_shortest_IO_queue();
-	}
-
-	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(event.get_logical_address());
-	bool wcrc_available = pointer_can_be_written_to(wcrc_pointer);
-
-	if (wcrc_available && w_hotness == WRITE_COLD && r_hotness == READ_COLD ) {
-		printf("WRITE_COLD READ_COLD\n");
-		return wcrc_pointer;
-	}
-
-	bool wcrh_available = pointer_can_be_written_to(wcrh_pointer);
-
-	if (wcrh_available && w_hotness == WRITE_COLD && r_hotness == READ_HOT ) {
-		printf("WRITE_COLD READ_HOT\n");
-		return wcrh_pointer;
-	}
-	printf("MISTAKE\n");
-	// if we are here, we must make a mistake. Simply choose some free pointer.
-	// can only get here if can_write returned true. It only allows mistakes for GC
-	assert(event.is_garbage_collection_op());
-
-	if (wh_available) {
-		return get_free_die_with_shortest_IO_queue();
-	}
-
-	if (wcrc_available) {
-		return wcrc_pointer;
-	}
-
-	if (wcrh_available) {
-		return wcrh_pointer;
-	}
-	assert(false);
-	return NULL;
-}*/

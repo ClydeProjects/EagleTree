@@ -857,8 +857,6 @@ public:
 	~Block_manager_parallel();
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	//virtual Address choose_write_location(Event const& event) const;
-	//virtual bool can_write(Event const& write) const;
 	virtual pair<double, Address> write(Event const& write) const;
 private:
 	bool has_free_pages(uint package_id, uint die_id) const;
@@ -872,8 +870,6 @@ public:
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	//virtual Address choose_write_location(Event const& event) const;
-	//virtual bool can_write(Event const& write) const;
 	virtual pair<double, Address> write(Event const& write) const;
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
@@ -894,8 +890,6 @@ public:
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	//virtual Address choose_write_location(Event const& event) const;
-	//virtual bool can_write(Event const& write) const;
 	virtual pair<double, Address> write(Event const& write) const;
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
@@ -1029,7 +1023,6 @@ private:
 	void execute_next_batch(std::vector<Event>& events);
 	void handle_writes(std::vector<Event>& events);
 
-	//double in_how_long_can_this_event_be_scheduled(Event const& event) const;
 	bool can_schedule_on_die(Event const& event) const;
 	void handle_finished_event(Event const&event, enum status outcome);
 
