@@ -816,21 +816,22 @@ public:
 	virtual void register_write_arrival(Event const& event);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual Address choose_write_location(Event const& event) const = 0;
-	virtual bool can_write(Event const& write) const;
+	//virtual Address choose_write_location(Event const& event) const = 0;
 	virtual pair<double, Address> write(Event const& write) const = 0;
+	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
 protected:
 	virtual void Garbage_Collect(uint package_id, uint die_id, double start_time);
 	void perform_emergency_garbage_collection(double start_time);
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	virtual void Wear_Level(Event const& event);
+	bool can_write(Event const& write) const;
 	Address find_free_unused_block(uint package_id, uint die_id, uint klass);
 	Address find_free_unused_block(uint package_id, uint die_id);
 	Address find_free_unused_block(uint package_id);
 	Address find_free_unused_block();
-	virtual std::pair<uint, uint> get_free_die_with_shortest_IO_queue(std::vector<std::vector<Address> > const& dies) const;
+	virtual pair<bool, pair<uint, uint> > get_free_die_with_shortest_IO_queue(std::vector<std::vector<Address> > const& dies) const;
 	virtual Address get_free_die_with_shortest_IO_queue() const;
-	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
+
 	Ssd& ssd;
 	FtlParent& ftl;
 	vector<vector<Address> > free_block_pointers;
@@ -856,8 +857,8 @@ public:
 	~Block_manager_parallel();
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual Address choose_write_location(Event const& event) const;
-	virtual bool can_write(Event const& write) const;
+	//virtual Address choose_write_location(Event const& event) const;
+	//virtual bool can_write(Event const& write) const;
 	virtual pair<double, Address> write(Event const& write) const;
 private:
 	bool has_free_pages(uint package_id, uint die_id) const;
@@ -871,8 +872,8 @@ public:
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual Address choose_write_location(Event const& event) const;
-	virtual bool can_write(Event const& write) const;
+	//virtual Address choose_write_location(Event const& event) const;
+	//virtual bool can_write(Event const& write) const;
 	virtual pair<double, Address> write(Event const& write) const;
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
@@ -893,8 +894,8 @@ public:
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual Address choose_write_location(Event const& event) const;
-	virtual bool can_write(Event const& write) const;
+	//virtual Address choose_write_location(Event const& event) const;
+	//virtual bool can_write(Event const& write) const;
 	virtual pair<double, Address> write(Event const& write) const;
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
@@ -913,8 +914,7 @@ class Block_manager_parallel_wearwolf_locality : public Block_manager_parallel_w
 public:
 	Block_manager_parallel_wearwolf_locality(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel_wearwolf_locality();
-
-	virtual Address choose_write_location(Event const& event);
+	virtual pair<double, Address> write(Event const& write);
 private:
 	enum parallel_degree_for_sequential_files { ONE, LUN, CHANNEL };
 	parallel_degree_for_sequential_files parallel_degree;
@@ -1029,7 +1029,7 @@ private:
 	void execute_next_batch(std::vector<Event>& events);
 	void handle_writes(std::vector<Event>& events);
 
-	double in_how_long_can_this_event_be_scheduled(Event const& event) const;
+	//double in_how_long_can_this_event_be_scheduled(Event const& event) const;
 	bool can_schedule_on_die(Event const& event) const;
 	void handle_finished_event(Event const&event, enum status outcome);
 
@@ -1042,7 +1042,7 @@ private:
 	static IOScheduler *inst;
 	Ssd& ssd;
 	FtlParent& ftl;
-	Block_manager_parallel bm;
+	Block_manager_parallel_wearwolf bm;
 
 	std::map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations.
 };

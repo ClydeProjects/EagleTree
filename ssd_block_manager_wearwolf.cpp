@@ -136,7 +136,7 @@ bool Block_manager_parallel_wearwolf::at_least_one_available_write_hot_pointer()
  * makes sure that there is at least 1 non-busy die with free space
  * and that the die is not waiting for an impending read transfer
  */
-bool Block_manager_parallel_wearwolf::can_write(Event const& write) const {
+/*bool Block_manager_parallel_wearwolf::can_write(Event const& write) const {
 	if (!Block_manager_parent::can_write(write)) {
 		return false;
 	}
@@ -160,10 +160,52 @@ bool Block_manager_parallel_wearwolf::can_write(Event const& write) const {
 	} else {
 		return wcrc_available;
 	}
-}
+}*/
 
 pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write) const {
+	pair<double, Address> result;
+	bool can_write = Block_manager_parent::can_write(write);
+	if (!can_write) {
+		result.first = 1;
+		return result;
+	}
 
+	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
+	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(write.get_logical_address());
+
+	bool relevant_pointer_unavailable = false;
+
+	if (w_hotness == WRITE_HOT) {
+		result.second = get_free_die_with_shortest_IO_queue();
+		if (result.second.valid == NONE) {
+			result.first = 1;
+			relevant_pointer_unavailable = true;
+		} else {
+			result.first = in_how_long_can_this_event_be_scheduled(result.second, write.get_start_time() + write.get_time_taken());
+		}
+	} else if (w_hotness == WRITE_COLD && r_hotness == WRITE_COLD) {
+		if (wcrc_pointer.page >= BLOCK_SIZE) {
+			result.first = 1;
+			relevant_pointer_unavailable = true;
+		} else {
+			result.first = in_how_long_can_this_event_be_scheduled(wcrc_pointer, write.get_start_time() + write.get_time_taken());
+			result.second = wcrc_pointer;
+		}
+	} else if (w_hotness == WRITE_COLD && r_hotness == WRITE_HOT) {
+		if (wcrh_pointer.page >= BLOCK_SIZE) {
+			result.first = 1;
+			relevant_pointer_unavailable = true;
+		} else {
+			result.first = in_how_long_can_this_event_be_scheduled(wcrh_pointer, write.get_start_time() + write.get_time_taken());
+			result.second = wcrh_pointer;
+		}
+	}
+
+	if (write.is_garbage_collection_op() && relevant_pointer_unavailable) {
+		assert(false);
+	}
+
+	return result;
 }
 
 void Block_manager_parallel_wearwolf::register_read_outcome(Event const& event, enum status status){
@@ -182,7 +224,7 @@ void Block_manager_parallel_wearwolf::check_if_should_trigger_more_GC(double sta
 	}
 }
 
-Address Block_manager_parallel_wearwolf::choose_write_location(Event const& event) const {
+/*Address Block_manager_parallel_wearwolf::choose_write_location(Event const& event) const {
 	// if GC, try writing in appropriate pointer. If that doesn't work, write anywhere free.
 	// if not
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(event.get_logical_address());
@@ -226,4 +268,4 @@ Address Block_manager_parallel_wearwolf::choose_write_location(Event const& even
 	}
 	assert(false);
 	return NULL;
-}
+}*/

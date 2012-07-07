@@ -180,9 +180,13 @@ void Block_manager_parent::update_blocks_with_min_age(uint min_age) {
 	}
 }
 
-pair<uint, uint> Block_manager_parent::get_free_die_with_shortest_IO_queue(vector<vector<Address> > const& dies) const {
+// This function takes a vector of channels, each of each has a vector of dies
+// it finds the die with the shortest queue, and returns its ID
+// if all dies are busy, the boolean field is returned as false
+pair<bool, pair<uint, uint> > Block_manager_parent::get_free_die_with_shortest_IO_queue(vector<vector<Address> > const& dies) const {
 	uint best_channel_id;
 	uint best_die_id;
+	bool can_write = false;
 	double shortest_time = std::numeric_limits<double>::max( );
 	for (uint i = 0; i < dies.size(); i++) {
 		double earliest_die_finish_time = std::numeric_limits<double>::max();
@@ -193,6 +197,7 @@ pair<uint, uint> Block_manager_parent::get_free_die_with_shortest_IO_queue(vecto
 			uint die_id = dies[i][j].die;
 			bool die_register_is_busy = ssd.getPackages()[channel_id].getDies()[die_id].register_is_busy();
 			if (die_has_free_pages && !die_register_is_busy) {
+				can_write = true;
 				double channel_finish_time = ssd.bus.get_channel(channel_id).get_currently_executing_operation_finish_time();
 				double die_finish_time = ssd.getPackages()[channel_id].getDies()[die_id].get_currently_executing_io_finish_time();
 				double max = std::max(channel_finish_time,die_finish_time);
@@ -210,12 +215,16 @@ pair<uint, uint> Block_manager_parent::get_free_die_with_shortest_IO_queue(vecto
 			}
 		}
 	}
-	return pair<uint, uint>(best_channel_id, best_die_id);
+	return pair<bool, pair<uint, uint> >(can_write, pair<uint, uint>(best_channel_id, best_die_id));
 }
 
 Address Block_manager_parent::get_free_die_with_shortest_IO_queue() const {
-	std::pair<uint, uint> best_die = get_free_die_with_shortest_IO_queue(free_block_pointers);
-	return free_block_pointers[best_die.first][best_die.second];
+	pair<bool, pair<uint, uint> > best_die = get_free_die_with_shortest_IO_queue(free_block_pointers);
+	if (!best_die.first) {
+		return Address();
+	} else {
+		return free_block_pointers[best_die.second.first][best_die.second.second];
+	}
 }
 
 // gives time until both the channel and die are clear

@@ -137,15 +137,39 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 		if (!event.is_garbage_collection_op()) {
 			eliminate_conflict_with_any_incoming_gc(event);
 		}
+		pair<double, Address> result = bm.write(event);
+		event.set_address(result.second);
+		event.set_noop(false);
+
+		if (result.first == 0) {
+			ftl.set_replace_address(event);
+			adjust_conflict_elimination_structures(event);
+			execute_next(event);
+		}
+		else {
+			event.incr_bus_wait_time(result.first);
+			event.incr_time_taken(result.first);
+			io_schedule.push_back(event);
+		}
+	}
+}
+
+/*void IOScheduler::handle_writes(std::vector<Event>& events) {
+	std::sort(events.begin(), events.end(), bus_wait_time_comparator);
+	while (events.size() > 0) {
+		Event event = events.back();
+		events.pop_back();
+		assert(event.get_event_type() == WRITE);
+		ftl.set_replace_address(event);
+		bm.register_write_arrival(event);
+		if (!event.is_garbage_collection_op()) {
+			eliminate_conflict_with_any_incoming_gc(event);
+		}
 		if (!bm.can_write(event)) {
 			event.incr_bus_wait_time(1);
 			event.incr_time_taken(1);
 			io_schedule.push_back(event);
 			continue;
-		}
-		if (event.get_logical_address() == 127) {
-			int i = 0;
-			i++;
 		}
 		Address page = bm.choose_write_location(event);
 		event.set_address(page);
@@ -163,7 +187,7 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 			io_schedule.push_back(event);
 		}
 	}
-}
+}*/
 
 // if a write to LBA X arrives, while there is already a pending GC operation
 // to migrate LBA X, the GC operation becomes redundant, so we cancel it.
@@ -225,7 +249,7 @@ void IOScheduler::execute_next_batch(std::vector<Event>& events) {
 		if (event.get_event_type() == READ_COMMAND || event.get_event_type() == READ_TRANSFER) {
 			ftl.set_read_address(event);
 		}
-		double time = in_how_long_can_this_event_be_scheduled(event);
+		double time = bm.in_how_long_can_this_event_be_scheduled(event.get_address(), event.get_start_time() + event.get_time_taken());
 		bool can_schedule = can_schedule_on_die(event);
 		if (can_schedule && time <= 0) {
 			execute_next(event);
@@ -269,7 +293,7 @@ enum status IOScheduler::execute_next(Event& event) {
 }
 
 // gives time until both the channel and die are clear
-double IOScheduler::in_how_long_can_this_event_be_scheduled(Event const& event) const {
+/*double IOScheduler::in_how_long_can_this_event_be_scheduled(Event const& event) const {
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;
 	double channel_finish_time = ssd.bus.get_channel(package_id).get_currently_executing_operation_finish_time();
@@ -277,7 +301,7 @@ double IOScheduler::in_how_long_can_this_event_be_scheduled(Event const& event) 
 	double max = std::max(channel_finish_time, die_finish_time);
 	double time = max - event.get_start_time() - event.get_time_taken();
 	return time <= 0 ? 0 : time;
-}
+}*/
 
 bool IOScheduler::can_schedule_on_die(Event const& event) const {
 	uint package_id = event.get_address().package;

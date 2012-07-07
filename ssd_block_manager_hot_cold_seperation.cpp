@@ -112,7 +112,7 @@ bool Block_manager_parallel_hot_cold_seperation::at_least_one_available_write_ho
  * makes sure that there is at least 1 non-busy die with free space
  * and that the die is not waiting for an impending read transfer
  */
-bool Block_manager_parallel_hot_cold_seperation::can_write(Event const& write) const {
+/*bool Block_manager_parallel_hot_cold_seperation::can_write(Event const& write) const {
 	if (!Block_manager_parent::can_write(write)) {
 		return false;
 	}
@@ -132,12 +132,42 @@ bool Block_manager_parallel_hot_cold_seperation::can_write(Event const& write) c
 	} else {
 		return cold_pointer_available;
 	}
-	assert(false);
-	return false;
-}
+}*/
 
 pair<double, Address> Block_manager_parallel_hot_cold_seperation::write(Event const& write) const {
+	pair<double, Address> result;
+	bool can_write = Block_manager_parent::can_write(write);
+	if (!can_write) {
+		result.first = 1;
+		return result;
+	}
 
+	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
+	bool relevant_pointer_unavailable = false;
+
+	if (w_hotness == WRITE_HOT) {
+		result.second = get_free_die_with_shortest_IO_queue();
+		if (result.second.valid == NONE) {
+			result.first = 1;
+			relevant_pointer_unavailable = true;
+		} else {
+			result.first = in_how_long_can_this_event_be_scheduled(result.second, write.get_start_time() + write.get_time_taken());
+		}
+	} else if (w_hotness == WRITE_COLD) {
+		if (cold_pointer.page >= BLOCK_SIZE) {
+			result.first = 1;
+			relevant_pointer_unavailable = true;
+		} else {
+			result.first = in_how_long_can_this_event_be_scheduled(cold_pointer, write.get_start_time() + write.get_time_taken());
+			result.second = cold_pointer;
+		}
+	}
+
+	if (write.is_garbage_collection_op() && relevant_pointer_unavailable) {
+		assert(false);
+	}
+
+	return result;
 }
 
 void Block_manager_parallel_hot_cold_seperation::register_read_outcome(Event const& event, enum status status){
@@ -153,7 +183,7 @@ void Block_manager_parallel_hot_cold_seperation::check_if_should_trigger_more_GC
 	}
 }
 
-Address Block_manager_parallel_hot_cold_seperation::choose_write_location(Event const& event) const {
+/*Address Block_manager_parallel_hot_cold_seperation::choose_write_location(Event const& event) const {
 	// if GC, try writing in appropriate pointer. If that doesn't work, write anywhere free.
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(event.get_logical_address());
 	bool wh_available = at_least_one_available_write_hot_pointer();
@@ -177,5 +207,5 @@ Address Block_manager_parallel_hot_cold_seperation::choose_write_location(Event 
 	// can only get here if can_write returned true. It only allows mistakes for GC
 	assert(event.is_garbage_collection_op());
 	return wh_available ? get_free_die_with_shortest_IO_queue() : cold_pointer;
-}
+}*/
 
