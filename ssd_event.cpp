@@ -51,7 +51,6 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	mapping_op(false)
 {
 	assert(start_time >= 0.0);
-	return;
 }
 /*
 Event::Event(enum event_type type, ulong logical_address, uint size, double start_time, uint hi)
@@ -59,12 +58,10 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	Event(type, logical_address, size, start_time);
 	application_io_id = hi;
 	assert(start_time >= 0.0);
-	return;
 }*/
 
 Event::~Event(void)
 {
-	return;
 }
 
 /* find the last event in the list to finish and use that event's finish time
@@ -95,7 +92,6 @@ void Event::consolidate_metaevent(Event &list)
 
 	assert(time_taken >= 0);
 	assert(bus_wait_time >= 0);
-	return;
 }
 
 ssd::ulong Event::get_logical_address(void) const
@@ -197,13 +193,11 @@ void Event::set_address(const Address &address)
 		assert(address.valid == PAGE);
 	}
 	this -> address = address;
-	return;
 }
 
 void Event::set_merge_address(const Address &address)
 {
 	merge_address = address;
-	return;
 }
 
 void Event::set_replace_address(const Address &address)
@@ -244,7 +238,6 @@ void Event::set_start_time(double value) {
 void Event::set_next(Event &next)
 {
 	this -> next = &next;
-	return;
 }
 
 double Event::incr_bus_wait_time(double time_incr)
@@ -282,7 +275,7 @@ void Event::print(FILE *stream) const
 	address.print(stream);
 	if(type == MERGE)
 		merge_address.print(stream);
-	fprintf(stream, "Time[%f, %f) Bus_wait: %f", start_time, start_time + time_taken, bus_wait_time);
+	fprintf(stream, "Time[%d, %d, %d]", (int)start_time, (int)(start_time + time_taken), (int)bus_wait_time);
 	fprintf(stream, " application io ID: %d", application_io_id);
 	if (garbage_collection_op) {
 		fprintf(stream, " GC");
@@ -290,7 +283,6 @@ void Event::print(FILE *stream) const
 		fprintf(stream, " MAPPING");
 	}
 	fprintf(stream, "\n");
-	return;
 }
 
 #if 0

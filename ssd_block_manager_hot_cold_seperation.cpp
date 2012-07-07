@@ -75,17 +75,13 @@ void Block_manager_parallel_hot_cold_seperation::register_erase_outcome(Event co
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;
 
-	Address addr = event.get_address();
-	addr.valid = PAGE;
-	addr.page = 0;
-
 	// TODO: Need better logic for this assignment. Easiest to remember some state.
 	// when we trigger GC for a cold pointer, remember which block was chosen.
 	if (free_block_pointers[package_id][die_id].page >= BLOCK_SIZE) {
-		free_block_pointers[package_id][die_id] = addr;
+		free_block_pointers[package_id][die_id] = find_free_unused_block(package_id, die_id);
 	}
 	else if (cold_pointer.page >= BLOCK_SIZE) {
-		cold_pointer = addr;
+		cold_pointer = find_free_unused_block(package_id, die_id);
 	}
 
 	check_if_should_trigger_more_GC(event.get_start_time() + event.get_time_taken());
@@ -140,6 +136,10 @@ bool Block_manager_parallel_hot_cold_seperation::can_write(Event const& write) c
 	return false;
 }
 
+pair<double, Address> Block_manager_parallel_hot_cold_seperation::write(Event const& write) const {
+
+}
+
 void Block_manager_parallel_hot_cold_seperation::register_read_outcome(Event const& event, enum status status){
 	if (status == SUCCESS && !event.is_garbage_collection_op()) {
 		page_hotness_measurer.register_event(event);
@@ -157,6 +157,8 @@ Address Block_manager_parallel_hot_cold_seperation::choose_write_location(Event 
 	// if GC, try writing in appropriate pointer. If that doesn't work, write anywhere free.
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(event.get_logical_address());
 	bool wh_available = at_least_one_available_write_hot_pointer();
+
+	Address a = free_block_pointers[0][0];
 
 	// TODO: if write-hot, need to assign READ_HOT to non-busy planes and READ_COLD to busy planes. Do this while still trying to write to a die with a short queue
 	if (wh_available && w_hotness == WRITE_HOT) {

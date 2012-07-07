@@ -67,6 +67,10 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	assert(blocks_currently_undergoing_gc.count(phys_addr) == 0);
 
 	Address a = event.get_address();
+	a.valid = PAGE;
+	a.page = 0;
+
+	Address top = free_blocks[a.package][a.die][0].back();
 	free_blocks[a.package][a.die][0].push_back(a);
 
 	num_free_pages += BLOCK_SIZE;
@@ -92,10 +96,15 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	if (block.get_pages_invalid() == BLOCK_SIZE && blocks_currently_undergoing_gc.count(block.get_physical_address()) == 0) {
 		double start_time = event.get_start_time() + event.get_time_taken();
 		printf("block "); ra.print(); printf(" is now invalid. An erase is issued\n");
-		migrate(&block, start_time);
+		Event erase = Event(ERASE, 0, 1, start_time);
+		erase.set_address(Address(block.physical_address, BLOCK));
+		erase.set_garbage_collection_op(true);
+		blocks_currently_undergoing_gc.insert(erase.get_address().get_linear_address());
+		IOScheduler::instance()->schedule_independent_event(erase);
 	}
 }
 
+// invalidates the original location of a write
 void Block_manager_parent::register_write_arrival(Event const& event) {
 	assert(event.get_event_type() == WRITE);
 	Address ra = event.get_replace_address();
@@ -171,7 +180,7 @@ void Block_manager_parent::update_blocks_with_min_age(uint min_age) {
 	}
 }
 
-std::pair<uint, uint> Block_manager_parent::get_free_die_with_shortest_IO_queue(std::vector<std::vector<Address> > const& dies) const {
+pair<uint, uint> Block_manager_parent::get_free_die_with_shortest_IO_queue(vector<vector<Address> > const& dies) const {
 	uint best_channel_id;
 	uint best_die_id;
 	double shortest_time = std::numeric_limits<double>::max( );
@@ -198,17 +207,26 @@ std::pair<uint, uint> Block_manager_parent::get_free_die_with_shortest_IO_queue(
 					best_die_id = j;
 					shortest_time = max;
 				}
-
-
 			}
 		}
 	}
-	return std::pair<uint, uint>(best_channel_id, best_die_id);
+	return pair<uint, uint>(best_channel_id, best_die_id);
 }
 
 Address Block_manager_parent::get_free_die_with_shortest_IO_queue() const {
 	std::pair<uint, uint> best_die = get_free_die_with_shortest_IO_queue(free_block_pointers);
 	return free_block_pointers[best_die.first][best_die.second];
+}
+
+// gives time until both the channel and die are clear
+double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const {
+	uint package_id = die_address.package;
+	uint die_id = die_address.die;
+	double channel_finish_time = ssd.bus.get_channel(package_id).get_currently_executing_operation_finish_time();
+	double die_finish_time = ssd.getPackages()[package_id].getDies()[die_id].get_currently_executing_io_finish_time();
+	double max = std::max(channel_finish_time, die_finish_time);
+	double time = max - time_taken;
+	return time <= 0 ? 0 : time;
 }
 
 // puts free blocks at the very end of the queue
@@ -230,7 +248,6 @@ void Block_manager_parent::perform_emergency_garbage_collection(double start_tim
 		assert(blocks_currently_undergoing_gc.size() > 0);
 		return;
 	}
-	//assert(num_available_pages_for_new_writes == BLOCK_SIZE);
 
 	Block *target;
 	bool found_suitable_block = false;
@@ -279,6 +296,9 @@ void Block_manager_parent::Garbage_Collect(uint package_id, uint die_id, double 
 	}
 }
 
+// Reads and rewrites all valid pages of a block somewhere else
+// An erase is issued in register_write_completion after the last
+// page from this block has been migrated
 void Block_manager_parent::migrate(Block const* const block, double start_time) {
 
 	assert(block->get_state() != FREE && block->get_state() != PARTIALLY_FREE && block->get_pages_valid() <= num_available_pages_for_new_writes);
@@ -288,15 +308,9 @@ void Block_manager_parent::migrate(Block const* const block, double start_time) 
 	blocks_currently_undergoing_gc.insert(block->get_physical_address());
 	assert(blocks_currently_undergoing_gc.count(block->physical_address) == 1);
 
-	Event erase = Event(ERASE, 0, 1, start_time);
-	erase.set_address(Address(block->physical_address, BLOCK));
-	erase.set_garbage_collection_op(true);
-
-	std::queue<Event> events;
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
-		Page const& page = block->getPages()[i];
-		enum page_state state = page.get_state();
-		if (state == VALID) {
+		if (block->getPages()[i].get_state() == VALID) {
+			std::queue<Event> events;
 			Address addr = Address(block->physical_address, PAGE);
 			addr.page = i;
 			long logical_address = ftl.get_logical_address(addr.get_linear_address());
@@ -311,11 +325,9 @@ void Block_manager_parent::migrate(Block const* const block, double start_time) 
 
 			events.push(read);
 			events.push(write);
+			IOScheduler::instance()->schedule_dependent_events(events);
 		}
 	}
-
-	events.push(erase);
-	IOScheduler::instance()->schedule_dependent_events(events);
 }
 
 // finds and returns a free block from anywhere in the SSD. Returns Address(0, NONE) is there is no such block
@@ -351,9 +363,11 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 }
 
 Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_id, uint klass) {
+	uint i = free_blocks[package_id][die_id][klass].size();
 	if (free_blocks[package_id][die_id][klass].size() > 0) {
-		Address a = free_blocks[package_id][die_id][0].back();
+		Address a = free_blocks[package_id][die_id][klass].back();
 		free_blocks[package_id][die_id][klass].pop_back();
+		uint j = free_blocks[package_id][die_id][klass].size();
 		return a;
 	} else {
 		return Address(0, NONE);

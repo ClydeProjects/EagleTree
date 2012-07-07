@@ -818,6 +818,7 @@ public:
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual Address choose_write_location(Event const& event) const = 0;
 	virtual bool can_write(Event const& write) const;
+	virtual pair<double, Address> write(Event const& write) const = 0;
 protected:
 	virtual void Garbage_Collect(uint package_id, uint die_id, double start_time);
 	void perform_emergency_garbage_collection(double start_time);
@@ -829,6 +830,7 @@ protected:
 	Address find_free_unused_block();
 	virtual std::pair<uint, uint> get_free_die_with_shortest_IO_queue(std::vector<std::vector<Address> > const& dies) const;
 	virtual Address get_free_die_with_shortest_IO_queue() const;
+	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
 	Ssd& ssd;
 	FtlParent& ftl;
 	vector<vector<Address> > free_block_pointers;
@@ -856,6 +858,7 @@ public:
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual Address choose_write_location(Event const& event) const;
 	virtual bool can_write(Event const& write) const;
+	virtual pair<double, Address> write(Event const& write) const;
 private:
 	bool has_free_pages(uint package_id, uint die_id) const;
 };
@@ -870,6 +873,7 @@ public:
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual Address choose_write_location(Event const& event) const;
 	virtual bool can_write(Event const& write) const;
+	virtual pair<double, Address> write(Event const& write) const;
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 private:
@@ -891,6 +895,7 @@ public:
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual Address choose_write_location(Event const& event) const;
 	virtual bool can_write(Event const& write) const;
+	virtual pair<double, Address> write(Event const& write) const;
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 private:
@@ -1037,7 +1042,7 @@ private:
 	static IOScheduler *inst;
 	Ssd& ssd;
 	FtlParent& ftl;
-	Block_manager_parallel_hot_cold_seperation bm;
+	Block_manager_parallel bm;
 
 	std::map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations.
 };

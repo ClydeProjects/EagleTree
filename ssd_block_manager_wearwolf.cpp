@@ -100,19 +100,15 @@ void Block_manager_parallel_wearwolf::reset_any_filled_pointers(Event const& eve
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;
 
-	Address addr = event.get_address();
-	addr.valid = PAGE;
-	addr.page = 0;
-
 	// TODO: Need better logic for this assignment. Easiest to remember some state.
 	// when we trigger GC for a cold pointer, remember which block was chosen.
 	if (free_block_pointers[package_id][die_id].page >= BLOCK_SIZE) {
 		free_block_pointers[package_id][die_id] = find_free_unused_block(package_id, die_id);
 	}
 	else if (wcrh_pointer.page >= BLOCK_SIZE) {
-		wcrh_pointer = addr;
+		wcrh_pointer = find_free_unused_block(package_id, die_id);;
 	} else if (wcrc_pointer.page >= BLOCK_SIZE) {
-		wcrc_pointer = addr;
+		wcrc_pointer = find_free_unused_block(package_id, die_id);;
 	}
 }
 
@@ -164,6 +160,10 @@ bool Block_manager_parallel_wearwolf::can_write(Event const& write) const {
 	} else {
 		return wcrc_available;
 	}
+}
+
+pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write) const {
+
 }
 
 void Block_manager_parallel_wearwolf::register_read_outcome(Event const& event, enum status status){

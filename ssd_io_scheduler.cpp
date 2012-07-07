@@ -143,10 +143,15 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 			io_schedule.push_back(event);
 			continue;
 		}
+		if (event.get_logical_address() == 127) {
+			int i = 0;
+			i++;
+		}
 		Address page = bm.choose_write_location(event);
 		event.set_address(page);
 		event.set_noop(false);
 		double time = in_how_long_can_this_event_be_scheduled(event);
+
 		if (time == 0) {
 			ftl.set_replace_address(event);
 			adjust_conflict_elimination_structures(event);

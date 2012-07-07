@@ -44,12 +44,11 @@ void Block_manager_parallel::register_erase_outcome(Event const& event, enum sta
 		return;
 	}
 	Block_manager_parent::register_erase_outcome(event, status);
-	uint package_id = event.get_address().package;
-	uint die_id = event.get_address().die;
+	Address a = event.get_address();
 
 	// if there is no free pointer for this block, set it to this one.
-	if (!has_free_pages(package_id, die_id)) {
-		free_block_pointers[package_id][die_id] = event.get_address();
+	if (!has_free_pages(a.package, a.die)) {
+		free_block_pointers[a.package][a.die] = find_free_unused_block(a.package, a.die);
 	}
 
 	check_if_should_trigger_more_GC(event.get_start_time() + event.get_time_taken());
@@ -89,4 +88,14 @@ bool Block_manager_parallel::can_write(Event const& write) const {
 	return false;
 }
 
-
+pair<double, Address> Block_manager_parallel::write(Event const& write) const {
+	pair<double, Address> result;
+	bool can_write = Block_manager_parent::can_write(write);
+	if (!can_write) {
+		result.first = 1;
+		return result;
+	}
+	result.second = get_free_die_with_shortest_IO_queue();
+	result.first = in_how_long_can_this_event_be_scheduled(result.second, write.get_start_time() + write.get_time_taken());
+	return result;
+}
