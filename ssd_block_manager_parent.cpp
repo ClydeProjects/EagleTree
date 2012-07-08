@@ -20,7 +20,6 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
    ftl(ftl),
    free_block_pointers(SSD_SIZE, vector<Address>(PACKAGE_SIZE)),
    free_blocks(SSD_SIZE, vector<vector<vector<Address> > >(PACKAGE_SIZE, vector<vector<Address> >(num_age_classes, vector<Address>(0)) )),
-   blocks(SSD_SIZE, vector<vector<Block*> >(PACKAGE_SIZE, vector<Block*>(0) )),
    all_blocks(0),
    max_age(0),
    min_age(0),
@@ -39,7 +38,6 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
 				Plane& plane = die.getPlanes()[t];
 				for (uint b = 0; b < PLANE_SIZE; b++) {
 					Block& block = plane.getBlocks()[b];
-					blocks[i][j].push_back(&block);
 					free_blocks[i][j][0].push_back(Address(block.get_physical_address(), PAGE));
 					all_blocks.push_back(&block);
 					blocks_with_min_age.insert(&block);
@@ -262,64 +260,6 @@ struct block_valid_pages_comparator_wearwolf {
 		return i->get_pages_invalid() > j->get_pages_invalid();
 	}
 };
-
-// GC from the cheapest block in the device.
-/*void Block_manager_parent::perform_emergency_garbage_collection(double start_time) {
-	// first, find the cheapest block
-	std::sort(all_blocks.begin(), all_blocks.end(), block_valid_pages_comparator_wearwolf());
-	assert(num_free_pages <= BLOCK_SIZE);
-
-	if (num_available_pages_for_new_writes < BLOCK_SIZE) {
-		assert(blocks_currently_undergoing_gc.size() > 0);
-		return;
-	}
-
-	Block *target;
-	bool found_suitable_block = false;
-	for (uint i = 0; i < all_blocks.size(); i++) {
-		target = all_blocks[i];
-		if (blocks_currently_undergoing_gc.count(target->get_physical_address()) == 0 &&
-				target->get_state() != FREE &&
-				target->get_state() != PARTIALLY_FREE &&
-				num_available_pages_for_new_writes >= target->get_pages_valid()) {
-			found_suitable_block = true;
-			break;
-		}
-	}
-	assert(found_suitable_block);
-
-
-	printf("Triggering emergency GC. Only %d free pages left.  ", num_free_pages);
-	Address a = Address(target->get_physical_address(), BLOCK);
-	a.print(); printf("\n");
-	migrate(target, start_time);
-}*/
-
-/*void Block_manager_parent::Garbage_Collect(uint package_id, uint die_id, double start_time) {
-	std::sort(blocks[package_id][die_id].begin(), blocks[package_id][die_id].end(), block_valid_pages_comparator_wearwolf());
-
-	Block *target;
-	bool found_suitable_block = false;
-	for (uint i = 0; i < blocks[package_id][die_id].size(); i++) {
-		target = blocks[package_id][die_id][i];
-
-		if (blocks_currently_undergoing_gc.count(target->get_physical_address()) == 0 &&
-				target->get_state() != FREE &&
-				target->get_state() != PARTIALLY_FREE &&
-				target->get_pages_valid() < BLOCK_SIZE &&
-				num_available_pages_for_new_writes >= target->get_pages_valid()) {
-			found_suitable_block = true;
-			break;
-		}
-	}
-	if (found_suitable_block) {
-		printf("triggering GC in ");
-		Address a = Address(target->get_physical_address(), BLOCK);
-		a.print();
-		printf("  %d invalid,  %d valid\n", target->get_pages_invalid(), target->get_pages_valid());
-		migrate(target, start_time);
-	}
-}*/
 
 void Block_manager_parent::perform_gc(double start_time) {
 	vector<set<Block*> > candidates;

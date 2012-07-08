@@ -819,8 +819,6 @@ public:
 	virtual pair<double, Address> write(Event const& write) const = 0;
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
 protected:
-	//virtual void Garbage_Collect(uint package_id, uint die_id, double start_time);
-	//void perform_emergency_garbage_collection(double start_time);
 	virtual void check_if_should_trigger_more_GC(double start_time);
 
 	void perform_gc(uint package_id, uint die_id, uint klass, double start_time);
@@ -843,12 +841,10 @@ protected:
 	vector<vector<Address> > free_block_pointers;
 private:
 	void migrate(Block const* const block, double start_time);
-
 	void choose_gc_victim(vector<set<Block*> > candidates, double start_time);
 	void update_blocks_with_min_age(uint age);
 	uint sort_into_age_class(Address const& address);
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
-	vector<vector<vector<Block*> > > blocks;
 	vector<Block*> all_blocks;
 	// WL structures
 	uint max_age;
