@@ -154,41 +154,6 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 	}
 }
 
-/*void IOScheduler::handle_writes(std::vector<Event>& events) {
-	std::sort(events.begin(), events.end(), bus_wait_time_comparator);
-	while (events.size() > 0) {
-		Event event = events.back();
-		events.pop_back();
-		assert(event.get_event_type() == WRITE);
-		ftl.set_replace_address(event);
-		bm.register_write_arrival(event);
-		if (!event.is_garbage_collection_op()) {
-			eliminate_conflict_with_any_incoming_gc(event);
-		}
-		if (!bm.can_write(event)) {
-			event.incr_bus_wait_time(1);
-			event.incr_time_taken(1);
-			io_schedule.push_back(event);
-			continue;
-		}
-		Address page = bm.choose_write_location(event);
-		event.set_address(page);
-		event.set_noop(false);
-		double time = in_how_long_can_this_event_be_scheduled(event);
-
-		if (time == 0) {
-			ftl.set_replace_address(event);
-			adjust_conflict_elimination_structures(event);
-			execute_next(event);
-		}
-		else {
-			event.incr_bus_wait_time(time);
-			event.incr_time_taken(time);
-			io_schedule.push_back(event);
-		}
-	}
-}*/
-
 // if a write to LBA X arrives, while there is already a pending GC operation
 // to migrate LBA X, the GC operation becomes redundant, so we cancel it.
 void IOScheduler::eliminate_conflict_with_any_incoming_gc(Event const&event) {
@@ -319,33 +284,3 @@ void IOScheduler::handle_finished_event(Event const&event, enum status outcome) 
 		ftl.register_read_completion(event, outcome);
 	}
 }
-
-// Looks for an idle LUN and schedules writes in it. Works in O(events + LUNs)
-/*void IOScheduler::handle_writes(std::vector<Event>& events) {
-	if (events.size() == 0) {
-		return;
-	}
-	std::sort(events.begin(), events.end(), bus_wait_time_comparator);
-	double start_time = events.back().get_start_time() + events.back().get_bus_wait_time();
-	for (uint i = 0; i < SSD_SIZE; i++) {
-		double channel_finish_time = ssd.bus.get_channel(i).get_currently_executing_operation_finish_time();
-		if (start_time < channel_finish_time) {
-			continue;
-		}
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			double die_finish_time = ssd.getPackages()[i].getDies()[j].get_currently_executing_io_finish_time();
-			if (start_time >= die_finish_time && events.size() > 0) {
-				Address free_page = Block_manager_parallel::instance()->get_free_page(i, j);
-				Event write = events.back();
-				events.pop_back();
-				write.set_address(free_page);
-				execute_next(write);
-			}
-		}
-	}
-	for (uint i = 0; i < events.size(); i++) {
-		events[i].incr_bus_wait_time(1);
-		events[i].incr_time_taken(1);
-		io_schedule.push_back(events[i]);
-	}
-}*/

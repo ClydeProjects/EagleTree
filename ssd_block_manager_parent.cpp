@@ -5,15 +5,6 @@
  *      Author: niv
  */
 
-
-/* Copyright 2011 Matias Bjørling */
-
-/* Block Management
- *
- * This class handle allocation of block pools for the FTL
- * algorithms.
- */
-
 #include <new>
 #include <assert.h>
 #include <stdio.h>
@@ -24,18 +15,21 @@
 using namespace ssd;
 using namespace std;
 
-Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int classes)
+Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age_classes)
  : ssd(ssd),
    ftl(ftl),
    free_block_pointers(SSD_SIZE, vector<Address>(PACKAGE_SIZE)),
-   free_blocks(SSD_SIZE, vector<vector<vector<Address> > >(PACKAGE_SIZE, vector<vector<Address> >(classes, vector<Address>(0)) )),
+   free_blocks(SSD_SIZE, vector<vector<vector<Address> > >(PACKAGE_SIZE, vector<vector<Address> >(num_age_classes, vector<Address>(0)) )),
    blocks(SSD_SIZE, vector<vector<Block*> >(PACKAGE_SIZE, vector<Block*>(0) )),
    all_blocks(0),
    max_age(0),
+   min_age(0),
+   num_age_classes(num_age_classes),
    blocks_with_min_age(),
    num_free_pages(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
    num_available_pages_for_new_writes(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
-   blocks_currently_undergoing_gc()
+   blocks_currently_undergoing_gc(),
+   gc_candidates(SSD_SIZE, vector<vector<set<Block*> > >(PACKAGE_SIZE, vector<set<Block*> >(num_age_classes, set<Block*>())))
 {
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		Package& package = ssd.getPackages()[i];
@@ -70,11 +64,22 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	a.valid = PAGE;
 	a.page = 0;
 
-	Address top = free_blocks[a.package][a.die][0].back();
-	free_blocks[a.package][a.die][0].push_back(a);
+	uint age_class = sort_into_age_class(a);
+	free_blocks[a.package][a.die][age_class].push_back(a);
 
 	num_free_pages += BLOCK_SIZE;
 	num_available_pages_for_new_writes += BLOCK_SIZE;
+}
+
+uint Block_manager_parent::sort_into_age_class(Address const& a) {
+	Block* b = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
+	uint age = BLOCK_ERASES - b->get_erases_remaining();
+	if (age > max_age) {
+		max_age = age;
+	}
+	double normalized_age = (age - min_age) / (max_age - min_age);
+	uint klass = floor(normalized_age * num_age_classes * 0.99999);
+	return klass;
 }
 
 void Block_manager_parent::register_write_outcome(Event const& event, enum status status) {
@@ -87,16 +92,25 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	}
 	// if there are very few pages left, need to trigger emergency GC
 	if (num_free_pages <= BLOCK_SIZE) {
-		perform_emergency_garbage_collection(event.get_start_time() + event.get_time_taken());
+		perform_gc(event.get_start_time() + event.get_time_taken());
+	}
+
+
+	Address ra = event.get_replace_address();
+	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
+
+	// TODO: fix thresholds for inserting blocks into GC lists
+	if (block.get_state() == ACTIVE &&
+			block.get_pages_invalid() < BLOCK_SIZE / 4 &&
+			blocks_currently_undergoing_gc.count(block.get_physical_address()) == 0) {
+		uint age_class = sort_into_age_class(ra);
+		gc_candidates[ra.package][ra.die][age_class].insert(&block);
 	}
 
 	// if the block on which a page has been invalidated is now empty, erase it
-	Address ra = event.get_replace_address();
-	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
 	if (block.get_pages_invalid() == BLOCK_SIZE && blocks_currently_undergoing_gc.count(block.get_physical_address()) == 0) {
-		double start_time = event.get_start_time() + event.get_time_taken();
 		printf("block "); ra.print(); printf(" is now invalid. An erase is issued\n");
-		Event erase = Event(ERASE, 0, 1, start_time);
+		Event erase = Event(ERASE, 0, 1, event.get_start_time() + event.get_time_taken());
 		erase.set_address(Address(block.physical_address, BLOCK));
 		erase.set_garbage_collection_op(true);
 		blocks_currently_undergoing_gc.insert(erase.get_address().get_linear_address());
@@ -125,12 +139,14 @@ bool Block_manager_parent::can_write(Event const& write) const {
 
 void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
 	if (num_free_pages <= BLOCK_SIZE) {
-		perform_emergency_garbage_collection(start_time);
+		//perform_emergency_garbage_collection(start_time);
+		perform_gc(start_time);
 	}
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			if (free_block_pointers[i][j].page >= BLOCK_SIZE) {
-				Garbage_Collect(i, j, start_time);
+				//Garbage_Collect(i, j, start_time);
+				perform_gc(i, j, 0, start_time);
 			}
 		}
 	}
@@ -161,6 +177,7 @@ void Block_manager_parent::Wear_Level(Event const& event) {
 	else if (blocks_with_min_age.count(b) == 1 && blocks_with_min_age.size() == 1) {
 		blocks_with_min_age.erase(b);
 		update_blocks_with_min_age(min_age);
+		min_age++;
 	}
 
 	while (!blocks_to_wl.empty() && num_available_pages_for_new_writes > blocks_to_wl.front()->get_pages_valid()) {
@@ -247,10 +264,9 @@ struct block_valid_pages_comparator_wearwolf {
 };
 
 // GC from the cheapest block in the device.
-void Block_manager_parent::perform_emergency_garbage_collection(double start_time) {
+/*void Block_manager_parent::perform_emergency_garbage_collection(double start_time) {
 	// first, find the cheapest block
 	std::sort(all_blocks.begin(), all_blocks.end(), block_valid_pages_comparator_wearwolf());
-
 	assert(num_free_pages <= BLOCK_SIZE);
 
 	if (num_available_pages_for_new_writes < BLOCK_SIZE) {
@@ -277,9 +293,9 @@ void Block_manager_parent::perform_emergency_garbage_collection(double start_tim
 	Address a = Address(target->get_physical_address(), BLOCK);
 	a.print(); printf("\n");
 	migrate(target, start_time);
-}
+}*/
 
-void Block_manager_parent::Garbage_Collect(uint package_id, uint die_id, double start_time) {
+/*void Block_manager_parent::Garbage_Collect(uint package_id, uint die_id, double start_time) {
 	std::sort(blocks[package_id][die_id].begin(), blocks[package_id][die_id].end(), block_valid_pages_comparator_wearwolf());
 
 	Block *target;
@@ -303,7 +319,66 @@ void Block_manager_parent::Garbage_Collect(uint package_id, uint die_id, double 
 		printf("  %d invalid,  %d valid\n", target->get_pages_invalid(), target->get_pages_valid());
 		migrate(target, start_time);
 	}
+}*/
+
+void Block_manager_parent::perform_gc(double start_time) {
+	vector<set<Block*> > candidates;
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			for (uint k = 0; k < num_age_classes; k++) {
+				candidates.push_back(gc_candidates[i][j][k]);
+			}
+		}
+	}
+	choose_gc_victim(candidates, start_time);
 }
+
+
+void Block_manager_parent::perform_gc(uint package_id, uint die_id, double start_time) {
+	vector<set<Block*> > candidates;
+	for (uint i = 0; i < gc_candidates[package_id][die_id].size(); i++) {
+		candidates.push_back(gc_candidates[package_id][die_id][i]);
+	}
+	choose_gc_victim(candidates, start_time);
+}
+
+void Block_manager_parent::perform_gc(uint klass, double start_time) {
+	vector<set<Block*> > candidates;
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			candidates.push_back(gc_candidates[i][j][klass]);
+		}
+	}
+	choose_gc_victim(candidates, start_time);
+}
+
+void Block_manager_parent::perform_gc(uint package_id, uint die_id, uint klass, double start_time) {
+	vector<set<Block*> > candidates;
+	candidates.push_back(gc_candidates[package_id][die_id][klass]);
+	choose_gc_victim(candidates, start_time);
+}
+
+void Block_manager_parent::choose_gc_victim(vector<set<Block*> > candidates, double start_time) {
+	uint min_valid_pages = BLOCK_SIZE;
+	Block* best_block;
+	for (uint i = 0; i < candidates.size(); i++) {
+		for (set<Block*>::iterator j = candidates[i].begin(); j != candidates[i].end(); j++) {
+			Block* candidate = *j;
+			if (candidate->get_pages_valid() < min_valid_pages) {
+				min_valid_pages = candidate->get_pages_valid();
+				best_block = candidate;
+			}
+		}
+	}
+
+	Address addr = Address(best_block->get_physical_address(), BLOCK);
+	uint age_class = sort_into_age_class(addr);
+	assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 1);
+	gc_candidates[addr.package][addr.die][age_class].erase(best_block);
+	assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 0);
+	migrate(best_block, start_time);
+}
+
 
 // Reads and rewrites all valid pages of a block somewhere else
 // An erase is issued in register_write_completion after the last
@@ -372,16 +447,27 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 }
 
 Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_id, uint klass) {
-	uint i = free_blocks[package_id][die_id][klass].size();
+	assert(klass < num_age_classes);
 	if (free_blocks[package_id][die_id][klass].size() > 0) {
 		Address a = free_blocks[package_id][die_id][klass].back();
 		free_blocks[package_id][die_id][klass].pop_back();
-		uint j = free_blocks[package_id][die_id][klass].size();
 		return a;
 	} else {
 		return Address(0, NONE);
 	}
 }
 
+Address Block_manager_parent::find_free_unused_block_with_class(uint klass) {
+	assert(klass < num_age_classes);
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			Address a = free_blocks[i][j][klass].back();
+			if (a.valid != NONE) {
+				return a;
+			}
+		}
+	}
+	return Address(0, NONE);
+}
 
 

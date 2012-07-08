@@ -4,7 +4,7 @@
 using namespace ssd;
 
 Block_manager_parallel_wearwolf::Block_manager_parallel_wearwolf(Ssd& ssd, FtlParent& ftl)
-	: Block_manager_parent(ssd, ftl),
+	: Block_manager_parent(ssd, ftl, 2),
 	  page_hotness_measurer()
 {
 	wcrh_pointer = find_free_unused_block(0, 0);
@@ -64,7 +64,7 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 		if (free_block.valid != NONE) {
 			free_block_pointers[package_id][die_id] = free_block;
 		} else {
-			Garbage_Collect(package_id, die_id, event.get_start_time() + event.get_time_taken());
+			perform_gc(package_id, die_id, 0, event.get_start_time() + event.get_time_taken());
 		}
 	} else if (block_address.compare(wcrh_pointer) == BLOCK) {
 		handle_cold_pointer_out_of_space(READ_HOT, event.get_start_time() + event.get_time_taken());
@@ -80,7 +80,7 @@ void Block_manager_parallel_wearwolf::handle_cold_pointer_out_of_space(enum read
 	if (free_block.valid != NONE) {
 		pointer = free_block;
 	} else {
-		Garbage_Collect(addr.package, addr.die, start_time);
+		perform_gc(addr.package, addr.die, 1, start_time);
 	}
 }
 

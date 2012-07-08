@@ -816,15 +816,21 @@ public:
 	virtual void register_write_arrival(Event const& event);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	//virtual Address choose_write_location(Event const& event) const = 0;
 	virtual pair<double, Address> write(Event const& write) const = 0;
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
 protected:
-	virtual void Garbage_Collect(uint package_id, uint die_id, double start_time);
-	void perform_emergency_garbage_collection(double start_time);
+	//virtual void Garbage_Collect(uint package_id, uint die_id, double start_time);
+	//void perform_emergency_garbage_collection(double start_time);
 	virtual void check_if_should_trigger_more_GC(double start_time);
+
+	void perform_gc(uint package_id, uint die_id, uint klass, double start_time);
+	void perform_gc(uint package_id, uint die_id, double start_time);
+	void perform_gc(uint klass, double start_time);
+	void perform_gc(double start_time);
+
 	virtual void Wear_Level(Event const& event);
 	bool can_write(Event const& write) const;
+	Address find_free_unused_block_with_class(uint klass);
 	Address find_free_unused_block(uint package_id, uint die_id, uint klass);
 	Address find_free_unused_block(uint package_id, uint die_id);
 	Address find_free_unused_block(uint package_id);
@@ -837,17 +843,23 @@ protected:
 	vector<vector<Address> > free_block_pointers;
 private:
 	void migrate(Block const* const block, double start_time);
+
+	void choose_gc_victim(vector<set<Block*> > candidates, double start_time);
 	void update_blocks_with_min_age(uint age);
+	uint sort_into_age_class(Address const& address);
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
-	std::vector<std::vector<std::vector<Block*> > > blocks;
-	std::vector<Block*> all_blocks;
+	vector<vector<vector<Block*> > > blocks;
+	vector<Block*> all_blocks;
 	// WL structures
 	uint max_age;
-	std::set<Block*> blocks_with_min_age;
+	uint min_age;
+	uint num_age_classes;
+	set<Block*> blocks_with_min_age;
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
-	std::set<long> blocks_currently_undergoing_gc;
+	set<long> blocks_currently_undergoing_gc;
 
+	vector<vector<vector<set<Block*> > > > gc_candidates;  // each age class has a vector of candidates for GC
 };
 
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation

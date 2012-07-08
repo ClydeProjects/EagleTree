@@ -4,7 +4,7 @@
 using namespace ssd;
 
 Block_manager_parallel_hot_cold_seperation::Block_manager_parallel_hot_cold_seperation(Ssd& ssd, FtlParent& ftl)
-	: Block_manager_parent(ssd, ftl),
+	: Block_manager_parent(ssd, ftl, 2),
 	  page_hotness_measurer()
 {
 	cold_pointer = find_free_unused_block(0, 0);
@@ -43,14 +43,12 @@ void Block_manager_parallel_hot_cold_seperation::register_write_outcome(Event co
 
 	// check if the pointer if full. If it is, find a free block for a new pointer, or trigger GC if there are no free blocks
 	if (block_address.compare(free_block_pointers[package_id][die_id]) == BLOCK) {
-		printf("hot pointer ");
-		free_block_pointers[package_id][die_id].print();
-		printf(" is out of space\n");
-		Address free_block = find_free_unused_block(package_id, die_id);
+		printf("hot pointer "); free_block_pointers[package_id][die_id].print(); printf(" is out of space\n");
+		Address free_block = find_free_unused_block(package_id, die_id, 0);
 		if (free_block.valid != NONE) {
 			free_block_pointers[package_id][die_id] = free_block;
 		} else {
-			Garbage_Collect(package_id, die_id, event.get_start_time() + event.get_time_taken());
+			perform_gc(package_id, die_id, 0, event.get_start_time() + event.get_time_taken());
 		}
 	} else if (block_address.compare(cold_pointer) == BLOCK) {
 		handle_cold_pointer_out_of_space(event.get_start_time() + event.get_time_taken());
@@ -58,11 +56,11 @@ void Block_manager_parallel_hot_cold_seperation::register_write_outcome(Event co
 }
 
 void Block_manager_parallel_hot_cold_seperation::handle_cold_pointer_out_of_space(double start_time) {
-	Address free_block = find_free_unused_block();
+	Address free_block = find_free_unused_block_with_class(1);
 	if (free_block.valid != NONE) {
 		cold_pointer = free_block;
 	} else {
-		perform_emergency_garbage_collection(start_time);
+		perform_gc(1, start_time);
 	}
 }
 
