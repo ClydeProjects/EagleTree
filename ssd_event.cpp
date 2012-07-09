@@ -152,9 +152,12 @@ double Event::get_start_time(void) const
 
 double Event::get_time_taken(void) const
 {
-
 	assert(time_taken >= 0.0);
 	return time_taken;
+}
+
+double Event::get_current_time(void) const {
+	return start_time + time_taken;
 }
 
 ssd::uint Event::get_application_io_id(void) const {

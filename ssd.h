@@ -399,6 +399,7 @@ public:
 	enum event_type get_event_type(void) const;
 	double get_start_time(void) const;
 	double get_time_taken(void) const;
+	double get_current_time(void) const;
 	uint get_application_io_id(void) const;
 	double get_bus_wait_time(void) const;
 	bool get_noop(void) const;
@@ -820,21 +821,23 @@ public:
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
-
-	void perform_gc(uint package_id, uint die_id, uint klass, double start_time);
-	void perform_gc(uint package_id, uint die_id, double start_time);
-	void perform_gc(uint klass, double start_time);
-	void perform_gc(double start_time);
-
-	virtual void Wear_Level(Event const& event);
+	void Wear_Level(Event const& event);
 	bool can_write(Event const& write) const;
-	Address find_free_unused_block_with_class(uint klass);
-	Address find_free_unused_block(uint package_id, uint die_id, uint klass);
-	Address find_free_unused_block(uint package_id, uint die_id);
-	Address find_free_unused_block(uint package_id);
-	Address find_free_unused_block();
-	virtual pair<bool, pair<uint, uint> > get_free_die_with_shortest_IO_queue(std::vector<std::vector<Address> > const& dies) const;
-	virtual Address get_free_die_with_shortest_IO_queue() const;
+
+	void perform_gc(uint package_id, uint die_id, uint klass, double time);
+	void perform_gc(uint package_id, uint die_id, double time);
+	void perform_gc(uint package_id, double time);
+	void perform_gc(double time);
+	void perform_gc_for_class(uint klass, double time);
+
+	Address find_free_unused_block(uint package_id, uint die_id, uint klass, double time);
+	Address find_free_unused_block(uint package_id, uint die_id, double time);
+	Address find_free_unused_block(uint package_id, double time);
+	Address find_free_unused_block(double time);
+	Address find_free_unused_block_with_class(uint klass, double time);
+
+	pair<bool, pair<uint, uint> > get_free_die_with_shortest_IO_queue(std::vector<std::vector<Address> > const& dies) const;
+	Address get_free_die_with_shortest_IO_queue() const;
 
 	Ssd& ssd;
 	FtlParent& ftl;
@@ -846,6 +849,7 @@ private:
 	uint sort_into_age_class(Address const& address);
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
+	bool greedy_gc;
 	// WL structures
 	uint max_age;
 	uint min_age;
@@ -853,7 +857,6 @@ private:
 	set<Block*> blocks_with_min_age;
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
-	set<long> blocks_currently_undergoing_gc;
 
 	vector<vector<vector<set<Block*> > > > gc_candidates;  // each age class has a vector of candidates for GC
 };
@@ -882,7 +885,6 @@ public:
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 private:
-
 	bool pointer_can_be_written_to(Address pointer) const;
 	bool at_least_one_available_write_hot_pointer() const;
 	void handle_cold_pointer_out_of_space(double start_time);
@@ -904,7 +906,6 @@ protected:
 private:
 	bool pointer_can_be_written_to(Address pointer) const;
 	bool at_least_one_available_write_hot_pointer() const;
-
 	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
 	void reset_any_filled_pointers(Event const& event);
 	Simple_Page_Hotness_Measurer page_hotness_measurer;

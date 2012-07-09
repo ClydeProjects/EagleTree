@@ -21,13 +21,13 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
    free_block_pointers(SSD_SIZE, vector<Address>(PACKAGE_SIZE)),
    free_blocks(SSD_SIZE, vector<vector<vector<Address> > >(PACKAGE_SIZE, vector<vector<Address> >(num_age_classes, vector<Address>(0)) )),
    all_blocks(0),
-   max_age(0),
+   greedy_gc(true),
+   max_age(1),
    min_age(0),
    num_age_classes(num_age_classes),
    blocks_with_min_age(),
    num_free_pages(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
    num_available_pages_for_new_writes(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
-   blocks_currently_undergoing_gc(),
    gc_candidates(SSD_SIZE, vector<vector<set<Block*> > >(PACKAGE_SIZE, vector<set<Block*> >(num_age_classes, set<Block*>())))
 {
 	for (uint i = 0; i < SSD_SIZE; i++) {
@@ -54,9 +54,6 @@ Block_manager_parent::~Block_manager_parent(void){}
 void Block_manager_parent::register_erase_outcome(Event const& event, enum status status) {
 
 	long phys_addr = event.get_address().get_linear_address();
-	assert(blocks_currently_undergoing_gc.count(phys_addr) == 1);
-	blocks_currently_undergoing_gc.erase(phys_addr);
-	assert(blocks_currently_undergoing_gc.count(phys_addr) == 0);
 
 	Address a = event.get_address();
 	a.valid = PAGE;
@@ -96,22 +93,24 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 
 	Address ra = event.get_replace_address();
 	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
+	uint age_class = sort_into_age_class(ra);
 
 	// TODO: fix thresholds for inserting blocks into GC lists
-	if (block.get_state() == ACTIVE &&
-			block.get_pages_invalid() < BLOCK_SIZE / 4 &&
-			blocks_currently_undergoing_gc.count(block.get_physical_address()) == 0) {
-		uint age_class = sort_into_age_class(ra);
+	if (block.get_state() == ACTIVE && (block.get_pages_invalid() < BLOCK_SIZE / 4 || gc_candidates[ra.package][ra.die][age_class].size() == 0)) {
+		if (block.get_physical_address() == 92) {
+			int i = 0;
+			i++;
+		}
 		gc_candidates[ra.package][ra.die][age_class].insert(&block);
 	}
 
 	// if the block on which a page has been invalidated is now empty, erase it
-	if (block.get_pages_invalid() == BLOCK_SIZE && blocks_currently_undergoing_gc.count(block.get_physical_address()) == 0) {
+	if (block.get_pages_invalid() == BLOCK_SIZE) {
 		printf("block "); ra.print(); printf(" is now invalid. An erase is issued\n");
 		Event erase = Event(ERASE, 0, 1, event.get_start_time() + event.get_time_taken());
 		erase.set_address(Address(block.physical_address, BLOCK));
 		erase.set_garbage_collection_op(true);
-		blocks_currently_undergoing_gc.insert(erase.get_address().get_linear_address());
+		gc_candidates[ra.package][ra.die][age_class].erase(&block);
 		IOScheduler::instance()->schedule_independent_event(erase);
 	}
 }
@@ -137,13 +136,11 @@ bool Block_manager_parent::can_write(Event const& write) const {
 
 void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
 	if (num_free_pages <= BLOCK_SIZE) {
-		//perform_emergency_garbage_collection(start_time);
 		perform_gc(start_time);
 	}
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			if (free_block_pointers[i][j].page >= BLOCK_SIZE) {
-				//Garbage_Collect(i, j, start_time);
 				perform_gc(i, j, 0, start_time);
 			}
 		}
@@ -300,7 +297,7 @@ void Block_manager_parent::perform_gc(uint package_id, uint die_id, uint klass, 
 
 void Block_manager_parent::choose_gc_victim(vector<set<Block*> > candidates, double start_time) {
 	uint min_valid_pages = BLOCK_SIZE;
-	Block* best_block;
+	Block* best_block = NULL;
 	for (uint i = 0; i < candidates.size(); i++) {
 		for (set<Block*>::iterator j = candidates[i].begin(); j != candidates[i].end(); j++) {
 			Block* candidate = *j;
@@ -310,13 +307,18 @@ void Block_manager_parent::choose_gc_victim(vector<set<Block*> > candidates, dou
 			}
 		}
 	}
-
-	Address addr = Address(best_block->get_physical_address(), BLOCK);
-	uint age_class = sort_into_age_class(addr);
-	assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 1);
-	gc_candidates[addr.package][addr.die][age_class].erase(best_block);
-	assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 0);
-	migrate(best_block, start_time);
+	if (best_block != NULL) {
+		Address addr = Address(best_block->get_physical_address(), BLOCK);
+		uint age_class = sort_into_age_class(addr);
+		if (gc_candidates[addr.package][addr.die][age_class].count(best_block) != 1) {
+			int i = 0;
+			i++;
+		}
+		assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 1);
+		gc_candidates[addr.package][addr.die][age_class].erase(best_block);
+		assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 0);
+		migrate(best_block, start_time);
+	}
 }
 
 
@@ -327,10 +329,6 @@ void Block_manager_parent::migrate(Block const* const block, double start_time) 
 
 	assert(block->get_state() != FREE && block->get_state() != PARTIALLY_FREE && block->get_pages_valid() <= num_available_pages_for_new_writes);
 	num_available_pages_for_new_writes -= block->get_pages_valid();
-
-	assert(blocks_currently_undergoing_gc.count(block->physical_address) == 0);
-	blocks_currently_undergoing_gc.insert(block->get_physical_address());
-	assert(blocks_currently_undergoing_gc.count(block->physical_address) == 1);
 
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
 		if (block->getPages()[i].get_state() == VALID) {
@@ -355,9 +353,9 @@ void Block_manager_parent::migrate(Block const* const block, double start_time) 
 }
 
 // finds and returns a free block from anywhere in the SSD. Returns Address(0, NONE) is there is no such block
-Address Block_manager_parent::find_free_unused_block() {
+Address Block_manager_parent::find_free_unused_block(double time) {
 	for (uint i = 0; i < SSD_SIZE; i++) {
-		Address address = find_free_unused_block(i);
+		Address address = find_free_unused_block(i, time);
 		if (address.valid != NONE) {
 			return address;
 		}
@@ -365,9 +363,9 @@ Address Block_manager_parent::find_free_unused_block() {
 	return Address(0, NONE);
 }
 
-Address Block_manager_parent::find_free_unused_block(uint package_id) {
+Address Block_manager_parent::find_free_unused_block(uint package_id, double time) {
 	for (uint i = 0; i < PACKAGE_SIZE; i++) {
-		Address address = find_free_unused_block(package_id, i);
+		Address address = find_free_unused_block(package_id, i, time);
 		if (address.valid != NONE) {
 			return address;
 		}
@@ -376,9 +374,9 @@ Address Block_manager_parent::find_free_unused_block(uint package_id) {
 }
 
 // finds and returns a free block from a particular die in the SSD
-Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_id) {
+Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_id, double time) {
 	for (uint i = 0; i < free_blocks[package_id][die_id].size(); i++) {
-		Address address = find_free_unused_block(package_id, die_id, i);
+		Address address = find_free_unused_block(package_id, die_id, i, time);
 		if (address.valid != NONE) {
 			return address;
 		}
@@ -386,28 +384,35 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 	return Address(0, NONE);
 }
 
-Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_id, uint klass) {
+Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_id, uint klass, double time) {
 	assert(klass < num_age_classes);
+	Address to_return;
 	if (free_blocks[package_id][die_id][klass].size() > 0) {
-		Address a = free_blocks[package_id][die_id][klass].back();
+		to_return = free_blocks[package_id][die_id][klass].back();
 		free_blocks[package_id][die_id][klass].pop_back();
-		return a;
 	} else {
-		return Address(0, NONE);
+		to_return = Address(0, NONE);
 	}
+	if (greedy_gc && free_blocks[package_id][die_id][klass].size() < 2) {
+		perform_gc(package_id, die_id, klass, time);
+	}
+	return to_return;
 }
 
-Address Block_manager_parent::find_free_unused_block_with_class(uint klass) {
+Address Block_manager_parent::find_free_unused_block_with_class(uint klass, double time) {
 	assert(klass < num_age_classes);
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			Address a = free_blocks[i][j][klass].back();
 			if (a.valid != NONE) {
+				if (greedy_gc && free_blocks[i][j][klass].size() < 2) {
+					perform_gc(i, j, klass, time);
+				}
 				return a;
 			}
 		}
 	}
-	return Address(0, NONE);
+	return Address(0, NONE);;
 }
 
 

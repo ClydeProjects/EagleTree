@@ -7,13 +7,13 @@ Block_manager_parallel_wearwolf::Block_manager_parallel_wearwolf(Ssd& ssd, FtlPa
 	: Block_manager_parent(ssd, ftl, 2),
 	  page_hotness_measurer()
 {
-	wcrh_pointer = find_free_unused_block(0, 0);
+	wcrh_pointer = find_free_unused_block(0, 0, 0);
 	if (SSD_SIZE > 1) {
-		wcrc_pointer = find_free_unused_block(1, 0);
+		wcrc_pointer = find_free_unused_block(1, 0, 0);
 	} else if (PACKAGE_SIZE > 1) {
-		wcrc_pointer = find_free_unused_block(0, 1);
+		wcrc_pointer = find_free_unused_block(0, 1, 0);
 	} else {
-		wcrc_pointer = find_free_unused_block(0, 0);
+		wcrc_pointer = find_free_unused_block(0, 0, 0);
 	}
 	wcrh_pointer.print();
 	printf("\n");
@@ -38,6 +38,11 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 	uint die_id = event.get_address().die;
 	Address block_address = Address(event.get_address().get_linear_address(), BLOCK);
 	uint num_pages_written = -1;
+
+	//free_block_pointers[package_id][die_id].print();
+	//block_address.print();
+	//printf("\n");
+
 	if (block_address.compare(free_block_pointers[package_id][die_id]) == BLOCK) {
 		Address pointer = free_block_pointers[package_id][die_id];
 		pointer.page = num_pages_written = pointer.page + 1;
@@ -48,6 +53,8 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 	}
 	else if (block_address.compare(wcrc_pointer) == BLOCK) {
 		wcrc_pointer.page = num_pages_written = wcrc_pointer.page + 1;
+	} else {
+		assert(false);
 	}
 
 	// there is still more room in this pointer, so no need to trigger GC
@@ -60,7 +67,7 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 		printf("hot pointer ");
 		free_block_pointers[package_id][die_id].print();
 		printf(" is out of space\n");
-		Address free_block = find_free_unused_block(package_id, die_id);
+		Address free_block = find_free_unused_block(package_id, die_id, event.get_current_time());
 		if (free_block.valid != NONE) {
 			free_block_pointers[package_id][die_id] = free_block;
 		} else {
