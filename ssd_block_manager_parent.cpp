@@ -21,7 +21,7 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
    free_block_pointers(SSD_SIZE, vector<Address>(PACKAGE_SIZE)),
    free_blocks(SSD_SIZE, vector<vector<vector<Address> > >(PACKAGE_SIZE, vector<vector<Address> >(num_age_classes, vector<Address>(0)) )),
    all_blocks(0),
-   greedy_gc(true),
+   greedy_gc(false),
    max_age(1),
    min_age(0),
    num_age_classes(num_age_classes),
@@ -124,6 +124,7 @@ void Block_manager_parent::register_write_arrival(Event const& event) {
 	if (page.get_state() == VALID) {
 		block.invalidate_page(ra.page);
 	}
+
 }
 
 void Block_manager_parent::register_read_outcome(Event const& event, enum status status) {
