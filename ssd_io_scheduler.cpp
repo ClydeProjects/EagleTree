@@ -138,10 +138,9 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 			eliminate_conflict_with_any_incoming_gc(event);
 		}
 		pair<double, Address> result = bm.write(event);
-		event.set_address(result.second);
-		event.set_noop(false);
-
 		if (result.first == 0) {
+			event.set_address(result.second);
+			event.set_noop(false);
 			ftl.set_replace_address(event);
 			adjust_conflict_elimination_structures(event);
 			execute_next(event);
@@ -191,6 +190,9 @@ void IOScheduler::eliminate_conflict_with_any_incoming_gc(Event const&event) {
 	}
 	if (num_events_eliminated == 2) {
 		ssd.getPackages()[addr_of_original_page.package].getDies()[addr_of_original_page.die].clear_register();
+	}
+	if (num_events_eliminated > 1) {
+		bm.inform_of_gc_cancellation();
 	}
 
 	printf("Incoming write making a pending GC operation unnecessary. LBA: %d   removed %d events\n", event.get_logical_address(), num_events_eliminated);

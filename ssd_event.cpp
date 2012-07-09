@@ -193,6 +193,10 @@ void *Event::get_payload(void) const
 void Event::set_address(const Address &address)
 {
 	if (type == WRITE || type == READ || type == READ_COMMAND || type == READ_TRANSFER) {
+		if (address.valid != PAGE) {
+			int i = 0;
+			i++;
+		}
 		assert(address.valid == PAGE);
 	}
 	this -> address = address;

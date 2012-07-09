@@ -39,10 +39,6 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 	Address block_address = Address(event.get_address().get_linear_address(), BLOCK);
 	uint num_pages_written = -1;
 
-	//free_block_pointers[package_id][die_id].print();
-	//block_address.print();
-	//printf("\n");
-
 	if (block_address.compare(free_block_pointers[package_id][die_id]) == BLOCK) {
 		Address pointer = free_block_pointers[package_id][die_id];
 		pointer.page = num_pages_written = pointer.page + 1;
@@ -95,6 +91,10 @@ void Block_manager_parallel_wearwolf::register_erase_outcome(Event const& event,
 	assert(event.get_event_type() == ERASE);
 	if (status == FAILURE) {
 		return;
+	}
+	if (event.get_id() == 255) {
+		int i = 0;
+		i++;
 	}
 	Block_manager_parent::register_erase_outcome(event, status);
 	reset_any_filled_pointers(event);
@@ -157,34 +157,46 @@ pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write)
 			result.first = 1;
 			relevant_pointer_unavailable = true;
 		} else {
-			result.first = in_how_long_can_this_event_be_scheduled(result.second, write.get_start_time() + write.get_time_taken());
+			result.first = in_how_long_can_this_event_be_scheduled(result.second, write.get_current_time());
 		}
-	} else if (w_hotness == WRITE_COLD && r_hotness == WRITE_COLD) {
+	} else if (w_hotness == WRITE_COLD && r_hotness == READ_COLD) {
 		if (wcrc_pointer.page >= BLOCK_SIZE) {
 			result.first = 1;
 			relevant_pointer_unavailable = true;
 		} else {
-			result.first = in_how_long_can_this_event_be_scheduled(wcrc_pointer, write.get_start_time() + write.get_time_taken());
+			result.first = in_how_long_can_this_event_be_scheduled(wcrc_pointer, write.get_current_time());
 			result.second = wcrc_pointer;
 		}
-	} else if (w_hotness == WRITE_COLD && r_hotness == WRITE_HOT) {
+	} else if (w_hotness == WRITE_COLD && r_hotness == READ_HOT) {
 		if (wcrh_pointer.page >= BLOCK_SIZE) {
 			result.first = 1;
 			relevant_pointer_unavailable = true;
 		} else {
-			result.first = in_how_long_can_this_event_be_scheduled(wcrh_pointer, write.get_start_time() + write.get_time_taken());
+			result.first = in_how_long_can_this_event_be_scheduled(wcrh_pointer, write.get_current_time());
 			result.second = wcrh_pointer;
 		}
 	}
 
 	if (write.is_garbage_collection_op() && relevant_pointer_unavailable) {
-		assert(false);
+		if (wcrh_pointer.page < BLOCK_SIZE) {
+			result.second = wcrh_pointer;
+		} else if (wcrc_pointer.page < BLOCK_SIZE) {
+			result.second = wcrc_pointer;
+		}
+		if (result.second.valid != NONE) {
+			result.first = in_how_long_can_this_event_be_scheduled(result.second, write.get_current_time());
+		}
+		printf("MAKING A MISTAKE\n");
 	}
 
 	return result;
 }
 
 void Block_manager_parallel_wearwolf::register_read_outcome(Event const& event, enum status status){
+	if (event.get_id() == 243) {
+		int i = 0;
+		i++;
+	}
 	if (status == SUCCESS && !event.is_garbage_collection_op()) {
 		page_hotness_measurer.register_event(event);
 	}

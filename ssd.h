@@ -557,6 +557,7 @@ public:
 	uint get_pages_valid(void) const;
 	uint get_pages_invalid(void) const;
 	enum block_state get_state(void) const;
+	void set_state(void) const;
 	enum page_state get_state(uint page) const;
 	enum page_state get_state(const Address &address) const;
 	double get_last_erase_time(void) const;
@@ -819,6 +820,7 @@ public:
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual pair<double, Address> write(Event const& write) const = 0;
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
+	void inform_of_gc_cancellation();
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	void Wear_Level(Event const& event);
@@ -857,7 +859,7 @@ private:
 	set<Block*> blocks_with_min_age;
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
-
+	set<Block*> blocks_being_garbage_collected;
 	vector<vector<vector<set<Block*> > > > gc_candidates;  // each age class has a vector of candidates for GC
 };
 

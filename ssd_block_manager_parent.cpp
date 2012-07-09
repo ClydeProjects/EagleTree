@@ -28,6 +28,7 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
    blocks_with_min_age(),
    num_free_pages(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
    num_available_pages_for_new_writes(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
+   blocks_being_garbage_collected(),
    gc_candidates(SSD_SIZE, vector<vector<set<Block*> > >(PACKAGE_SIZE, vector<set<Block*> >(num_age_classes, set<Block*>())))
 {
 	for (uint i = 0; i < SSD_SIZE; i++) {
@@ -62,6 +63,9 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	uint age_class = sort_into_age_class(a);
 	free_blocks[a.package][a.die][age_class].push_back(a);
 
+	Block* b = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
+	blocks_being_garbage_collected.erase(b);
+
 	num_free_pages += BLOCK_SIZE;
 	num_available_pages_for_new_writes += BLOCK_SIZE;
 }
@@ -90,27 +94,23 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 		perform_gc(event.get_start_time() + event.get_time_taken());
 	}
 
-
 	Address ra = event.get_replace_address();
 	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
 	uint age_class = sort_into_age_class(ra);
 
 	// TODO: fix thresholds for inserting blocks into GC lists
 	if (block.get_state() == ACTIVE && (block.get_pages_invalid() < BLOCK_SIZE / 4 || gc_candidates[ra.package][ra.die][age_class].size() == 0)) {
-		if (block.get_physical_address() == 92) {
-			int i = 0;
-			i++;
-		}
 		gc_candidates[ra.package][ra.die][age_class].insert(&block);
 	}
 
 	// if the block on which a page has been invalidated is now empty, erase it
-	if (block.get_pages_invalid() == BLOCK_SIZE) {
+	if (block.get_state() == INACTIVE && blocks_being_garbage_collected.count(&block) == 0) {
 		printf("block "); ra.print(); printf(" is now invalid. An erase is issued\n");
 		Event erase = Event(ERASE, 0, 1, event.get_start_time() + event.get_time_taken());
 		erase.set_address(Address(block.physical_address, BLOCK));
 		erase.set_garbage_collection_op(true);
 		gc_candidates[ra.package][ra.die][age_class].erase(&block);
+		blocks_being_garbage_collected.insert(&block);
 		IOScheduler::instance()->schedule_independent_event(erase);
 	}
 }
@@ -250,6 +250,10 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 	return time <= 0 ? 0 : time;
 }
 
+void Block_manager_parent::inform_of_gc_cancellation() {
+	num_available_pages_for_new_writes++;
+}
+
 // puts free blocks at the very end of the queue
 struct block_valid_pages_comparator_wearwolf {
 	bool operator () (const Block * i, const Block * j)
@@ -307,7 +311,7 @@ void Block_manager_parent::choose_gc_victim(vector<set<Block*> > candidates, dou
 			}
 		}
 	}
-	if (best_block != NULL) {
+	if (best_block != NULL && num_available_pages_for_new_writes >= best_block->get_pages_valid()) {
 		Address addr = Address(best_block->get_physical_address(), BLOCK);
 		uint age_class = sort_into_age_class(addr);
 		if (gc_candidates[addr.package][addr.die][age_class].count(best_block) != 1) {
@@ -317,6 +321,7 @@ void Block_manager_parent::choose_gc_victim(vector<set<Block*> > candidates, dou
 		assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 1);
 		gc_candidates[addr.package][addr.die][age_class].erase(best_block);
 		assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 0);
+		blocks_being_garbage_collected.insert(best_block);
 		migrate(best_block, start_time);
 	}
 }
@@ -327,7 +332,14 @@ void Block_manager_parent::choose_gc_victim(vector<set<Block*> > candidates, dou
 // page from this block has been migrated
 void Block_manager_parent::migrate(Block const* const block, double start_time) {
 
-	assert(block->get_state() != FREE && block->get_state() != PARTIALLY_FREE && block->get_pages_valid() <= num_available_pages_for_new_writes);
+	assert(block->get_state() != FREE);
+	assert(block->get_state() != PARTIALLY_FREE);
+	if (block->get_pages_valid() > num_available_pages_for_new_writes) {
+		int i = 0;
+		i++;
+	}
+	assert(block->get_pages_valid() <= num_available_pages_for_new_writes);
+
 	num_available_pages_for_new_writes -= block->get_pages_valid();
 
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
