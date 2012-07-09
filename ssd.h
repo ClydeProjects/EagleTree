@@ -1429,7 +1429,6 @@ public:
 	// Singleton
 	static VisualTracer *get_instance();
 	static void init();
-
 	void register_completed_event(Event const& event);
 	void print();
 private:
@@ -1438,6 +1437,20 @@ private:
 	~VisualTracer();
 	void write(int package, int die, char symbol, int length);
 	std::vector<std::vector<std::vector<char> > > trace;
+};
+
+class StateTracer
+{
+public:
+	static void print(Ssd& ssd);
+	// Singleton
+	/*static StateTracer *get_instance();
+	static void init();
+
+private:
+	static StateTracer *inst;
+	StateTracer();
+	~StateTracer();*/
 };
 
 } /* end namespace ssd */
