@@ -134,7 +134,7 @@ double Package::get_last_erase_time(const Address &address) const
 
 /* if given a valid Die address, call the Die's method
  * else return local value */
-ssd::ulong Package::get_erases_remaining(const Address &address) const
+ulong Package::get_erases_remaining(const Address &address) const
 {
 	assert(data != NULL);
 	if(address.valid > PACKAGE && address.die < size)
@@ -143,7 +143,7 @@ ssd::ulong Package::get_erases_remaining(const Address &address) const
 		return erases_remaining;
 }
 
-ssd::uint ssd::Package::get_num_invalid(const Address & address) const
+uint ssd::Package::get_num_invalid(const Address & address) const
 {
 	assert(address.valid >= DIE);
 	return data[address.die].get_num_invalid(address);
@@ -193,13 +193,13 @@ void Package::get_free_page(Address &address) const
 	return;
 }
 
-ssd::uint Package::get_num_free(const Address &address) const
+uint Package::get_num_free(const Address &address) const
 {
 	assert(address.valid >= DIE);
 	return data[address.die].get_num_free(address);
 }
 
-ssd::uint Package::get_num_valid(const Address &address) const
+uint Package::get_num_valid(const Address &address) const
 {
 	assert(address.valid >= DIE);
 	return data[address.die].get_num_valid(address);

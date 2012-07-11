@@ -163,7 +163,7 @@ void Controller::translate_address(Address &address)
 		return;
 }
 
-ssd::ulong Controller::get_erases_remaining(const Address &address) const
+ulong Controller::get_erases_remaining(const Address &address) const
 {
 	assert(address.valid > NONE);
 	return ssd.get_erases_remaining(address);
@@ -200,19 +200,19 @@ void Controller::get_free_page(Address &address) const
 	return;
 }
 
-ssd::uint Controller::get_num_free(const Address &address) const
+uint Controller::get_num_free(const Address &address) const
 {
 	assert(address.valid > NONE);
 	return ssd.get_num_free(address);
 }
 
-ssd::uint Controller::get_num_valid(const Address &address) const
+uint Controller::get_num_valid(const Address &address) const
 {
 	assert(address.valid > NONE);
 	return ssd.get_num_valid(address);
 }
 
-ssd::uint Controller::get_num_invalid(const Address &address) const
+uint Controller::get_num_invalid(const Address &address) const
 {
 	assert(address.valid > NONE);
 	return ssd.get_num_invalid(address);

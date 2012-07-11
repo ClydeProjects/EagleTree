@@ -242,7 +242,7 @@ enum status Ssd::merge_replacement_block(Event &event)
 }
 
 /* add up the erases remaining for all packages in the ssd*/
-ssd::ulong Ssd::get_erases_remaining(const Address &address) const
+ulong Ssd::get_erases_remaining(const Address &address) const
 {
 	assert (data != NULL);
 	
@@ -305,19 +305,19 @@ void Ssd::get_free_page(Address &address) const
 	return;
 }
 
-ssd::uint Ssd::get_num_free(const Address &address) const
+uint Ssd::get_num_free(const Address &address) const
 {  
 	return 0;
 /* 	return data[address.package].get_num_free(address); */
 }
 
-ssd::uint Ssd::get_num_valid(const Address &address) const
+uint Ssd::get_num_valid(const Address &address) const
 {  
 	assert(address.valid >= PACKAGE);
 	return data[address.package].get_num_valid(address);
 }
 
-ssd::uint Ssd::get_num_invalid(const Address &address) const
+uint Ssd::get_num_invalid(const Address &address) const
 {
 	assert(address.valid >= PACKAGE);
 	return data[address.package].get_num_invalid(address);

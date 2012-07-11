@@ -41,6 +41,7 @@
 #include <boost/multi_index/global_fun.hpp>
 #include <boost/multi_index/random_access_index.hpp>
 #include "bloom_filter.hpp"
+#include <sys/types.h>
 
 #ifndef _SSD_H
 #define _SSD_H
@@ -55,12 +56,6 @@ namespace ssd {
 
 /* Uncomment to disable asserts for production */
 #define NDEBUG
-
-
-/* some obvious typedefs for laziness */
-typedef unsigned int uint;
-typedef unsigned long ulong;
-
 
 /* Simulator configuration from ssd_config.cpp */
 
@@ -606,9 +601,9 @@ public:
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
 	void get_free_page(Address &address) const;
-	ssd::uint get_num_free(const Address &address) const;
-	ssd::uint get_num_valid(const Address &address) const;
-	ssd::uint get_num_invalid(const Address &address) const;
+	uint get_num_free(const Address &address) const;
+	uint get_num_valid(const Address &address) const;
+	uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
 	Block *getBlocks();
 private:
@@ -647,9 +642,9 @@ public:
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
 	void get_free_page(Address &address) const;
-	ssd::uint get_num_free(const Address &address) const;
-	ssd::uint get_num_valid(const Address &address) const;
-	ssd::uint get_num_invalid(const Address &address) const;
+	uint get_num_free(const Address &address) const;
+	uint get_num_valid(const Address &address) const;
+	uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
 	Plane *getPlanes();
 	void clear_register();
@@ -690,9 +685,9 @@ public:
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
 	void get_free_page(Address &address) const;
-	ssd::uint get_num_free(const Address &address) const;
-	ssd::uint get_num_valid(const Address &address) const;
-	ssd::uint get_num_invalid(const Address &address) const;
+	uint get_num_free(const Address &address) const;
+	uint get_num_valid(const Address &address) const;
+	uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
 	Die *getDies();
 private:
@@ -733,7 +728,7 @@ private:
 	std::vector<double> write_moving_average;
 	std::map<ulong, uint> read_current_count;
 	std::vector<double> read_moving_average;
-	ssd::uint current_interval;
+	uint current_interval;
 	double average_write_hotness;
 	double average_read_hotness;
 	std::vector<std::vector<uint> > num_wcrh_pages_per_die;
@@ -1334,15 +1329,15 @@ public:
 private:
 	enum status issue(Event &event_list);
 	void translate_address(Address &address);
-	ssd::ulong get_erases_remaining(const Address &address) const;
+	ulong get_erases_remaining(const Address &address) const;
 	void get_least_worn(Address &address) const;
 	double get_last_erase_time(const Address &address) const;
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
 	void get_free_page(Address &address) const;
-	ssd::uint get_num_free(const Address &address) const;
-	ssd::uint get_num_valid(const Address &address) const;
-	ssd::uint get_num_invalid(const Address &address) const;
+	uint get_num_free(const Address &address) const;
+	uint get_num_valid(const Address &address) const;
+	uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
 	Ssd &ssd;
 	FtlParent *ftl;
@@ -1386,9 +1381,9 @@ private:
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
 	void get_free_page(Address &address) const;
-	ssd::uint get_num_free(const Address &address) const;
-	ssd::uint get_num_valid(const Address &address) const;
-	ssd::uint get_num_invalid(const Address &address) const;
+	uint get_num_free(const Address &address) const;
+	uint get_num_valid(const Address &address) const;
+	uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
 
 	uint size;
