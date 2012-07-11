@@ -273,7 +273,7 @@ enum status Plane::_merge(Event &event)
 	}
 }
 
-ssd::uint Plane::get_size(void) const
+uint Plane::get_size(void) const
 {
 	return size;
 }
@@ -296,7 +296,7 @@ double Plane::get_last_erase_time(const Address &address) const
 
 /* if given a valid Block address, call the Block's method
  * else return local value */
-ssd::ulong Plane::get_erases_remaining(const Address &address) const
+ulong Plane::get_erases_remaining(const Address &address) const
 {
 	assert(data != NULL);
 	if(address.valid > PLANE && address.block < size)
@@ -380,19 +380,19 @@ enum status Plane::get_next_page(void)
 }
 
 /* free_blocks is updated in the write and erase methods */
-ssd::uint Plane::get_num_free(const Address &address) const
+uint Plane::get_num_free(const Address &address) const
 {
 	assert(address.valid >= PLANE);
 	return free_blocks;
 }
 
-ssd::uint Plane::get_num_valid(const Address &address) const
+uint Plane::get_num_valid(const Address &address) const
 {
 	assert(address.valid >= PLANE);
 	return data[address.block].get_pages_valid();
 }
 
-ssd::uint Plane::get_num_invalid(const Address & address) const
+uint Plane::get_num_invalid(const Address & address) const
 {
 	assert(address.valid >= PLANE);
 	return data[address.block].get_pages_invalid();

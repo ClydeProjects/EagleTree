@@ -31,8 +31,8 @@
 
 using namespace ssd;
 
-ssd::uint Event::id_generator = 0;
-ssd::uint Event::application_io_id_generator = 0;
+uint Event::id_generator = 0;
+uint Event::application_io_id_generator = 0;
 
 /* see "enum event_type" in ssd.h for details on event types */
 Event::Event(enum event_type type, ulong logical_address, uint size, double start_time):
@@ -94,12 +94,12 @@ void Event::consolidate_metaevent(Event &list)
 	assert(bus_wait_time >= 0);
 }
 
-ssd::ulong Event::get_logical_address(void) const
+ulong Event::get_logical_address(void) const
 {
 	return logical_address;
 }
 
-ssd::uint Event::get_id(void) const
+uint Event::get_id(void) const
 {
 	return id;
 }
@@ -129,7 +129,7 @@ void Event::set_log_address(const Address &address)
 	log_address = address;
 }
 
-ssd::uint Event::get_size(void) const
+uint Event::get_size(void) const
 {
 	return size;
 }
@@ -160,7 +160,7 @@ double Event::get_current_time(void) const {
 	return start_time + time_taken;
 }
 
-ssd::uint Event::get_application_io_id(void) const {
+uint Event::get_application_io_id(void) const {
 	return application_io_id;
 }
 

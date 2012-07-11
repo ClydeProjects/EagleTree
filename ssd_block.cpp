@@ -27,6 +27,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include "ssd.h"
+#include <sys/types.h>
 
 using namespace ssd;
 
@@ -172,12 +173,12 @@ const Plane &Block::get_parent(void) const
 	return parent;
 }
 
-ssd::uint Block::get_pages_valid(void) const
+uint Block::get_pages_valid(void) const
 {
 	return pages_valid;
 }
 
-ssd::uint Block::get_pages_invalid(void) const
+uint Block::get_pages_invalid(void) const
 {
 	return pages_invalid;
 }
@@ -205,12 +206,12 @@ double Block::get_last_erase_time(void) const
 	return last_erase_time;
 }
 
-ssd::ulong Block::get_erases_remaining(void) const
+ulong Block::get_erases_remaining(void) const
 {
 	return erases_remaining;
 }
 
-ssd::uint Block::get_size(void) const
+uint Block::get_size(void) const
 {
 	return size;
 }
