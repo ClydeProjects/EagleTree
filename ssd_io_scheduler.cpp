@@ -133,7 +133,7 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 		events.pop_back();
 		assert(event.get_event_type() == WRITE);
 		ftl.set_replace_address(event);
-		bm.register_write_arrival(event);
+		//bm.register_write_arrival(event);
 		if (!event.is_garbage_collection_op()) {
 			eliminate_conflict_with_any_incoming_gc(event);
 		}
@@ -163,7 +163,7 @@ void IOScheduler::eliminate_conflict_with_any_incoming_gc(Event const&event) {
 	uint dependency_code = LBA_to_dependencies[event.get_logical_address()];
 	std::deque<Event> gc_queue = dependencies[dependency_code];
 
-
+	Address addr_of_original_page;
 	uint num_events_eliminated = 0;
 	for (uint i = 0; i < gc_queue.size(); i++) {
 		Event gc_event = gc_queue[i];
@@ -171,9 +171,16 @@ void IOScheduler::eliminate_conflict_with_any_incoming_gc(Event const&event) {
 			gc_queue.erase (gc_queue.begin()+i);
 			i--;
 			num_events_eliminated++;
+			if (addr_of_original_page.valid == NONE) {
+				if (gc_event.get_event_type() == READ_COMMAND || gc_event.get_event_type() == READ_TRANSFER) {
+					addr_of_original_page = gc_event.get_address();
+				} else if (gc_event.get_event_type() == WRITE) {
+					addr_of_original_page = gc_event.get_replace_address();
+				}
+			}
 		}
 	}
-	Address addr_of_original_page;
+
 	if (num_events_eliminated < 3) {
 		for (uint i = 0; i < io_schedule.size(); i++) {
 			Event some_event = io_schedule[i];
@@ -181,8 +188,12 @@ void IOScheduler::eliminate_conflict_with_any_incoming_gc(Event const&event) {
 				io_schedule.erase(io_schedule.begin() + i);
 				i--;
 				num_events_eliminated++;
-				if (some_event.get_event_type() == READ_COMMAND) {
-					addr_of_original_page = some_event.get_address();
+				if (addr_of_original_page.valid == NONE) {
+					if (some_event.get_event_type() == READ_COMMAND || some_event.get_event_type() == READ_TRANSFER) {
+						addr_of_original_page = some_event.get_address();
+					} else if (some_event.get_event_type() == WRITE) {
+						addr_of_original_page = some_event.get_replace_address();
+					}
 				}
 				break;
 			}
@@ -191,11 +202,13 @@ void IOScheduler::eliminate_conflict_with_any_incoming_gc(Event const&event) {
 	if (num_events_eliminated == 2) {
 		ssd.getPackages()[addr_of_original_page.package].getDies()[addr_of_original_page.die].clear_register();
 	}
-	if (num_events_eliminated > 1) {
-		bm.inform_of_gc_cancellation();
-	}
 
-	printf("Incoming write making a pending GC operation unnecessary. LBA: %d   removed %d events\n", event.get_logical_address(), num_events_eliminated);
+	printf("Write makes pending GC unnecessary. LBA: %d   removed %d events", event.get_logical_address(), num_events_eliminated);
+	event.get_replace_address().print();
+	printf("\n");
+
+	bm.inform_of_gc_cancellation(addr_of_original_page, event.get_current_time());
+	assert(num_events_eliminated > 0);
 
 	LBA_to_dependencies.erase(event.get_logical_address());
 }

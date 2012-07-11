@@ -41,14 +41,14 @@ int main()
 	double cur_time = 1;
 	double delta = BUS_DATA_DELAY - 2 > 0 ? BUS_DATA_DELAY - 2 : BUS_DATA_DELAY;
 
-	for (int i = 0; i < 30; i++)
+	for (int i = 0; i < 60; i++)
 	{
 		result = ssd -> event_arrive(WRITE, i, 1, 1 + i * 5  );
 	}
 
 	for (int j = 0; j < 10; j++) {
 		StateTracer::print(*ssd);
-		for (int i = 31; i < 60; i++)
+		for (int i = 61; i < 90; i++)
 		{
 			result = ssd -> event_arrive(WRITE, i, 1, j * 500 + 300 + i * 5  );
 		}

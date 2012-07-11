@@ -820,7 +820,7 @@ public:
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual pair<double, Address> write(Event const& write) const = 0;
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
-	void inform_of_gc_cancellation();
+	void inform_of_gc_cancellation(Address const& target_page, double time);
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	void Wear_Level(Event const& event);
@@ -849,6 +849,7 @@ private:
 	void choose_gc_victim(vector<set<Block*> > candidates, double start_time);
 	void update_blocks_with_min_age(uint age);
 	uint sort_into_age_class(Address const& address);
+	void issue_erase(Address a, double time);
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 	bool greedy_gc;
@@ -859,7 +860,7 @@ private:
 	set<Block*> blocks_with_min_age;
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
-	set<Block*> blocks_being_garbage_collected;
+	map<int, int> blocks_being_garbage_collected;
 	vector<vector<vector<set<Block*> > > > gc_candidates;  // each age class has a vector of candidates for GC
 };
 

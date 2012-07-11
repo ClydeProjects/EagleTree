@@ -64,7 +64,9 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	free_blocks[a.package][a.die][age_class].push_back(a);
 
 	Block* b = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
-	blocks_being_garbage_collected.erase(b);
+	blocks_being_garbage_collected.erase(b->get_physical_address());
+
+	printf("%d GC operations taking place now \n", blocks_being_garbage_collected.size());
 
 	num_free_pages += BLOCK_SIZE;
 	num_available_pages_for_new_writes += BLOCK_SIZE;
@@ -98,21 +100,54 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
 	uint age_class = sort_into_age_class(ra);
 
+	register_write_arrival(event);
+
 	// TODO: fix thresholds for inserting blocks into GC lists
-	if (block.get_state() == ACTIVE && (block.get_pages_invalid() < BLOCK_SIZE / 4 || gc_candidates[ra.package][ra.die][age_class].size() == 0)) {
+	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
+			block.get_state() == ACTIVE &&
+			(block.get_pages_invalid() < BLOCK_SIZE / 4 || gc_candidates[ra.package][ra.die][age_class].size() == 0)) {
 		gc_candidates[ra.package][ra.die][age_class].insert(&block);
 	}
 
-	// if the block on which a page has been invalidated is now empty, erase it
-	if (block.get_state() == INACTIVE && blocks_being_garbage_collected.count(&block) == 0) {
-		printf("block "); ra.print(); printf(" is now invalid. An erase is issued\n");
-		Event erase = Event(ERASE, 0, 1, event.get_start_time() + event.get_time_taken());
-		erase.set_address(Address(block.physical_address, BLOCK));
-		erase.set_garbage_collection_op(true);
-		gc_candidates[ra.package][ra.die][age_class].erase(&block);
-		blocks_being_garbage_collected.insert(&block);
-		IOScheduler::instance()->schedule_independent_event(erase);
+	if (event.is_garbage_collection_op()) {
+		//assert(blocks_being_garbage_collected[&block] > 0);
+		blocks_being_garbage_collected[block.get_physical_address()]--;
 	}
+
+	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 && block.get_state() == INACTIVE) {
+		gc_candidates[ra.package][ra.die][age_class].erase(&block);
+		blocks_being_garbage_collected[block.get_physical_address()] = 0;
+		issue_erase(ra, event.get_current_time());
+	}
+	else if (blocks_being_garbage_collected.count(block.get_physical_address()) == 1 && blocks_being_garbage_collected[block.get_physical_address()] == 0) {
+		blocks_being_garbage_collected[block.get_physical_address()]--;
+		issue_erase(ra, event.get_current_time());
+	}
+}
+
+void Block_manager_parent::inform_of_gc_cancellation(Address const& target_page, double time) {
+	Block* b = &ssd.getPackages()[target_page.package].getDies()[target_page.die].getPlanes()[target_page.plane].getBlocks()[target_page.block];
+	int g = blocks_being_garbage_collected[b->get_physical_address()];
+	assert(blocks_being_garbage_collected.count(b->get_physical_address()) == 1);
+	//assert(blocks_being_garbage_collected[b] > 0);
+	blocks_being_garbage_collected[b->get_physical_address()]--;
+	int j = blocks_being_garbage_collected[b->get_physical_address()];
+	num_available_pages_for_new_writes++;
+	if (blocks_being_garbage_collected[b->get_physical_address()] == 0) {
+		issue_erase(target_page, time);
+	}
+}
+
+void Block_manager_parent::issue_erase(Address ra, double time) {
+	ra.valid = BLOCK;
+	ra.page = 0;
+	printf("block %d", ra.get_linear_address()); ra.print(); printf(" is now invalid. An erase is issued\n");
+	printf("%d GC operations taking place now \n", blocks_being_garbage_collected.size());
+	Event erase = Event(ERASE, 0, 1, time);
+
+	erase.set_address(ra);
+	erase.set_garbage_collection_op(true);
+	IOScheduler::instance()->schedule_independent_event(erase);
 }
 
 // invalidates the original location of a write
@@ -205,9 +240,10 @@ pair<bool, pair<uint, uint> > Block_manager_parent::get_free_die_with_shortest_I
 		double earliest_die_finish_time = std::numeric_limits<double>::max();
 		uint die_with_earliest_finish_time = 0;
 		for (uint j = 0; j < dies[i].size(); j++) {
-			bool die_has_free_pages = dies[i][j].page < BLOCK_SIZE;
-			uint channel_id = dies[i][j].package;
-			uint die_id = dies[i][j].die;
+			Address pointer = dies[i][j];
+			bool die_has_free_pages = pointer.page < BLOCK_SIZE;
+			uint channel_id = pointer.package;
+			uint die_id = pointer.die;
 			bool die_register_is_busy = ssd.getPackages()[channel_id].getDies()[die_id].register_is_busy();
 			if (die_has_free_pages && !die_register_is_busy) {
 				can_write = true;
@@ -249,10 +285,6 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 	double max = std::max(channel_finish_time, die_finish_time);
 	double time = max - time_taken;
 	return time <= 0 ? 0 : time;
-}
-
-void Block_manager_parent::inform_of_gc_cancellation() {
-	num_available_pages_for_new_writes++;
 }
 
 // puts free blocks at the very end of the queue
@@ -315,14 +347,13 @@ void Block_manager_parent::choose_gc_victim(vector<set<Block*> > candidates, dou
 	if (best_block != NULL && num_available_pages_for_new_writes >= best_block->get_pages_valid()) {
 		Address addr = Address(best_block->get_physical_address(), BLOCK);
 		uint age_class = sort_into_age_class(addr);
-		if (gc_candidates[addr.package][addr.die][age_class].count(best_block) != 1) {
-			int i = 0;
-			i++;
-		}
 		assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 1);
 		gc_candidates[addr.package][addr.die][age_class].erase(best_block);
 		assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 0);
-		blocks_being_garbage_collected.insert(best_block);
+		blocks_being_garbage_collected[best_block->get_physical_address()] = best_block->get_pages_valid();
+		int size = blocks_being_garbage_collected.size();
+		printf("Triggering GC in %d ", best_block->get_physical_address()); addr.print(); printf(". Migrating %d \n", best_block->get_pages_valid());
+		printf("%d GC opersations taking place now \n", blocks_being_garbage_collected.size());
 		migrate(best_block, start_time);
 	}
 }
@@ -335,7 +366,7 @@ void Block_manager_parent::migrate(Block const* const block, double start_time) 
 
 	assert(block->get_state() != FREE);
 	assert(block->get_state() != PARTIALLY_FREE);
-	if (block->get_pages_valid() > num_available_pages_for_new_writes) {
+	if (block->get_physical_address() == 4) {
 		int i = 0;
 		i++;
 	}
