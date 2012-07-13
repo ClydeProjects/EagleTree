@@ -813,7 +813,7 @@ public:
 	virtual void register_write_arrival(Event const& event);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write) const = 0;
+	virtual pair<double, Address> write(Event const& write) = 0;
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
 	void inform_of_gc_cancellation(Address const& target_page, double time);
 protected:
@@ -835,6 +835,8 @@ protected:
 
 	pair<bool, pair<uint, uint> > get_free_die_with_shortest_IO_queue(std::vector<std::vector<Address> > const& dies) const;
 	Address get_free_die_with_shortest_IO_queue() const;
+
+	uint how_many_gc_operations_are_scheduled() const;
 
 	Ssd& ssd;
 	FtlParent& ftl;
@@ -866,7 +868,7 @@ public:
 	~Block_manager_parallel();
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write) const;
+	virtual pair<double, Address> write(Event const& write);
 private:
 	bool has_free_pages(uint package_id, uint die_id) const;
 };
@@ -879,7 +881,7 @@ public:
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write) const;
+	virtual pair<double, Address> write(Event const& write);
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 private:
@@ -898,7 +900,7 @@ public:
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write) const;
+	virtual pair<double, Address> write(Event const& write);
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 private:

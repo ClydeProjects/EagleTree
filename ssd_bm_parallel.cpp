@@ -65,7 +65,7 @@ bool Block_manager_parallel::has_free_pages(uint package_id, uint die_id) const 
 	return free_block_pointers[package_id][die_id].page < BLOCK_SIZE;
 }
 
-pair<double, Address> Block_manager_parallel::write(Event const& write) const {
+pair<double, Address> Block_manager_parallel::write(Event const& write) {
 	pair<double, Address> result;
 	bool can_write = Block_manager_parent::can_write(write);
 	if (!can_write) {

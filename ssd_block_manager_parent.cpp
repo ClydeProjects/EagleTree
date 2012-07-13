@@ -53,9 +53,6 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
 Block_manager_parent::~Block_manager_parent(void){}
 
 void Block_manager_parent::register_erase_outcome(Event const& event, enum status status) {
-
-	long phys_addr = event.get_address().get_linear_address();
-
 	Address a = event.get_address();
 	a.valid = PAGE;
 	a.page = 0;
@@ -78,7 +75,7 @@ uint Block_manager_parent::sort_into_age_class(Address const& a) {
 	if (age > max_age) {
 		max_age = age;
 	}
-	double normalized_age = (age - min_age) / (max_age - min_age);
+	double normalized_age = (double)(age - min_age) / (max_age - min_age);
 	uint klass = floor(normalized_age * num_age_classes * 0.99999);
 	return klass;
 }
@@ -92,7 +89,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 		num_available_pages_for_new_writes--;
 	}
 	// if there are very few pages left, need to trigger emergency GC
-	if (num_free_pages <= BLOCK_SIZE) {
+	if (num_free_pages <= BLOCK_SIZE && how_many_gc_operations_are_scheduled() == 0) {
 		perform_gc(event.get_current_time());
 	}
 
@@ -106,6 +103,13 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
 			block.get_state() == ACTIVE &&
 			(block.get_pages_invalid() < BLOCK_SIZE / 4 || gc_candidates[ra.package][ra.die][age_class].size() == 0)) {
+		printf("Inserting as GC candidate: "); ra.print(); printf(" with age %d and valid blocks: %d\n", age_class, block.get_pages_valid());
+		if (block.get_physical_address() == 108) {
+			int i = 0;
+			int max = max_age;
+			int min = min_age;
+			i++;
+		}
 		gc_candidates[ra.package][ra.die][age_class].insert(&block);
 	}
 
@@ -276,6 +280,10 @@ Address Block_manager_parent::get_free_die_with_shortest_IO_queue() const {
 	}
 }
 
+uint Block_manager_parent::how_many_gc_operations_are_scheduled() const {
+	return blocks_being_garbage_collected.size();
+}
+
 // gives time until both the channel and die are clear
 double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const {
 	uint package_id = die_address.package;
@@ -347,7 +355,15 @@ void Block_manager_parent::choose_gc_victim(vector<set<Block*> > candidates, dou
 	if (best_block != NULL && num_available_pages_for_new_writes >= best_block->get_pages_valid()) {
 		Address addr = Address(best_block->get_physical_address(), BLOCK);
 		uint age_class = sort_into_age_class(addr);
-		assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 1);
+		if (gc_candidates[addr.package][addr.die][age_class].count(best_block) == 0) {
+			int j = gc_candidates[addr.package][addr.die][1].count(best_block);
+			int max = max_age;
+			int min = min_age;
+			int i = 0;
+			uint age_class3 = sort_into_age_class(addr);
+			i++;
+		}
+		//assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 1);
 		gc_candidates[addr.package][addr.die][age_class].erase(best_block);
 		assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 0);
 		blocks_being_garbage_collected[best_block->get_physical_address()] = best_block->get_pages_valid();
@@ -366,10 +382,6 @@ void Block_manager_parent::migrate(Block const* const block, double start_time) 
 
 	assert(block->get_state() != FREE);
 	assert(block->get_state() != PARTIALLY_FREE);
-	if (block->get_physical_address() == 4) {
-		int i = 0;
-		i++;
-	}
 	assert(block->get_pages_valid() <= num_available_pages_for_new_writes);
 
 	num_available_pages_for_new_writes -= block->get_pages_valid();

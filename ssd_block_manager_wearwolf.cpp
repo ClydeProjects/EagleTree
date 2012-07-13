@@ -71,12 +71,12 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 			assert(free_block.die == die_id);
 			free_block_pointers[package_id][die_id] = free_block;
 		} else {
-			perform_gc(package_id, die_id, 0, event.get_start_time() + event.get_time_taken());
+			perform_gc(package_id, die_id, 0, event.get_current_time());
 		}
 	} else if (block_address.compare(wcrh_pointer) == BLOCK) {
-		handle_cold_pointer_out_of_space(READ_HOT, event.get_start_time() + event.get_time_taken());
+		handle_cold_pointer_out_of_space(READ_HOT, event.get_current_time());
 	} else if (block_address.compare(wcrc_pointer) == BLOCK) {
-		handle_cold_pointer_out_of_space(READ_COLD, event.get_start_time() + event.get_time_taken());
+		handle_cold_pointer_out_of_space(READ_COLD, event.get_current_time());
 	}
 }
 
@@ -142,7 +142,7 @@ bool Block_manager_parallel_wearwolf::at_least_one_available_write_hot_pointer()
 	return false;
 }
 
-pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write) const {
+pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write) {
 	pair<double, Address> result;
 	bool can_write = Block_manager_parent::can_write(write);
 	if (!can_write) {
@@ -185,6 +185,10 @@ pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write)
 			result.first = in_how_long_can_this_event_be_scheduled(wcrh_pointer, write.get_current_time());
 			result.second = wcrh_pointer;
 		}
+	}
+
+	if (!write.is_garbage_collection_op() && relevant_pointer_unavailable && how_many_gc_operations_are_scheduled() == 0) {
+		Block_manager_parent::perform_gc(write.get_current_time());
 	}
 
 	if (write.is_garbage_collection_op() && relevant_pointer_unavailable) {
