@@ -93,7 +93,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	}
 	// if there are very few pages left, need to trigger emergency GC
 	if (num_free_pages <= BLOCK_SIZE) {
-		perform_gc(event.get_start_time() + event.get_time_taken());
+		perform_gc(event.get_current_time());
 	}
 
 	Address ra = event.get_replace_address();
@@ -114,12 +114,12 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 		blocks_being_garbage_collected[block.get_physical_address()]--;
 	}
 
-	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 && block.get_state() == INACTIVE) {
+	if (!event.is_garbage_collection_op() && blocks_being_garbage_collected.count(block.get_physical_address()) == 0 && block.get_state() == INACTIVE) {
 		gc_candidates[ra.package][ra.die][age_class].erase(&block);
 		blocks_being_garbage_collected[block.get_physical_address()] = 0;
 		issue_erase(ra, event.get_current_time());
 	}
-	else if (blocks_being_garbage_collected.count(block.get_physical_address()) == 1 && blocks_being_garbage_collected[block.get_physical_address()] == 0) {
+	else if (event.is_garbage_collection_op() && blocks_being_garbage_collected.count(block.get_physical_address()) == 1 && blocks_being_garbage_collected[block.get_physical_address()] == 0) {
 		blocks_being_garbage_collected[block.get_physical_address()]--;
 		issue_erase(ra, event.get_current_time());
 	}
