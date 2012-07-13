@@ -51,7 +51,7 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 		wcrc_pointer.page = num_pages_written = wcrc_pointer.page + 1;
 	} else {
 		event.print();
-		StateTracer::print(ssd);
+		StateTracer::print();
 		assert(false);
 	}
 
@@ -158,7 +158,7 @@ pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write)
 	if (write.get_id() == 120 && result.first == 0) {
 		int i = 0;
 		i++;
-		StateTracer::print(ssd);
+		StateTracer::print();
 	}
 
 	if (w_hotness == WRITE_HOT) {

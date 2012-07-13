@@ -1438,7 +1438,9 @@ private:
 class StateTracer
 {
 public:
-	static void print(Ssd& ssd);
+	static void print();
+	static Ssd * ssd;
+	static void init(Ssd * ssd);
 	// Singleton
 	/*static StateTracer *get_instance();
 	static void init();
