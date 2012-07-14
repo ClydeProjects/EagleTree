@@ -843,7 +843,7 @@ protected:
 	vector<vector<Address> > free_block_pointers;
 private:
 	void migrate(Block const* const block, double start_time);
-	void choose_gc_victim(vector<set<Block*> > candidates, double start_time);
+	void choose_gc_victim(vector<pair<Block*, uint> > candidates, double start_time);
 	void update_blocks_with_min_age(uint age);
 	uint sort_into_age_class(Address const& address);
 	void issue_erase(Address a, double time);
