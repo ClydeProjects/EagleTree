@@ -63,7 +63,11 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	Block* b = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 	blocks_being_garbage_collected.erase(b->get_physical_address());
 
-	printf("%d GC operations taking place now \n", blocks_being_garbage_collected.size());
+	printf("%d GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
+    for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
+    	printf("%d  ", (*iter).first);
+	}
+    printf("\n");
 
 	num_free_pages += BLOCK_SIZE;
 	num_available_pages_for_new_writes += BLOCK_SIZE;
@@ -98,6 +102,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	uint age_class = sort_into_age_class(ra);
 
 	if (ra.valid != NONE) {
+		assert(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE);
 		register_write_arrival(event);
 	}
 
@@ -109,17 +114,20 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 		gc_candidates[ra.package][ra.die][age_class].insert(&block);
 	}
 
-	if (event.is_garbage_collection_op()) {
-		//assert(blocks_being_garbage_collected[&block] > 0);
+	if (ra.valid != NONE && blocks_being_garbage_collected.count(block.get_physical_address()) == 1) {
+		assert(blocks_being_garbage_collected[block.get_physical_address()] > 0);
 		blocks_being_garbage_collected[block.get_physical_address()]--;
 	}
 
-	if (!event.is_garbage_collection_op() && blocks_being_garbage_collected.count(block.get_physical_address()) == 0 && block.get_state() == INACTIVE) {
+
+
+	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 && block.get_state() == INACTIVE) {
 		gc_candidates[ra.package][ra.die][age_class].erase(&block);
 		blocks_being_garbage_collected[block.get_physical_address()] = 0;
 		issue_erase(ra, event.get_current_time());
 	}
-	else if (event.is_garbage_collection_op() && blocks_being_garbage_collected.count(block.get_physical_address()) == 1 && blocks_being_garbage_collected[block.get_physical_address()] == 0) {
+	else if (blocks_being_garbage_collected.count(block.get_physical_address()) == 1 && blocks_being_garbage_collected[block.get_physical_address()] == 0) {
+		assert(block.get_state() == INACTIVE);
 		blocks_being_garbage_collected[block.get_physical_address()]--;
 		issue_erase(ra, event.get_current_time());
 	}
@@ -127,22 +135,25 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 
 void Block_manager_parent::inform_of_gc_cancellation(Address const& target_page, double time) {
 	Block* b = &ssd.getPackages()[target_page.package].getDies()[target_page.die].getPlanes()[target_page.plane].getBlocks()[target_page.block];
-	int g = blocks_being_garbage_collected[b->get_physical_address()];
 	assert(blocks_being_garbage_collected.count(b->get_physical_address()) == 1);
-	//assert(blocks_being_garbage_collected[b] > 0);
-	blocks_being_garbage_collected[b->get_physical_address()]--;
-	int j = blocks_being_garbage_collected[b->get_physical_address()];
 	num_available_pages_for_new_writes++;
+	//assert(blocks_being_garbage_collected[b] > 0);
+
+	/*blocks_being_garbage_collected[b->get_physical_address()]--;
 	if (blocks_being_garbage_collected[b->get_physical_address()] == 0) {
 		issue_erase(target_page, time);
-	}
+	}*/
 }
 
 void Block_manager_parent::issue_erase(Address ra, double time) {
 	ra.valid = BLOCK;
 	ra.page = 0;
 	printf("block %d", ra.get_linear_address()); ra.print(); printf(" is now invalid. An erase is issued\n");
-	printf("%d GC operations taking place now \n", blocks_being_garbage_collected.size());
+	printf("%d GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
+    for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
+    	printf("%d  ", (*iter).first);
+	}
+    printf("\n");
 	Event erase = Event(ERASE, 0, 1, time);
 
 	erase.set_address(ra);
@@ -372,7 +383,13 @@ void Block_manager_parent::choose_gc_victim(vector<pair<Block*, uint> > candidat
 		blocks_being_garbage_collected[best_block->get_physical_address()] = best_block->get_pages_valid();
 		int size = blocks_being_garbage_collected.size();
 		printf("Triggering GC in %d ", best_block->get_physical_address()); addr.print(); printf(". Migrating %d \n", best_block->get_pages_valid());
-		printf("%d GC opersations taking place now \n", blocks_being_garbage_collected.size());
+
+		printf("%d GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
+	    for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
+	    	printf("%d  ", (*iter).first);
+		}
+	    printf("\n");
+
 		migrate(best_block, start_time);
 	}
 }

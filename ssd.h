@@ -857,7 +857,7 @@ private:
 	set<Block*> blocks_with_min_age;
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
-	map<int, int> blocks_being_garbage_collected;
+	map<int, int> blocks_being_garbage_collected;   // maps block physical address to the number of pages that still need to be migrated
 	vector<vector<vector<set<Block*> > > > gc_candidates;  // each age class has a vector of candidates for GC
 };
 
