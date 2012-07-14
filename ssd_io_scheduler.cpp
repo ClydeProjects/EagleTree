@@ -155,7 +155,7 @@ void IOScheduler::handle_writes(std::vector<Event>& events) {
 
 // if a write to LBA X arrives, while there is already a pending GC operation
 // to migrate LBA X, the GC operation becomes redundant, so we cancel it.
-void IOScheduler::eliminate_conflict_with_any_incoming_gc(Event const&event) {
+void IOScheduler::eliminate_conflict_with_any_incoming_gc(Event & event) {
 	assert(!event.is_garbage_collection_op());
 	if (LBA_to_dependencies.count(event.get_logical_address()) == 0) {
 		return;
@@ -207,7 +207,7 @@ void IOScheduler::eliminate_conflict_with_any_incoming_gc(Event const&event) {
 	event.get_replace_address().print();
 	printf("\n");
 
-	bm.inform_of_gc_cancellation(addr_of_original_page, event.get_current_time());
+	event.set_garbage_collection_op(true);
 	assert(num_events_eliminated > 0);
 
 	LBA_to_dependencies.erase(event.get_logical_address());
@@ -289,8 +289,8 @@ void IOScheduler::handle_finished_event(Event const&event, enum status outcome) 
 	}
 	VisualTracer::get_instance()->register_completed_event(event);
 	if (event.get_event_type() == WRITE) {
-		bm.register_write_outcome(event, outcome);
 		ftl.register_write_completion(event, outcome);
+		bm.register_write_outcome(event, outcome);
 	} else if (event.get_event_type() == ERASE) {
 		bm.register_erase_outcome(event, outcome);
 	} else if (event.get_event_type() == READ_COMMAND) {

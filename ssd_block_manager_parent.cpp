@@ -133,18 +133,6 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	}
 }
 
-void Block_manager_parent::inform_of_gc_cancellation(Address const& target_page, double time) {
-	Block* b = &ssd.getPackages()[target_page.package].getDies()[target_page.die].getPlanes()[target_page.plane].getBlocks()[target_page.block];
-	assert(blocks_being_garbage_collected.count(b->get_physical_address()) == 1);
-	num_available_pages_for_new_writes++;
-	//assert(blocks_being_garbage_collected[b] > 0);
-
-	/*blocks_being_garbage_collected[b->get_physical_address()]--;
-	if (blocks_being_garbage_collected[b->get_physical_address()] == 0) {
-		issue_erase(target_page, time);
-	}*/
-}
-
 void Block_manager_parent::issue_erase(Address ra, double time) {
 	ra.valid = BLOCK;
 	ra.page = 0;

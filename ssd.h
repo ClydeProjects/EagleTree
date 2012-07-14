@@ -815,7 +815,6 @@ public:
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual pair<double, Address> write(Event const& write) = 0;
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
-	void inform_of_gc_cancellation(Address const& target_page, double time);
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	void Wear_Level(Event const& event);
@@ -1035,7 +1034,7 @@ private:
 	bool can_schedule_on_die(Event const& event) const;
 	void handle_finished_event(Event const&event, enum status outcome);
 
-	void eliminate_conflict_with_any_incoming_gc(Event const&event);
+	void eliminate_conflict_with_any_incoming_gc(Event&event);
 	void adjust_conflict_elimination_structures(Event const&event);
 
 	std::vector<Event> io_schedule;
