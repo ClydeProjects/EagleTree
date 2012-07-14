@@ -97,19 +97,15 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
 	uint age_class = sort_into_age_class(ra);
 
-	register_write_arrival(event);
+	if (ra.valid != NONE) {
+		register_write_arrival(event);
+	}
 
 	// TODO: fix thresholds for inserting blocks into GC lists
 	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
 			block.get_state() == ACTIVE &&
 			(block.get_pages_invalid() < BLOCK_SIZE / 4 || gc_candidates[ra.package][ra.die][age_class].size() == 0)) {
 		printf("Inserting as GC candidate: "); ra.print(); printf(" with age %d and valid blocks: %d\n", age_class, block.get_pages_valid());
-		if (block.get_physical_address() == 108) {
-			int i = 0;
-			int max = max_age;
-			int min = min_age;
-			i++;
-		}
 		gc_candidates[ra.package][ra.die][age_class].insert(&block);
 	}
 
@@ -355,15 +351,7 @@ void Block_manager_parent::choose_gc_victim(vector<set<Block*> > candidates, dou
 	if (best_block != NULL && num_available_pages_for_new_writes >= best_block->get_pages_valid()) {
 		Address addr = Address(best_block->get_physical_address(), BLOCK);
 		uint age_class = sort_into_age_class(addr);
-		if (gc_candidates[addr.package][addr.die][age_class].count(best_block) == 0) {
-			int j = gc_candidates[addr.package][addr.die][1].count(best_block);
-			int max = max_age;
-			int min = min_age;
-			int i = 0;
-			uint age_class3 = sort_into_age_class(addr);
-			i++;
-		}
-		//assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 1);
+		assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 1);
 		gc_candidates[addr.package][addr.die][age_class].erase(best_block);
 		assert(gc_candidates[addr.package][addr.die][age_class].count(best_block) == 0);
 		blocks_being_garbage_collected[best_block->get_physical_address()] = best_block->get_pages_valid();

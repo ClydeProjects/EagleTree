@@ -155,12 +155,6 @@ pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write)
 
 	bool relevant_pointer_unavailable = false;
 
-	if (write.get_id() == 120 && result.first == 0) {
-		int i = 0;
-		i++;
-		StateTracer::print();
-	}
-
 	if (w_hotness == WRITE_HOT) {
 		result.second = get_free_die_with_shortest_IO_queue();
 		if (result.second.valid == NONE) {
