@@ -102,7 +102,7 @@ void Block_manager_parallel_wearwolf::register_erase_outcome(Event const& event,
 	}
 	Block_manager_parent::register_erase_outcome(event, status);
 	reset_any_filled_pointers(event);
-	check_if_should_trigger_more_GC(event.get_start_time() + event.get_time_taken());
+	check_if_should_trigger_more_GC(event.get_current_time());
 	Wear_Level(event);
 }
 
@@ -185,12 +185,17 @@ pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write)
 		Block_manager_parent::perform_gc(write.get_current_time());
 	}
 
-	if (write.is_garbage_collection_op() && relevant_pointer_unavailable) {
-		if (wcrh_pointer.page < BLOCK_SIZE) {
+	if ((write.is_garbage_collection_op() && relevant_pointer_unavailable) ||
+			(!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0)) {
+
+		if (w_hotness == WRITE_HOT && wcrh_pointer.page < BLOCK_SIZE) {
 			result.second = wcrh_pointer;
-		} else if (wcrc_pointer.page < BLOCK_SIZE) {
+		} else if (w_hotness == WRITE_HOT && wcrc_pointer.page < BLOCK_SIZE) {
 			result.second = wcrc_pointer;
+		} else if (w_hotness == WRITE_COLD) {
+			result.second = get_free_die_with_shortest_IO_queue();
 		}
+
 		if (result.second.valid != NONE) {
 			result.first = in_how_long_can_this_event_be_scheduled(result.second, write.get_current_time());
 		}

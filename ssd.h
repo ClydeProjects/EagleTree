@@ -842,7 +842,7 @@ protected:
 	vector<vector<Address> > free_block_pointers;
 private:
 	void migrate(Block const* const block, double start_time);
-	void choose_gc_victim(vector<pair<Block*, uint> > candidates, double start_time);
+	void choose_gc_victim(vector<pair<long, uint> > candidates, double start_time);
 	void update_blocks_with_min_age(uint age);
 	uint sort_into_age_class(Address const& address);
 	void issue_erase(Address a, double time);
@@ -857,7 +857,7 @@ private:
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
 	map<int, int> blocks_being_garbage_collected;   // maps block physical address to the number of pages that still need to be migrated
-	vector<vector<vector<set<Block*> > > > gc_candidates;  // each age class has a vector of candidates for GC
+	vector<vector<vector<set<long> > > > gc_candidates;  // each age class has a vector of candidates for GC
 };
 
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation
