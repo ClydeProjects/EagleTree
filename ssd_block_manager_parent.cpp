@@ -106,6 +106,11 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 		register_write_arrival(event);
 	}
 
+	if (ra.valid != NONE && blocks_being_garbage_collected.count(block.get_physical_address()) == 1) {
+		assert(blocks_being_garbage_collected[block.get_physical_address()] > 0);
+		blocks_being_garbage_collected[block.get_physical_address()]--;
+	}
+
 	// TODO: fix thresholds for inserting blocks into GC lists
 	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
 			(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE) && block.get_pages_valid() < BLOCK_SIZE) {
@@ -117,14 +122,10 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 		}
 		printf("Inserting as GC candidate: %d ", phys_addr); ra.print(); printf(" with age_class %d and valid blocks: %d\n", age_class, block.get_pages_valid());
 		gc_candidates[ra.package][ra.die][age_class].insert(phys_addr);
+		if (gc_candidates[ra.package][ra.die][age_class].size() == 1) {
+			check_if_should_trigger_more_GC(event.get_current_time());
+		}
 	}
-
-	if (ra.valid != NONE && blocks_being_garbage_collected.count(block.get_physical_address()) == 1) {
-		assert(blocks_being_garbage_collected[block.get_physical_address()] > 0);
-		blocks_being_garbage_collected[block.get_physical_address()]--;
-	}
-
-
 
 	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 && block.get_state() == INACTIVE) {
 		gc_candidates[ra.package][ra.die][age_class].erase(block.get_physical_address());
