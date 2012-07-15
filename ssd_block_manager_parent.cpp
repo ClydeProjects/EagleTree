@@ -108,7 +108,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 
 	// TODO: fix thresholds for inserting blocks into GC lists
 	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
-			block.get_state() == ACTIVE && block.get_pages_valid() < BLOCK_SIZE) {
+			(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE) && block.get_pages_valid() < BLOCK_SIZE) {
 		long phys_addr = block.get_physical_address();
 		for (uint i = 0; i < num_age_classes; i++) {
 			if (i != age_class && gc_candidates[ra.package][ra.die][i].count(phys_addr) == 1) {
@@ -367,7 +367,7 @@ void Block_manager_parent::choose_gc_victim(vector<pair<long, uint> > candidates
 		Address a = Address(physical_address, BLOCK);
 		Block* block = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 		uint age_class = candidate.second;
-		if (block->get_pages_valid() < min_valid_pages) {
+		if (block->get_pages_valid() < min_valid_pages && block->get_state() == ACTIVE) {
 			min_valid_pages = block->get_pages_valid();
 			best_block = block;
 			best_block_age_class = age_class;
