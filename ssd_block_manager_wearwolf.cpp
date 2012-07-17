@@ -186,11 +186,11 @@ pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write)
 	}
 
 	if ((write.is_garbage_collection_op() && relevant_pointer_unavailable) ||
-			(!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0)) {
+			(relevant_pointer_unavailable && !write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0)) {
 
-		if (w_hotness == WRITE_HOT && wcrh_pointer.page < BLOCK_SIZE) {
+		if (wcrh_pointer.page < BLOCK_SIZE) {
 			result.second = wcrh_pointer;
-		} else if (w_hotness == WRITE_HOT && wcrc_pointer.page < BLOCK_SIZE) {
+		} else if (wcrc_pointer.page < BLOCK_SIZE) {
 			result.second = wcrc_pointer;
 		} else if (w_hotness == WRITE_COLD) {
 			result.second = get_free_die_with_shortest_IO_queue();
