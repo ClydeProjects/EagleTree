@@ -100,6 +100,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	Address ra = event.get_replace_address();
 	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
 	uint age_class = sort_into_age_class(ra);
+	long const phys_addr = block.get_physical_address();
 
 	if (ra.valid != NONE) {
 		assert(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE);
@@ -114,12 +115,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	// TODO: fix thresholds for inserting blocks into GC lists
 	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
 			(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE) && block.get_pages_valid() < BLOCK_SIZE) {
-		long phys_addr = block.get_physical_address();
-		for (uint i = 0; i < num_age_classes; i++) {
-			if (i != age_class && gc_candidates[ra.package][ra.die][i].count(phys_addr) == 1) {
-				gc_candidates[ra.package][ra.die][i].erase(phys_addr);
-			}
-		}
+		remove_as_gc_candidate(ra);
 		printf("Inserting as GC candidate: %d ", phys_addr); ra.print(); printf(" with age_class %d and valid blocks: %d\n", age_class, block.get_pages_valid());
 		gc_candidates[ra.package][ra.die][age_class].insert(phys_addr);
 		if (gc_candidates[ra.package][ra.die][age_class].size() == 1) {
@@ -127,15 +123,22 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 		}
 	}
 
-	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 && block.get_state() == INACTIVE) {
-		gc_candidates[ra.package][ra.die][age_class].erase(block.get_physical_address());
-		blocks_being_garbage_collected[block.get_physical_address()] = 0;
+	if (blocks_being_garbage_collected.count(phys_addr) == 0 && block.get_state() == INACTIVE) {
+		remove_as_gc_candidate(ra);
+		gc_candidates[ra.package][ra.die][age_class].erase(phys_addr);
+		blocks_being_garbage_collected[phys_addr] = 0;
 		issue_erase(ra, event.get_current_time());
 	}
-	else if (blocks_being_garbage_collected.count(block.get_physical_address()) == 1 && blocks_being_garbage_collected[block.get_physical_address()] == 0) {
+	else if (blocks_being_garbage_collected.count(phys_addr) == 1 && blocks_being_garbage_collected[block.get_physical_address()] == 0) {
 		assert(block.get_state() == INACTIVE);
-		blocks_being_garbage_collected[block.get_physical_address()]--;
+		blocks_being_garbage_collected[phys_addr]--;
 		issue_erase(ra, event.get_current_time());
+	}
+}
+
+void Block_manager_parent::remove_as_gc_candidate(Address const& phys_address) {
+	for (uint i = 0; i < num_age_classes; i++) {
+		gc_candidates[phys_address.package][phys_address.die][i].erase(phys_address.get_linear_address());
 	}
 }
 

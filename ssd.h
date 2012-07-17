@@ -846,6 +846,7 @@ private:
 	void update_blocks_with_min_age(uint age);
 	uint sort_into_age_class(Address const& address);
 	void issue_erase(Address a, double time);
+	void remove_as_gc_candidate(Address const& phys_address);
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 	bool greedy_gc;
