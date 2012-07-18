@@ -7,26 +7,30 @@
 
 #include "ssd.h"
 using namespace ssd;
-/*
-StateTracer *StateTracer::inst = NULL;
 
+Ssd *StateTracer::ssd = NULL;
+
+/*
 StateTracer::StateTracer()
 {}
 
 StateTracer::~StateTracer() {}
+*/
 
-void StateTracer::init()
+void StateTracer::init(Ssd * ssd)
 {
-	StateTracer::inst = new StateTracer();
+	StateTracer::ssd = ssd;
 }
 
+/*
 StateTracer *StateTracer::get_instance()
 {
 	return StateTracer::inst;
 }
 */
-void StateTracer::print(Ssd& ssd) {
+void StateTracer::print() {
 	printf("\n");
+	Ssd & ssd_ref = *ssd;
 	uint num_valid_pages = 0;
 	uint num_invalid_pages = 0;
 	uint num_empty_pages = 0;
@@ -35,7 +39,7 @@ void StateTracer::print(Ssd& ssd) {
 			for (uint k = 0; k < DIE_SIZE; k++) {
 				for (uint t = 0; t < PLANE_SIZE; t++) {
 					for (uint y = 0; y < BLOCK_SIZE; y++) {
-						Page const& page = ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t].getPages()[y];
+						Page const& page = ssd_ref.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t].getPages()[y];
 						if (page.get_state() == EMPTY) {
 							printf(" ");
 							num_empty_pages++;

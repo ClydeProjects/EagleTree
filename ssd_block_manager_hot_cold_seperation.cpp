@@ -105,7 +105,7 @@ bool Block_manager_parallel_hot_cold_seperation::at_least_one_available_write_ho
 	return false;
 }
 
-pair<double, Address> Block_manager_parallel_hot_cold_seperation::write(Event const& write) const {
+pair<double, Address> Block_manager_parallel_hot_cold_seperation::write(Event const& write) {
 	pair<double, Address> result;
 	bool can_write = Block_manager_parent::can_write(write);
 	if (!can_write) {

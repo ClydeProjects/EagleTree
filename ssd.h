@@ -840,9 +840,8 @@ public:
 	virtual void register_write_arrival(Event const& event);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write) const = 0;
+	virtual pair<double, Address> write(Event const& write) = 0;
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
-	void inform_of_gc_cancellation();
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	void Wear_Level(Event const& event);
@@ -863,14 +862,18 @@ protected:
 	pair<bool, pair<uint, uint> > get_free_die_with_shortest_IO_queue(std::vector<std::vector<Address> > const& dies) const;
 	Address get_free_die_with_shortest_IO_queue() const;
 
+	uint how_many_gc_operations_are_scheduled() const;
+
 	Ssd& ssd;
 	FtlParent& ftl;
 	vector<vector<Address> > free_block_pointers;
 private:
 	void migrate(Block const* const block, double start_time);
-	void choose_gc_victim(vector<set<Block*> > candidates, double start_time);
+	void choose_gc_victim(vector<pair<long, uint> > candidates, double start_time);
 	void update_blocks_with_min_age(uint age);
 	uint sort_into_age_class(Address const& address);
+	void issue_erase(Address a, double time);
+	void remove_as_gc_candidate(Address const& phys_address);
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 	bool greedy_gc;
@@ -881,8 +884,8 @@ private:
 	set<Block*> blocks_with_min_age;
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
-	set<Block*> blocks_being_garbage_collected;
-	vector<vector<vector<set<Block*> > > > gc_candidates;  // each age class has a vector of candidates for GC
+	map<int, int> blocks_being_garbage_collected;   // maps block physical address to the number of pages that still need to be migrated
+	vector<vector<vector<set<long> > > > gc_candidates;  // each age class has a vector of candidates for GC
 };
 
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation
@@ -892,7 +895,7 @@ public:
 	~Block_manager_parallel();
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write) const;
+	virtual pair<double, Address> write(Event const& write);
 private:
 	bool has_free_pages(uint package_id, uint die_id) const;
 };
@@ -905,7 +908,7 @@ public:
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write) const;
+	virtual pair<double, Address> write(Event const& write);
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 private:
@@ -924,7 +927,7 @@ public:
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write) const;
+	virtual pair<double, Address> write(Event const& write);
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 private:
@@ -1059,7 +1062,7 @@ private:
 	bool can_schedule_on_die(Event const& event) const;
 	void handle_finished_event(Event const&event, enum status outcome);
 
-	void eliminate_conflict_with_any_incoming_gc(Event const&event);
+	void eliminate_conflict_with_any_incoming_gc(Event&event);
 	void adjust_conflict_elimination_structures(Event const&event);
 
 	std::vector<Event> io_schedule;
@@ -1464,7 +1467,9 @@ private:
 class StateTracer
 {
 public:
-	static void print(Ssd& ssd);
+	static void print();
+	static Ssd * ssd;
+	static void init(Ssd * ssd);
 	// Singleton
 	/*static StateTracer *get_instance();
 	static void init();

@@ -264,26 +264,30 @@ double Event::incr_time_taken(double time_incr)
 void Event::print(FILE *stream) const
 {
 	if(type == READ)
-		fprintf(stream, "Read ");
+		fprintf(stream, "R ");
 	else if(type == READ_COMMAND)
-		fprintf(stream, "ReCo ");
+		fprintf(stream, "C ");
 	else if(type == READ_TRANSFER)
-		fprintf(stream, "ReTr ");
+		fprintf(stream, "T ");
 	else if(type == WRITE)
-		fprintf(stream, "Writ ");
+		fprintf(stream, "W ");
 	else if(type == ERASE)
-		fprintf(stream, "Eras ");
+		fprintf(stream, "E ");
 	else if(type == MERGE)
-		fprintf(stream, "Merg ");
+		fprintf(stream, "M ");
 	else
 		fprintf(stream, "Unknown event type: ");
-	fprintf(stream, "ID: %d ", id);
-	fprintf(stream, "LBA: %d ", logical_address);
+
+	fprintf(stream, "%d ", logical_address);
 	address.print(stream);
 	if(type == MERGE)
 		merge_address.print(stream);
-	fprintf(stream, "Time[%d, %d, %d]", (int)start_time, (int)(start_time + time_taken), (int)bus_wait_time);
-	fprintf(stream, " application io ID: %d", application_io_id);
+	if(type == WRITE)
+		replace_address.print(stream);
+	fprintf(stream, " Time[%d, %d, %d]", (int)start_time, (int)(start_time + time_taken), (int)bus_wait_time);
+	fprintf(stream, " ID: %d ", id);
+	fprintf(stream, " appID: %d", application_io_id);
+
 	if (garbage_collection_op) {
 		fprintf(stream, " GC");
 	} else if (mapping_op)  {

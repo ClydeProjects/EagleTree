@@ -92,6 +92,7 @@ enum status Page::_write(Event &event)
 		if (state != EMPTY) {
 			int i = 0;
 			i++;
+			StateTracer::print();
 			event.print();
 		}
 		assert(state == EMPTY);

@@ -81,7 +81,7 @@ Block::Block(const Plane &parent, uint block_size, ulong erases_remaining, doubl
 
 	// Creates the active cost structure in the block manager.
 	// It assumes that it is created lineary.
-	Block_manager::instance()->cost_insert(this);
+	//Block_manager::instance()->cost_insert(this);
 
 	return;
 }
@@ -119,7 +119,7 @@ enum status Block::write(Event &event)
 		}
 		modification_time = event.get_start_time();
 
-		Block_manager::instance()->update_block(this);
+		//Block_manager::instance()->update_block(this);
 	}
 	return ret;
 }
@@ -162,7 +162,7 @@ enum status Block::_erase(Event &event)
 		pages_invalid = 0;
 		state = FREE;
 
-		Block_manager::instance()->update_block(this);
+		//Block_manager::instance()->update_block(this);
 	}
 
 	return SUCCESS;
@@ -230,7 +230,7 @@ void Block::invalidate_page(uint page)
 	pages_invalid++;
 	pages_valid--;
 
-	Block_manager::instance()->update_block(this);
+	//Block_manager::instance()->update_block(this);
 
 	/* update block state */
 	if(pages_invalid == size)
