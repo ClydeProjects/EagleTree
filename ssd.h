@@ -740,63 +740,90 @@ private:
 };
 
 // BloomFilter hotness
-//typedef std::vector<bool> BloomFilter;
 typedef std::vector< bloom_filter > hot_bloom_filter;
-typedef std::vector< std::vector<unsigned int> > lun_counters;
+typedef std::vector< std::vector<uint> > lun_counters;
 
 class Die_Stats {
 public:
-	Die_Stats(bloom_parameters bloomfilter_parameters)
+	Die_Stats(bloom_parameters bloomfilter_parameters, uint read_window_size, uint write_window_size)
 	:	live_pages(0),
 	 	reads(0),
 	 	reads_targeting_wc_pages(0),
-	 	reads_targeting_wc_pages_previous_window(0),
+	 	reads_targeting_wc_pages_previous_window(-1),
 	 	writes(0),
 	 	unique_wh_encountered(0),
-	 	unique_wh_encountered_previous_window(0),
-	 	wh_counted_already(bloomfilter_parameters)
+	 	unique_wh_encountered_previous_window(-1),
+	 	wh_counted_already(bloomfilter_parameters),
+	 	read_counter_window_size(read_window_size),
+	 	write_counter_window_size(write_window_size)
 	{}
 
-	// WC = live pages - WH
-	inline unsigned int wc_pages() {
-		return unique_wh_encountered_previous_window == 0 ? live_pages - unique_wh_encountered : live_pages - unique_wh_encountered_previous_window;
+	// Incomplete copy-constructor
+	Die_Stats(const Die_Stats& object) {
+		wh_counted_already = object.wh_counted_already;
 	}
 
-	unsigned int live_pages;
+	// WC = live pages - WH
+	inline uint wc_pages() const {
+		if (unique_wh_encountered_previous_window != -1) return live_pages - unique_wh_encountered_previous_window;
+		return live_pages - unique_wh_encountered;
+	}
 
-	unsigned int reads;
-	unsigned int reads_targeting_wc_pages;
-	unsigned int reads_targeting_wc_pages_previous_window;
+	inline uint get_reads_targeting_wc_pages() const {
+		if (reads_targeting_wc_pages_previous_window != -1) return reads_targeting_wc_pages_previous_window;
+		return (uint) reads_targeting_wc_pages * ((double) read_counter_window_size / reads);
+	}
 
-	unsigned int writes;
-	unsigned int unique_wh_encountered;
-	unsigned int unique_wh_encountered_previous_window;
+	inline uint get_wcrc_count() const {                     // all        - whrc - whrh                             - wcrh
+		if (unique_wh_encountered_previous_window != -1) return live_pages - unique_wh_encountered_previous_window /*- wcrh pages*/;
+		return 0;
+	}
+
+	void print() const {
+		printf("live |\tr\tr->wc\tr>wc(l)\tw\tuq_wh\tuq_wh(l)\n");
+		printf("%u\t%u\t%u\t%d\t%u\t%d\t%d\t\n", live_pages, reads, reads_targeting_wc_pages, reads_targeting_wc_pages_previous_window,
+				writes, unique_wh_encountered, unique_wh_encountered_previous_window);
+	}
+	uint live_pages;
+
+	uint reads;
+	uint reads_targeting_wc_pages;
+	int reads_targeting_wc_pages_previous_window;
+
+	uint writes;
+	int unique_wh_encountered;
+	int unique_wh_encountered_previous_window;
 	bloom_filter wh_counted_already;
 
-	//unsigned int read_counter;
-	//unsigned int read_hot_counter;
-	//unsigned int last_window_hot_count;
-	//bloom_filter counted_already;
+	uint read_counter_window_size;
+	uint write_counter_window_size;
 };
 
 class BloomFilter_Page_Hotness_Measurer : public Page_Hotness_Measurer {
+friend class Die_Stats;
 public:
-	BloomFilter_Page_Hotness_Measurer(unsigned int num_bloom_filters = 4, unsigned int bloom_filter_size = 2048, unsigned int decay_time = 512);
+	BloomFilter_Page_Hotness_Measurer(uint num_bloom_filters = 4, uint bloom_filter_size = 2048, uint decay_time = 512);
 	~BloomFilter_Page_Hotness_Measurer(void);
 	void register_event(Event const& event);
 	enum write_hotness get_write_hotness(unsigned long page_address) const;
 	enum read_hotness get_read_hotness(unsigned long page_address) const;
 	Address get_die_with_least_WC(enum read_hotness rh) const;
+
+	// Debug output
+	void print_die_stats() const;
+
 private:
-	double get_hot_data_index(hot_bloom_filter const& filter, unsigned long page_address) const;
+	//double get_hot_data_index(hot_bloom_filter const& filter, unsigned long page_address) const;
+	double get_hot_data_index(event_type type, unsigned long page_address) const;
+	inline double get_max_hot_data_index_value() { return V + 1; } // == (2 / (double) V) * (V + 1) * (V / 2)
 
 	// Parameters
-	unsigned int V, M, /*K,*/ T, hotness_threshold, read_counter_window_size, write_counter_window_size;
+	uint V, M, /*K,*/ T, hotness_threshold, read_counter_window_size, write_counter_window_size;
 
 	// Bookkeeping variables
-	unsigned int oldest_BF;
-	unsigned int BF_read_pos, BF_write_pos;
-	unsigned int read_counter, write_counter;
+	uint read_oldest_BF, write_oldest_BF;
+//	uint BF_read_pos, BF_write_pos;
+	uint read_counter, write_counter;
 	hot_bloom_filter read_bloom;
 	hot_bloom_filter write_bloom;
 	std::vector< std::vector<Die_Stats> > package_die_stats;
@@ -888,7 +915,7 @@ private:
 	bool pointer_can_be_written_to(Address pointer) const;
 	bool at_least_one_available_write_hot_pointer() const;
 	void handle_cold_pointer_out_of_space(double start_time);
-	Simple_Page_Hotness_Measurer page_hotness_measurer;
+	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
 	Address cold_pointer;
 };
 
@@ -908,7 +935,7 @@ private:
 	bool at_least_one_available_write_hot_pointer() const;
 	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
 	void reset_any_filled_pointers(Event const& event);
-	Simple_Page_Hotness_Measurer page_hotness_measurer;
+	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
 	Address wcrh_pointer;
 	Address wcrc_pointer;
 };

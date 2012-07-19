@@ -182,9 +182,10 @@ void Simple_Page_Hotness_Measurer::start_new_interval_reads() {
  */
 
 BloomFilter_Page_Hotness_Measurer::BloomFilter_Page_Hotness_Measurer(unsigned int numBloomFilters, unsigned int bloomFilterSize, unsigned int decayTime)
-	:	oldest_BF(0),                 // Bloom filter with oldest data; next to be reset
-	 	BF_read_pos(0),               // Read BF Cursor position
-	 	BF_write_pos(0),              // Write BF Cursor position
+	:	read_oldest_BF(0),            // Read bloom filter with oldest data; next to be reset
+	 	write_oldest_BF(0),           // Write bloom filter with oldest data; next to be reset
+//	 	BF_read_pos(0),               // Read BF Cursor position
+//	 	BF_write_pos(0),              // Write BF Cursor position
 		read_counter(0),              // Read command counter
 		write_counter(0),             // Write command counter
 		V(numBloomFilters),           // Number of bloom filters
@@ -192,7 +193,8 @@ BloomFilter_Page_Hotness_Measurer::BloomFilter_Page_Hotness_Measurer(unsigned in
 //		K(2),                         // Number of hash functions
 		T(decayTime),                 // Number of I/Os before decay
 		hotness_threshold(1),         // Threshold value for considering a given page hot
-		read_counter_window_size(128)
+		read_counter_window_size(128),
+		write_counter_window_size(128)
 {
 	bloom_parameters parameters;
 	parameters.projected_element_count    = T;
@@ -208,25 +210,72 @@ BloomFilter_Page_Hotness_Measurer::BloomFilter_Page_Hotness_Measurer(unsigned in
 	write_bloom.resize(V, bloom_filter(parameters));
 
 	// Initialize 2D vector package_die_stats indexed by [package][die], used for keeping track of LUN usage statistics
-	std::vector<Die_Stats> die_stats = std::vector<Die_Stats>(PACKAGE_SIZE, Die_Stats(parameters)); // !! NOTE TO SELF: Parameters needs to be tuned for this application
-	std::vector< std::vector<Die_Stats> > package_die_stats(SSD_SIZE, die_stats);
+	package_die_stats.resize(SSD_SIZE);
+	for (unsigned int ssd_size = 0; ssd_size < SSD_SIZE; ssd_size++) {
+		package_die_stats.reserve(PACKAGE_SIZE);
+		for (unsigned int package_size = 0; package_size < PACKAGE_SIZE; package_size++) {
+			package_die_stats[ssd_size].push_back(Die_Stats(parameters, read_counter_window_size, write_counter_window_size)); // !! NOTE TO SELF: Parameters needs to be tuned for this application
+		}
+	}
+
+	// std::vector<Die_Stats> die_stats = std::vector<Die_Stats>(PACKAGE_SIZE, Die_Stats(parameters));
+	// std::vector< std::vector<Die_Stats> > package_die_stats(SSD_SIZE, die_stats);
 }
 
 BloomFilter_Page_Hotness_Measurer::~BloomFilter_Page_Hotness_Measurer(void) {}
 
 enum write_hotness BloomFilter_Page_Hotness_Measurer::get_write_hotness(unsigned long page_address) const {
-	return (get_hot_data_index(write_bloom, page_address) >= hotness_threshold) ? WRITE_HOT : WRITE_COLD;
+//	printf("Write hotness of addr. %d : %f\n", page_address, get_hot_data_index(write_bloom, page_address));
+
+	return (get_hot_data_index(WRITE, page_address) >= hotness_threshold) ? WRITE_HOT : WRITE_COLD;
 }
 
 enum read_hotness BloomFilter_Page_Hotness_Measurer::get_read_hotness(unsigned long page_address) const {
-	return (get_hot_data_index(read_bloom, page_address) >= hotness_threshold) ? READ_HOT : READ_COLD;
+	//printf("Read hotness of addr. %d : %f\n", page_address, get_hot_data_index(read_bloom, page_address));
+
+	return (get_hot_data_index(READ, page_address) >= hotness_threshold) ? READ_HOT : READ_COLD;
+}
+
+void BloomFilter_Page_Hotness_Measurer::print_die_stats() const {
+	for (uint package = 0; package < SSD_SIZE; package++) {
+		for (uint die = 0; die < PACKAGE_SIZE; die++) {
+			printf("=== Package: %d, Die: %d =================================\n", package, die);
+			package_die_stats[package][die].print();
+		}
+	}
+
 }
 
 Address BloomFilter_Page_Hotness_Measurer::get_die_with_least_WC(enum read_hotness rh) const {
-	// To be implemented.
-	return Address(0,0,0,0,0,DIE);
-/*	uint package;
-	uint die;
+	// Only works with read_hotness = READ_HOT as of now.
+
+	// - die with least WCRH pages
+	// the one with highest : reads_targeting_wc_pages (_previous_window)
+	// - die with least WCRC pages
+
+	uint min_package;
+	uint min_die;
+	double min_value = PLANE_SIZE * BLOCK_SIZE; // Total number of pages on a die
+
+	for (uint package = 0; package < SSD_SIZE; package++) {
+		for (uint die = 0; die < PACKAGE_SIZE; die++) {
+			uint value;
+			if (rh == READ_HOT) value = package_die_stats[package][die].get_reads_targeting_wc_pages();
+			else if (rh == READ_COLD) value = 0; // WCRC = live pages − WCRH − WH
+
+			if (min_value >= value) {
+				min_value = value;
+				min_package = package;
+				min_die = die;
+			}
+		}
+	}
+
+	return Address(min_package, min_die, 0,0,0, DIE);
+/*
+	uint min_package;
+	uint min_die;
+
 	std::vector<std::vector<uint> > num_such_pages_per_die;
 	if (rh == READ_COLD) {
 		num_such_pages_per_die = num_wcrc_pages_per_die;
@@ -246,7 +295,8 @@ Address BloomFilter_Page_Hotness_Measurer::get_die_with_least_WC(enum read_hotne
 		}
 	}
 
-	return Address(package, die, 0,0,0, DIE); */
+	return Address(package, die, 0,0,0, DIE);
+*/
 }
 
 void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
@@ -260,9 +310,12 @@ void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 
 	// Set references to variables corresponding to chosen event type (read/write)
 	hot_bloom_filter& filter = (type == WRITE ? write_bloom : read_bloom);
-	unsigned int& counter = (type == WRITE ? write_counter : read_counter);
-	unsigned int& pos = (type == WRITE ? BF_write_pos : BF_read_pos);
-	unsigned int startPos = pos;
+	uint& counter = (type == WRITE ? write_counter : read_counter);
+	uint& oldest_BF = (type == WRITE ? write_oldest_BF : read_oldest_BF);
+//	uint& pos = (type == WRITE ? BF_write_pos : BF_read_pos);
+
+	uint& pos = (type == WRITE ? write_oldest_BF : read_oldest_BF);
+	uint startPos = pos;
 
 	// Decay: Reset oldest filter if the time has come
 	if (++counter >= T) {
@@ -271,9 +324,9 @@ void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 		counter = 0;
 	}
 
-	// Find a filter where address is not present (if any), and insert
+	// Find a filter where address is not present (if any), starting from newest, and insert
 	do {
-		pos = (pos + 1) % V;
+		pos = (pos + V - 1) % V; // Move backwards from newest to oldest in a round-robin fashion
 		if (filter[pos].contains(page_address)) continue; // Address already in this filter, try next
 		filter[pos].insert(page_address); // Address not in filter, insert and stop
 		break;
@@ -285,22 +338,33 @@ void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 	// Keep track of live pages per LUN: Increment counter when page is written to LUN, decrement when page is invalidated in LUN
 	if (type == WRITE) {
 		current_die_stats.live_pages += 1;
+		current_die_stats.writes += 1;
 
-		// If WH data has been moved to new LUN, increase its WH counter
-		if (address_write_hot) {
+		// If end of window is reached, reset
+		if (current_die_stats.writes > write_counter_window_size) {
+			current_die_stats.writes = 0;
+			current_die_stats.unique_wh_encountered_previous_window = current_die_stats.unique_wh_encountered;
+			current_die_stats.unique_wh_encountered = 0;
+		}
+
+		// Count unique WHs per LUN
+		if (address_write_hot && !current_die_stats.wh_counted_already.contains(page_address)) {
 			current_die_stats.unique_wh_encountered += 1;
 			current_die_stats.wh_counted_already.insert(page_address);
 		}
 
-		// If an address is being invalidated, decrement counter of corresponding LUN
-		if (event.get_replace_address().valid != NONE) {
+		// If an earlier address from another LUN is being invalidated, decrement counter of corresponding LUN
+		if (event.get_replace_address().valid != NONE && (invalidated_address.package != physical_address.package || invalidated_address.die != physical_address.die)) {
 			Die_Stats& invalidated_die_stats = package_die_stats[invalidated_address.package][invalidated_address.die];
 			invalidated_die_stats.live_pages -= 1;
 
-			// If WH data is removed from a LUN, and it has been previously been counted as WH, decrease counter to undo count
-			if (address_write_hot && current_die_stats.wh_counted_already.contains(page_address)) {
-				current_die_stats.unique_wh_encountered -= 1;
-				// Here it would have been nice to remove physical address from unique_wh_encountered bloom filter, but that is not possible.
+			/*debug*/ printf("Data moved across LUNs: Written to Package %d, Die %d. Invalidated on Package %d, Die %d.\n", physical_address.package, physical_address.die, invalidated_address.package, invalidated_address.die);
+
+			// If WH data is removed from a LUN, where it has been previously been counted as WH, decrease counter to undo count
+			if (address_write_hot && invalidated_die_stats.wh_counted_already.contains(page_address)) {
+				invalidated_die_stats.unique_wh_encountered -= 1;
+				// Here it would have been nice to remove physical address from unique_wh_encountered bloom filter,
+				// but that is not possible using the normal BF implementation.
 			}
 		}
 	}
@@ -319,31 +383,16 @@ void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 		// Count reads targeting WC pages
 		if (!get_write_hotness(page_address)) current_die_stats.reads_targeting_wc_pages += 1;
 	}
-
-	// Keep track of unique WH per LUN
-	if (type == WRITE) {
-		current_die_stats.writes += 1;
-
-		// If end of window is reached, reset
-		if (current_die_stats.writes > write_counter_window_size) {
-			current_die_stats.writes = 0;
-			current_die_stats.unique_wh_encountered_previous_window = current_die_stats.unique_wh_encountered;
-			current_die_stats.unique_wh_encountered = 0;
-		}
-
-		// Count unique WHs
-		if (address_write_hot && !current_die_stats.wh_counted_already.contains(page_address)) {
-			current_die_stats.wh_counted_already.insert(page_address);
-			current_die_stats.unique_wh_encountered += 1;
-		}
-	}
 }
 
-double BloomFilter_Page_Hotness_Measurer::get_hot_data_index(hot_bloom_filter const& filter, unsigned long page_address) const {
+double BloomFilter_Page_Hotness_Measurer::get_hot_data_index(event_type type, unsigned long page_address) const {
 	double result = 0;
 	double stepSize = 2 / (double) V;
-	unsigned int pos = oldest_BF;
-	unsigned int newness = 0;
+	const hot_bloom_filter& filter = (type == WRITE ? write_bloom : read_bloom);
+	const uint& oldest_BF = (type == WRITE ? write_oldest_BF : read_oldest_BF);
+
+	uint pos = oldest_BF;
+	uint newness = 0;
 
 	// Iterate though BFs from oldest to newest, adding recency weight to result if address in BF
 	do {
