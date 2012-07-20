@@ -178,7 +178,7 @@ void Simple_Page_Hotness_Measurer::start_new_interval_reads() {
 /*
  * Bloom Filter based hotness measurer
  * ----------------------------------------------------------------------------------
- * By Martin Kjær Svendsen Based on work by Park and Du
+ * By Martin Kjær Svendsen Based on work by Park and Dub
  */
 
 BloomFilter_Page_Hotness_Measurer::BloomFilter_Page_Hotness_Measurer(unsigned int numBloomFilters, unsigned int bloomFilterSize, unsigned int decayTime)
@@ -335,9 +335,7 @@ void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 	bool address_write_hot = (get_write_hotness(page_address) == WRITE_HOT);
 	bool address_read_hot  = (get_read_hotness(page_address) == READ_HOT);
 
-	// Keep track of live pages per LUN: Increment counter when page is written to LUN, decrement when page is invalidated in LUN
 	if (type == WRITE) {
-		current_die_stats.live_pages += 1;
 		current_die_stats.writes += 1;
 
 		// If end of window is reached, reset
@@ -353,7 +351,8 @@ void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 			current_die_stats.wh_counted_already.insert(page_address);
 		}
 
-		// If an earlier address from another LUN is being invalidated, decrement counter of corresponding LUN
+		// Keep track of live pages per LUN: Increment counter when page is written to LUN, decrement when page is invalidated in another LUN
+		current_die_stats.live_pages += 1;
 		if (event.get_replace_address().valid != NONE && (invalidated_address.package != physical_address.package || invalidated_address.die != physical_address.die)) {
 			Die_Stats& invalidated_die_stats = package_die_stats[invalidated_address.package][invalidated_address.die];
 			invalidated_die_stats.live_pages -= 1;
