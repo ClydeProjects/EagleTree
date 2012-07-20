@@ -246,6 +246,10 @@ void BloomFilter_Page_Hotness_Measurer::print_die_stats() const {
 
 }
 
+// Where should I place:
+// WCRC: Put to page with lowest WC count
+// WCRH: put to page with lowest WCRH count
+
 Address BloomFilter_Page_Hotness_Measurer::get_die_with_least_WC(enum read_hotness rh) const {
 	// Only works with read_hotness = READ_HOT as of now.
 
@@ -253,25 +257,47 @@ Address BloomFilter_Page_Hotness_Measurer::get_die_with_least_WC(enum read_hotne
 	// the one with highest : reads_targeting_wc_pages (_previous_window)
 	// - die with least WCRC pages
 
-	uint min_package;
-	uint min_die;
-	double min_value = PLANE_SIZE * BLOCK_SIZE; // Total number of pages on a die
-
+	// UNOPTIMIZED: Total WC pages computed by a linear pass through all dies; It could easily be kept track of incrementally
+	printf("Looking for WC%s. Total WC PAGES: ", (rh == READ_HOT ? "RH" : "RC"));
+	uint total_wc_pages = 0;
 	for (uint package = 0; package < SSD_SIZE; package++) {
 		for (uint die = 0; die < PACKAGE_SIZE; die++) {
-			uint value;
-			if (rh == READ_HOT) value = package_die_stats[package][die].get_reads_targeting_wc_pages();
-			else if (rh == READ_COLD) value = 0; // WCRC = live pages − WCRH − WH
+			total_wc_pages += package_die_stats[package][die].get_wc_pages();
+			printf("%d + ", package_die_stats[package][die].get_wc_pages());
+		}
+	}
+	double average_wc_pages = (double) total_wc_pages / (SSD_SIZE * PACKAGE_SIZE);
+	printf(" = %u\nAverage: %f per die.\n", total_wc_pages, average_wc_pages);
 
-			if (min_value >= value) {
-				min_value = value;
-				min_package = package;
-				min_die = die;
+	int best_candidate_package = -1;
+	int best_candidate_die = -1;
+	double best_num_reads_per_wc = (rh == READ_HOT ? numeric_limits<double>::max() : -numeric_limits<double>::max());
+
+	double min_value = PLANE_SIZE * BLOCK_SIZE; // Total number of pages on a die
+	for (uint package = 0; package < SSD_SIZE; package++) {
+		for (uint die = 0; die < PACKAGE_SIZE; die++) {
+			printf("Package %d, Die %d has %d WC pages, with %d reads targeting those.\n", package, die, package_die_stats[package][die].get_wc_pages(), package_die_stats[package][die].get_reads_targeting_wc_pages());
+			if (package_die_stats[package][die].get_wc_pages() <= average_wc_pages) {
+				double reads_per_wc = (package_die_stats[package][die].get_wc_pages() == 0) ? 0 : (double) package_die_stats[package][die].get_reads_targeting_wc_pages() / package_die_stats[package][die].get_wc_pages();
+				printf("Reads targeting WC PAGES: %u, WC PAGES: %u\n", package_die_stats[package][die].get_reads_targeting_wc_pages(), package_die_stats[package][die].get_wc_pages());
+				printf("Is package %d die %d with reads per wc %f better than %f?", package, die, reads_per_wc, best_num_reads_per_wc);
+				if ((rh == READ_HOT && reads_per_wc < best_num_reads_per_wc) ||
+						(rh == READ_COLD && reads_per_wc > best_num_reads_per_wc)) {
+					printf("Yes\n");
+					best_num_reads_per_wc = reads_per_wc;
+					best_candidate_package = package;
+					best_candidate_die = die;
+				} else {
+					printf("No.\n");
+				}
 			}
 		}
 	}
 
-	return Address(min_package, min_die, 0,0,0, DIE);
+	assert(best_candidate_package != -1 && best_candidate_die != -1);
+
+	printf("Package %d, Die %d is best. Is has %d WC pages, with %d reads targeting those.\n", best_candidate_package, best_candidate_die, package_die_stats[best_candidate_package][best_candidate_die].get_wc_pages(), package_die_stats[best_candidate_package][best_candidate_die].get_reads_targeting_wc_pages());
+	return Address(best_candidate_package, best_candidate_die, 0,0,0, DIE);
 /*
 	uint min_package;
 	uint min_die;
@@ -312,8 +338,6 @@ void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 	hot_bloom_filter& filter = (type == WRITE ? write_bloom : read_bloom);
 	uint& counter = (type == WRITE ? write_counter : read_counter);
 	uint& oldest_BF = (type == WRITE ? write_oldest_BF : read_oldest_BF);
-//	uint& pos = (type == WRITE ? BF_write_pos : BF_read_pos);
-
 	uint& pos = (type == WRITE ? write_oldest_BF : read_oldest_BF);
 	uint startPos = pos;
 
@@ -336,8 +360,6 @@ void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 	bool address_read_hot  = (get_read_hotness(page_address) == READ_HOT);
 
 	if (type == WRITE) {
-		current_die_stats.writes += 1;
-
 		// If end of window is reached, reset
 		if (current_die_stats.writes > write_counter_window_size) {
 			current_die_stats.writes = 0;
@@ -345,26 +367,31 @@ void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 			current_die_stats.unique_wh_encountered = 0;
 		}
 
-		// Count unique WHs per LUN
-		if (address_write_hot && !current_die_stats.wh_counted_already.contains(page_address)) {
-			current_die_stats.unique_wh_encountered += 1;
-			current_die_stats.wh_counted_already.insert(page_address);
-		}
+		current_die_stats.writes += 1;
+		current_die_stats.live_pages += 1;
 
 		// Keep track of live pages per LUN: Increment counter when page is written to LUN, decrement when page is invalidated in another LUN
-		current_die_stats.live_pages += 1;
-		if (event.get_replace_address().valid != NONE && (invalidated_address.package != physical_address.package || invalidated_address.die != physical_address.die)) {
+		if (event.get_replace_address().valid != NONE) {
 			Die_Stats& invalidated_die_stats = package_die_stats[invalidated_address.package][invalidated_address.die];
 			invalidated_die_stats.live_pages -= 1;
 
-			/*debug*/ printf("Data moved across LUNs: Written to Package %d, Die %d. Invalidated on Package %d, Die %d.\n", physical_address.package, physical_address.die, invalidated_address.package, invalidated_address.die);
+			if (invalidated_address.package != physical_address.package || invalidated_address.die != physical_address.die) {
+				/*debug*/ printf("Data moved across LUNs: Written to Package %d, Die %d. Invalidated on Package %d, Die %d.\n", physical_address.package, physical_address.die, invalidated_address.package, invalidated_address.die);
 
-			// If WH data is removed from a LUN, where it has been previously been counted as WH, decrease counter to undo count
-			if (address_write_hot && invalidated_die_stats.wh_counted_already.contains(page_address)) {
-				invalidated_die_stats.unique_wh_encountered -= 1;
-				// Here it would have been nice to remove physical address from unique_wh_encountered bloom filter,
-				// but that is not possible using the normal BF implementation.
+				if (address_write_hot) {
+					current_die_stats.unique_wh_encountered += 1;
+					current_die_stats.wh_counted_already.insert(page_address);
+
+					// If WH data is removed from a LUN, where it has been previously been counted as WH, decrease counter to undo count
+					if (invalidated_die_stats.wh_counted_already.contains(page_address)) invalidated_die_stats.unique_wh_encountered -= 1;
+
+					// Here it would have been nice to remove physical address from unique_wh_encountered bloom filter,
+					// but that is not possible using the normal BF implementation.
+				}
 			}
+		} else if (address_write_hot && !current_die_stats.wh_counted_already.contains(page_address)) {
+			current_die_stats.unique_wh_encountered += 1;
+			current_die_stats.wh_counted_already.insert(page_address);
 		}
 	}
 
@@ -382,6 +409,8 @@ void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 		// Count reads targeting WC pages
 		if (!get_write_hotness(page_address)) current_die_stats.reads_targeting_wc_pages += 1;
 	}
+
+	print_die_stats();
 }
 
 double BloomFilter_Page_Hotness_Measurer::get_hot_data_index(event_type type, unsigned long page_address) const {

@@ -764,7 +764,7 @@ public:
 	}
 
 	// WC = live pages - WH
-	inline uint wc_pages() const {
+	inline uint get_wc_pages() const {
 		if (unique_wh_encountered_previous_window != -1) return live_pages - unique_wh_encountered_previous_window;
 		return live_pages - unique_wh_encountered;
 	}
