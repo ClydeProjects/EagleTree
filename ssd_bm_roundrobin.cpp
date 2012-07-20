@@ -65,7 +65,17 @@ bool Block_manager_roundrobin::has_free_pages(uint package_id, uint die_id) cons
 	return free_block_pointers[package_id][die_id].page < BLOCK_SIZE;
 }
 
-pair<double, Address> Block_manager_roundrobin::write(Event const& write) {
+// NOTES:
+// ------
+// Cycle through packages (=channels)
+// either: channel1die1, channel1die2, channel2die1, channel2die2
+//     or: channel1die1, channel2die1, channel1die2, channel2die2
+// SSD - PACKAGE - DIE - PLANE - BLOCK - PAGE
+// Ignore planes: Assume one one
+// Blocks/pages are already taken care up, blocks are filled up with pages sequentially
+// Package(channel) and die is the shit around here.
+
+pair<double, Address> Block_manager_roundrobin::write(Event const& write) { // const
 	pair<double, Address> result;
 	bool can_write = Block_manager_parent::can_write(write);
 	if (!can_write) {
