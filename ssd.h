@@ -959,6 +959,7 @@ public:
 	Block_manager_parallel_wearwolf_locality(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel_wearwolf_locality();
 	virtual pair<double, Address> write(Event const& write);
+	virtual void register_write_outcome(Event const& event, enum status status);
 private:
 	enum parallel_degree_for_sequential_files { ONE, LUN, CHANNEL };
 	parallel_degree_for_sequential_files parallel_degree;
@@ -966,18 +967,19 @@ private:
 	// map from the next expected sequential write LBA to a counter and timestamp.
 	typedef ulong logical_address;
 	struct sequential_writes_tracking {
-		double last_LBA_timestamp;
 		int counter;
-		std::vector<std::vector<Address> > *pointers;
-		sequential_writes_tracking();
+		double last_LBA_timestamp;
+		std::vector<std::vector<Address> > pointers;
+		sequential_writes_tracking(double time);
 		~sequential_writes_tracking();
 	};
-	std::map<logical_address, Address> sequential_writes_tracker;	// maps an incoming write belonging to a given sequential pattern to the address in which it should be written
+	//std::map<logical_address, Address> sequential_writes_tracker;	// maps an incoming write belonging to a given sequential pattern to the address in which it should be written
 	std::map<logical_address, logical_address> sequential_writes_key_lookup;  // a map from the next expected LBA in a seqeuntial pattern to the first LBA, which is the key
 	std::map<logical_address, sequential_writes_tracking*> sequential_writes_identification_and_data;	// a map from the first logical write of a sequential pattern to metadata about the pattern
 
-	void set_pointers_for_sequential_write(sequential_writes_tracking swt);
-
+	void set_pointers_for_sequential_write(sequential_writes_tracking & swt, double time);
+	pair<double, Address> perform_sequential_write(Event const& write, logical_address key, sequential_writes_tracking & swt);
+	void remove_old_sequential_writes_metadata(double time);
 	// if there are less than 2 free blocks in each class, trigger GC for this class
 	int num_age_classes;
 	std::vector<std::vector<Address> > free_blocks_classified_into_age_classes;
