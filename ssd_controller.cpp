@@ -41,7 +41,8 @@ using namespace ssd;
 Controller::Controller(Ssd &parent):
 	ssd(parent)
 {
-	switch (FTL_IMPLEMENTATION)
+	ftl = new FtlImpl_Dftl(*this);
+	/*switch (FTL_IMPLEMENTATION)
 	{
 	case 0:
 		ftl = new FtlImpl_Page(*this);
@@ -58,8 +59,7 @@ Controller::Controller(Ssd &parent):
 	case 4:
 		ftl = new FtlImpl_BDftl(*this);
 		break;
-	}
-	return;
+	}*/
 }
 
 Controller::~Controller(void)
@@ -71,11 +71,11 @@ Controller::~Controller(void)
 enum status Controller::event_arrive(Event *event)
 {
 	if(event->get_event_type() == READ)
-		return ftl->read(*event);
+		return ftl->read(event);
 	else if(event->get_event_type() == WRITE)
-		return ftl->write(*event);
+		return ftl->write(event);
 	else if(event->get_event_type() == TRIM)
-		return ftl->trim(*event);
+		return ftl->trim(event);
 	else
 		fprintf(stderr, "Controller: %s: Invalid event type\n", __func__);
 	return FAILURE;

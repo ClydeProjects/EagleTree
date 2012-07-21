@@ -21,36 +21,6 @@ Block_manager_parallel_wearwolf_locality::sequential_writes_tracking::sequential
 Block_manager_parallel_wearwolf_locality::sequential_writes_tracking::~sequential_writes_tracking() {
 }
 
-/*pair<double, Address> Block_manager_parallel_wearwolf_locality::write(Event const& event) {
-	// check if write matches sequential pattern
-	logical_address lb = event.get_logical_address();
-	pair<double, Address> to_return;
-
-	if (sequential_writes_key_lookup.count(lb) == 1) {
-		logical_address key = sequential_writes_key_lookup[lb];
-		sequential_writes_tracking& seq_write_metadata = *sequential_writes_identification_and_data[key];
-		seq_write_metadata.counter++;
-		logical_address start_address = sequential_writes_key_lookup[lb];
-		sequential_writes_key_lookup.erase(lb);
-		sequential_writes_key_lookup[lb + 1] = start_address;
-
-		if (seq_write_metadata.counter > 3) {
-			to_return = perform_sequential_write(event, key, seq_write_metadata);
-		} else if (seq_write_metadata.counter == 3) {
-			set_pointers_for_sequential_write(seq_write_metadata, event.get_current_time());
-			to_return = Block_manager_parallel_wearwolf::write(event);
-		} else if (seq_write_metadata.counter < 3) {
-			to_return = Block_manager_parallel_wearwolf::write(event);
-		}
-	} else {
-		sequential_writes_key_lookup[lb + 1] = lb;
-		sequential_writes_identification_and_data[lb] = new sequential_writes_tracking();
-		to_return = Block_manager_parallel_wearwolf::write(event);
-	}
-
-	return to_return;
-}*/
-
 pair<double, Address> Block_manager_parallel_wearwolf_locality::write(Event const& event) {
 	// check if write matches sequential pattern
 	logical_address lb = event.get_logical_address();

@@ -43,7 +43,7 @@ FtlImpl_Page::~FtlImpl_Page(void)
 	return;
 }
 
-enum status FtlImpl_Page::read(Event &event)
+enum status FtlImpl_Page::read(Event *event)
 {
 	event.set_address(Address(0, PAGE));
 	event.set_noop(true);
@@ -53,10 +53,10 @@ enum status FtlImpl_Page::read(Event &event)
 	return controller.issue(event);
 }
 
-enum status FtlImpl_Page::write(Event &event)
+enum status FtlImpl_Page::write(Event *event)
 {
-	event.set_address(Address(1, PAGE));
-	event.set_noop(true);
+	event->set_address(Address(1, PAGE));
+	event->set_noop(true);
 
 	controller.stats.numFTLWrite++;
 
@@ -64,12 +64,12 @@ enum status FtlImpl_Page::write(Event &event)
 	{
 		numPagesActive -= BLOCK_SIZE;
 
-		Event eraseEvent = Event(ERASE, event.get_logical_address(), 1, event.get_start_time());
+		Event eraseEvent = Event(ERASE, event->get_logical_address(), 1, event->get_start_time());
 		eraseEvent.set_address(Address(0, PAGE));
 
 		if (controller.issue(eraseEvent) == FAILURE) printf("Erase failed");
 
-		event.incr_time_taken(eraseEvent.get_time_taken());
+		event->incr_time_taken(eraseEvent.get_time_taken());
 
 		controller.stats.numFTLErase++;
 	}
@@ -80,14 +80,14 @@ enum status FtlImpl_Page::write(Event &event)
 	return controller.issue(event);
 }
 
-enum status FtlImpl_Page::trim(Event &event)
+enum status FtlImpl_Page::trim(Event *event)
 {
 	controller.stats.numFTLTrim++;
 
-	uint dlpn = event.get_logical_address();
+	uint dlpn = event->get_logical_address();
 
-	if (!trim_map[event.get_logical_address()])
-		trim_map[event.get_logical_address()] = true;
+	if (!trim_map[event->get_logical_address()])
+		trim_map[event->get_logical_address()] = true;
 
 	// Update trim map and update block map if all pages are trimmed. i.e. the state are reseted to optimal.
 	long addressStart = dlpn - dlpn % BLOCK_SIZE;
@@ -100,12 +100,12 @@ enum status FtlImpl_Page::trim(Event &event)
 
 	if (allTrimmed)
 	{
-		Event eraseEvent = Event(ERASE, event.get_logical_address(), 1, event.get_start_time());
+		Event eraseEvent = Event(ERASE, event->get_logical_address(), 1, event->get_start_time());
 		eraseEvent.set_address(Address(0, PAGE));
 
 		if (controller.issue(eraseEvent) == FAILURE) printf("Erase failed");
 
-		event.incr_time_taken(eraseEvent.get_time_taken());
+		event->incr_time_taken(eraseEvent.get_time_taken());
 
 		for (uint i=addressStart;i<addressStart+BLOCK_SIZE;i++)
 			trim_map[i] = false;

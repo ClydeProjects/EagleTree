@@ -90,7 +90,7 @@ FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
 	reverse_trans_map = new long[ssdSize];
 }
 
-void FtlImpl_DftlParent::consult_GTD(long dlpn, Event &event)
+void FtlImpl_DftlParent::consult_GTD(long dlpn, Event *event)
 {
 	long mvpn = dlpn / addressPerPage;
 	long mppn = global_translation_directory[mvpn];
@@ -98,9 +98,9 @@ void FtlImpl_DftlParent::consult_GTD(long dlpn, Event &event)
 		return;
 	}
 	Address mapping_address = Address(mppn, PAGE);
-	Event readEvent = Event(READ, mvpn, 1, event.get_start_time());
-	readEvent.set_address(mapping_address);
-	readEvent.set_mapping_op(true);
+	Event* readEvent = new Event(READ, mvpn, 1, event->get_start_time());
+	readEvent->set_address(mapping_address);
+	readEvent->set_mapping_op(true);
 	current_dependent_events.push(readEvent);
 	controller.stats.numFTLRead++;
 }
@@ -111,12 +111,12 @@ void FtlImpl_DftlParent::reset_MPage(FtlImpl_DftlParent::MPage &mpage)
 	mpage.modified_ts = -2;
 }
 
-bool FtlImpl_DftlParent::lookup_CMT(long dlpn, Event &event)
+bool FtlImpl_DftlParent::lookup_CMT(long dlpn, Event *event)
 {
 	if (!trans_map[dlpn].cached)
 		return false;
 
-	event.incr_time_taken(RAM_READ_DELAY);
+	event->incr_time_taken(RAM_READ_DELAY);
 	controller.stats.numMemoryRead++;
 
 	return true;
@@ -159,21 +159,21 @@ FtlImpl_DftlParent::~FtlImpl_DftlParent(void)
  * 3. If not, then goto GDT, lookup page
  * 4. If CMT full, evict a page
  */
-void FtlImpl_DftlParent::resolve_mapping(Event &event, bool isWrite)
+void FtlImpl_DftlParent::resolve_mapping(Event *event, bool isWrite)
 {
-	if (lookup_CMT(event.get_logical_address(), event))
+	if (lookup_CMT(event->get_logical_address(), event))
 	{
 		controller.stats.numCacheHits++;
 		evict_page_from_cache(event);
 	} else {
 		controller.stats.numCacheFaults++;
 		evict_page_from_cache(event);
-		uint dlpn = event.get_logical_address();
+		uint dlpn = event->get_logical_address();
 		consult_GTD(dlpn, event);
 	}
 }
 
-void FtlImpl_DftlParent::evict_page_from_cache(Event &event)
+void FtlImpl_DftlParent::evict_page_from_cache(Event *event)
 {
 	while (cmt >= totalCMTentries)
 	{
@@ -206,14 +206,14 @@ void FtlImpl_DftlParent::evict_page_from_cache(Event &event)
 			long mppn = global_translation_directory[mvpn];
 			if (mppn != -1 && num_cached_entries_in_mapping_page < addressPerPage) {
 				Address mapping_address = Address(mppn, PAGE);
-				Event readEvent = Event(READ, mvpn, 1, event.get_start_time());
-				readEvent.set_address(mapping_address);
-				readEvent.set_mapping_op(true);
+				Event* readEvent = new Event(READ, mvpn, 1, event->get_start_time());
+				readEvent->set_address(mapping_address);
+				readEvent->set_mapping_op(true);
 				current_dependent_events.push(readEvent);
 			}
 
-			Event write_event = Event(WRITE, mvpn, 1, event.get_start_time());
-			write_event.set_mapping_op(true);
+			Event* write_event = new Event(WRITE, mvpn, 1, event->get_start_time());
+			write_event->set_mapping_op(true);
 			current_dependent_events.push(write_event);
 
 			controller.stats.numFTLWrite++;
@@ -231,7 +231,7 @@ void FtlImpl_DftlParent::evict_page_from_cache(Event &event)
 
 // I don't understand why a write is needed in this method. Ask Matias.
 // if a page is trimmed, it does
-void FtlImpl_DftlParent::evict_specific_page_from_cache(Event &event, long lba)
+void FtlImpl_DftlParent::evict_specific_page_from_cache(Event *event, long lba)
 {
 		// asserting false because this method still needs work
 		assert(false);
@@ -262,14 +262,14 @@ void FtlImpl_DftlParent::evict_specific_page_from_cache(Event &event, long lba)
 			}
 
 			// Simulate the write to translate page
-			Event write_event = Event(WRITE, event.get_logical_address(), 1, event.get_start_time());
-			write_event.set_mapping_op(true);
+			Event* write_event = new Event(WRITE, event->get_logical_address(), 1, event->get_start_time());
+			write_event->set_mapping_op(true);
 			//write_event.set_address(Address(0, PAGE));
 			//write_event.set_noop(true);
 
-			if (controller.issue(write_event) == FAILURE) {	assert(false);}
+			//if (controller.issue(write_event) == FAILURE) {	assert(false);}
 
-			event.incr_time_taken(write_event.get_time_taken());
+			event->incr_time_taken(write_event->get_time_taken());
 			controller.stats.numFTLWrite++;
 			controller.stats.numGCWrite++;
 		}

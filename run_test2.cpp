@@ -28,6 +28,8 @@
 
 using namespace ssd;
 
+
+
 int main()
 	{	load_config();
 	print_config(NULL);
@@ -35,26 +37,44 @@ int main()
    //getchar();
    printf("\n");
 
-	Ssd *ssd = new Ssd();
 
-	double result;
+
 	double cur_time = 1;
 	double delta = BUS_DATA_DELAY - 2 > 0 ? BUS_DATA_DELAY - 2 : BUS_DATA_DELAY;
 
-	for (int i = 0; i < 70; i++)
+	for (int i = 0; i < 20; i++)
 	{
-		result = ssd -> event_arrive(WRITE, i, 1, 1 + i * 5  );
+		//ssd -> event_arrive(WRITE, i, 1, 1 + i * 5  );
+	}
+	//StateTracer::print();
+
+	Thread* sw = new Synchronous_Writer(0, 100, 2);
+
+	vector<Thread*> threads;
+	threads.push_back(sw);
+
+	OperatingSystem* os = new OperatingSystem(threads);
+
+	Ssd *ssd = new Ssd(*os);
+	os->set_ssd(ssd);
+	os->run();
+
+	for (int i = 0; i < 2; i++)
+	{
+		//ssd -> event_arrive(WRITE, i, 1, 1 + i * 5  );
 	}
 
-	for (int j = 0; j < 10; j++) {
+	//os.run();
+
+	/*for (int j = 0; j < 15; j++) {
 		StateTracer::print();
-		for (int i = 71; i < 105; i++)
+		for (int i = 121; i < 240; i++)
 		{
-			result = ssd -> event_arrive(WRITE, i, 1, j * 500 + 300 + i * 5  );
+			result = ssd -> event_arrive(WRITE, i, 1, j * 600 + 2000 + i * 5  );
 		}
 	}
 	StateTracer::print();
-
+*/
 
 	//result = ssd -> event_arrive(WRITE, 100, 1, 200 );
 	//result = ssd -> event_arrive(WRITE, 100, 1, 1000 );
@@ -67,7 +87,7 @@ int main()
 
 	for (int i = 0; i < 1; i++)
 	{
-		int lba = rand() % (NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE / 2);
+		//int lba = rand() % (NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE / 2);
 		//result = ssd -> event_arrive(READ, lba, 1, 0);
 	}
 

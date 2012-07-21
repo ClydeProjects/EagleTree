@@ -58,7 +58,6 @@ void Block_manager_parallel::register_erase_outcome(Event const& event, enum sta
 	}
 
 	check_if_should_trigger_more_GC(event.get_start_time() + event.get_time_taken());
-	Wear_Level(event);
 }
 
 bool Block_manager_parallel::has_free_pages(uint package_id, uint die_id) const {

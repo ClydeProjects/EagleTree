@@ -83,7 +83,6 @@ void Block_manager_parallel_hot_cold_seperation::register_erase_outcome(Event co
 	}
 
 	check_if_should_trigger_more_GC(event.get_start_time() + event.get_time_taken());
-	Wear_Level(event);
 }
 
 // ensures the pointer has at least 1 free page, and that the die is not busy (waiting for a read)

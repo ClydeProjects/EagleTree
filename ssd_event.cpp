@@ -48,10 +48,19 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	id(id_generator++),
 	application_io_id(application_io_id_generator++),
 	garbage_collection_op(false),
-	mapping_op(false)
+	mapping_op(false),
+	original_application_io(false)
 {
 	assert(start_time >= 0.0);
+	if (VIRTUAL_PAGE_SIZE == 1)
+		assert((long long int) logical_address <= (long long int) SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE);
+	else
+		assert((long long int) logical_address*VIRTUAL_PAGE_SIZE <= (long long int) SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE);
+
 }
+
+Event::Event() : type(NOT_VALID) {}
+
 /*
 Event::Event(enum event_type type, ulong logical_address, uint size, double start_time, uint hi)
 {
@@ -215,6 +224,14 @@ void Event::set_replace_address(const Address &address)
 void Event::set_noop(bool value)
 {
 	noop = value;
+}
+
+bool Event::is_original_application_io(void) const {
+	return original_application_io;
+}
+
+void Event::set_original_application_io(bool val) {
+	original_application_io = val;
 }
 
 void Event::set_application_io_id(uint value) {

@@ -55,13 +55,13 @@ FtlImpl_Dftl::~FtlImpl_Dftl(void)
 	return;
 }
 
-enum status FtlImpl_Dftl::read(Event &event)
+enum status FtlImpl_Dftl::read(Event *event)
 {
 	//assert(event.get_logical_address() < NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * (1 - over_provisioning_percentage));
 
-	MPage current = trans_map[event.get_logical_address()];
+	MPage current = trans_map[event->get_logical_address()];
 	if (current.ppn == -1) {
-		fprintf(stderr, "LBA %d is unwritten, so read will be cancelled\n", event.get_logical_address(), __func__);
+		fprintf(stderr, "LBA %d is unwritten, so read will be cancelled\n", event->get_logical_address(), __func__);
 		return SUCCESS;
 	}
 
@@ -74,7 +74,7 @@ enum status FtlImpl_Dftl::read(Event &event)
 	return SUCCESS;
 }
 
-enum status FtlImpl_Dftl::write(Event &event)
+enum status FtlImpl_Dftl::write(Event *event)
 {
 	//assert(event.get_logical_address() < NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * (1 - over_provisioning_percentage));
 	//uint dlpn = event.get_logical_address();
@@ -99,12 +99,12 @@ enum status FtlImpl_Dftl::write(Event &event)
 	return SUCCESS;
 }
 
-enum status FtlImpl_Dftl::trim(Event &event)
+enum status FtlImpl_Dftl::trim(Event *event)
 {
 	//assert(event.get_logical_address() < NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * (1 - over_provisioning_percentage));
-	uint dlpn = event.get_logical_address();
+	uint dlpn = event->get_logical_address();
 
-	event.set_address(Address(0, PAGE));
+	event->set_address(Address(0, PAGE));
 
 	MPage current = trans_map[dlpn];
 
@@ -123,7 +123,8 @@ enum status FtlImpl_Dftl::trim(Event &event)
 
 	controller.stats.numFTLTrim++;
 
-	return controller.issue(event);
+	//return controller.issue(event);
+	return FAILURE;
 }
 
 void FtlImpl_Dftl::cleanup_block(Event &event, Block *block)

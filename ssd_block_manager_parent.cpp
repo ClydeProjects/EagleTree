@@ -71,6 +71,8 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 
 	num_free_pages += BLOCK_SIZE;
 	num_available_pages_for_new_writes += BLOCK_SIZE;
+
+	Wear_Level(event);
 }
 
 uint Block_manager_parent::sort_into_age_class(Address const& a) {
@@ -151,10 +153,10 @@ void Block_manager_parent::issue_erase(Address ra, double time) {
     	printf("%d  ", (*iter).first);
 	}
     printf("\n");
-	Event erase = Event(ERASE, 0, 1, time);
+	Event* erase = new Event(ERASE, 0, 1, time);
 
-	erase.set_address(ra);
-	erase.set_garbage_collection_op(true);
+	erase->set_address(ra);
+	erase->set_garbage_collection_op(true);
 	IOScheduler::instance()->schedule_independent_event(erase);
 }
 
@@ -410,18 +412,18 @@ void Block_manager_parent::migrate(Block const* const block, double start_time) 
 
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
 		if (block->getPages()[i].get_state() == VALID) {
-			std::queue<Event> events;
+			std::queue<Event*> events;
 			Address addr = Address(block->physical_address, PAGE);
 			addr.page = i;
 			long logical_address = ftl.get_logical_address(addr.get_linear_address());
 
-			Event read = Event(READ, logical_address, 1, start_time);
-			read.set_address(addr);
-			read.set_garbage_collection_op(true);
+			Event* read = new Event(READ, logical_address, 1, start_time);
+			read->set_address(addr);
+			read->set_garbage_collection_op(true);
 
-			Event write = Event(WRITE, logical_address, 1, start_time);
-			write.set_garbage_collection_op(true);
-			write.set_replace_address(addr);
+			Event* write = new Event(WRITE, logical_address, 1, start_time);
+			write->set_garbage_collection_op(true);
+			write->set_replace_address(addr);
 
 			events.push(read);
 			events.push(write);

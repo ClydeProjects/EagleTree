@@ -41,7 +41,7 @@ using namespace ssd;
 /* use caution when editing the initialization list - initialization actually
  * occurs in the order of declaration in the class definition and not in the
  * order listed here */
-Ssd::Ssd(uint ssd_size): 
+Ssd::Ssd(OperatingSystem& os, uint ssd_size):
 	size(ssd_size), 
 	controller(*this), 
 	ram(RAM_READ_DELAY, RAM_WRITE_DELAY), 
@@ -61,7 +61,8 @@ Ssd::Ssd(uint ssd_size):
 
 	/* assume hardware created at time 0 and had an implied free erasure */
 	last_erase_time(0.0),
-	last_io_submission_time(0.0)
+	last_io_submission_time(0.0),
+	os(os)
 {
 	uint i;
 
@@ -113,6 +114,7 @@ Ssd::Ssd(uint ssd_size):
 	IOScheduler::instance_initialize(*this, controller.get_ftl());
 	VisualTracer::init();
 	StateTracer::init(this);
+	StatisticsGatherer::init(this);
 
 	return;
 }
@@ -121,6 +123,7 @@ Ssd::~Ssd(void)
 {
 	IOScheduler::instance()->finish(10000000);
 	StateTracer::print();
+	StatisticsGatherer::get_instance()->print();
 	/* explicitly call destructors and use free
 	 * since we used malloc and placement new */
 	for (uint i = 0; i < size; i++)
@@ -134,9 +137,25 @@ Ssd::~Ssd(void)
 	return;
 }
 
-double Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, double start_time)
+void Ssd::event_arrive(Event* event) {
+	assert(event->get_start_time() >= 0.0);
+	assert(event->get_start_time() >= last_io_submission_time);
+	last_io_submission_time = event->get_start_time();
+
+
+
+	IOScheduler::instance()->finish(event->get_start_time());
+
+	if(controller.event_arrive(event) != SUCCESS)
+	{
+		fprintf(stderr, "Ssd error: %s: request failed:\n", __func__);
+		event -> print(stderr);
+	}
+}
+
+void Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, double start_time)
 {
-	return event_arrive(type, logical_address, size, start_time, NULL);
+	event_arrive(type, logical_address, size, start_time, NULL);
 }
 
 /* This is the function that will be called by DiskSim
@@ -145,17 +164,8 @@ double Ssd::event_arrive(enum event_type type, ulong logical_address, uint size,
  * 	time (arrive time) of the request
  * The SSD will process the request and return the time taken to process the
  * 	request.  Remember to use the same time units as in the config file. */
-double Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, double start_time, void *buffer)
+void Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, double start_time, void *buffer)
 {
-	assert(start_time >= 0.0);
-	assert(start_time >= last_io_submission_time);
-	last_io_submission_time = start_time;
-
-	if (VIRTUAL_PAGE_SIZE == 1)
-		assert((long long int) logical_address <= (long long int) SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE);
-	else
-		assert((long long int) logical_address*VIRTUAL_PAGE_SIZE <= (long long int) SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE);
-
 	/* allocate the event and address dynamically so that the allocator can
 	 * handle efficiency issues for us */
 	Event *event = NULL;
@@ -168,18 +178,15 @@ double Ssd::event_arrive(enum event_type type, ulong logical_address, uint size,
 
 	event->set_payload(buffer);
 
-	IOScheduler::instance()->finish(event->get_start_time());
+	event_arrive(event);
+}
 
-	if(controller.event_arrive(event) != SUCCESS)
-	{
-		fprintf(stderr, "Ssd error: %s: request failed:\n", __func__);
-		event -> print(stderr);
-	}
+void Ssd::progress_since_os_is_idle() {
+	IOScheduler::instance()->progess();
+}
 
-	/* use start_time as a temporary for returning time taken to service event */
-	start_time = event -> get_time_taken();
-	delete event;
-	return start_time;
+void Ssd::register_event_completion(Event * event) {
+	os.register_event_completion(event);
 }
 
 /*

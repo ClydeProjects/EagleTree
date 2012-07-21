@@ -46,8 +46,7 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 	}
 	else if (block_address.compare(wcrh_pointer) == BLOCK) {
 		wcrh_pointer.page = num_pages_written = wcrh_pointer.page + 1;
-	}
-	else if (block_address.compare(wcrc_pointer) == BLOCK) {
+	} else if (block_address.compare(wcrc_pointer) == BLOCK) {
 		wcrc_pointer.page = num_pages_written = wcrc_pointer.page + 1;
 	} else {
 		event.print();
@@ -103,7 +102,7 @@ void Block_manager_parallel_wearwolf::register_erase_outcome(Event const& event,
 	Block_manager_parent::register_erase_outcome(event, status);
 	reset_any_filled_pointers(event);
 	check_if_should_trigger_more_GC(event.get_current_time());
-	Wear_Level(event);
+
 }
 
 // must really improve logic in this class. Currently, mistakes are too easy if much GC happens at same time

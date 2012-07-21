@@ -191,7 +191,7 @@ enum block_state{FREE, PARTIALLY_FREE, ACTIVE, INACTIVE};
  * 	                                page states set to empty)
  * 	merge - move valid pages from block at address (page state set to invalid)
  * 	           to free pages in block at merge_address */
-enum event_type{READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, MERGE, TRIM};
+enum event_type{NOT_VALID, READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, MERGE, TRIM};
 
 /* General return status
  * return status for simulator operations that only need to provide general
@@ -267,6 +267,10 @@ class Block_manager_parallel_wearwolf;
 class Block_manager_parallel_wearwolf_locality;
 
 class Page_Hotness_Measurer;
+
+class OperatingSystem;
+class Thread;
+class Synchronous_Writer;
 
 /* Class to manage physical addresses for the SSD.  It was designed to have
  * public members like a struct for quick access but also have checking,
@@ -382,7 +386,7 @@ class Event
 {
 public:
 	Event(enum event_type type, ulong logical_address, uint size, double start_time);
-	//Event(enum event_type type, ulong logical_address, uint size, double start_time, uint application_io_id);
+	Event();
 	~Event(void);
 	void consolidate_metaevent(Event &list);
 	ulong get_logical_address(void) const;
@@ -393,6 +397,8 @@ public:
 	uint get_size(void) const;
 	enum event_type get_event_type(void) const;
 	double get_start_time(void) const;
+	bool is_original_application_io(void) const;
+	void set_original_application_io(bool);
 	double get_time_taken(void) const;
 	double get_current_time(void) const;
 	uint get_application_io_id(void) const;
@@ -436,6 +442,7 @@ private:
 
 	bool garbage_collection_op;
 	bool mapping_op;
+	bool original_application_io;
 
 	// an ID for a single IO to the chip. This is not actually used for any logical purpose
 	static uint id_generator;
@@ -844,7 +851,7 @@ public:
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
-	void Wear_Level(Event const& event);
+
 	bool can_write(Event const& write) const;
 
 	void perform_gc(uint package_id, uint die_id, uint klass, double time);
@@ -874,6 +881,7 @@ private:
 	uint sort_into_age_class(Address const& address);
 	void issue_erase(Address a, double time);
 	void remove_as_gc_candidate(Address const& phys_address);
+	void Wear_Level(Event const& event);
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 	bool greedy_gc;
@@ -1047,28 +1055,29 @@ private:
 
 class IOScheduler {
 public:
-	void schedule_dependent_events(std::queue<Event>& events);
-	void schedule_independent_event(Event& events);
+	void schedule_dependent_events(std::queue<Event*>& events);
+	void schedule_independent_event(Event* events);
 	void finish(double start_time);
+	void progess();
 	static IOScheduler *instance();
 	static void instance_initialize(Ssd& ssd, FtlParent& ftl);
 private:
 	IOScheduler(Ssd& ssd, FtlParent& ftl);
 	~IOScheduler();
-	enum status execute_next(Event& event);
-	std::vector<Event> gather_current_waiting_ios();
+	enum status execute_next(Event* event);
+	std::vector<Event*> gather_current_waiting_ios();
 	void execute_current_waiting_ios();
-	void execute_next_batch(std::vector<Event>& events);
-	void handle_writes(std::vector<Event>& events);
+	void execute_next_batch(std::vector<Event*>& events);
+	void handle_writes(std::vector<Event*>& events);
 
-	bool can_schedule_on_die(Event const& event) const;
-	void handle_finished_event(Event const&event, enum status outcome);
+	bool can_schedule_on_die(Event const* event) const;
+	void handle_finished_event(Event *event, enum status outcome);
 
-	void eliminate_conflict_with_any_incoming_gc(Event&event);
-	void adjust_conflict_elimination_structures(Event const&event);
+	void eliminate_conflict_with_any_incoming_gc(Event * event);
+	void adjust_conflict_elimination_structures(Event const*const event);
 
-	std::vector<Event> io_schedule;
-	std::map<uint, std::deque<Event> > dependencies;
+	std::vector<Event*> io_schedule;
+	std::map<uint, std::deque<Event*> > dependencies;
 
 	static IOScheduler *inst;
 	Ssd& ssd;
@@ -1084,9 +1093,9 @@ public:
 	FtlParent(Controller &controller);
 
 	virtual ~FtlParent () {};
-	virtual enum status read(Event &event) = 0;
-	virtual enum status write(Event &event) = 0;
-	virtual enum status trim(Event &event) = 0;
+	virtual enum status read(Event *event) = 0;
+	virtual enum status write(Event *event) = 0;
+	virtual enum status trim(Event *event) = 0;
 	virtual void cleanup_block(Event &event, Block *block);
 
 	virtual void print_ftl_statistics();
@@ -1116,9 +1125,9 @@ class FtlImpl_Page : public FtlParent
 public:
 	FtlImpl_Page(Controller &controller);
 	~FtlImpl_Page();
-	enum status read(Event &event);
-	enum status write(Event &event);
-	enum status trim(Event &event);
+	enum status read(Event *event);
+	enum status write(Event *event);
+	enum status trim(Event *event);
 private:
 	ulong currentPage;
 	ulong numPagesActive;
@@ -1197,9 +1206,9 @@ class FtlImpl_DftlParent : public FtlParent
 public:
 	FtlImpl_DftlParent(Controller &controller);
 	~FtlImpl_DftlParent();
-	virtual enum status read(Event &event) = 0;
-	virtual enum status write(Event &event) = 0;
-	virtual enum status trim(Event &event) = 0;
+	virtual enum status read(Event *event) = 0;
+	virtual enum status write(Event *event) = 0;
+	virtual enum status trim(Event *event) = 0;
 protected:
 	struct MPage {
 		long vpn;
@@ -1231,19 +1240,19 @@ protected:
 	trans_set trans_map;
 	long *reverse_trans_map;
 
-	void consult_GTD(long dppn, Event &event);
+	void consult_GTD(long dppn, Event *event);
 	void reset_MPage(FtlImpl_DftlParent::MPage &mpage);
 
-	void resolve_mapping(Event &event, bool isWrite);
+	void resolve_mapping(Event *event, bool isWrite);
 	void update_translation_map(FtlImpl_DftlParent::MPage &mpage, long ppn);
 
-	bool lookup_CMT(long dlpn, Event &event);
+	bool lookup_CMT(long dlpn, Event *event);
 
 	long get_free_data_page(Event &event);
 	long get_free_data_page(Event &event, bool insert_events);
 
-	void evict_page_from_cache( Event & event);
-	void evict_specific_page_from_cache(Event &event, long lba);
+	void evict_page_from_cache( Event * event);
+	void evict_specific_page_from_cache(Event *event, long lba);
 
 	long get_logical_address(uint physical_address) const;
 
@@ -1256,7 +1265,7 @@ protected:
 	long currentDataPage;
 	long currentTranslationPage;
 
-	std::queue<Event> current_dependent_events;
+	std::queue<Event*> current_dependent_events;
 
 	std::vector<long> global_translation_directory;
 
@@ -1271,9 +1280,9 @@ class FtlImpl_Dftl : public FtlImpl_DftlParent
 public:
 	FtlImpl_Dftl(Controller &controller);
 	~FtlImpl_Dftl();
-	enum status read(Event &event);
-	enum status write(Event &event);
-	enum status trim(Event &event);
+	enum status read(Event *event);
+	enum status write(Event *event);
+	enum status trim(Event *event);
 	void cleanup_block(Event &event, Block *block);
 	void print_ftl_statistics();
 	void register_write_completion(Event const& event, enum status result);
@@ -1380,10 +1389,13 @@ private:
 class Ssd 
 {
 public:
-	Ssd (uint ssd_size = SSD_SIZE);
+	Ssd (OperatingSystem& os, uint ssd_size = SSD_SIZE);
 	~Ssd(void);
-	double event_arrive(enum event_type type, ulong logical_address, uint size, double start_time);
-	double event_arrive(enum event_type type, ulong logical_address, uint size, double start_time, void *buffer);
+	void event_arrive(Event* event);
+	void event_arrive(enum event_type type, ulong logical_address, uint size, double start_time);
+	void event_arrive(enum event_type type, ulong logical_address, uint size, double start_time, void *buffer);
+	void progress_since_os_is_idle();
+	void register_event_completion(Event * event);
 	void *get_result_buffer();
 	friend class Controller;
 	friend class IOScheduler;
@@ -1393,7 +1405,6 @@ public:
 	void write_statistics(FILE *stream);
 	void write_header(FILE *stream);
 	const Controller &get_controller(void);
-
 	void print_ftl_statistics();
 	double ready_at(void);
 	Package* getPackages();
@@ -1426,6 +1437,7 @@ private:
 	ulong least_worn;
 	double last_erase_time;
 	double last_io_submission_time;
+	OperatingSystem& os;
 };
 
 class RaidSsd
@@ -1453,7 +1465,6 @@ private:
 class VisualTracer
 {
 public:
-	// Singleton
 	static VisualTracer *get_instance();
 	static void init();
 	void register_completed_event(Event const& event);
@@ -1472,14 +1483,67 @@ public:
 	static void print();
 	static Ssd * ssd;
 	static void init(Ssd * ssd);
-	// Singleton
-	/*static StateTracer *get_instance();
-	static void init();
+};
 
+class StatisticsGatherer
+{
+public:
+	static StatisticsGatherer *get_instance();
+	static void init(Ssd * ssd);
+	void register_completed_event(Event const& event);
+	void print();
 private:
-	static StateTracer *inst;
-	StateTracer();
-	~StateTracer();*/
+	static StatisticsGatherer *inst;
+	Ssd & ssd;
+	StatisticsGatherer(Ssd & ssd);
+	~StatisticsGatherer();
+	double compute_average_age(uint package_id, uint die_id);
+
+	vector<vector<double> > sum_bus_wait_time_for_reads_per_LUN;
+	vector<vector<uint> > num_reads_per_LUN;
+
+	vector<vector<double> > sum_bus_wait_time_for_writes_per_LUN;
+	vector<vector<uint> > num_writes_per_LUN;
+
+	vector<vector<uint> > num_gc_reads_per_LUN;
+	vector<vector<uint> > num_gc_writes_per_LUN;
+};
+
+class Thread
+{
+public:
+	virtual Event* issue_next_io() = 0;
+	virtual void register_event_completion(Event* event) = 0;
+};
+
+class Synchronous_Writer : public Thread
+{
+public:
+	Synchronous_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat);
+	Event* issue_next_io();
+	void register_event_completion(Event* event);
+private:
+	long min_LBA, max_LBA;
+	double time;
+	bool ready_to_issue_next_write;
+	int number_of_times_to_repeat, counter;
+};
+
+class OperatingSystem
+{
+public:
+	OperatingSystem(vector<Thread*> threads);
+	~OperatingSystem();
+	void run();
+	void register_event_completion(Event* event);
+	void set_ssd(Ssd * ssd);
+private:
+	Ssd * ssd;
+	vector<Thread*> threads;
+	vector<Event*> events;
+	map<long, uint> LBA_to_thread_id_map;
+	int currently_executing_ios_counter;
+	int currently_pending_ios_counter;
 };
 
 } /* end namespace ssd */
