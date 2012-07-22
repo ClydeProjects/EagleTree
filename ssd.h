@@ -966,7 +966,7 @@ class Block_manager_parallel_wearwolf_locality : public Block_manager_parallel_w
 public:
 	Block_manager_parallel_wearwolf_locality(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel_wearwolf_locality();
-	virtual pair<double, Address> write(Event const& write);
+	virtual pair<double, Address> write(Event & write);
 	virtual void register_write_outcome(Event const& event, enum status status);
 private:
 	enum parallel_degree_for_sequential_files { ONE, LUN, CHANNEL };
@@ -986,7 +986,7 @@ private:
 	std::map<logical_address, sequential_writes_tracking*> sequential_writes_identification_and_data;	// a map from the first logical write of a sequential pattern to metadata about the pattern
 
 	void set_pointers_for_sequential_write(sequential_writes_tracking & swt, double time);
-	pair<double, Address> perform_sequential_write(Event const& write, logical_address key, sequential_writes_tracking & swt);
+	pair<double, Address> perform_sequential_write(Event & write, logical_address key, sequential_writes_tracking & swt);
 	void remove_old_sequential_writes_metadata(double time);
 	// if there are less than 2 free blocks in each class, trigger GC for this class
 	int num_age_classes;
@@ -1096,7 +1096,7 @@ private:
 	static IOScheduler *inst;
 	Ssd& ssd;
 	FtlParent& ftl;
-	Block_manager_parallel_wearwolf bm;
+	Block_manager_parallel_wearwolf_locality bm;
 
 	std::map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations.
 };
@@ -1530,16 +1530,28 @@ public:
 	virtual void register_event_completion(Event* event) = 0;
 };
 
-class Synchronous_Writer : public Thread
+class Synchronous_Sequential_Writer : public Thread
 {
 public:
-	Synchronous_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat);
+	Synchronous_Sequential_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat);
 	Event* issue_next_io();
 	void register_event_completion(Event* event);
 private:
 	long min_LBA, max_LBA;
 	double time;
 	bool ready_to_issue_next_write;
+	int number_of_times_to_repeat, counter;
+};
+
+class Asynchronous_Sequential_Writer : public Thread
+{
+public:
+	Asynchronous_Sequential_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat);
+	Event* issue_next_io();
+	void register_event_completion(Event* event);
+private:
+	long min_LBA, max_LBA;
+	double time;
 	int number_of_times_to_repeat, counter;
 };
 

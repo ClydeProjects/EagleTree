@@ -4,6 +4,8 @@
 using namespace ssd;
 using namespace std;
 
+#define THRESHOLD 3 // the number of sequential writes before we recognize the pattern as sequential
+
 Block_manager_parallel_wearwolf_locality::Block_manager_parallel_wearwolf_locality(Ssd& ssd, FtlParent& ftl)
 	: Block_manager_parallel_wearwolf(ssd, ftl),
 	  parallel_degree(LUN)
@@ -21,7 +23,7 @@ Block_manager_parallel_wearwolf_locality::sequential_writes_tracking::sequential
 Block_manager_parallel_wearwolf_locality::sequential_writes_tracking::~sequential_writes_tracking() {
 }
 
-pair<double, Address> Block_manager_parallel_wearwolf_locality::write(Event const& event) {
+pair<double, Address> Block_manager_parallel_wearwolf_locality::write(Event & event) {
 	// check if write matches sequential pattern
 	logical_address lb = event.get_logical_address();
 	pair<double, Address> to_return;
@@ -31,9 +33,9 @@ pair<double, Address> Block_manager_parallel_wearwolf_locality::write(Event cons
 	} else {
 		logical_address key = sequential_writes_key_lookup[lb];
 		sequential_writes_tracking& swt = *sequential_writes_identification_and_data[key];
-		if (swt.counter >= 3) {
+		if (swt.counter >= THRESHOLD) {
 			to_return = perform_sequential_write(event, key, swt);
-		} else if (swt.counter < 3) {
+		} else if (swt.counter < THRESHOLD) {
 			to_return = Block_manager_parallel_wearwolf::write(event);
 		}
 	}
@@ -41,8 +43,15 @@ pair<double, Address> Block_manager_parallel_wearwolf_locality::write(Event cons
 	return to_return;
 }
 
-pair<double, Address> Block_manager_parallel_wearwolf_locality::perform_sequential_write(Event const& event, logical_address key, sequential_writes_tracking & swt) {
+pair<double, Address> Block_manager_parallel_wearwolf_locality::perform_sequential_write(Event & event, logical_address key, sequential_writes_tracking & swt) {
 	pair<double, Address> to_return;
+
+	double cannot_be_scheduled_before_this_time = swt.last_LBA_timestamp;
+	if (event.get_current_time() < cannot_be_scheduled_before_this_time) {
+		to_return.first = cannot_be_scheduled_before_this_time - event.get_current_time();
+		return to_return;
+	}
+
 	pair<bool, pair<uint, uint> > best_die_id = Block_manager_parent::get_free_die_with_shortest_IO_queue(swt.pointers);
 	bool can_write = best_die_id.first;
 	if (can_write) {
@@ -95,17 +104,17 @@ void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event cons
 		logical_address key = sequential_writes_key_lookup[lb];
 		sequential_writes_tracking& swm = *sequential_writes_identification_and_data[key];
 		swm.counter++;
-		swm.last_LBA_timestamp = event.get_current_time();
+		swm.last_LBA_timestamp = event.get_start_time() + event.get_bus_wait_time();
 		sequential_writes_key_lookup.erase(lb);
 		sequential_writes_key_lookup[lb + 1] = key;
 
-		if (swm.counter == 3) {
+		if (swm.counter == THRESHOLD) {
 			set_pointers_for_sequential_write(swm, event.get_current_time());
 		}
 
-		if (swm.counter <= 3) {
+		if (swm.counter <= THRESHOLD) {
 			Block_manager_parallel_wearwolf::register_write_outcome(event, status);
-		} else if (swm.counter > 3) {
+		} else if (swm.counter > THRESHOLD) {
 			Block_manager_parent::register_write_outcome(event, status);
 
 			int i, j;

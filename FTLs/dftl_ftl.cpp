@@ -220,7 +220,7 @@ void FtlImpl_Dftl::cleanup_block(Event &event, Block *block)
 
 void FtlImpl_Dftl::print_ftl_statistics()
 {
-	Block_manager::instance()->print_statistics();
+	//Block_manager::instance()->print_statistics();
 }
 
 void FtlImpl_Dftl::register_write_completion(Event const& event, enum status result) {

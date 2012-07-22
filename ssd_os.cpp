@@ -64,7 +64,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	threads[thread_id]->register_event_completion(event);
 	events[thread_id] = threads[thread_id]->issue_next_io();
 	currently_executing_ios_counter--;
-	if (events[thread_id]->get_event_type() != NOT_VALID) {
+	if (events[thread_id] != NULL && events[thread_id]->get_event_type() != NOT_VALID) {
 		currently_pending_ios_counter++;
 	}
 }
