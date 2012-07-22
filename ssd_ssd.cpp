@@ -140,12 +140,7 @@ Ssd::~Ssd(void)
 void Ssd::event_arrive(Event* event) {
 	assert(event->get_start_time() >= 0.0);
 	assert(event->get_start_time() >= last_io_submission_time);
-	last_io_submission_time = event->get_start_time();
-
-
-
 	IOScheduler::instance()->finish(event->get_start_time());
-
 	if(controller.event_arrive(event) != SUCCESS)
 	{
 		fprintf(stderr, "Ssd error: %s: request failed:\n", __func__);
@@ -186,6 +181,7 @@ void Ssd::progress_since_os_is_idle() {
 }
 
 void Ssd::register_event_completion(Event * event) {
+	last_io_submission_time = event->get_start_time();
 	os.register_event_completion(event);
 }
 

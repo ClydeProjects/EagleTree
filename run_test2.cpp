@@ -48,10 +48,12 @@ int main()
 	}
 	//StateTracer::print();
 
-	Thread* sw = new Synchronous_Writer(0, 100, 2);
+	Thread* sw1 = new Synchronous_Writer(0, 20, 10);
+	Thread* sw2 = new Synchronous_Writer(50, 70, 10);
 
 	vector<Thread*> threads;
-	threads.push_back(sw);
+	threads.push_back(sw1);
+	threads.push_back(sw2);
 
 	OperatingSystem* os = new OperatingSystem(threads);
 

@@ -36,13 +36,11 @@ void OperatingSystem::run() {
 		double soonest_time = 1000000000;
 		int thread_id = -1;
 
-
 		for (uint i = 0; i < events.size(); i++) {
 			Event* e = events[i];
 			if (e != NULL && e->get_event_type() != NOT_VALID && e->get_start_time() < soonest_time && LBA_to_thread_id_map.count(e->get_logical_address()) == 0) {
 				soonest_time = events[i]->get_start_time();
 				thread_id = i;
-				//exit = false;
 			}
 		}
 
@@ -51,7 +49,6 @@ void OperatingSystem::run() {
 		} else {
 			currently_executing_ios_counter++;
 			currently_pending_ios_counter--;
-
 			Event* event = events[thread_id];
 			LBA_to_thread_id_map[event->get_logical_address()] = thread_id;
 			events[thread_id] = NULL;
