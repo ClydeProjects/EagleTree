@@ -709,12 +709,12 @@ private:
 
 class Page_Hotness_Measurer {
 public:
-	//virtual Page_Hotness_Measurer() = 0;
-	//virtual ~Page_Hotness_Measurer(void) = 0;
+//	virtual Page_Hotness_Measurer() = 0;
+	virtual ~Page_Hotness_Measurer(void) {};
 	virtual void register_event(Event const& event) = 0; // Inform hotness measurer about a read or write event
 	virtual enum write_hotness get_write_hotness(unsigned long page_address) const = 0; // Return write hotness of a given page address
 	virtual enum read_hotness get_read_hotness(unsigned long page_address) const = 0; // Return read hotness of a given page address
-	virtual Address get_die_with_least_WC(enum read_hotness rh) const = 0; // Return address of die with leads WC data (with chosen read hotness)
+	virtual Address get_best_target_die_for_WC(enum read_hotness rh) const = 0; // Return address of die with leads WC data (with chosen read hotness)
 };
 
 // Simple (naïve page hotness measurer implementation)
@@ -746,7 +746,7 @@ private:
 	uint reads_counter;
 };
 
-// BloomFilter hotness
+// BloomFilter based hotness measurer
 typedef std::vector< bloom_filter > hot_bloom_filter;
 typedef std::vector< std::vector<uint> > lun_counters;
 
@@ -765,8 +765,17 @@ public:
 	 	write_counter_window_size(write_window_size)
 	{}
 
-	// Incomplete copy-constructor
-	Die_Stats(const Die_Stats& object) {
+	Die_Stats(const Die_Stats& object)
+	:	live_pages(object.live_pages),
+	 	reads(object.reads),
+	 	reads_targeting_wc_pages(object.reads_targeting_wc_pages),
+	 	reads_targeting_wc_pages_previous_window(object.reads_targeting_wc_pages_previous_window),
+	 	writes(object.writes),
+	 	unique_wh_encountered(object.unique_wh_encountered),
+	 	unique_wh_encountered_previous_window(object.unique_wh_encountered_previous_window),
+	 	read_counter_window_size(object.read_counter_window_size),
+	 	write_counter_window_size(object.write_counter_window_size)
+	{
 		wh_counted_already = object.wh_counted_already;
 	}
 
@@ -778,12 +787,8 @@ public:
 
 	inline uint get_reads_targeting_wc_pages() const {
 		if (reads_targeting_wc_pages_previous_window != -1) return reads_targeting_wc_pages_previous_window;
-		return (uint) reads_targeting_wc_pages * ((double) read_counter_window_size / reads);
-	}
-
-	inline uint get_wcrc_count() const {                     // all        - whrc - whrh                             - wcrh
-		if (unique_wh_encountered_previous_window != -1) return live_pages - unique_wh_encountered_previous_window /*- wcrh pages*/;
-		return 0;
+		if (reads == 0) return 0;
+		return (uint) reads_targeting_wc_pages * ((double) read_counter_window_size / reads); // Compensate for a partially completed 1st window
 	}
 
 	void print() const {
@@ -809,34 +814,30 @@ public:
 class BloomFilter_Page_Hotness_Measurer : public Page_Hotness_Measurer {
 friend class Die_Stats;
 public:
-	BloomFilter_Page_Hotness_Measurer(uint num_bloom_filters = 4, uint bloom_filter_size = 2048, uint decay_time = 512);
+	BloomFilter_Page_Hotness_Measurer(uint num_bloom_filters = 4, uint bloom_filter_size = 2048, uint IOs_before_decay = 512);
 	~BloomFilter_Page_Hotness_Measurer(void);
 	void register_event(Event const& event);
 	enum write_hotness get_write_hotness(unsigned long page_address) const;
 	enum read_hotness get_read_hotness(unsigned long page_address) const;
-	Address get_die_with_least_WC(enum read_hotness rh) const;
+	Address get_best_target_die_for_WC(enum read_hotness rh) const;
 
 	// Debug output
 	void print_die_stats() const;
 
 private:
-	//double get_hot_data_index(hot_bloom_filter const& filter, unsigned long page_address) const;
 	double get_hot_data_index(event_type type, unsigned long page_address) const;
-	inline double get_max_hot_data_index_value() { return V + 1; } // == (2 / (double) V) * (V + 1) * (V / 2)
+	inline double get_max_hot_data_index_value() { return num_bloom_filters + 1; } // == (2 / (double) V) * (V + 1) * (V / 2)
 
 	// Parameters
-	uint V, M, /*K,*/ T, hotness_threshold, read_counter_window_size, write_counter_window_size;
+	uint num_bloom_filters, bloom_filter_size, IOs_before_decay;
+	uint hotness_threshold, read_counter_window_size, write_counter_window_size;
 
 	// Bookkeeping variables
 	uint read_oldest_BF, write_oldest_BF;
-//	uint BF_read_pos, BF_write_pos;
 	uint read_counter, write_counter;
 	hot_bloom_filter read_bloom;
 	hot_bloom_filter write_bloom;
 	std::vector< std::vector<Die_Stats> > package_die_stats;
-
-	//	std::vector< std::map<int, bool> > ReadErrorFreeCounter;
-//	std::vector< std::map<int, bool> > WriteErrorFreeCounter;
 };
 
 class Block_manager_parent {
