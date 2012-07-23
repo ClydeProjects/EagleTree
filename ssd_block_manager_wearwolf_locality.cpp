@@ -95,6 +95,12 @@ void Block_manager_parallel_wearwolf_locality::set_pointers_for_sequential_write
 
 void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event const& event, enum status status) {
 	long lb = event.get_logical_address();
+	if (!event.is_original_application_io()) {
+		Block_manager_parallel_wearwolf::register_write_outcome(event, status);
+		return;
+	}
+
+
 	if (sequential_writes_key_lookup.count(lb) == 0) {
 		sequential_writes_key_lookup[lb + 1] = lb;
 		sequential_writes_identification_and_data[lb] = new sequential_writes_tracking(event.get_current_time());
@@ -116,7 +122,7 @@ void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event cons
 			Block_manager_parallel_wearwolf::register_write_outcome(event, status);
 		} else if (swm.counter > THRESHOLD) {
 			Block_manager_parent::register_write_outcome(event, status);
-
+			page_hotness_measurer.register_event(event);
 			int i, j;
 			if (parallel_degree == ONE) {
 				i = j = 0;

@@ -814,12 +814,13 @@ public:
 class BloomFilter_Page_Hotness_Measurer : public Page_Hotness_Measurer {
 friend class Die_Stats;
 public:
-	BloomFilter_Page_Hotness_Measurer(uint num_bloom_filters = 4, uint bloom_filter_size = 2048, uint IOs_before_decay = 512);
+	BloomFilter_Page_Hotness_Measurer(uint num_bloom_filters = 4, uint bloom_filter_size = 2048, uint IOs_before_decay = 512, bool preheat = true);
 	~BloomFilter_Page_Hotness_Measurer(void);
 	void register_event(Event const& event);
 	enum write_hotness get_write_hotness(unsigned long page_address) const;
 	enum read_hotness get_read_hotness(unsigned long page_address) const;
 	Address get_best_target_die_for_WC(enum read_hotness rh) const;
+	void heat_all_addresses();
 
 	// Debug output
 	void print_die_stats() const;
@@ -843,7 +844,7 @@ private:
 class Block_manager_parent {
 public:
 	Block_manager_parent(Ssd& ssd, FtlParent& ftl, int classes = 1);
-	~Block_manager_parent();
+	virtual ~Block_manager_parent();
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_write_arrival(Event const& event);
 	virtual void register_read_outcome(Event const& event, enum status status);
@@ -953,12 +954,12 @@ public:
 	virtual pair<double, Address> write(Event const& write);
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
+	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
 private:
 	bool pointer_can_be_written_to(Address pointer) const;
 	bool at_least_one_available_write_hot_pointer() const;
 	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
 	void reset_any_filled_pointers(Event const& event);
-	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
 	Address wcrh_pointer;
 	Address wcrc_pointer;
 };
@@ -1404,7 +1405,7 @@ private:
 class Ssd 
 {
 public:
-	Ssd (OperatingSystem& os, uint ssd_size = SSD_SIZE);
+	Ssd (OperatingSystem* os = NULL, uint ssd_size = SSD_SIZE);
 	~Ssd(void);
 	void event_arrive(Event* event);
 	void event_arrive(enum event_type type, ulong logical_address, uint size, double start_time);
@@ -1452,7 +1453,7 @@ private:
 	ulong least_worn;
 	double last_erase_time;
 	double last_io_submission_time;
-	OperatingSystem& os;
+	OperatingSystem* os;
 };
 
 class RaidSsd

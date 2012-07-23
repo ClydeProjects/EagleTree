@@ -181,7 +181,7 @@ void Simple_Page_Hotness_Measurer::start_new_interval_reads() {
  * By Martin Kjær Svendsen Based on work by Park and Du
  * ================================================================================== */
 
-BloomFilter_Page_Hotness_Measurer::BloomFilter_Page_Hotness_Measurer(uint num_bloom_filters, uint bloom_filter_size, uint IOs_before_decay)
+BloomFilter_Page_Hotness_Measurer::BloomFilter_Page_Hotness_Measurer(uint num_bloom_filters, uint bloom_filter_size, uint IOs_before_decay, bool preheat)
 	:	read_oldest_BF(0),						// Read bloom filter with oldest data; next to be reset
 	 	write_oldest_BF(0),						// Write bloom filter with oldest data; next to be reset
 		read_counter(0),						// Read command counter
@@ -214,6 +214,8 @@ BloomFilter_Page_Hotness_Measurer::BloomFilter_Page_Hotness_Measurer(uint num_bl
 			package_die_stats[ssd_size].push_back(Die_Stats(parameters, read_counter_window_size, write_counter_window_size)); // !! NOTE TO SELF: Parameters needs to be tuned for this application
 		}
 	}
+
+	if (preheat) heat_all_addresses();
 }
 
 BloomFilter_Page_Hotness_Measurer::~BloomFilter_Page_Hotness_Measurer(void) {}
@@ -233,7 +235,6 @@ void BloomFilter_Page_Hotness_Measurer::print_die_stats() const {
 			package_die_stats[package][die].print();
 		}
 	}
-
 }
 
 // Looks at all dies having less than the average number of WC pages:
@@ -253,6 +254,7 @@ Address BloomFilter_Page_Hotness_Measurer::get_best_target_die_for_WC(enum read_
 	int best_candidate_die = -1;
 	double best_num_reads_per_wc = (rh == READ_HOT ? numeric_limits<double>::max() : -numeric_limits<double>::max());
 
+	// Iterate though all dies with less than average WC pages, and find the one thats best for inserting WCRC or WCRH pages, depending on rh parameter
 	for (uint package = 0; package < SSD_SIZE; package++) {
 		for (uint die = 0; die < PACKAGE_SIZE; die++) {
 			if (package_die_stats[package][die].get_wc_pages() <= average_wc_pages) {
@@ -268,6 +270,7 @@ Address BloomFilter_Page_Hotness_Measurer::get_best_target_die_for_WC(enum read_
 			}
 		}
 	}
+
 	assert(best_candidate_package != -1 && best_candidate_die != -1);
 	return Address(best_candidate_package, best_candidate_die, 0,0,0, DIE);
 }
@@ -377,5 +380,13 @@ double BloomFilter_Page_Hotness_Measurer::get_hot_data_index(event_type type, ul
 	} while (pos != oldest_BF);
 
 	return result;
+}
+
+// Makes every address instantly hot by filling all bloom filters with 1's. The effect will fade as filters decay.
+void BloomFilter_Page_Hotness_Measurer::heat_all_addresses() {
+	for (uint bf = 0; bf < num_bloom_filters; bf++) {
+		read_bloom[bf].insert_all_keys();
+		write_bloom[bf].insert_all_keys();
+	}
 }
 

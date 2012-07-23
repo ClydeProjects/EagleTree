@@ -36,12 +36,12 @@ int main() {
 	Thread* sw2 = new Asynchronous_Sequential_Writer(50, 70, 1);
 
 	vector<Thread*> threads;
-	threads.push_back(sw2);
+	//threads.push_back(sw2);
 	//threads.push_back(sw2);
 
 	OperatingSystem* os = new OperatingSystem(threads);
 
-	Ssd *ssd = new Ssd(*os);
+	Ssd *ssd = new Ssd();
 	os->set_ssd(ssd);
 	os->run();
 
@@ -50,7 +50,7 @@ int main() {
 
     int user_input_address;
 	string user_input;
-	int time = 100;
+	int time = 0;
 	double result;
 	bool done = false;
 	do {

@@ -29,7 +29,7 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 		return;
 	}
 	Block_manager_parent::register_write_outcome(event, status);
-	if (!event.is_garbage_collection_op()) {
+	if (event.is_original_application_io()) {
 		page_hotness_measurer.register_event(event);
 	}
 
