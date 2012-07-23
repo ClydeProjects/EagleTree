@@ -75,6 +75,10 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	Wear_Level(event);
 }
 
+void Block_manager_parent::register_write_arrival(Event const& write) {
+
+}
+
 uint Block_manager_parent::sort_into_age_class(Address const& a) {
 	Block* b = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 	uint age = BLOCK_ERASES - b->get_erases_remaining();
@@ -106,7 +110,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 
 	if (ra.valid != NONE) {
 		assert(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE);
-		register_write_arrival(event);
+		invalidate(event);
 	}
 
 	if (ra.valid != NONE && blocks_being_garbage_collected.count(block.get_physical_address()) == 1) {
@@ -161,7 +165,7 @@ void Block_manager_parent::issue_erase(Address ra, double time) {
 }
 
 // invalidates the original location of a write
-void Block_manager_parent::register_write_arrival(Event const& event) {
+void Block_manager_parent::invalidate(Event const& event) {
 	assert(event.get_event_type() == WRITE);
 	Address ra = event.get_replace_address();
 	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];

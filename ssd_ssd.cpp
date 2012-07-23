@@ -41,7 +41,7 @@ using namespace ssd;
 /* use caution when editing the initialization list - initialization actually
  * occurs in the order of declaration in the class definition and not in the
  * order listed here */
-Ssd::Ssd(OperatingSystem& os, uint ssd_size):
+Ssd::Ssd(OperatingSystem* os, uint ssd_size):
 	size(ssd_size), 
 	controller(*this), 
 	ram(RAM_READ_DELAY, RAM_WRITE_DELAY), 
@@ -141,6 +141,7 @@ void Ssd::event_arrive(Event* event) {
 	assert(event->get_start_time() >= 0.0);
 	assert(event->get_start_time() >= last_io_submission_time);
 	IOScheduler::instance()->finish(event->get_start_time());
+	event->set_original_application_io(true);
 	if(controller.event_arrive(event) != SUCCESS)
 	{
 		fprintf(stderr, "Ssd error: %s: request failed:\n", __func__);
@@ -182,7 +183,9 @@ void Ssd::progress_since_os_is_idle() {
 
 void Ssd::register_event_completion(Event * event) {
 	last_io_submission_time = event->get_start_time();
-	os.register_event_completion(event);
+	if (os != NULL) {
+		os->register_event_completion(event);
+	}
 }
 
 /*

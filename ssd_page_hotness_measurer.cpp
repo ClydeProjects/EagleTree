@@ -258,16 +258,16 @@ Address BloomFilter_Page_Hotness_Measurer::get_die_with_least_WC(enum read_hotne
 	// - die with least WCRC pages
 
 	// UNOPTIMIZED: Total WC pages computed by a linear pass through all dies; It could easily be kept track of incrementally
-	printf("Looking for WC%s. Total WC PAGES: ", (rh == READ_HOT ? "RH" : "RC"));
+	//printf("Looking for WC%s. Total WC PAGES: ", (rh == READ_HOT ? "RH" : "RC"));
 	uint total_wc_pages = 0;
 	for (uint package = 0; package < SSD_SIZE; package++) {
 		for (uint die = 0; die < PACKAGE_SIZE; die++) {
 			total_wc_pages += package_die_stats[package][die].get_wc_pages();
-			printf("%d + ", package_die_stats[package][die].get_wc_pages());
+			//printf("%d + ", package_die_stats[package][die].get_wc_pages());
 		}
 	}
 	double average_wc_pages = (double) total_wc_pages / (SSD_SIZE * PACKAGE_SIZE);
-	printf(" = %u\nAverage: %f per die.\n", total_wc_pages, average_wc_pages);
+	//printf(" = %u\nAverage: %f per die.\n", total_wc_pages, average_wc_pages);
 
 	int best_candidate_package = -1;
 	int best_candidate_die = -1;
@@ -276,19 +276,19 @@ Address BloomFilter_Page_Hotness_Measurer::get_die_with_least_WC(enum read_hotne
 	double min_value = PLANE_SIZE * BLOCK_SIZE; // Total number of pages on a die
 	for (uint package = 0; package < SSD_SIZE; package++) {
 		for (uint die = 0; die < PACKAGE_SIZE; die++) {
-			printf("Package %d, Die %d has %d WC pages, with %d reads targeting those.\n", package, die, package_die_stats[package][die].get_wc_pages(), package_die_stats[package][die].get_reads_targeting_wc_pages());
+			//printf("Package %d, Die %d has %d WC pages, with %d reads targeting those.\n", package, die, package_die_stats[package][die].get_wc_pages(), package_die_stats[package][die].get_reads_targeting_wc_pages());
 			if (package_die_stats[package][die].get_wc_pages() <= average_wc_pages) {
 				double reads_per_wc = (package_die_stats[package][die].get_wc_pages() == 0) ? 0 : (double) package_die_stats[package][die].get_reads_targeting_wc_pages() / package_die_stats[package][die].get_wc_pages();
-				printf("Reads targeting WC PAGES: %u, WC PAGES: %u\n", package_die_stats[package][die].get_reads_targeting_wc_pages(), package_die_stats[package][die].get_wc_pages());
-				printf("Is package %d die %d with reads per wc %f better than %f?", package, die, reads_per_wc, best_num_reads_per_wc);
+				//printf("Reads targeting WC PAGES: %u, WC PAGES: %u\n", package_die_stats[package][die].get_reads_targeting_wc_pages(), package_die_stats[package][die].get_wc_pages());
+				//printf("Is package %d die %d with reads per wc %f better than %f?", package, die, reads_per_wc, best_num_reads_per_wc);
 				if ((rh == READ_HOT && reads_per_wc < best_num_reads_per_wc) ||
 						(rh == READ_COLD && reads_per_wc > best_num_reads_per_wc)) {
-					printf("Yes\n");
+					//printf("Yes\n");
 					best_num_reads_per_wc = reads_per_wc;
 					best_candidate_package = package;
 					best_candidate_die = die;
 				} else {
-					printf("No.\n");
+					//printf("No.\n");
 				}
 			}
 		}
@@ -410,7 +410,7 @@ void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 		if (!get_write_hotness(page_address)) current_die_stats.reads_targeting_wc_pages += 1;
 	}
 
-	print_die_stats();
+	//print_die_stats();
 }
 
 double BloomFilter_Page_Hotness_Measurer::get_hot_data_index(event_type type, unsigned long page_address) const {

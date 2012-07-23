@@ -51,8 +51,8 @@ void OperatingSystem::run() {
 			currently_pending_ios_counter--;
 			Event* event = events[thread_id];
 			LBA_to_thread_id_map[event->get_logical_address()] = thread_id;
-			events[thread_id] = NULL;
 			ssd->event_arrive(event);
+			events[thread_id] = threads[thread_id]->issue_next_io();
 		}
 	} while (currently_executing_ios_counter > 0 || currently_pending_ios_counter > 0);
 }

@@ -266,6 +266,7 @@ class Block_manager_parallel_hot_cold_seperation;
 class Block_manager_parallel_wearwolf;
 class Block_manager_parallel_wearwolf_locality;
 
+class Sequential_Pattern_Detector;
 class Page_Hotness_Measurer;
 
 class OperatingSystem;
@@ -482,7 +483,7 @@ private:
 	};
 
 	//static bool timings_sorter(lock_times const& lhs, lock_times const& rhs);
-	//std::vector<lock_times> timings;
+	//vector<lock_times> timings;
 
 	uint table_entries;
 	uint selected_entry;
@@ -731,24 +732,24 @@ public:
 private:
 	void start_new_interval_writes();
 	void start_new_interval_reads();
-	std::map<ulong, uint> write_current_count;
-	std::vector<double> write_moving_average;
-	std::map<ulong, uint> read_current_count;
-	std::vector<double> read_moving_average;
+	map<ulong, uint> write_current_count;
+	vector<double> write_moving_average;
+	map<ulong, uint> read_current_count;
+	vector<double> read_moving_average;
 	uint current_interval;
 	double average_write_hotness;
 	double average_read_hotness;
-	std::vector<std::vector<uint> > num_wcrh_pages_per_die;
-	std::vector<std::vector<uint> > num_wcrc_pages_per_die;
-	std::vector<std::vector<double> > average_reads_per_die;
-	std::vector<std::vector<uint> > current_reads_per_die;
+	vector<vector<uint> > num_wcrh_pages_per_die;
+	vector<vector<uint> > num_wcrc_pages_per_die;
+	vector<vector<double> > average_reads_per_die;
+	vector<vector<uint> > current_reads_per_die;
 	uint writes_counter;
 	uint reads_counter;
 };
 
 // BloomFilter hotness
-typedef std::vector< bloom_filter > hot_bloom_filter;
-typedef std::vector< std::vector<uint> > lun_counters;
+typedef vector< bloom_filter > hot_bloom_filter;
+typedef vector< vector<uint> > lun_counters;
 
 class Die_Stats {
 public:
@@ -833,10 +834,10 @@ private:
 	uint read_counter, write_counter;
 	hot_bloom_filter read_bloom;
 	hot_bloom_filter write_bloom;
-	std::vector< std::vector<Die_Stats> > package_die_stats;
+	vector< vector<Die_Stats> > package_die_stats;
 
-	//	std::vector< std::map<int, bool> > ReadErrorFreeCounter;
-//	std::vector< std::map<int, bool> > WriteErrorFreeCounter;
+	//	vector< map<int, bool> > ReadErrorFreeCounter;
+//	vector< map<int, bool> > WriteErrorFreeCounter;
 };
 
 class Block_manager_parent {
@@ -844,10 +845,10 @@ public:
 	Block_manager_parent(Ssd& ssd, FtlParent& ftl, int classes = 1);
 	~Block_manager_parent();
 	virtual void register_write_outcome(Event const& event, enum status status);
-	virtual void register_write_arrival(Event const& event);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual pair<double, Address> write(Event const& write) = 0;
+	virtual void register_write_arrival(Event const& write);
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
@@ -866,7 +867,7 @@ protected:
 	Address find_free_unused_block(double time);
 	Address find_free_unused_block_with_class(uint klass, double time);
 
-	pair<bool, pair<uint, uint> > get_free_die_with_shortest_IO_queue(std::vector<std::vector<Address> > const& dies) const;
+	pair<bool, pair<uint, uint> > get_free_die_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
 	Address get_free_die_with_shortest_IO_queue() const;
 
 	uint how_many_gc_operations_are_scheduled() const;
@@ -882,6 +883,7 @@ private:
 	void issue_erase(Address a, double time);
 	void remove_as_gc_candidate(Address const& phys_address);
 	void Wear_Level(Event const& event);
+	virtual void invalidate(Event const& event);
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 	bool greedy_gc;
@@ -952,14 +954,41 @@ public:
 	virtual pair<double, Address> write(Event const& write);
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
+	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
 private:
 	bool pointer_can_be_written_to(Address pointer) const;
 	bool at_least_one_available_write_hot_pointer() const;
 	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
 	void reset_any_filled_pointers(Event const& event);
-	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
 	Address wcrh_pointer;
 	Address wcrc_pointer;
+};
+
+
+
+class Sequential_Pattern_Detector {
+public:
+	typedef ulong logical_address;
+	Sequential_Pattern_Detector();
+	~Sequential_Pattern_Detector();
+	void register_event(logical_address lb, double time);
+	int get_sequential_write_id(logical_address lb);
+	int get_counter(logical_address lb);
+private:
+
+	struct sequential_writes_tracking {
+		int counter;
+		double last_LBA_timestamp;
+		sequential_writes_tracking(double time);
+		~sequential_writes_tracking();
+	};
+
+	map<logical_address, logical_address> sequential_writes_key_lookup;  // a map from the next expected LBA in a seqeuntial pattern to the first LBA, which is the key
+	map<logical_address, sequential_writes_tracking*> sequential_writes_identification_and_data;	// a map from the first logical write of a sequential pattern to metadata about the pattern
+
+	void remove_old_sequential_writes_metadata(double time);
+
+	uint registration_counter;
 };
 
 class Block_manager_parallel_wearwolf_locality : public Block_manager_parallel_wearwolf {
@@ -968,32 +997,19 @@ public:
 	~Block_manager_parallel_wearwolf_locality();
 	virtual pair<double, Address> write(Event & write);
 	virtual void register_write_outcome(Event const& event, enum status status);
+	virtual void register_write_arrival(Event const& write);
 private:
 	enum parallel_degree_for_sequential_files { ONE, LUN, CHANNEL };
 	parallel_degree_for_sequential_files parallel_degree;
 
-	// map from the next expected sequential write LBA to a counter and timestamp.
-	typedef ulong logical_address;
-	struct sequential_writes_tracking {
-		int counter;
-		double last_LBA_timestamp;
-		std::vector<std::vector<Address> > pointers;
-		sequential_writes_tracking(double time);
-		~sequential_writes_tracking();
-	};
-	//std::map<logical_address, Address> sequential_writes_tracker;	// maps an incoming write belonging to a given sequential pattern to the address in which it should be written
-	std::map<logical_address, logical_address> sequential_writes_key_lookup;  // a map from the next expected LBA in a seqeuntial pattern to the first LBA, which is the key
-	std::map<logical_address, sequential_writes_tracking*> sequential_writes_identification_and_data;	// a map from the first logical write of a sequential pattern to metadata about the pattern
+	map<long, vector<vector<Address> > > seq_write_key_to_pointers_mapping;
 
-	void set_pointers_for_sequential_write(sequential_writes_tracking & swt, double time);
-	pair<double, Address> perform_sequential_write(Event & write, logical_address key, sequential_writes_tracking & swt);
+	void set_pointers_for_sequential_write(long key, double time);
+	pair<double, Address> perform_sequential_write(long key, double time);
 	void remove_old_sequential_writes_metadata(double time);
-	// if there are less than 2 free blocks in each class, trigger GC for this class
-	int num_age_classes;
-	std::vector<std::vector<Address> > free_blocks_classified_into_age_classes;
 
-	std::vector<std::vector<Address> > candidates_for_GC;
-
+	Sequential_Pattern_Detector detector;
+	Sequential_Pattern_Detector recorder;
 };
 
 class Block_manager
@@ -1052,9 +1068,9 @@ private:
 	typedef active_set::nth_index<1>::type ActiveByCost;
 	active_set active_cost;
 	// Usual block lists
-	std::vector<Block*> active_list;
-	std::vector<Block*> free_list;
-	std::vector<Block*> invalid_list;
+	vector<Block*> active_list;
+	vector<Block*> free_list;
+	vector<Block*> invalid_list;
 	// Counter for returning the next free page.
 	ulong directoryCurrentPage;
 	// Address on the current cached page in SRAM.
@@ -1069,7 +1085,7 @@ private:
 
 class IOScheduler {
 public:
-	void schedule_dependent_events(std::queue<Event*>& events);
+	void schedule_dependent_events(queue<Event*>& events);
 	void schedule_independent_event(Event* events);
 	void finish(double start_time);
 	void progess();
@@ -1079,10 +1095,10 @@ private:
 	IOScheduler(Ssd& ssd, FtlParent& ftl);
 	~IOScheduler();
 	enum status execute_next(Event* event);
-	std::vector<Event*> gather_current_waiting_ios();
+	vector<Event*> gather_current_waiting_ios();
 	void execute_current_waiting_ios();
-	void execute_next_batch(std::vector<Event*>& events);
-	void handle_writes(std::vector<Event*>& events);
+	void execute_next_batch(vector<Event*>& events);
+	void handle_writes(vector<Event*>& events);
 
 	bool can_schedule_on_die(Event const* event) const;
 	void handle_finished_event(Event *event, enum status outcome);
@@ -1090,15 +1106,18 @@ private:
 	void eliminate_conflict_with_any_incoming_gc(Event * event);
 	void adjust_conflict_elimination_structures(Event const*const event);
 
-	std::vector<Event*> io_schedule;
-	std::map<uint, std::deque<Event*> > dependencies;
+
+	vector<Event*> io_schedule;
+	map<uint, deque<Event*> > dependencies;
 
 	static IOScheduler *inst;
 	Ssd& ssd;
 	FtlParent& ftl;
 	Block_manager_parallel_wearwolf_locality bm;
 
-	std::map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations.
+	map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations.
+
+	double time_of_last_IO_execution_start;
 };
 
 class FtlParent
@@ -1158,7 +1177,7 @@ public:
 	enum status write(Event &event);
 	enum status trim(Event &event);
 private:
-	std::map<long, LogPageBlock*> log_map;
+	map<long, LogPageBlock*> log_map;
 
 	long *data_list;
 
@@ -1187,7 +1206,7 @@ public:
 private:
 	void initialize_log_pages();
 
-	std::map<long, LogPageBlock*> log_map;
+	map<long, LogPageBlock*> log_map;
 
 	long *data_list;
 	bool *pin_list;
@@ -1279,13 +1298,13 @@ protected:
 	long currentDataPage;
 	long currentTranslationPage;
 
-	std::queue<Event*> current_dependent_events;
+	queue<Event*> current_dependent_events;
 
-	std::vector<long> global_translation_directory;
+	vector<long> global_translation_directory;
 
 	// Translation blocks, and mapping from logical translation pages to physical translation pages
-	//std::vector<Address> translationBlocks;
-	//std::map<ulong, Address> logicalToPhysicalTranslationPageMapping;
+	//vector<Address> translationBlocks;
+	//map<ulong, Address> logicalToPhysicalTranslationPageMapping;
 	//Address compute_logical_translation_page(long logical_page_address);
 };
 
@@ -1328,7 +1347,7 @@ private:
 	BPage *block_map;
 	bool *trim_map;
 
-	std::queue<Block*> blockQueue;
+	queue<Block*> blockQueue;
 
 	Block* inuseBlock;
 	bool block_next_new();
@@ -1403,7 +1422,7 @@ private:
 class Ssd 
 {
 public:
-	Ssd (OperatingSystem& os, uint ssd_size = SSD_SIZE);
+	Ssd (OperatingSystem* os = NULL, uint ssd_size = SSD_SIZE);
 	~Ssd(void);
 	void event_arrive(Event* event);
 	void event_arrive(enum event_type type, ulong logical_address, uint size, double start_time);
@@ -1451,7 +1470,7 @@ private:
 	ulong least_worn;
 	double last_erase_time;
 	double last_io_submission_time;
-	OperatingSystem& os;
+	OperatingSystem* os;
 };
 
 class RaidSsd
@@ -1488,7 +1507,7 @@ private:
 	VisualTracer();
 	~VisualTracer();
 	void write(int package, int die, char symbol, int length);
-	std::vector<std::vector<std::vector<char> > > trace;
+	vector<vector<vector<char> > > trace;
 };
 
 class StateTracer

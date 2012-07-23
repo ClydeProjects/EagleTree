@@ -13,7 +13,8 @@ using namespace ssd;
 IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
 	ssd(ssd),
 	ftl(ftl),
-	bm(ssd, ftl)
+	bm(ssd, ftl),
+	time_of_last_IO_execution_start(0)
 {}
 
 IOScheduler::~IOScheduler(){}
@@ -35,7 +36,7 @@ bool myfunction (const Event* i, const Event* j) {
 }
 
 bool bus_wait_time_comparator (const Event* i, const Event* j) {
-	return i->get_bus_wait_time() > j->get_bus_wait_time();
+	return i->get_bus_wait_time() < j->get_bus_wait_time();
 }
 
 void IOScheduler::schedule_dependent_events(std::queue<Event*>& events) {
@@ -63,7 +64,14 @@ void IOScheduler::schedule_dependent_events(std::queue<Event*>& events) {
 	io_schedule.push_back(first);
 	//std::sort(io_schedule.begin(), io_schedule.end(), myfunction);
 
-	while (io_schedule.size() > 0 && io_schedule.back()->get_start_time() + 1 <= first->get_start_time()) {
+	//printf("%d  %f\nSTART\n", first->get_logical_address(), first->get_start_time());
+
+	for (int i = 0; i < io_schedule.size(); i++) {
+		//printf("%d  %f\n", io_schedule[i]->get_logical_address(), io_schedule[i]->get_start_time());
+	}
+	//printf("\n");
+	//std::sort(io_schedule.begin(), io_schedule.end(), myfunction);
+	while (io_schedule.size() > 0 && io_schedule.back()->get_current_time() + 1 <= first->get_start_time()) {
 		execute_current_waiting_ios();
 	}
 	assert(events.empty());
@@ -76,7 +84,7 @@ void IOScheduler::schedule_independent_event(Event* event) {
 }
 
 void IOScheduler::finish(double start_time) {
-	while (io_schedule.size() > 0 && io_schedule.back()->get_start_time() + 1 < start_time) {
+	while (io_schedule.size() > 0 && io_schedule.back()->get_current_time() + 1 < start_time) {
 		execute_current_waiting_ios();
 	}
 }
@@ -89,13 +97,9 @@ void IOScheduler::progess() {
 
 std::vector<Event*> IOScheduler::gather_current_waiting_ios() {
 	std::sort(io_schedule.begin(), io_schedule.end(), myfunction);
-	Event* top = io_schedule.back();
-	io_schedule.pop_back();
-	Event* top2 = io_schedule.back();
-	double start_time = top->get_current_time();
+	double start_time = io_schedule.back()->get_current_time();
 	std::vector<Event*> current_ios;
-	current_ios.push_back(top);
-	while (io_schedule.size() > 0 && start_time + 1 > io_schedule.back()->get_start_time() + io_schedule.back()->get_time_taken()) {
+	while (io_schedule.size() > 0 && start_time + 1 > io_schedule.back()->get_current_time()) {
 		Event* current_top = io_schedule.back();
 		io_schedule.pop_back();
 		current_ios.push_back(current_top);
@@ -103,9 +107,12 @@ std::vector<Event*> IOScheduler::gather_current_waiting_ios() {
 	return current_ios;
 }
 
+
+
 void IOScheduler::execute_current_waiting_ios() {
 	assert(io_schedule.size() > 0);
 	vector<Event*> current_ios = gather_current_waiting_ios();
+
 	vector<Event*> read_commands;
 	vector<Event*> read_transfers;
 	vector<Event*> writes;
@@ -137,10 +144,8 @@ void IOScheduler::handle_writes(std::vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
-		if (event->get_id() == 5148) {
-			int i = 0;
-			i++;
-			StateTracer::print();
+		if (event->get_bus_wait_time() == 0) {
+			bm.register_write_arrival(*event);
 		}
 		assert(event->get_event_type() == WRITE);
 		ftl.set_replace_address(*event);
@@ -278,6 +283,11 @@ enum status IOScheduler::execute_next(Event* event) {
 		printf("F ");
 		dependencies.erase(event->get_application_io_id());
 	}
+
+	/*double io_start_time = event->get_start_time() + event->get_bus_wait_time();
+	assert(io_start_time >=  time_of_last_IO_execution_start);
+	time_of_last_IO_execution_start = io_start_time;*/
+
 	event->print();
 	handle_finished_event(event, result);
 	return result;
