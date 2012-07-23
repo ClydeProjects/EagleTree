@@ -913,7 +913,7 @@ private:
 // A simple BM that assigns writes sequentially to dies in a round-robin fashion. No hot-cold separation or anything else intelligent
 class Block_manager_roundrobin : public Block_manager_parent {
 public:
-	Block_manager_roundrobin(Ssd& ssd, FtlParent& ftl);
+	Block_manager_roundrobin(Ssd& ssd, FtlParent& ftl, bool channel_alternation = true);
 	~Block_manager_roundrobin();
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
@@ -922,6 +922,7 @@ private:
 	bool has_free_pages(uint package_id, uint die_id) const;
 	void move_address_cursor();
 	Address address_cursor;
+	bool channel_alternation;
 };
 
 // A BM that assigns each write to the die with the shortest queue, as well as hot-cold seperation
