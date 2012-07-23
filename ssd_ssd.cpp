@@ -140,6 +140,7 @@ Ssd::~Ssd(void)
 void Ssd::event_arrive(Event* event) {
 	assert(event->get_start_time() >= 0.0);
 	assert(event->get_start_time() >= last_io_submission_time);
+	event->set_original_application_io(true);
 	IOScheduler::instance()->finish(event->get_start_time());
 	event->set_original_application_io(true);
 	if(controller.event_arrive(event) != SUCCESS)

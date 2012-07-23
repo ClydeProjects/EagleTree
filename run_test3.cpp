@@ -31,20 +31,33 @@ int main() {
 	print_config(NULL);
     printf("\n");
 
+//	Ssd *ssd = new Ssd();
+	Thread* sw1 = new Synchronous_Sequential_Writer(0, 20, 1);
+	Thread* sw2 = new Asynchronous_Sequential_Writer(50, 70, 1);
+
+	vector<Thread*> threads;
+	//threads.push_back(sw2);
+	//threads.push_back(sw2);
+
+	OperatingSystem* os = new OperatingSystem(threads);
+
 	Ssd *ssd = new Ssd();
+	os->set_ssd(ssd);
+	os->run();
+
 
     printf("Max LBA address: %d\n", SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE);
 
     int user_input_address;
 	string user_input;
-	int time = 1;
+	int time = 0;
 	double result;
 	bool done = false;
 	do {
 		printf("Write to LBA: ");
 		getline (cin, user_input);
 		if (! (stringstream(user_input) >> user_input_address)) break;
-		result = ssd -> event_arrive(WRITE, user_input_address, 1, time );
+		ssd -> event_arrive(WRITE, user_input_address, 1, time );
 		time += 5;
 	} while (!done);
 

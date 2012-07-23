@@ -63,7 +63,7 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	Block* b = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 	blocks_being_garbage_collected.erase(b->get_physical_address());
 
-	printf("%d GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
+	printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
     for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
     	printf("%d  ", (*iter).first);
 	}
@@ -122,7 +122,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
 			(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE) && block.get_pages_valid() < BLOCK_SIZE) {
 		remove_as_gc_candidate(ra);
-		printf("Inserting as GC candidate: %d ", phys_addr); ra.print(); printf(" with age_class %d and valid blocks: %d\n", age_class, block.get_pages_valid());
+		printf("Inserting as GC candidate: %ld ", phys_addr); ra.print(); printf(" with age_class %d and valid blocks: %d\n", age_class, block.get_pages_valid());
 		gc_candidates[ra.package][ra.die][age_class].insert(phys_addr);
 		if (gc_candidates[ra.package][ra.die][age_class].size() == 1) {
 			check_if_should_trigger_more_GC(event.get_current_time());
@@ -151,8 +151,8 @@ void Block_manager_parent::remove_as_gc_candidate(Address const& phys_address) {
 void Block_manager_parent::issue_erase(Address ra, double time) {
 	ra.valid = BLOCK;
 	ra.page = 0;
-	printf("block %d", ra.get_linear_address()); ra.print(); printf(" is now invalid. An erase is issued\n");
-	printf("%d GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
+	printf("block %lu", ra.get_linear_address()); ra.print(); printf(" is now invalid. An erase is issued\n");
+	printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
     for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
     	printf("%d  ", (*iter).first);
 	}
@@ -391,9 +391,9 @@ void Block_manager_parent::choose_gc_victim(vector<pair<long, uint> > candidates
 		assert(gc_candidates[addr.package][addr.die][best_block_age_class].count(best_block->get_physical_address()) == 0);
 		blocks_being_garbage_collected[best_block->get_physical_address()] = best_block->get_pages_valid();
 		int size = blocks_being_garbage_collected.size();
-		printf("Triggering GC in %d ", best_block->get_physical_address()); addr.print(); printf(". Migrating %d \n", best_block->get_pages_valid());
+		printf("Triggering GC in %ld ", best_block->get_physical_address()); addr.print(); printf(". Migrating %d \n", best_block->get_pages_valid());
 
-		printf("%d GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
+		printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
 	    for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
 	    	printf("%d  ", (*iter).first);
 		}
@@ -496,7 +496,7 @@ Address Block_manager_parent::find_free_unused_block_with_class(uint klass, doub
 			}
 		}
 	}
-	return Address(0, NONE);;
+	return Address(0, NONE);
 }
 
 

@@ -437,6 +437,11 @@ public:
       return salt_.size();
    }
 
+   // Added by MKS 23/07-2012: Basically fills the entire filter with 1's, making any element exist in the filter
+   inline void insert_all_keys() {
+       std::fill_n(bit_table_,raw_table_size_,0xFF);
+   }
+
 protected:
 
    inline virtual void compute_indices(const bloom_type& hash, std::size_t& bit_index, std::size_t& bit) const
