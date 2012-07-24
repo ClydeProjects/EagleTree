@@ -143,11 +143,7 @@ void Ssd::event_arrive(Event* event) {
 	event->set_original_application_io(true);
 	IOScheduler::instance()->finish(event->get_start_time());
 	event->set_original_application_io(true);
-	if(controller.event_arrive(event) != SUCCESS)
-	{
-		fprintf(stderr, "Ssd error: %s: request failed:\n", __func__);
-		event -> print(stderr);
-	}
+	controller.event_arrive(event);
 }
 
 void Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, double start_time)
@@ -331,31 +327,6 @@ uint Ssd::get_num_invalid(const Address &address) const
 	return data[address.package].get_num_invalid(address);
 }
 
-void Ssd::print_statistics()
-{
-	controller.stats.print_statistics();
-}
-
-void Ssd::reset_statistics()
-{
-	controller.stats.reset_statistics();
-}
-
-void Ssd::write_statistics(FILE *stream)
-{
-	controller.stats.write_statistics(stream);
-}
-
-void Ssd::print_ftl_statistics()
-{
-	controller.print_ftl_statistics();
-}
-
-void Ssd::write_header(FILE *stream)
-{
-	controller.stats.write_header(stream);
-}
-
 Block *Ssd::get_block_pointer(const Address & address)
 {
 	assert(address.valid >= PACKAGE);
@@ -365,27 +336,6 @@ Block *Ssd::get_block_pointer(const Address & address)
 const Controller &Ssd::get_controller(void)
 {
 	return controller;
-}
-
-/**
- * Returns the next ready time. The ready time is the latest point in time when one of the channels are ready to serve new requests.
- */
-double Ssd::ready_at(void)
-{
-	double next_ready_time = std::numeric_limits<double>::max();
-
-	for (uint i=0;i<size;i++)
-	{
-		double ready_time = bus.get_channel(i).ready_time();
-
-		if (ready_time != -1 && ready_time < next_ready_time)
-				next_ready_time = ready_time;
-	}
-
-	if (next_ready_time == std::numeric_limits<double>::max())
-		return -1;
-	else
-		return next_ready_time;
 }
 
 Package* Ssd::getPackages() {

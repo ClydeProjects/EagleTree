@@ -151,7 +151,6 @@ pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write)
 
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
 	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(write.get_logical_address());
-
 	bool relevant_pointer_unavailable = false;
 
 	if (w_hotness == WRITE_HOT) {

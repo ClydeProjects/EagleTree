@@ -13,8 +13,7 @@ using namespace ssd;
 IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
 	ssd(ssd),
 	ftl(ftl),
-	bm(ssd, ftl),
-	time_of_last_IO_execution_start(0)
+	bm(ssd, ftl)
 {}
 
 IOScheduler::~IOScheduler(){}

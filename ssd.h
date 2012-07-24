@@ -1125,8 +1125,6 @@ private:
 	Block_manager_parallel_wearwolf_locality bm;
 
 	map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations.
-
-	double time_of_last_IO_execution_start;
 };
 
 class FtlParent
@@ -1135,10 +1133,9 @@ public:
 	FtlParent(Controller &controller);
 
 	virtual ~FtlParent () {};
-	virtual enum status read(Event *event) = 0;
-	virtual enum status write(Event *event) = 0;
-	virtual enum status trim(Event *event) = 0;
-	virtual void cleanup_block(Event &event, Block *block);
+	virtual void read(Event *event) = 0;
+	virtual void write(Event *event) = 0;
+	virtual void trim(Event *event) = 0;
 
 	virtual void print_ftl_statistics();
 
@@ -1167,9 +1164,9 @@ class FtlImpl_Page : public FtlParent
 public:
 	FtlImpl_Page(Controller &controller);
 	~FtlImpl_Page();
-	enum status read(Event *event);
-	enum status write(Event *event);
-	enum status trim(Event *event);
+	void read(Event *event);
+	void write(Event *event);
+	void trim(Event *event);
 private:
 	ulong currentPage;
 	ulong numPagesActive;
@@ -1248,9 +1245,9 @@ class FtlImpl_DftlParent : public FtlParent
 public:
 	FtlImpl_DftlParent(Controller &controller);
 	~FtlImpl_DftlParent();
-	virtual enum status read(Event *event) = 0;
-	virtual enum status write(Event *event) = 0;
-	virtual enum status trim(Event *event) = 0;
+	virtual void read(Event *event) = 0;
+	virtual void write(Event *event) = 0;
+	virtual void trim(Event *event) = 0;
 protected:
 	struct MPage {
 		long vpn;
@@ -1322,11 +1319,9 @@ class FtlImpl_Dftl : public FtlImpl_DftlParent
 public:
 	FtlImpl_Dftl(Controller &controller);
 	~FtlImpl_Dftl();
-	enum status read(Event *event);
-	enum status write(Event *event);
-	enum status trim(Event *event);
-	void cleanup_block(Event &event, Block *block);
-	void print_ftl_statistics();
+	void read(Event *event);
+	void write(Event *event);
+	void trim(Event *event);
 	void register_write_completion(Event const& event, enum status result);
 	virtual void register_read_completion(Event const& event, enum status result);
 	virtual void set_replace_address(Event& event) const;
@@ -1393,7 +1388,7 @@ class Controller
 public:
 	Controller(Ssd &parent);
 	~Controller(void);
-	enum status event_arrive(Event *event);
+	void event_arrive(Event *event);
 	friend class FtlParent;
 	friend class FtlImpl_Page;
 	friend class FtlImpl_Bast;
@@ -1442,13 +1437,7 @@ public:
 	friend class Controller;
 	friend class IOScheduler;
 	friend class Block_manager_parent;
-	void print_statistics();
-	void reset_statistics();
-	void write_statistics(FILE *stream);
-	void write_header(FILE *stream);
 	const Controller &get_controller(void);
-	void print_ftl_statistics();
-	double ready_at(void);
 	Package* getPackages();
 private:
 	enum status read(Event &event);
