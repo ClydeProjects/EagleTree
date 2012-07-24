@@ -56,7 +56,7 @@ Asynchronous_Sequential_Writer::Asynchronous_Sequential_Writer(long min_LBA, lon
 
 Event* Asynchronous_Sequential_Writer::issue_next_io() {
 	if (number_of_times_to_repeat > 0) {
-		Event* event =  new Event(WRITE, min_LBA + counter++, 1, time);
+		Event* event =  new Event(WRITE, min_LBA + counter++, 1, time++);
 		event->set_original_application_io(true);
 		return event;
 	} else {
@@ -65,7 +65,6 @@ Event* Asynchronous_Sequential_Writer::issue_next_io() {
 }
 
 void Asynchronous_Sequential_Writer::register_event_completion(Event* event) {
-	time += 2;
 	if (min_LBA + counter == max_LBA) {
 		counter = 0;
 		number_of_times_to_repeat--;

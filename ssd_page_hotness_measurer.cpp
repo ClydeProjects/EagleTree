@@ -246,9 +246,11 @@ Address BloomFilter_Page_Hotness_Measurer::get_best_target_die_for_WC(enum read_
 	for (uint package = 0; package < SSD_SIZE; package++) {
 		for (uint die = 0; die < PACKAGE_SIZE; die++) {
 			total_wc_pages += package_die_stats[package][die].get_wc_pages();
+			//printf("%d + ", package_die_stats[package][die].get_wc_pages());
 		}
 	}
 	double average_wc_pages = (double) total_wc_pages / (SSD_SIZE * PACKAGE_SIZE);
+	//printf(" = %u\nAverage: %f per die.\n", total_wc_pages, average_wc_pages);
 
 	int best_candidate_package = -1;
 	int best_candidate_die = -1;
@@ -257,6 +259,7 @@ Address BloomFilter_Page_Hotness_Measurer::get_best_target_die_for_WC(enum read_
 	// Iterate though all dies with less than average WC pages, and find the one thats best for inserting WCRC or WCRH pages, depending on rh parameter
 	for (uint package = 0; package < SSD_SIZE; package++) {
 		for (uint die = 0; die < PACKAGE_SIZE; die++) {
+
 			if (package_die_stats[package][die].get_wc_pages() <= average_wc_pages) {
 				if (package_die_stats[package][die].get_wc_pages() == 0) return Address(package, die, 0,0,0, DIE); // If die has zero WC pages it is chosen as the target with no further search
 				double reads_per_wc = (double) package_die_stats[package][die].get_reads_targeting_wc_pages() / package_die_stats[package][die].get_wc_pages();
@@ -360,7 +363,7 @@ void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 		if (!get_write_hotness(page_address)) current_die_stats.reads_targeting_wc_pages += 1;
 	}
 
-	print_die_stats();
+	//print_die_stats();
 }
 
 double BloomFilter_Page_Hotness_Measurer::get_hot_data_index(event_type type, ulong page_address) const {

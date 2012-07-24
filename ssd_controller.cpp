@@ -68,17 +68,16 @@ Controller::~Controller(void)
 	return;
 }
 
-enum status Controller::event_arrive(Event *event)
+void Controller::event_arrive(Event *event)
 {
 	if(event->get_event_type() == READ)
-		return ftl->read(event);
+		ftl->read(event);
 	else if(event->get_event_type() == WRITE)
-		return ftl->write(event);
+		ftl->write(event);
 	else if(event->get_event_type() == TRIM)
-		return ftl->trim(event);
+		ftl->trim(event);
 	else
 		fprintf(stderr, "Controller: %s: Invalid event type\n", __func__);
-	return FAILURE;
 }
 
 enum status Controller::issue(Event &event_list)
