@@ -42,6 +42,8 @@
 #include <boost/multi_index/random_access_index.hpp>
 #include "bloom_filter.hpp"
 #include <sys/types.h>
+#include "MTRand/mtrand.h" // Marsenne Twister random number generator
+
 
 #ifndef _SSD_H
 #define _SSD_H
@@ -1557,6 +1559,21 @@ private:
 	double time;
 	int number_of_times_to_repeat, counter;
 };
+
+class Synchronous_Random_Writer : public Thread
+{
+public:
+	Synchronous_Random_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed);
+	Event* issue_next_io();
+	void register_event_completion(Event* event);
+private:
+	long min_LBA, max_LBA;
+	double time;
+	bool ready_to_issue_next_write;
+	int number_of_times_to_repeat, counter;
+	MTRand_int32 random_number_generator;
+};
+
 
 class OperatingSystem
 {

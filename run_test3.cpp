@@ -32,12 +32,13 @@ int main() {
     printf("\n");
 
 //	Ssd *ssd = new Ssd();
-	Thread* sw1 = new Synchronous_Sequential_Writer(0, 20, 1);
-	Thread* sw2 = new Asynchronous_Sequential_Writer(50, 70, 1);
+	//Thread* sw1 = new Synchronous_Sequential_Writer(0, 20, 1);
+	//Thread* sw2 = new Asynchronous_Sequential_Writer(50, 70, 1);
+	Thread* sw3 = new Synchronous_Random_Writer(0, 10, 100, time(NULL));
 
 	vector<Thread*> threads;
 	//threads.push_back(sw2);
-	//threads.push_back(sw2);
+	threads.push_back(sw3);
 
 	OperatingSystem* os = new OperatingSystem(threads);
 
