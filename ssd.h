@@ -1548,6 +1548,8 @@ class Thread
 public:
 	virtual Event* issue_next_io() = 0;
 	virtual void register_event_completion(Event* event) = 0;
+private:
+
 };
 
 class Synchronous_Sequential_Writer : public Thread
@@ -1589,6 +1591,18 @@ private:
 	MTRand_int32 random_number_generator;
 };
 
+class Asynchronous_Random_Writer : public Thread
+{
+public:
+	Asynchronous_Random_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed);
+	Event* issue_next_io();
+	void register_event_completion(Event* event);
+private:
+	long min_LBA, max_LBA;
+	double time;
+	int number_of_times_to_repeat, counter;
+	MTRand_int32 random_number_generator;
+};
 
 class OperatingSystem
 {
