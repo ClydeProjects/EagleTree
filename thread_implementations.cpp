@@ -74,13 +74,13 @@ void Asynchronous_Sequential_Writer::register_event_completion(Event* event) {
 
 
 
-Synchronous_Random_Writer::Synchronous_Random_Writer(long min_LBA, long max_LBA, int repetitions_num, ulong randseed)
+Synchronous_Random_Writer::Synchronous_Random_Writer(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed)
 	: min_LBA(min_LBA),
 	  max_LBA(max_LBA),
 	  counter(0),
 	  time(1),
 	  ready_to_issue_next_write(true),
-	  number_of_times_to_repeat(repetitions_num)
+	  number_of_times_to_repeat(num_ios_to_issue)
 {
 	random_number_generator.seed(randseed);
 }

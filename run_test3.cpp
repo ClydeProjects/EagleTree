@@ -41,11 +41,9 @@ int main() {
 	threads.push_back(sw3);
 
 	OperatingSystem* os = new OperatingSystem(threads);
-
-	Ssd *ssd = new Ssd();
-	os->set_ssd(ssd);
 	os->run();
 
+	Ssd *ssd = new Ssd();
 
     printf("Max LBA address: %d\n", SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE);
 

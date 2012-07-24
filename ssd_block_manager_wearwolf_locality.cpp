@@ -20,7 +20,7 @@ void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event cons
 	}
 	long lb = write.get_logical_address();
 	detector.register_event(lb, write.get_current_time());
-	printf("arrival: %d  in time: %f\n", write.get_logical_address(), write.get_current_time());
+	//printf("arrival: %d  in time: %f\n", write.get_logical_address(), write.get_current_time());
 	if (detector.get_counter(lb) == THRESHOLD) {
 		long key = detector.get_sequential_write_id(lb);
 		set_pointers_for_sequential_write(key, write.get_current_time());
@@ -36,7 +36,7 @@ pair<double, Address> Block_manager_parallel_wearwolf_locality::write(Event & ev
 	if (seq_write_key_to_pointers_mapping.count(key) == 0) {
 		return Block_manager_parallel_wearwolf::write(event);
 	} else {
-		printf("performing seq write for: %d \n", event.get_logical_address());
+		//printf("performing seq write for: %d \n", event.get_logical_address());
 		return perform_sequential_write(key, event.get_current_time());
 	}
 }

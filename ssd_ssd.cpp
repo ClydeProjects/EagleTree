@@ -41,7 +41,7 @@ using namespace ssd;
 /* use caution when editing the initialization list - initialization actually
  * occurs in the order of declaration in the class definition and not in the
  * order listed here */
-Ssd::Ssd(OperatingSystem* os, uint ssd_size):
+Ssd::Ssd(uint ssd_size):
 	size(ssd_size), 
 	controller(*this), 
 	ram(RAM_READ_DELAY, RAM_WRITE_DELAY), 
@@ -62,7 +62,7 @@ Ssd::Ssd(OperatingSystem* os, uint ssd_size):
 	/* assume hardware created at time 0 and had an implied free erasure */
 	last_erase_time(0.0),
 	last_io_submission_time(0.0),
-	os(os)
+	os(NULL)
 {
 	uint i;
 
@@ -340,4 +340,8 @@ const Controller &Ssd::get_controller(void)
 
 Package* Ssd::getPackages() {
 	return data;
+}
+
+void Ssd::set_operating_system(OperatingSystem* new_os) {
+	os = new_os;
 }

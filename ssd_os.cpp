@@ -9,7 +9,7 @@
 using namespace ssd;
 
 OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
-	: ssd(ssd), threads(new_threads),
+	: ssd(new Ssd()), threads(new_threads),
 	  events(threads.size()),
 	  LBA_to_thread_id_map(),
 	  currently_executing_ios_counter(0),
@@ -21,14 +21,15 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 			currently_pending_ios_counter++;
 		}
 	}
+	ssd->set_operating_system(this);
 }
 
 OperatingSystem::~OperatingSystem() {
-
 	for (uint i = 0; i < threads.size(); i++) {
 		delete threads[i];
 		delete events[i];
 	}
+	delete ssd;
 }
 
 void OperatingSystem::run() {
@@ -67,9 +68,5 @@ void OperatingSystem::register_event_completion(Event* event) {
 	if (events[thread_id] != NULL && events[thread_id]->get_event_type() != NOT_VALID) {
 		currently_pending_ios_counter++;
 	}
-}
-
-void OperatingSystem::set_ssd(Ssd * new_ssd) {
-	ssd = new_ssd;
 }
 

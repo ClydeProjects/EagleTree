@@ -39,21 +39,19 @@ int main()
 	printf("\n");
 
 	//Thread* sw1 = new Synchronous_Sequential_Writer(0, 20, 1);
-	Thread* sw2 = new Asynchronous_Sequential_Writer(50, 55, 1);
+	//Thread* sw2 = new Asynchronous_Sequential_Writer(50, 55, 1);
+	Thread* sw2 = new Synchronous_Random_Writer(0, 50, 20, 1);
 
 	vector<Thread*> threads;
 	threads.push_back(sw2);
 	//threads.push_back(sw2);
 
 	OperatingSystem* os = new OperatingSystem(threads);
-
-	Ssd *ssd = new Ssd();
-	os->set_ssd(ssd);
-	//os->run();
+	os->run();
 
 	for (int i = 0; i < 10; i++)
 	{
-		ssd -> event_arrive(WRITE, i, 1, 1 + i * 5  );
+		//ssd -> event_arrive(WRITE, i, 1, 1 + i * 1  );
 	}
 
 	//os.run();
@@ -75,7 +73,7 @@ int main()
 	}
 
 
-	delete ssd;
+	//delete ssd;
 
 	VisualTracer::get_instance()->print();
 

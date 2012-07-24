@@ -1428,7 +1428,7 @@ private:
 class Ssd 
 {
 public:
-	Ssd (OperatingSystem* os = NULL, uint ssd_size = SSD_SIZE);
+	Ssd (uint ssd_size = SSD_SIZE);
 	~Ssd(void);
 	void event_arrive(Event* event);
 	void event_arrive(enum event_type type, ulong logical_address, uint size, double start_time);
@@ -1441,6 +1441,7 @@ public:
 	friend class Block_manager_parent;
 	const Controller &get_controller(void);
 	Package* getPackages();
+	void set_operating_system(OperatingSystem* os);
 private:
 	enum status read(Event &event);
 	enum status write(Event &event);
@@ -1596,7 +1597,6 @@ public:
 	~OperatingSystem();
 	void run();
 	void register_event_completion(Event* event);
-	void set_ssd(Ssd * ssd);
 private:
 	Ssd * ssd;
 	vector<Thread*> threads;
