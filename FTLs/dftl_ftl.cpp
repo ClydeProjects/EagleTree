@@ -110,24 +110,24 @@ void FtlImpl_Dftl::register_write_completion(Event const& event, enum status res
 	// if it's a normal write, we assume its mapping is cached, and we update the modified ts to indicate change
 	if (event.is_original_application_io()) {
 		if (current.ppn == -1) {
-			current.modified_ts = event.get_start_time() + event.get_time_taken();
-			current.create_ts = event.get_start_time() + event.get_time_taken();
+			current.modified_ts = event.get_current_time();
+			current.create_ts = event.get_current_time();
 			current.cached = true;
 			cmt++;
 		} else {
 			assert(current.cached);
-			current.modified_ts = event.get_start_time() + event.get_time_taken();
+			current.modified_ts = event.get_current_time();
 		}
 	}
 
 	// if it's a GC, it may already be in cache, in which case we update it. Else, we add it to the cache.
 	if (event.is_garbage_collection_op()) {
 		if (current.cached) {
-			current.modified_ts = event.get_start_time() + event.get_time_taken();
+			current.modified_ts = event.get_current_time();
 		}
 		else {
-			current.modified_ts = event.get_start_time() + event.get_time_taken();
-			current.create_ts = event.get_start_time() + event.get_time_taken();
+			current.modified_ts = event.get_current_time();
+			current.create_ts = event.get_current_time();
 			current.cached = true;
 			cmt++;
 		}

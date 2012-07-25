@@ -10,6 +10,10 @@
 
 using namespace ssd;
 
+void Thread::register_event_completion(Event* event) {
+	delete event;
+}
+
 // =================  Synchronous_Sequential_Writer  =============================
 
 Synchronous_Sequential_Writer::Synchronous_Sequential_Writer(long min_LBA, long max_LBA, int repetitions_num)
@@ -20,7 +24,6 @@ Synchronous_Sequential_Writer::Synchronous_Sequential_Writer(long min_LBA, long 
 	  ready_to_issue_next_write(true),
 	  number_of_times_to_repeat(repetitions_num)
 {}
-
 
 Event* Synchronous_Sequential_Writer::issue_next_io() {
 	if (ready_to_issue_next_write && number_of_times_to_repeat > 0) {
@@ -42,33 +45,62 @@ void Synchronous_Sequential_Writer::register_event_completion(Event* event) {
 	delete event;
 }
 
+// =================  Synchronous_Sequential_Writer_And_Reader  =============================
+
+Synchronous_Sequential_Writer_And_Reader::Synchronous_Sequential_Writer_And_Reader(long min_LBA, long max_LBA, int repetitions_num)
+	: min_LBA(min_LBA),
+	  max_LBA(max_LBA),
+	  counter(0),
+	  time(1),
+	  ready_to_issue_next_write(true),
+	  number_of_times_to_repeat(repetitions_num),
+	  writing(true)
+{}
+
+Event* Synchronous_Sequential_Writer_And_Reader::issue_next_io() {
+	if (ready_to_issue_next_write && number_of_times_to_repeat > 0) {
+		ready_to_issue_next_write = false;
+		return new Event(writing ? WRITE : READ, min_LBA + counter++, 1, time);
+	} else {
+		return NULL;
+	}
+}
+
+void Synchronous_Sequential_Writer_And_Reader::register_event_completion(Event* event) {
+	assert(!ready_to_issue_next_write);
+	ready_to_issue_next_write = true;
+	time = event->get_current_time();
+	if (min_LBA + counter == max_LBA) {
+		if (!writing) {
+			number_of_times_to_repeat--;
+		}
+		counter = 0;
+		writing = !writing;
+	}
+	delete event;
+}
 
 // =================  Asynchronous_Sequential_Writer  =============================
 
 Asynchronous_Sequential_Writer::Asynchronous_Sequential_Writer(long min_LBA, long max_LBA, int repetitions_num)
 	: min_LBA(min_LBA),
 	  max_LBA(max_LBA),
-	  counter(0),
+	  offset(0),
 	  time(1),
 	  number_of_times_to_repeat(repetitions_num)
 {}
 
-
 Event* Asynchronous_Sequential_Writer::issue_next_io() {
+	if (min_LBA + offset == max_LBA) {
+		offset = 0;
+		number_of_times_to_repeat--;
+	}
 	if (number_of_times_to_repeat > 0) {
-		Event* event =  new Event(WRITE, min_LBA + counter++, 1, time++);
-		return event;
+		time += 3;
+		return new Event(WRITE, min_LBA + offset++, 1, time);
 	} else {
 		return NULL;
 	}
-}
-
-void Asynchronous_Sequential_Writer::register_event_completion(Event* event) {
-	if (min_LBA + counter == max_LBA) {
-		counter = 0;
-		number_of_times_to_repeat--;
-	}
-	delete event;
 }
 
 // =================  Synchronous_Random_Writer  =============================
@@ -76,7 +108,6 @@ void Asynchronous_Sequential_Writer::register_event_completion(Event* event) {
 Synchronous_Random_Writer::Synchronous_Random_Writer(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed)
 	: min_LBA(min_LBA),
 	  max_LBA(max_LBA),
-	  counter(0),
 	  time(1),
 	  ready_to_issue_next_write(true),
 	  number_of_times_to_repeat(num_ios_to_issue)
@@ -84,13 +115,10 @@ Synchronous_Random_Writer::Synchronous_Random_Writer(long min_LBA, long max_LBA,
 	random_number_generator.seed(randseed);
 }
 
-
 Event* Synchronous_Random_Writer::issue_next_io() {
-	if (ready_to_issue_next_write && counter < number_of_times_to_repeat) {
+	if (ready_to_issue_next_write && 0 < number_of_times_to_repeat--) {
 		ready_to_issue_next_write = false;
-		Event* event =  new Event(WRITE, min_LBA + random_number_generator() % (max_LBA - min_LBA + 1), 1, time);
-		counter++;
-		return event;
+		return new Event(WRITE, min_LBA + random_number_generator() % (max_LBA - min_LBA + 1), 1, time);
 	} else {
 		return NULL;
 	}
@@ -109,16 +137,14 @@ void Synchronous_Random_Writer::register_event_completion(Event* event) {
 Asynchronous_Random_Writer::Asynchronous_Random_Writer(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed)
 	: min_LBA(min_LBA),
 	  max_LBA(max_LBA),
-	  counter(0),
 	  time(1),
 	  number_of_times_to_repeat(num_ios_to_issue)
 {
 	random_number_generator.seed(randseed);
 }
 
-
 Event* Asynchronous_Random_Writer::issue_next_io() {
-	if (counter++ < number_of_times_to_repeat) {
+	if (0 < number_of_times_to_repeat--) {
 		Event* event =  new Event(WRITE, min_LBA + random_number_generator() % (max_LBA - min_LBA + 1), 1, time++);
 		return event;
 	} else {
@@ -126,6 +152,3 @@ Event* Asynchronous_Random_Writer::issue_next_io() {
 	}
 }
 
-void Asynchronous_Random_Writer::register_event_completion(Event* event) {
-	delete event;
-}

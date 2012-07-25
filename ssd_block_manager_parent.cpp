@@ -72,6 +72,7 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	num_free_pages += BLOCK_SIZE;
 	num_available_pages_for_new_writes += BLOCK_SIZE;
 
+	check_if_should_trigger_more_GC(event.get_current_time());
 	Wear_Level(event);
 }
 
@@ -499,4 +500,10 @@ Address Block_manager_parent::find_free_unused_block_with_class(uint klass, doub
 	return Address(0, NONE);
 }
 
+void Block_manager_parent::return_unfilled_block(Address pba) {
+	if (pba.page < BLOCK_SIZE) {
+		int age_class = sort_into_age_class(pba);
+		free_blocks[pba.package][pba.die][age_class].push_back(pba);
+	}
+}
 

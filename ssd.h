@@ -877,6 +877,8 @@ protected:
 	Address find_free_unused_block(double time);
 	Address find_free_unused_block_with_class(uint klass, double time);
 
+	void return_unfilled_block(Address block_address);
+
 	pair<bool, pair<uint, uint> > get_free_die_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
 	Address get_free_die_with_shortest_IO_queue() const;
 
@@ -913,9 +915,9 @@ class Block_manager_parallel : public Block_manager_parent {
 public:
 	Block_manager_parallel(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel();
-	virtual void register_write_outcome(Event const& event, enum status status);
-	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write);
+	void register_write_outcome(Event const& event, enum status status);
+	void register_erase_outcome(Event const& event, enum status status);
+	pair<double, Address> write(Event const& write);
 private:
 	bool has_free_pages(uint package_id, uint die_id) const;
 };
@@ -925,9 +927,9 @@ class Block_manager_roundrobin : public Block_manager_parent {
 public:
 	Block_manager_roundrobin(Ssd& ssd, FtlParent& ftl, bool channel_alternation = true);
 	~Block_manager_roundrobin();
-	virtual void register_write_outcome(Event const& event, enum status status);
-	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write);
+	void register_write_outcome(Event const& event, enum status status);
+	void register_erase_outcome(Event const& event, enum status status);
+	pair<double, Address> write(Event const& write);
 private:
 	bool has_free_pages(uint package_id, uint die_id) const;
 	void move_address_cursor();
@@ -940,12 +942,12 @@ class Block_manager_parallel_hot_cold_seperation : public Block_manager_parent {
 public:
 	Block_manager_parallel_hot_cold_seperation(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel_hot_cold_seperation();
-	virtual void register_write_outcome(Event const& event, enum status status);
-	virtual void register_read_outcome(Event const& event, enum status status);
-	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write);
+	void register_write_outcome(Event const& event, enum status status);
+	void register_read_outcome(Event const& event, enum status status);
+	void register_erase_outcome(Event const& event, enum status status);
+	pair<double, Address> write(Event const& write);
 protected:
-	virtual void check_if_should_trigger_more_GC(double start_time);
+	void check_if_should_trigger_more_GC(double start_time);
 private:
 	bool pointer_can_be_written_to(Address pointer) const;
 	bool at_least_one_available_write_hot_pointer() const;
@@ -975,7 +977,10 @@ private:
 	Address wcrc_pointer;
 };
 
-
+class Sequential_Pattern_Detector_Listener {
+public:
+	virtual void sequential_event_metadata_removed(long key) = 0;
+};
 
 class Sequential_Pattern_Detector {
 public:
@@ -984,11 +989,16 @@ public:
 	~Sequential_Pattern_Detector();
 	void register_event(logical_address lb, double time);
 	int get_sequential_write_id(logical_address lb);
-	int get_counter(logical_address lb);
+	int get_current_offset(logical_address lb);
+	int get_num_times_pattern_has_repeated(logical_address lb);
+	double get_arrival_time_of_last_io_in_pattern(logical_address lb);
+	//void remove(logical_address lb);
+	void set_listener(Sequential_Pattern_Detector_Listener * listener);
 private:
 
 	struct sequential_writes_tracking {
 		int counter;
+		int num_times_pattern_has_repeated;
 		double last_LBA_timestamp;
 		sequential_writes_tracking(double time);
 		~sequential_writes_tracking();
@@ -1000,27 +1010,32 @@ private:
 	void remove_old_sequential_writes_metadata(double time);
 
 	uint registration_counter;
+	Sequential_Pattern_Detector_Listener* listener;
 };
 
-class Block_manager_parallel_wearwolf_locality : public Block_manager_parallel_wearwolf {
+class Block_manager_parallel_wearwolf_locality : public Block_manager_parallel_wearwolf, public Sequential_Pattern_Detector_Listener {
 public:
 	Block_manager_parallel_wearwolf_locality(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel_wearwolf_locality();
-	virtual pair<double, Address> write(Event & write);
-	virtual void register_write_outcome(Event const& event, enum status status);
-	virtual void register_write_arrival(Event const& write);
+	void register_write_arrival(Event const& write);
+	pair<double, Address> write(Event & write);
+	void register_write_outcome(Event const& event, enum status status);
+	void register_erase_outcome(Event const& event, enum status status);
+	void sequential_event_metadata_removed(long key);
+protected:
+	//void check_if_should_trigger_more_GC(double start_time);
 private:
 	enum parallel_degree_for_sequential_files { ONE, LUN, CHANNEL };
 	parallel_degree_for_sequential_files parallel_degree;
 
 	map<long, vector<vector<Address> > > seq_write_key_to_pointers_mapping;
 
+
 	void set_pointers_for_sequential_write(long key, double time);
 	pair<double, Address> perform_sequential_write(long key, double time);
-	void remove_old_sequential_writes_metadata(double time);
 
-	Sequential_Pattern_Detector detector;
-	Sequential_Pattern_Detector recorder;
+	Sequential_Pattern_Detector* detector;
+	Sequential_Pattern_Detector* recorder;
 };
 
 class Block_manager
@@ -1547,9 +1562,7 @@ class Thread
 {
 public:
 	virtual Event* issue_next_io() = 0;
-	virtual void register_event_completion(Event* event) = 0;
-private:
-
+	virtual void register_event_completion(Event* event);
 };
 
 class Synchronous_Sequential_Writer : public Thread
@@ -1565,16 +1578,29 @@ private:
 	int number_of_times_to_repeat, counter;
 };
 
-class Asynchronous_Sequential_Writer : public Thread
+class Synchronous_Sequential_Writer_And_Reader : public Thread
 {
 public:
-	Asynchronous_Sequential_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat);
+	Synchronous_Sequential_Writer_And_Reader(long min_LBA, long max_LAB, int number_of_times_to_repeat);
 	Event* issue_next_io();
 	void register_event_completion(Event* event);
 private:
 	long min_LBA, max_LBA;
 	double time;
+	bool ready_to_issue_next_write;
 	int number_of_times_to_repeat, counter;
+	bool writing;
+};
+
+class Asynchronous_Sequential_Writer : public Thread
+{
+public:
+	Asynchronous_Sequential_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat);
+	Event* issue_next_io();
+private:
+	long min_LBA, max_LBA;
+	double time;
+	int number_of_times_to_repeat, offset;
 };
 
 class Synchronous_Random_Writer : public Thread
@@ -1587,7 +1613,7 @@ private:
 	long min_LBA, max_LBA;
 	double time;
 	bool ready_to_issue_next_write;
-	int number_of_times_to_repeat, counter;
+	int number_of_times_to_repeat;
 	MTRand_int32 random_number_generator;
 };
 
@@ -1596,11 +1622,10 @@ class Asynchronous_Random_Writer : public Thread
 public:
 	Asynchronous_Random_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed);
 	Event* issue_next_io();
-	void register_event_completion(Event* event);
 private:
 	long min_LBA, max_LBA;
 	double time;
-	int number_of_times_to_repeat, counter;
+	int number_of_times_to_repeat;
 	MTRand_int32 random_number_generator;
 };
 

@@ -91,18 +91,9 @@ void Block_manager_parallel_wearwolf::handle_cold_pointer_out_of_space(enum read
 }
 
 void Block_manager_parallel_wearwolf::register_erase_outcome(Event const& event, enum status status) {
-	assert(event.get_event_type() == ERASE);
-	if (status == FAILURE) {
-		return;
-	}
-	if (event.get_id() == 255) {
-		int i = 0;
-		i++;
-	}
 	Block_manager_parent::register_erase_outcome(event, status);
 	reset_any_filled_pointers(event);
 	check_if_should_trigger_more_GC(event.get_current_time());
-
 }
 
 // must really improve logic in this class. Currently, mistakes are too easy if much GC happens at same time
@@ -210,7 +201,6 @@ void Block_manager_parallel_wearwolf::register_read_outcome(Event const& event, 
 }
 
 void Block_manager_parallel_wearwolf::check_if_should_trigger_more_GC(double start_time) {
-	Block_manager_parent::check_if_should_trigger_more_GC(start_time);
 	if (wcrh_pointer.page >= BLOCK_SIZE) {
 		handle_cold_pointer_out_of_space(READ_HOT, start_time);
 	}
