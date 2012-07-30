@@ -38,13 +38,11 @@ int main()
 	//getchar();
 	printf("\n");
 
-	//Thread* sw1 = new Synchronous_Sequential_Writer(0, 20, 1);
-	//Thread* sw2 = new Asynchronous_Sequential_Writer(50, 55, 1);
-	Thread* sw2 = new Synchronous_Random_Writer(0, 50, 20, 1);
-
 	vector<Thread*> threads;
-	threads.push_back(sw2);
-	//threads.push_back(sw2);
+	threads.push_back(new Synchronous_Sequential_Writer(0, 50, 1));
+	threads.push_back(new Synchronous_Sequential_Writer(50, 100, 1));
+	threads.push_back(new Synchronous_Sequential_Writer(100, 150, 1));
+	threads.push_back(new Synchronous_Sequential_Writer(150, 200, 5));
 
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
@@ -75,7 +73,9 @@ int main()
 
 	//delete ssd;
 
+	StatisticsGatherer::get_instance()->print();
 	VisualTracer::get_instance()->print();
+	StateTracer::print();
 
 	return 0;
 }

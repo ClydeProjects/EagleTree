@@ -103,12 +103,12 @@ void Block_manager_parallel_wearwolf::reset_any_filled_pointers(Event const& eve
 
 	// TODO: Need better logic for this assignment. Easiest to remember some state.
 	// when we trigger GC for a cold pointer, remember which block was chosen.
-	if (free_block_pointers[package_id][die_id].page >= BLOCK_SIZE) {
+	if (!has_free_pages(free_block_pointers[package_id][die_id])) {
 		free_block_pointers[package_id][die_id] = find_free_unused_block(package_id, die_id, event.get_current_time());
 	}
-	else if (wcrh_pointer.page >= BLOCK_SIZE) {
+	else if (!has_free_pages(wcrh_pointer)) {
 		wcrh_pointer = find_free_unused_block(package_id, die_id, event.get_current_time());
-	} else if (wcrc_pointer.page >= BLOCK_SIZE) {
+	} else if (!has_free_pages(wcrc_pointer)) {
 		wcrc_pointer = find_free_unused_block(package_id, die_id, event.get_current_time() );
 	}
 }

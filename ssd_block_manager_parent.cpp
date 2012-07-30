@@ -194,7 +194,7 @@ void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
 	}
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			if (free_block_pointers[i][j].page >= BLOCK_SIZE) {
+			if (!has_free_pages(free_block_pointers[i][j])) {
 				perform_gc(i, j, 0, start_time);
 			}
 		}
@@ -253,13 +253,15 @@ pair<bool, pair<uint, uint> > Block_manager_parent::get_free_die_with_shortest_I
 	uint best_channel_id;
 	uint best_die_id;
 	bool can_write = false;
+	bool at_least_one_address = false;
 	double shortest_time = std::numeric_limits<double>::max( );
 	for (uint i = 0; i < dies.size(); i++) {
 		double earliest_die_finish_time = std::numeric_limits<double>::max();
 		uint die_with_earliest_finish_time = 0;
 		for (uint j = 0; j < dies[i].size(); j++) {
 			Address pointer = dies[i][j];
-			bool die_has_free_pages = pointer.page < BLOCK_SIZE;
+			at_least_one_address = at_least_one_address ? at_least_one_address : pointer.valid == PAGE;
+			bool die_has_free_pages = has_free_pages(pointer);
 			uint channel_id = pointer.package;
 			uint die_id = pointer.die;
 			bool die_register_is_busy = ssd.getPackages()[channel_id].getDies()[die_id].register_is_busy();
@@ -282,6 +284,7 @@ pair<bool, pair<uint, uint> > Block_manager_parent::get_free_die_with_shortest_I
 			}
 		}
 	}
+	assert(at_least_one_address);
 	return pair<bool, pair<uint, uint> >(can_write, pair<uint, uint>(best_channel_id, best_die_id));
 }
 
@@ -296,6 +299,10 @@ Address Block_manager_parent::get_free_die_with_shortest_IO_queue() const {
 
 uint Block_manager_parent::how_many_gc_operations_are_scheduled() const {
 	return blocks_being_garbage_collected.size();
+}
+
+bool Block_manager_parent::has_free_pages(Address const& address) const {
+	return address.valid == PAGE && address.page < BLOCK_SIZE;
 }
 
 // gives time until both the channel and die are clear

@@ -884,6 +884,8 @@ protected:
 
 	uint how_many_gc_operations_are_scheduled() const;
 
+	bool has_free_pages(Address const& address) const;
+
 	Ssd& ssd;
 	FtlParent& ftl;
 	vector<vector<Address> > free_block_pointers;
@@ -1007,6 +1009,9 @@ private:
 	map<logical_address, logical_address> sequential_writes_key_lookup;  // a map from the next expected LBA in a seqeuntial pattern to the first LBA, which is the key
 	map<logical_address, sequential_writes_tracking*> sequential_writes_identification_and_data;	// a map from the first logical write of a sequential pattern to metadata about the pattern
 
+	void restart_pattern(int key, double time);
+	void process_next_write(int lb, double time);
+	void init_pattern(int lb, double time);
 	void remove_old_sequential_writes_metadata(double time);
 
 	uint registration_counter;
@@ -1028,8 +1033,13 @@ private:
 	enum parallel_degree_for_sequential_files { ONE, LUN, CHANNEL };
 	parallel_degree_for_sequential_files parallel_degree;
 
-	map<long, vector<vector<Address> > > seq_write_key_to_pointers_mapping;
+	struct sequential_writes_pointers {
+		int num_pointers;
+		vector<vector<Address> > pointers;
+		sequential_writes_pointers();
+	};
 
+	map<long, sequential_writes_pointers> seq_write_key_to_pointers_mapping;
 
 	void set_pointers_for_sequential_write(long key, double time);
 	pair<double, Address> perform_sequential_write(long key, double time);

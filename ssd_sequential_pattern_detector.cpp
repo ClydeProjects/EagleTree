@@ -20,37 +20,45 @@ Sequential_Pattern_Detector::~Sequential_Pattern_Detector() {
 }
 
 void Sequential_Pattern_Detector::register_event(logical_address lb, double time) {
-
-	// the next LBA is registered
-	if (sequential_writes_key_lookup.count(lb) == 1) {
-		logical_address key = sequential_writes_key_lookup[lb];
-		sequential_writes_tracking& swm = *sequential_writes_identification_and_data[key];
-		swm.counter++;
-		swm.last_LBA_timestamp = time;
-		sequential_writes_key_lookup.erase(lb - 1);
-		sequential_writes_key_lookup[lb + 1] = key;
+	if (sequential_writes_identification_and_data.count(lb) == 1) {
+		restart_pattern(lb, time);
 	}
-	// the sequential pattern has restarted
-	else if (sequential_writes_identification_and_data.count(lb) == 1 && sequential_writes_key_lookup.count(lb) == 0) {
-		sequential_writes_tracking& swm = *sequential_writes_identification_and_data[lb];
-		swm.num_times_pattern_has_repeated++;
-		sequential_writes_key_lookup.erase(lb + swm.counter);
-		sequential_writes_key_lookup.erase(lb + swm.counter + 1);
-		sequential_writes_key_lookup[lb] = lb;
-		sequential_writes_key_lookup[lb + 1] = lb;
-		swm.counter = 0;
-		printf("SEQUENTIAL PATTERN RESTARTED!\n");
+	else if (sequential_writes_key_lookup.count(lb) == 1) {
+		process_next_write(lb, time);
 	}
-	// the LBA is seen here for the first time
-	else if (sequential_writes_key_lookup.count(lb) == 0) {
-		sequential_writes_key_lookup[lb + 1] = lb;
-		sequential_writes_identification_and_data[lb] = new sequential_writes_tracking(time);
+	else {
+		init_pattern(lb, time);
 	}
-
 
 	if (++registration_counter % 50 == 0) {
 		remove_old_sequential_writes_metadata(time);
 	}
+}
+
+void Sequential_Pattern_Detector::init_pattern(int key, double time) {
+	sequential_writes_key_lookup[key + 1] = key;
+	sequential_writes_identification_and_data[key] = new sequential_writes_tracking(time);
+}
+
+void Sequential_Pattern_Detector::process_next_write(int lb, double time) {
+	logical_address key = sequential_writes_key_lookup[lb];
+	sequential_writes_tracking& swm = *sequential_writes_identification_and_data[key];
+	swm.counter++;
+	swm.last_LBA_timestamp = time;
+	sequential_writes_key_lookup.erase(lb - 1);
+	sequential_writes_key_lookup[lb + 1] = key;
+}
+
+void Sequential_Pattern_Detector::restart_pattern(int key, double time) {
+	sequential_writes_tracking& swm = *sequential_writes_identification_and_data[key];
+	swm.num_times_pattern_has_repeated++;
+	sequential_writes_key_lookup.erase(key + swm.counter);
+	sequential_writes_key_lookup.erase(key + swm.counter + 1);
+	sequential_writes_key_lookup[key] = key;
+	sequential_writes_key_lookup[key + 1] = key;
+	swm.counter = 0;
+	swm.last_LBA_timestamp = time;
+	printf("SEQUENTIAL PATTERN RESTARTED!  key: %d\n", key);
 }
 
 int Sequential_Pattern_Detector::get_current_offset(logical_address lb) {
@@ -124,7 +132,6 @@ void Sequential_Pattern_Detector::remove_old_sequential_writes_metadata(double t
 		} else {
 			++iter;
 		}
-
 	}
 }
 
