@@ -15,6 +15,7 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	  currently_executing_ios_counter(0),
 	  currently_pending_ios_counter(0)
 {
+	assert(threads.size() > 0);
 	for (uint i = 0; i < threads.size(); i++) {
 		events[i] = threads[i]->issue_next_io();
 		if (events[i]->get_event_type() != NOT_VALID) {
@@ -63,7 +64,9 @@ void OperatingSystem::register_event_completion(Event* event) {
 	uint thread_id = LBA_to_thread_id_map[event->get_logical_address()];
 	LBA_to_thread_id_map.erase(event->get_logical_address());
 	threads[thread_id]->register_event_completion(event);
-	events[thread_id] = threads[thread_id]->issue_next_io();
+	if (threads[thread_id] == NULL) {
+		events[thread_id] = threads[thread_id]->issue_next_io();
+	}
 	currently_executing_ios_counter--;
 	if (events[thread_id] != NULL && events[thread_id]->get_event_type() != NOT_VALID) {
 		currently_pending_ios_counter++;
