@@ -39,10 +39,11 @@ int main()
 	printf("\n");
 
 	vector<Thread*> threads;
-	threads.push_back(new Synchronous_Sequential_Writer(0, 50, 1));
-	threads.push_back(new Synchronous_Sequential_Writer(50, 100, 1));
-	threads.push_back(new Synchronous_Sequential_Writer(100, 150, 1));
-	threads.push_back(new Synchronous_Sequential_Writer(150, 200, 5));
+	threads.push_back(new Synchronous_Sequential_Writer(0, 40, 1));
+	threads.push_back(new Synchronous_Sequential_Writer(40, 80, 1));
+	threads.push_back(new Synchronous_Sequential_Writer(80, 120, 1));
+	threads.push_back(new Synchronous_Sequential_Writer(120, 160, 10));
+	threads.push_back(new Synchronous_Sequential_Writer(160, 200, 10));
 
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
@@ -54,28 +55,13 @@ int main()
 
 	//os.run();
 
-	/*for (int j = 0; j < 15; j++) {
-		StateTracer::print();
-		for (int i = 121; i < 240; i++)
-		{
-			result = ssd -> event_arrive(WRITE, i, 1, j * 600 + 2000 + i * 5  );
-		}
-	}
-	StateTracer::print();
-*/
-
-	for (int i = 0; i < 1; i++)
-	{
-		//int lba = rand() % (NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE / 2);
-		//result = ssd -> event_arrive(READ, lba, 1, 0);
-	}
 
 
 	//delete ssd;
 
-	StatisticsGatherer::get_instance()->print();
+
 	VisualTracer::get_instance()->print();
 	StateTracer::print();
-
+	StatisticsGatherer::get_instance()->print();
 	return 0;
 }

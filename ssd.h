@@ -786,8 +786,9 @@ public:
 
 	// WC = live pages - WH
 	inline uint get_wc_pages() const {
-		if (unique_wh_encountered_previous_window != -1) return live_pages - unique_wh_encountered_previous_window;
-		return live_pages - unique_wh_encountered;
+		int unique_wh = unique_wh_encountered_previous_window == -1 ? unique_wh_encountered : unique_wh_encountered;
+		int diff = live_pages - unique_wh;
+		return diff > 0 ? diff : 0;
 	}
 
 	inline uint get_reads_targeting_wc_pages() const {
