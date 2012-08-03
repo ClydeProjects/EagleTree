@@ -104,6 +104,11 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 		perform_gc(event.get_current_time());
 	}
 
+	trim(event);
+}
+
+void Block_manager_parent::trim(Event const& event) {
+
 	Address ra = event.get_replace_address();
 	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
 	uint age_class = sort_into_age_class(ra);
@@ -141,6 +146,9 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 		blocks_being_garbage_collected[phys_addr]--;
 		issue_erase(ra, event.get_current_time());
 	}
+
+
+
 }
 
 void Block_manager_parent::remove_as_gc_candidate(Address const& phys_address) {
@@ -167,7 +175,7 @@ void Block_manager_parent::issue_erase(Address ra, double time) {
 
 // invalidates the original location of a write
 void Block_manager_parent::invalidate(Event const& event) {
-	assert(event.get_event_type() == WRITE);
+	assert(event.get_event_type() == WRITE || event.get_event_type() == TRIM);
 	Address ra = event.get_replace_address();
 	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
 	Page const& page = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block].getPages()[ra.page];

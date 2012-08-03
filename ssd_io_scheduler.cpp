@@ -119,6 +119,7 @@ void IOScheduler::execute_current_waiting_ios() {
 	vector<Event*> gc_writes;
 	vector<Event*> writes;
 	vector<Event*> erases;
+	vector<Event*> trims;
 	for(uint i = 0; i < current_ios.size(); i++) {
 		if (current_ios[i]->get_event_type() == READ_COMMAND) {
 			read_commands.push_back(current_ios[i]);
@@ -134,6 +135,10 @@ void IOScheduler::execute_current_waiting_ios() {
 		}
 		else if (current_ios[i]->get_event_type() == ERASE) {
 			erases.push_back(current_ios[i]);
+		}
+		else if (current_ios[i]->get_event_type() == TRIM) {
+			ftl.set_replace_address(*current_ios[i]);
+			handle_finished_event(current_ios[i], SUCCESS);
 		}
 	}
 	//printf("\n -------------------------------- \n");
@@ -298,7 +303,6 @@ enum status IOScheduler::execute_next(Event* event) {
 				dependent->set_address(event->get_address());
 			}
 		}
-		printf("S ");
 	} else {
 		printf("F ");
 		dependencies.erase(event->get_application_io_id());
@@ -308,7 +312,6 @@ enum status IOScheduler::execute_next(Event* event) {
 	assert(io_start_time >=  time_of_last_IO_execution_start);
 	time_of_last_IO_execution_start = io_start_time;*/
 
-	event->print();
 	handle_finished_event(event, result);
 	return result;
 }
@@ -325,6 +328,7 @@ bool IOScheduler::can_schedule_on_die(Event const* event) const {
 }
 
 void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
+	event->print();
 	if (outcome == FAILURE) {
 		return;
 	}
@@ -338,6 +342,9 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		bm.register_read_outcome(*event, outcome);
 	} else if (event->get_event_type() == READ_TRANSFER) {
 		ftl.register_read_completion(*event, outcome);
+	} else if (event->get_event_type() == TRIM) {
+		ftl.register_trim_completion(*event);
+		bm.trim(*event);
 	}
 	StatisticsGatherer::get_instance()->register_completed_event(*event);
 

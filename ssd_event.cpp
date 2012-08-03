@@ -206,7 +206,7 @@ void Event::set_address(const Address &address)
 			int i = 0;
 			i++;
 		}
-		assert(address.valid == PAGE);
+		//assert(address.valid == PAGE);
 	}
 	this -> address = address;
 }
@@ -292,10 +292,12 @@ void Event::print(FILE *stream) const
 		fprintf(stream, "E ");
 	else if(type == MERGE)
 		fprintf(stream, "M ");
+	else if (type == TRIM)
+		fprintf(stream, "D ");
 	else
 		fprintf(stream, "Unknown event type: ");
 
-	fprintf(stream, "%d ", logical_address);
+	fprintf(stream, "%d\t", logical_address);
 	address.print(stream);
 	if(type == MERGE)
 		merge_address.print(stream);

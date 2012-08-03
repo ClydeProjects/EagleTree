@@ -860,6 +860,7 @@ public:
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual pair<double, Address> write(Event const& write) = 0;
 	virtual void register_write_arrival(Event const& write);
+	virtual void trim(Event const& write);
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
@@ -1179,6 +1180,7 @@ public:
 	// I dont't want to implement it in BAST and FAST yet
 	virtual void register_write_completion(Event const& event, enum status result);
 	virtual void register_read_completion(Event const& event, enum status result);
+	virtual void register_trim_completion(Event & event);
 	virtual long get_logical_address(uint physical_address) const;
 	virtual void set_replace_address(Event& event) const;
 	virtual void set_read_address(Event& event) const;
@@ -1350,9 +1352,10 @@ public:
 	void write(Event *event);
 	void trim(Event *event);
 	void register_write_completion(Event const& event, enum status result);
-	virtual void register_read_completion(Event const& event, enum status result);
-	virtual void set_replace_address(Event& event) const;
-	virtual void set_read_address(Event& event) const;
+	void register_read_completion(Event const& event, enum status result);
+	void register_trim_completion(Event & event);
+	void set_replace_address(Event& event) const;
+	void set_read_address(Event& event) const;
 private:
 	const double over_provisioning_percentage;
 };
@@ -1653,12 +1656,13 @@ public:
 	Event* issue_next_io();
 	Event* execute_first_phase();
 	Event* execute_second_phase();
+	Event* execute_third_phase();
 	void register_event_completion(Event* event);
 private:
 	long relation_min_LBA, relation_max_LBA, RAM_available, free_space_min_LBA, free_space_max_LBA, cursor, counter, number_finished;
 	int num_partitions, num_pages_in_last_partition;
 	double time;
-	enum external_sort_phase {FIRST_PHASE_READ, FIRST_PHASE_WRITE, SECOND_PHASE, FINISHED};
+	enum external_sort_phase {FIRST_PHASE_READ, FIRST_PHASE_WRITE, SECOND_PHASE, THIRD_PHASE, FINISHED};
 	external_sort_phase phase;
 	bool can_start_next_read;
 };

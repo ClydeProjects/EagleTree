@@ -27,6 +27,9 @@ VisualTracer *VisualTracer::get_instance()
 }
 
 void VisualTracer::register_completed_event(Event const& event) {
+	if (event.get_event_type() == TRIM) {
+		return;
+	}
 	Address add = event.get_address();
 
 	int i = event.get_start_time() + event.get_bus_wait_time() - trace[add.package][add.die].size();

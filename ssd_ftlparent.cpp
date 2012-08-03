@@ -77,6 +77,11 @@ void FtlParent::register_read_completion(Event const& event, enum status result)
 	return;
 }
 
+void FtlParent::register_trim_completion(Event & event) {
+	assert(false);
+	return;
+}
+
 long FtlParent::get_logical_address(uint physical_address) const {
 	assert(false);
 	return 0;

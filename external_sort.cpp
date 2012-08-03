@@ -31,6 +31,8 @@ Event* External_Sort::issue_next_io() {
 		return execute_first_phase();
 	} else if (phase == SECOND_PHASE) {
 		return execute_second_phase();
+	} else if (phase == THIRD_PHASE) {
+		return execute_third_phase();
 	} else if (phase == FINISHED) {
 		return NULL;
 	}
@@ -51,12 +53,20 @@ Event* External_Sort::execute_second_phase() {
 	if (can_start_next_read) {
 		can_start_next_read = false;
 		long current_lba = counter++ * RAM_available + cursor;
-		io = new Event(READ, current_lba, 1, time++);
+		io = new Event(READ, current_lba, 1, time);
 		long next_lba = counter * RAM_available + cursor;
 		if (next_lba > relation_max_LBA - relation_min_LBA + free_space_min_LBA) {
 			counter = 0;
 			cursor++;
 		}
+	}
+	return io;
+}
+
+Event* External_Sort::execute_third_phase() {
+	Event *io = new Event(TRIM, cursor++, 1, time);
+	if (cursor > relation_max_LBA - relation_min_LBA + free_space_min_LBA) {
+		phase = FINISHED;
 	}
 	return io;
 }
@@ -81,8 +91,9 @@ void External_Sort::register_event_completion(Event* event) {
 		can_start_next_read = true;
 	}
 	else if (phase == SECOND_PHASE && number_finished == relation_max_LBA - relation_min_LBA + 1) {
-		phase = FINISHED;
-		time = event->get_current_time() ;
+		phase = THIRD_PHASE;
+		cursor = free_space_min_LBA;
+		time = event->get_current_time() + 2;
 	}
 	else if (phase == SECOND_PHASE) {
 		can_start_next_read = true;
