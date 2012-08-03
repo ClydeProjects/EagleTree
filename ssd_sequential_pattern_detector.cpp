@@ -20,6 +20,10 @@ Sequential_Pattern_Detector::~Sequential_Pattern_Detector() {
 }
 
 void Sequential_Pattern_Detector::register_event(logical_address lb, double time) {
+	if (lb == 161) {
+		int i = 0;
+		i++;
+	}
 	if (sequential_writes_identification_and_data.count(lb) == 1) {
 		restart_pattern(lb, time);
 	}
@@ -36,6 +40,7 @@ void Sequential_Pattern_Detector::register_event(logical_address lb, double time
 }
 
 void Sequential_Pattern_Detector::init_pattern(int key, double time) {
+	printf("init_pattern: %d \n", key);
 	sequential_writes_key_lookup[key + 1] = key;
 	sequential_writes_identification_and_data[key] = new sequential_writes_tracking(time);
 }
@@ -92,12 +97,18 @@ double Sequential_Pattern_Detector::get_arrival_time_of_last_io_in_pattern(logic
 }
 
 int Sequential_Pattern_Detector::get_sequential_write_id(logical_address lb) {
-	if (sequential_writes_key_lookup.count(lb) == 0) {
-		return -1;
-	} else {
-		logical_address key = sequential_writes_key_lookup[lb];
-		return key;
+
+	map<logical_address, sequential_writes_tracking*>::iterator iter = sequential_writes_identification_and_data.begin();
+	while(iter != sequential_writes_identification_and_data.end())
+	{
+		long key = (*iter).first;
+		sequential_writes_tracking* swt = (*iter).second;
+		if (lb >= key && lb <= key + swt->counter) {
+			return key;
+		}
+		iter++;
 	}
+	return -1;
 }
 
 void Sequential_Pattern_Detector::set_listener(Sequential_Pattern_Detector_Listener * new_listener) {
