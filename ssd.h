@@ -995,8 +995,8 @@ public:
 	int get_current_offset(logical_address lb);
 	int get_num_times_pattern_has_repeated(logical_address lb);
 	double get_arrival_time_of_last_io_in_pattern(logical_address lb);
-	//void remove(logical_address lb);
 	void set_listener(Sequential_Pattern_Detector_Listener * listener);
+
 private:
 
 	struct sequential_writes_tracking {
@@ -1046,7 +1046,7 @@ private:
 	pair<double, Address> perform_sequential_write(long key, double time);
 
 	Sequential_Pattern_Detector* detector;
-	Sequential_Pattern_Detector* recorder;
+	//Sequential_Pattern_Detector* recorder;
 };
 
 class Block_manager
@@ -1143,14 +1143,13 @@ private:
 	void eliminate_conflict_with_any_incoming_gc(Event * event);
 	void adjust_conflict_elimination_structures(Event const*const event);
 
-
 	vector<Event*> io_schedule;
 	map<uint, deque<Event*> > dependencies;
 
 	static IOScheduler *inst;
 	Ssd& ssd;
 	FtlParent& ftl;
-	Block_manager_parallel_wearwolf_locality bm;
+	Block_manager_parallel_wearwolf bm;
 
 	map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations.
 };
@@ -1567,6 +1566,8 @@ private:
 
 	vector<vector<uint> > num_gc_reads_per_LUN;
 	vector<vector<uint> > num_gc_writes_per_LUN;
+
+	vector<vector<uint> > num_erases_per_LUN;
 };
 
 class Thread
@@ -1608,10 +1609,12 @@ class Asynchronous_Sequential_Writer : public Thread
 public:
 	Asynchronous_Sequential_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat);
 	Event* issue_next_io();
+	void register_event_completion(Event* event);
 private:
 	long min_LBA, max_LBA;
 	double time;
 	int number_of_times_to_repeat, offset;
+	bool finished_round;
 };
 
 class Synchronous_Random_Writer : public Thread
@@ -1638,6 +1641,26 @@ private:
 	double time;
 	int number_of_times_to_repeat;
 	MTRand_int32 random_number_generator;
+};
+
+// assuming the relation is made of contigouse pages
+// RAM_available is the number of pages that fit into RAM
+class External_Sort : public Thread
+{
+public:
+	External_Sort(long relation_min_LBA, long relation_max_LBA, long RAM_available,
+			long free_space_min_LBA, long free_space_max_LBA, double start_time);
+	Event* issue_next_io();
+	Event* execute_first_phase();
+	Event* execute_second_phase();
+	void register_event_completion(Event* event);
+private:
+	long relation_min_LBA, relation_max_LBA, RAM_available, free_space_min_LBA, free_space_max_LBA, cursor, counter, number_finished;
+	int num_partitions, num_pages_in_last_partition;
+	double time;
+	enum external_sort_phase {FIRST_PHASE_READ, FIRST_PHASE_WRITE, SECOND_PHASE, FINISHED};
+	external_sort_phase phase;
+	bool can_start_next_read;
 };
 
 class OperatingSystem
