@@ -53,6 +53,7 @@ void IOScheduler::schedule_dependent_events(std::queue<Event*>& events) {
 			dependencies[dependency_code].push_back(read_command);
 		}
 		if (event->is_garbage_collection_op() && event->get_event_type() == WRITE) {
+			assert(LBA_to_dependencies.count(event->get_logical_address()) == 0);
 			LBA_to_dependencies[event->get_logical_address()] = dependency_code;
 		}
 		dependencies[dependency_code].push_back(event);
@@ -70,6 +71,7 @@ void IOScheduler::schedule_dependent_events(std::queue<Event*>& events) {
 	}
 	//printf("\n");
 	//std::sort(io_schedule.begin(), io_schedule.end(), myfunction);
+	Event* e = io_schedule.back();
 	while (io_schedule.size() > 0 && io_schedule.back()->get_current_time() + 1 <= first->get_start_time()) {
 		execute_current_waiting_ios();
 	}
@@ -114,6 +116,7 @@ void IOScheduler::execute_current_waiting_ios() {
 
 	vector<Event*> read_commands;
 	vector<Event*> read_transfers;
+	vector<Event*> gc_writes;
 	vector<Event*> writes;
 	vector<Event*> erases;
 	for(uint i = 0; i < current_ios.size(); i++) {
@@ -123,8 +126,11 @@ void IOScheduler::execute_current_waiting_ios() {
 		else if (current_ios[i]->get_event_type() == READ_TRANSFER) {
 			read_transfers.push_back(current_ios[i]);
 		}
-		else if (current_ios[i]->get_event_type() == WRITE) {
+		else if (current_ios[i]->get_event_type() == WRITE && !current_ios[i]->is_garbage_collection_op()) {
 			writes.push_back(current_ios[i]);
+		}
+		else if (current_ios[i]->get_event_type() == WRITE && current_ios[i]->is_garbage_collection_op()) {
+			gc_writes.push_back(current_ios[i]);
 		}
 		else if (current_ios[i]->get_event_type() == ERASE) {
 			erases.push_back(current_ios[i]);
@@ -134,15 +140,25 @@ void IOScheduler::execute_current_waiting_ios() {
 	execute_next_batch(erases);
 	execute_next_batch(read_commands);
 	execute_next_batch(read_transfers);
+	handle_writes(gc_writes);
 	handle_writes(writes);
 }
 
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_writes(std::vector<Event*>& events) {
 	std::sort(events.begin(), events.end(), bus_wait_time_comparator);
+	//printf("STARTTTTTTTTTTTTTTT\n");
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
+
+		if (event->get_id() == 179 && event->get_bus_wait_time() > 700) {
+			int i = 0;
+			i++;
+			StateTracer::print();
+		}
+
+
 		if (event->get_bus_wait_time() == 0) {
 			bm.register_write_arrival(*event);
 		}
@@ -223,7 +239,12 @@ void IOScheduler::eliminate_conflict_with_any_incoming_gc(Event * event) {
 	printf("\n");
 
 	event->set_garbage_collection_op(true);
-	assert(num_events_eliminated > 0);
+	if (num_events_eliminated == 0) {
+		int i = 0;
+		i++;
+		event->print();
+	}
+	//assert(num_events_eliminated > 0);
 
 	LBA_to_dependencies.erase(event->get_logical_address());
 }

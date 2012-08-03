@@ -120,7 +120,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	}
 
 	// TODO: fix thresholds for inserting blocks into GC lists
-	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
+	if (ra.valid > NONE && blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
 			(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE) && block.get_pages_valid() < BLOCK_SIZE) {
 		remove_as_gc_candidate(ra);
 		printf("Inserting as GC candidate: %ld ", phys_addr); ra.print(); printf(" with age_class %d and valid blocks: %d\n", age_class, block.get_pages_valid());
@@ -182,9 +182,6 @@ void Block_manager_parent::register_read_outcome(Event const& event, enum status
 }
 
 bool Block_manager_parent::can_write(Event const& write) const {
-	/*if (!write.is_garbage_collection_op() && num_free_pages >= 4 && num_available_pages_for_new_writes > 0) {
-
-	}*/
 	return num_available_pages_for_new_writes > 0 || write.is_garbage_collection_op();
 }
 
