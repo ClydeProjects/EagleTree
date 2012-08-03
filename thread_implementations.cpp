@@ -87,19 +87,28 @@ Asynchronous_Sequential_Writer::Asynchronous_Sequential_Writer(long min_LBA, lon
 	  max_LBA(max_LBA),
 	  offset(0),
 	  time(1),
-	  number_of_times_to_repeat(repetitions_num)
+	  number_of_times_to_repeat(repetitions_num),
+	  finished_round(false)
 {}
 
 Event* Asynchronous_Sequential_Writer::issue_next_io() {
-	if (min_LBA + offset == max_LBA) {
+	if (number_of_times_to_repeat == 0 || finished_round) {
+		return NULL;
+	}
+	Event* e = new Event(WRITE, min_LBA + offset, 1, time);
+	time += 3;
+	if (min_LBA + offset++ == max_LBA) {
+		finished_round = true;
+	}
+	return e;
+}
+
+void Asynchronous_Sequential_Writer::register_event_completion(Event* event) {
+	if (event->get_logical_address() == max_LBA) {
+		finished_round = false;
 		offset = 0;
 		number_of_times_to_repeat--;
-	}
-	if (number_of_times_to_repeat > 0) {
-		time += 3;
-		return new Event(WRITE, min_LBA + offset++, 1, time);
-	} else {
-		return NULL;
+		time = event->get_current_time();
 	}
 }
 
