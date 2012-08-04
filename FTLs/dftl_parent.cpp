@@ -234,7 +234,7 @@ void FtlImpl_DftlParent::evict_page_from_cache(Event *event)
 void FtlImpl_DftlParent::evict_specific_page_from_cache(Event *event, long lba)
 {
 		// asserting false because this method still needs work
-		assert(false);
+		//assert(false);
 
 		// Find page to evict
 		MPage evictPage = trans_map[lba];

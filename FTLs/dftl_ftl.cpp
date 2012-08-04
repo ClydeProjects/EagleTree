@@ -76,26 +76,21 @@ void FtlImpl_Dftl::write(Event *event)
 
 void FtlImpl_Dftl::trim(Event *event)
 {
-	//assert(event.get_logical_address() < NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * (1 - over_provisioning_percentage));
-	uint dlpn = event->get_logical_address();
+	IOScheduler::instance()->schedule_independent_event(event);
+}
 
-	event->set_address(Address(0, PAGE));
-
+void FtlImpl_Dftl::register_trim_completion(Event & event) {
+	uint dlpn = event.get_logical_address();
 	MPage current = trans_map[dlpn];
-
 	if (current.ppn != -1)
 	{
 		Address address = Address(current.ppn, PAGE);
-		Block *block = controller.get_block_pointer(address);
-		block->invalidate_page(address.page);
-		evict_specific_page_from_cache(event, dlpn);
+		evict_specific_page_from_cache(&event, dlpn);
 		current.ppn = -1;
 		trans_map.replace(trans_map.begin()+dlpn, current);
 	}
 
 	controller.stats.numFTLTrim++;
-
-	//return controller.issue(event);
 }
 
 
@@ -150,6 +145,7 @@ void FtlImpl_Dftl::register_write_completion(Event const& event, enum status res
 	}
 }
 
+
 void FtlImpl_Dftl::register_read_completion(Event const& event, enum status result) {
 	assert(event.get_event_type() == READ_TRANSFER);
 	if (result != SUCCESS) {
@@ -165,12 +161,14 @@ void FtlImpl_Dftl::register_read_completion(Event const& event, enum status resu
 	}
 }
 
+
+
 // important to execute this immediately before a write is executed
 // to ensure that the replace address has not been changed by GC while this write
 // in the IO scheduler queue
 void FtlImpl_Dftl::set_replace_address(Event& event) const {
 	MPage current = trans_map[event.get_logical_address()];
-	assert(event.get_event_type() == WRITE);
+	assert(event.get_event_type() == WRITE || event.get_event_type() == TRIM);
 	Address a = Address(current.ppn, PAGE);
 	if (current.ppn != -1) {
 		assert(current.cached);
