@@ -426,6 +426,7 @@ public:
 	void *get_payload(void) const;
 	double incr_bus_wait_time(double time);
 	double incr_time_taken(double time_incr);
+	double get_best_case_finish_time();
 	void print(FILE *stream = stdout) const;
 private:
 	double start_time;
@@ -1610,7 +1611,7 @@ private:
 class Asynchronous_Sequential_Writer : public Thread
 {
 public:
-	Asynchronous_Sequential_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat);
+	Asynchronous_Sequential_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, double start_time = 1);
 	Event* issue_next_io();
 	void register_event_completion(Event* event);
 private:
@@ -1674,6 +1675,7 @@ public:
 	~OperatingSystem();
 	void run();
 	void register_event_completion(Event* event);
+	double get_event_minimal_completion_time(Event const*const event) const;
 private:
 	Ssd * ssd;
 	vector<Thread*> threads;
@@ -1681,6 +1683,7 @@ private:
 	map<long, uint> LBA_to_thread_id_map;
 	int currently_executing_ios_counter;
 	int currently_pending_ios_counter;
+	double last_dispatched_event_minimal_finish_time;
 };
 
 } /* end namespace ssd */

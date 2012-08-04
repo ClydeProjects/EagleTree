@@ -1,4 +1,4 @@
-/*
+/*++++----------------------------------------------
  * ssd_os.cpp
  *
  *  Created on: Jul 20, 2012
@@ -22,6 +22,7 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 			currently_pending_ios_counter++;
 		}
 	}
+	last_dispatched_event_minimal_finish_time = events[0]->get_start_time();
 	ssd->set_operating_system(this);
 }
 
@@ -45,21 +46,23 @@ void OperatingSystem::run() {
 				thread_id = i;
 			}
 		}
+		Event* event = events[thread_id];
 
-		if (thread_id == -1) {
+		if (thread_id == -1 || (currently_executing_ios_counter > 0 && last_dispatched_event_minimal_finish_time < event->get_start_time())) {
 			ssd->progress_since_os_is_idle();
-		} else {
+		}
+		else {
 			currently_executing_ios_counter++;
 			currently_pending_ios_counter--;
-			//currently_pending_ios_counter = currently_pending_ios_counter == 0 ? 0 : currently_pending_ios_counter - 1;
-			Event* event = events[thread_id];
+			last_dispatched_event_minimal_finish_time = get_event_minimal_completion_time(event);
 			LBA_to_thread_id_map[event->get_logical_address()] = thread_id;
 			ssd->event_arrive(event);
 			events[thread_id] = threads[thread_id]->issue_next_io();
-			if (events[thread_id] != NULL && events[thread_id]->get_event_type() != NOT_VALID) {
+			if (events[thread_id] != NULL && event->get_event_type() != NOT_VALID) {
 				currently_pending_ios_counter++;
 			}
 		}
+
 	} while (currently_executing_ios_counter > 0 || currently_pending_ios_counter > 0);
 }
 
@@ -75,6 +78,16 @@ void OperatingSystem::register_event_completion(Event* event) {
 		}
 	}
 	currently_executing_ios_counter--;
+}
 
+double OperatingSystem::get_event_minimal_completion_time(Event const*const event) const {
+	double result = event->get_start_time();
+	if (event->get_event_type() == WRITE) {
+		result += 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY + PAGE_WRITE_DELAY;
+	}
+	else if (event->get_event_type() == READ) {
+		result += 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY + PAGE_READ_DELAY;
+	}
+	return result;
 }
 

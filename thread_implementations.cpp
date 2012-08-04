@@ -82,11 +82,11 @@ void Synchronous_Sequential_Writer_And_Reader::register_event_completion(Event* 
 
 // =================  Asynchronous_Sequential_Writer  =============================
 
-Asynchronous_Sequential_Writer::Asynchronous_Sequential_Writer(long min_LBA, long max_LBA, int repetitions_num)
+Asynchronous_Sequential_Writer::Asynchronous_Sequential_Writer(long min_LBA, long max_LBA, int repetitions_num, double start_time)
 	: min_LBA(min_LBA),
 	  max_LBA(max_LBA),
 	  offset(0),
-	  time(1),
+	  time(start_time),
 	  number_of_times_to_repeat(repetitions_num),
 	  finished_round(false)
 {}
