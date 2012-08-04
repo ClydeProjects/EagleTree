@@ -14,27 +14,28 @@ void Thread::register_event_completion(Event* event) {
 	delete event;
 }
 
-// =================  Synchronous_Sequential_Writer  =============================
+// =================  Synchronous_Sequential_Thread  =============================
 
-Synchronous_Sequential_Writer::Synchronous_Sequential_Writer(long min_LBA, long max_LBA, int repetitions_num, double start_time)
+Synchronous_Sequential_Thread::Synchronous_Sequential_Thread(long min_LBA, long max_LBA, int repetitions_num, event_type type, double start_time)
 	: Thread(start_time),
 	  min_LBA(min_LBA),
 	  max_LBA(max_LBA),
 	  counter(0),
 	  ready_to_issue_next_write(true),
-	  number_of_times_to_repeat(repetitions_num)
+	  number_of_times_to_repeat(repetitions_num),
+	  type(type)
 {}
 
-Event* Synchronous_Sequential_Writer::issue_next_io() {
+Event* Synchronous_Sequential_Thread::issue_next_io() {
 	if (ready_to_issue_next_write && number_of_times_to_repeat > 0) {
 		ready_to_issue_next_write = false;
-		return new Event(WRITE, min_LBA + counter++, 1, time);
+		return new Event(type, min_LBA + counter++, 1, time);
 	} else {
 		return NULL;
 	}
 }
 
-void Synchronous_Sequential_Writer::register_event_completion(Event* event) {
+void Synchronous_Sequential_Thread::register_event_completion(Event* event) {
 	assert(!ready_to_issue_next_write);
 	ready_to_issue_next_write = true;
 	time = event->get_current_time();
@@ -45,57 +46,24 @@ void Synchronous_Sequential_Writer::register_event_completion(Event* event) {
 	delete event;
 }
 
-// =================  Synchronous_Sequential_Writer_And_Reader  =============================
-
-Synchronous_Sequential_Writer_And_Reader::Synchronous_Sequential_Writer_And_Reader(long min_LBA, long max_LBA, int repetitions_num)
-	: Thread(1),
-	  min_LBA(min_LBA),
-	  max_LBA(max_LBA),
-	  counter(0),
-	  ready_to_issue_next_write(true),
-	  number_of_times_to_repeat(repetitions_num),
-	  writing(true)
-{}
-
-Event* Synchronous_Sequential_Writer_And_Reader::issue_next_io() {
-	if (ready_to_issue_next_write && number_of_times_to_repeat > 0) {
-		ready_to_issue_next_write = false;
-		return new Event(writing ? WRITE : READ, min_LBA + counter++, 1, time);
-	} else {
-		return NULL;
-	}
-}
-
-void Synchronous_Sequential_Writer_And_Reader::register_event_completion(Event* event) {
-	assert(!ready_to_issue_next_write);
-	ready_to_issue_next_write = true;
-	time = event->get_current_time();
-	if (min_LBA + counter == max_LBA) {
-		if (!writing) {
-			number_of_times_to_repeat--;
-		}
-		counter = 0;
-		writing = !writing;
-	}
-	delete event;
-}
-
 // =================  Asynchronous_Sequential_Writer  =============================
 
-Asynchronous_Sequential_Writer::Asynchronous_Sequential_Writer(long min_LBA, long max_LBA, int repetitions_num, double start_time)
+Asynchronous_Sequential_Thread::Asynchronous_Sequential_Thread(long min_LBA, long max_LBA, int repetitions_num, event_type type, double start_time)
 	: Thread(start_time),
 	  min_LBA(min_LBA),
 	  max_LBA(max_LBA),
 	  offset(0),
 	  number_of_times_to_repeat(repetitions_num),
-	  finished_round(false)
+	  finished_round(false),
+	  type(type),
+	  number_finished(0)
 {}
 
-Event* Asynchronous_Sequential_Writer::issue_next_io() {
+Event* Asynchronous_Sequential_Thread::issue_next_io() {
 	if (number_of_times_to_repeat == 0 || finished_round) {
 		return NULL;
 	}
-	Event* e = new Event(WRITE, min_LBA + offset, 1, time);
+	Event* e = new Event(type, min_LBA + offset, 1, time);
 	time += 3;
 	if (min_LBA + offset++ == max_LBA) {
 		finished_round = true;
@@ -103,12 +71,13 @@ Event* Asynchronous_Sequential_Writer::issue_next_io() {
 	return e;
 }
 
-void Asynchronous_Sequential_Writer::register_event_completion(Event* event) {
-	if (event->get_logical_address() == max_LBA) {
+void Asynchronous_Sequential_Thread::register_event_completion(Event* event) {
+	if (number_finished++ == max_LBA - min_LBA) {
 		finished_round = false;
 		offset = 0;
 		number_of_times_to_repeat--;
 		time = event->get_current_time();
+		number_finished = 0;
 	}
 	if (number_of_times_to_repeat == 0) {
 		finished = true;

@@ -1595,42 +1595,31 @@ protected:
 	double time;
 };
 
-class Synchronous_Sequential_Writer : public Thread
+class Synchronous_Sequential_Thread : public Thread
 {
 public:
-	Synchronous_Sequential_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, double start_time = 1);
+	Synchronous_Sequential_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, event_type type, double start_time = 1);
 	Event* issue_next_io();
 	void register_event_completion(Event* event);
 private:
 	long min_LBA, max_LBA;
 	bool ready_to_issue_next_write;
 	int number_of_times_to_repeat, counter;
+	event_type type;
 };
 
-class Synchronous_Sequential_Writer_And_Reader : public Thread
+class Asynchronous_Sequential_Thread : public Thread
 {
 public:
-	Synchronous_Sequential_Writer_And_Reader(long min_LBA, long max_LAB, int number_of_times_to_repeat);
+	Asynchronous_Sequential_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, event_type type, double start_time = 1);
 	Event* issue_next_io();
 	void register_event_completion(Event* event);
 private:
 	long min_LBA, max_LBA;
-	bool ready_to_issue_next_write;
-	int number_of_times_to_repeat, counter;
-	bool writing;
-};
-
-class Asynchronous_Sequential_Writer : public Thread
-{
-public:
-	Asynchronous_Sequential_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, double start_time = 1);
-	Event* issue_next_io();
-	void register_event_completion(Event* event);
-private:
-	long min_LBA, max_LBA;
-	double time;
 	int number_of_times_to_repeat, offset;
 	bool finished_round;
+	event_type type;
+	int number_finished;
 };
 
 class Synchronous_Random_Writer : public Thread
