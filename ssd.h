@@ -1577,19 +1577,32 @@ private:
 class Thread
 {
 public:
-	virtual Event* issue_next_io() = 0;
+	Thread(double time) : finished(false), time(time) {}
+	virtual ~Thread() {}
+	Event* run() {
+		return finished ? NULL : issue_next_io();
+	}
 	virtual void register_event_completion(Event* event);
+	bool is_finished() {
+		return finished;
+	}
+	void set_time(double current_time) {
+		time = current_time;
+	}
+protected:
+	virtual Event* issue_next_io() = 0;
+	bool finished;
+	double time;
 };
 
 class Synchronous_Sequential_Writer : public Thread
 {
 public:
-	Synchronous_Sequential_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat);
+	Synchronous_Sequential_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, double start_time = 1);
 	Event* issue_next_io();
 	void register_event_completion(Event* event);
 private:
 	long min_LBA, max_LBA;
-	double time;
 	bool ready_to_issue_next_write;
 	int number_of_times_to_repeat, counter;
 };
@@ -1602,7 +1615,6 @@ public:
 	void register_event_completion(Event* event);
 private:
 	long min_LBA, max_LBA;
-	double time;
 	bool ready_to_issue_next_write;
 	int number_of_times_to_repeat, counter;
 	bool writing;
@@ -1624,12 +1636,11 @@ private:
 class Synchronous_Random_Writer : public Thread
 {
 public:
-	Synchronous_Random_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed);
+	Synchronous_Random_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed, double start_time = 1);
 	Event* issue_next_io();
 	void register_event_completion(Event* event);
 private:
 	long min_LBA, max_LBA;
-	double time;
 	bool ready_to_issue_next_write;
 	int number_of_times_to_repeat;
 	MTRand_int32 random_number_generator;
@@ -1638,11 +1649,10 @@ private:
 class Asynchronous_Random_Writer : public Thread
 {
 public:
-	Asynchronous_Random_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed);
+	Asynchronous_Random_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed, double start_time = 1);
 	Event* issue_next_io();
 private:
 	long min_LBA, max_LBA;
-	double time;
 	int number_of_times_to_repeat;
 	MTRand_int32 random_number_generator;
 };
@@ -1653,7 +1663,7 @@ class External_Sort : public Thread
 {
 public:
 	External_Sort(long relation_min_LBA, long relation_max_LBA, long RAM_available,
-			long free_space_min_LBA, long free_space_max_LBA, double start_time);
+			long free_space_min_LBA, long free_space_max_LBA, double start_time = 1);
 	Event* issue_next_io();
 	Event* execute_first_phase();
 	Event* execute_second_phase();
@@ -1662,7 +1672,6 @@ public:
 private:
 	long relation_min_LBA, relation_max_LBA, RAM_available, free_space_min_LBA, free_space_max_LBA, cursor, counter, number_finished;
 	int num_partitions, num_pages_in_last_partition;
-	double time;
 	enum external_sort_phase {FIRST_PHASE_READ, FIRST_PHASE_WRITE, SECOND_PHASE, THIRD_PHASE, FINISHED};
 	external_sort_phase phase;
 	bool can_start_next_read;
@@ -1672,13 +1681,18 @@ class OperatingSystem
 {
 public:
 	OperatingSystem(vector<Thread*> threads);
+	OperatingSystem(vector<queue<Thread*> > threads_dependencies);
 	~OperatingSystem();
 	void run();
 	void register_event_completion(Event* event);
-	double get_event_minimal_completion_time(Event const*const event) const;
+
 private:
+	int pick_event_with_shortest_start_time();
+	void dispatch_event(int thread_id);
+	double get_event_minimal_completion_time(Event const*const event) const;
 	Ssd * ssd;
 	vector<Thread*> threads;
+	vector<queue<Thread*> > thread_dependencies;
 	vector<Event*> events;
 	map<long, uint> LBA_to_thread_id_map;
 	int currently_executing_ios_counter;

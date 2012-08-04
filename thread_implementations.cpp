@@ -16,11 +16,11 @@ void Thread::register_event_completion(Event* event) {
 
 // =================  Synchronous_Sequential_Writer  =============================
 
-Synchronous_Sequential_Writer::Synchronous_Sequential_Writer(long min_LBA, long max_LBA, int repetitions_num)
-	: min_LBA(min_LBA),
+Synchronous_Sequential_Writer::Synchronous_Sequential_Writer(long min_LBA, long max_LBA, int repetitions_num, double start_time)
+	: Thread(start_time),
+	  min_LBA(min_LBA),
 	  max_LBA(max_LBA),
 	  counter(0),
-	  time(1),
 	  ready_to_issue_next_write(true),
 	  number_of_times_to_repeat(repetitions_num)
 {}
@@ -48,10 +48,10 @@ void Synchronous_Sequential_Writer::register_event_completion(Event* event) {
 // =================  Synchronous_Sequential_Writer_And_Reader  =============================
 
 Synchronous_Sequential_Writer_And_Reader::Synchronous_Sequential_Writer_And_Reader(long min_LBA, long max_LBA, int repetitions_num)
-	: min_LBA(min_LBA),
+	: Thread(1),
+	  min_LBA(min_LBA),
 	  max_LBA(max_LBA),
 	  counter(0),
-	  time(1),
 	  ready_to_issue_next_write(true),
 	  number_of_times_to_repeat(repetitions_num),
 	  writing(true)
@@ -83,10 +83,10 @@ void Synchronous_Sequential_Writer_And_Reader::register_event_completion(Event* 
 // =================  Asynchronous_Sequential_Writer  =============================
 
 Asynchronous_Sequential_Writer::Asynchronous_Sequential_Writer(long min_LBA, long max_LBA, int repetitions_num, double start_time)
-	: min_LBA(min_LBA),
+	: Thread(start_time),
+	  min_LBA(min_LBA),
 	  max_LBA(max_LBA),
 	  offset(0),
-	  time(start_time),
 	  number_of_times_to_repeat(repetitions_num),
 	  finished_round(false)
 {}
@@ -110,14 +110,17 @@ void Asynchronous_Sequential_Writer::register_event_completion(Event* event) {
 		number_of_times_to_repeat--;
 		time = event->get_current_time();
 	}
+	if (number_of_times_to_repeat == 0) {
+		finished = true;
+	}
 }
 
 // =================  Synchronous_Random_Writer  =============================
 
-Synchronous_Random_Writer::Synchronous_Random_Writer(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed)
-	: min_LBA(min_LBA),
+Synchronous_Random_Writer::Synchronous_Random_Writer(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed, double start_time)
+	: Thread(start_time),
+	  min_LBA(min_LBA),
 	  max_LBA(max_LBA),
-	  time(1),
 	  ready_to_issue_next_write(true),
 	  number_of_times_to_repeat(num_ios_to_issue)
 {
@@ -143,10 +146,10 @@ void Synchronous_Random_Writer::register_event_completion(Event* event) {
 
 // =================  Asynchronous_Random_Writer  =============================
 
-Asynchronous_Random_Writer::Asynchronous_Random_Writer(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed)
-	: min_LBA(min_LBA),
+Asynchronous_Random_Writer::Asynchronous_Random_Writer(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed, double start_time)
+	: Thread(start_time),
+	  min_LBA(min_LBA),
 	  max_LBA(max_LBA),
-	  time(1),
 	  number_of_times_to_repeat(num_ios_to_issue)
 {
 	random_number_generator.seed(randseed);

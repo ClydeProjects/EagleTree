@@ -12,9 +12,9 @@ using namespace ssd;
 
 External_Sort::External_Sort(long relation_min_LBA, long relation_max_LBA, long RAM_available,
 		long free_space_min_LBA, long free_space_max_LBA, double start_time) :
-		relation_min_LBA(relation_min_LBA), relation_max_LBA(relation_max_LBA), RAM_available(RAM_available),
+		Thread(start_time), relation_min_LBA(relation_min_LBA), relation_max_LBA(relation_max_LBA), RAM_available(RAM_available),
 		free_space_min_LBA(free_space_min_LBA), free_space_max_LBA(free_space_max_LBA),
-		cursor(0), counter(0), number_finished(0), time(start_time), phase(FIRST_PHASE_READ)
+		cursor(0), counter(0), number_finished(0), phase(FIRST_PHASE_READ)
 {
 	assert(relation_min_LBA < relation_max_LBA);
 	assert(free_space_min_LBA < free_space_max_LBA);
@@ -64,11 +64,10 @@ Event* External_Sort::execute_second_phase() {
 }
 
 Event* External_Sort::execute_third_phase() {
-	Event *io = new Event(TRIM, cursor++, 1, time);
-	if (cursor > relation_max_LBA - relation_min_LBA + free_space_min_LBA) {
-		phase = FINISHED;
+	if (cursor <= relation_max_LBA - relation_min_LBA + free_space_min_LBA) {
+		return new Event(TRIM, cursor++, 1, time);
 	}
-	return io;
+	return NULL;
 }
 
 void External_Sort::register_event_completion(Event* event) {
@@ -94,10 +93,15 @@ void External_Sort::register_event_completion(Event* event) {
 		phase = THIRD_PHASE;
 		cursor = free_space_min_LBA;
 		time = event->get_current_time() + 2;
+		number_finished = 0;
 	}
 	else if (phase == SECOND_PHASE) {
 		can_start_next_read = true;
 		time = event->get_current_time();
+	}
+	else if (phase == THIRD_PHASE && number_finished == relation_max_LBA - relation_min_LBA + 1) {
+		phase = FINISHED;
+		finished = true;
 	}
 }
 
