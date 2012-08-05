@@ -1184,7 +1184,7 @@ public:
 	virtual void register_trim_completion(Event & event);
 	virtual long get_logical_address(uint physical_address) const;
 	virtual void set_replace_address(Event& event) const;
-	virtual void set_read_address(Event& event) const;
+	virtual void set_read_address(Event& event);
 protected:
 	Controller &controller;
 };

@@ -92,7 +92,7 @@ void FtlParent::set_replace_address(Event& event) const {
 	return;
 }
 
-void FtlParent::set_read_address(Event& event) const {
+void FtlParent::set_read_address(Event& event) {
 	assert(false);
 	return;
 }
