@@ -50,6 +50,7 @@ void IOScheduler::schedule_dependent_events(std::queue<Event*>& events) {
 			Event* read_command = new Event(READ_COMMAND, event->get_logical_address(), event->get_size(), event->get_start_time());
 			read_command->set_application_io_id(dependency_code);
 			read_command->set_garbage_collection_op(event->is_garbage_collection_op());
+			read_command->set_mapping_op(event->is_mapping_op());
 			dependencies[dependency_code].push_back(read_command);
 		}
 		if (event->is_garbage_collection_op() && event->get_event_type() == WRITE) {
@@ -348,10 +349,5 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	}
 	StatisticsGatherer::get_instance()->register_completed_event(*event);
 
-	if (event->is_original_application_io()) {
-		ssd.register_event_completion(event);
-	}
-	else {
-		delete event;
-	}
+	ssd.register_event_completion(event);
 }

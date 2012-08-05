@@ -1317,17 +1317,17 @@ protected:
 
 	bool lookup_CMT(long dlpn, Event *event);
 
-	long get_free_data_page(Event &event);
-	long get_free_data_page(Event &event, bool insert_events);
-
 	void evict_page_from_cache( Event * event);
 	void evict_specific_page_from_cache(Event *event, long lba);
 
 	long get_logical_address(uint physical_address) const;
 
+	long get_mapping_virtual_address(long event_lba);
+
 	// Mapping information
 	int addressSize;
 	int addressPerPage;
+	int num_mapping_pages;
 	uint totalCMTentries;
 
 	// Current storage
@@ -1336,7 +1336,7 @@ protected:
 
 	queue<Event*> current_dependent_events;
 
-	vector<long> global_translation_directory;
+	map<long, long> global_translation_directory; // a map from virtual translation pages to physical translation pages
 
 	// Translation blocks, and mapping from logical translation pages to physical translation pages
 	//vector<Address> translationBlocks;
@@ -1356,7 +1356,7 @@ public:
 	void register_read_completion(Event const& event, enum status result);
 	void register_trim_completion(Event & event);
 	void set_replace_address(Event& event) const;
-	void set_read_address(Event& event) const;
+	void set_read_address(Event& event);
 private:
 	const double over_provisioning_percentage;
 };

@@ -39,7 +39,7 @@ void Synchronous_Sequential_Thread::register_event_completion(Event* event) {
 	assert(!ready_to_issue_next_write);
 	ready_to_issue_next_write = true;
 	time = event->get_current_time();
-	if (min_LBA + counter == max_LBA) {
+	if (min_LBA + counter > max_LBA) {
 		counter = 0;
 		number_of_times_to_repeat--;
 	}

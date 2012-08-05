@@ -138,7 +138,12 @@ Ssd::~Ssd(void)
 }
 
 void Ssd::event_arrive(Event* event) {
+	//printf("submitted: "); event->print();
 	assert(event->get_start_time() >= 0.0);
+	if (event->get_start_time() < last_io_submission_time) {
+		int i = 0;
+		i++;
+	}
 	assert(event->get_start_time() >= last_io_submission_time);
 	event->set_original_application_io(true);
 	IOScheduler::instance()->finish(event->get_start_time());
@@ -179,9 +184,13 @@ void Ssd::progress_since_os_is_idle() {
 }
 
 void Ssd::register_event_completion(Event * event) {
-	last_io_submission_time = event->get_start_time();
-	if (os != NULL) {
+	if (event->get_event_type() == WRITE || event->get_event_type() == READ_COMMAND) {
+		last_io_submission_time = event->get_start_time();
+	}
+	if (os != NULL && event->is_original_application_io()) {
 		os->register_event_completion(event);
+	} else {
+		delete event;
 	}
 }
 

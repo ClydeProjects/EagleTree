@@ -68,6 +68,9 @@ void FtlImpl_Dftl::read(Event *event)
 
 void FtlImpl_Dftl::write(Event *event)
 {
+	int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
+	assert(event->get_logical_address() < num_pages - num_mapping_pages);
+
 	resolve_mapping(event, true);
 	controller.stats.numFTLWrite++;
 	current_dependent_events.push(event);
@@ -95,14 +98,14 @@ void FtlImpl_Dftl::register_trim_completion(Event & event) {
 
 
 void FtlImpl_Dftl::register_write_completion(Event const& event, enum status result) {
-	if (result == FAILURE) {
+	// if the write that just finished was a mapping page, we need to update the GTD to be able to find this page
+	if (event.is_mapping_op()) {
+		long mapping_virtual_address = get_mapping_virtual_address(event.get_logical_address());
+		global_translation_directory[mapping_virtual_address] = event.get_address().get_linear_address();
 		return;
 	}
-	uint logical = event.get_logical_address();
-	uint physical = event.get_address().get_linear_address();
-	MPage current = trans_map[logical];
+	MPage current = trans_map[event.get_logical_address()];
 
-	// if it's a normal write, we assume its mapping is cached, and we update the modified ts to indicate change
 	if (event.is_original_application_io()) {
 		if (current.ppn == -1) {
 			current.modified_ts = event.get_current_time();
@@ -128,33 +131,19 @@ void FtlImpl_Dftl::register_write_completion(Event const& event, enum status res
 		}
 	}
 
-	current.ppn = physical;
-	reverse_trans_map[physical] = current.vpn;
-	trans_map.replace(trans_map.begin() + logical, current);
+	current.ppn = event.get_address().get_linear_address();
+	reverse_trans_map[current.ppn] = current.vpn;
+	trans_map.replace(trans_map.begin() + event.get_logical_address(), current);
 
-	// if the write that just finished was a mapping page, we need to update the GTD to be able to find this page
-	if (event.is_mapping_op()) {
-		long mvpn = logical / 512;
-		long original = global_translation_directory[mvpn];
 
-		Address address = Address(original, PAGE);
-		Block *block = controller.get_block_pointer(address);
-		block->invalidate_page(address.page);
-
-		global_translation_directory[mvpn] = physical;
-	}
 }
 
 
 void FtlImpl_Dftl::register_read_completion(Event const& event, enum status result) {
-	assert(event.get_event_type() == READ_TRANSFER);
-	if (result != SUCCESS) {
-		return;
-	}
 	if (event.is_mapping_op()) {
 		MPage current = trans_map[event.get_logical_address()];
-		current.modified_ts = event.get_start_time() + event.get_time_taken();
-		current.create_ts = event.get_start_time() + event.get_time_taken();
+		current.modified_ts = event.get_current_time();
+		current.create_ts = event.get_current_time();
 		current.cached = true;
 		trans_map.replace(trans_map.begin()+event.get_logical_address(), current);
 		cmt++;
@@ -178,10 +167,16 @@ void FtlImpl_Dftl::set_replace_address(Event& event) const {
 
 // important to execute this immediately before a read is executed
 // to ensure that the address has not been changed by GC in the meanwhile
-void FtlImpl_Dftl::set_read_address(Event& event) const {
-	assert(event.get_event_type() == READ_COMMAND || event.get_event_type() == READ_TRANSFER);
-	MPage current = trans_map[event.get_logical_address()];
-	assert(current.cached);
-	assert(current.ppn != -1);
-	event.set_address(Address(current.ppn, PAGE));
+void FtlImpl_Dftl::set_read_address(Event& event) {
+	if (event.is_mapping_op()) {
+		assert(global_translation_directory.count(event.get_logical_address() == 1));
+		long physical_addr = global_translation_directory[event.get_logical_address()];
+		Address a = Address(physical_addr, PAGE);
+		event.set_address(a);
+	} else {
+		MPage current = trans_map[event.get_logical_address()];
+		assert(current.cached);
+		assert(current.ppn != -1);
+		event.set_address(Address(current.ppn, PAGE));
+	}
 }
