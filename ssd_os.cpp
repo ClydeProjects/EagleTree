@@ -117,6 +117,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 		}
 	}
 	currently_executing_ios_counter--;
+	delete event;
 }
 
 double OperatingSystem::get_event_minimal_completion_time(Event const*const event) const {

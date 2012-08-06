@@ -10,10 +10,6 @@
 
 using namespace ssd;
 
-void Thread::register_event_completion(Event* event) {
-	delete event;
-}
-
 // =================  Synchronous_Sequential_Thread  =============================
 
 Synchronous_Sequential_Thread::Synchronous_Sequential_Thread(long min_LBA, long max_LBA, int repetitions_num, event_type type, double start_time)
@@ -41,9 +37,11 @@ void Synchronous_Sequential_Thread::register_event_completion(Event* event) {
 	time = event->get_current_time();
 	if (min_LBA + counter > max_LBA) {
 		counter = 0;
-		number_of_times_to_repeat--;
+		StateTracer::print();
+		if (--number_of_times_to_repeat == 0) {
+			finished = true;
+		}
 	}
-	delete event;
 }
 
 // =================  Asynchronous_Sequential_Writer  =============================
@@ -111,7 +109,6 @@ void Synchronous_Random_Writer::register_event_completion(Event* event) {
 	assert(!ready_to_issue_next_write);
 	ready_to_issue_next_write = true;
 	time = event->get_current_time();
-	delete event;
 }
 
 
