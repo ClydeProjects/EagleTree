@@ -27,7 +27,9 @@ void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event cons
 	long lb = write.get_logical_address();
 
 	detector->register_event(lb, write.get_current_time());
-	printf("arrival: %d  in time: %f\n", write.get_logical_address(), write.get_current_time());
+	if (PRINT_LEVEL > 1) {
+		printf("arrival: %d  in time: %f\n", write.get_logical_address(), write.get_current_time());
+	}
 	if (detector->get_num_times_pattern_has_repeated(lb) == 0 && detector->get_current_offset(lb) == THRESHOLD) {
 		if (PRINT_LEVEL > 1) {
 			printf("SEQUENTIAL PATTERN IDENTIFIED!  KEY: %d \n", detector->get_sequential_write_id(lb));

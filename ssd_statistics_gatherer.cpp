@@ -66,7 +66,7 @@ void StatisticsGatherer::print() {
 	printf("erases\t\t");
 	printf("write wait\t");
 	printf("read wait\t");
-	printf("age\t");
+	//printf("age\t");
 
 	printf("\n");
 	for (uint i = 0; i < SSD_SIZE; i++) {
@@ -81,7 +81,7 @@ void StatisticsGatherer::print() {
 			}
 			double avg_age = compute_average_age(i, j);
 
-			printf("P%d D%d\t", i, j);
+			printf("C%d D%d\t", i, j);
 
 			printf("%d\t\t", num_writes_per_LUN[i][j]);
 			printf("%d\t\t", num_reads_per_LUN[i][j]);
@@ -93,7 +93,51 @@ void StatisticsGatherer::print() {
 			printf("%f\t", average_write_wait_time);
 			printf("%f\t", average_read_wait_time);
 
-			printf("%f\t", avg_age);
+			//printf("%f\t", avg_age);
+			printf("\n");
+		}
+	}
+}
+
+void StatisticsGatherer::print_csv() {
+	printf("\n");
+	printf("Channel,");
+	printf("Die,");
+	printf("num writes,");
+	printf("num reads,");
+	printf("GC writes,");
+	printf("GC reads,");
+	printf("erases,");
+	printf("write wait,");
+	printf("read wait,");
+	//printf("age\t");
+
+	printf("\n");
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			double average_write_wait_time = sum_bus_wait_time_for_writes_per_LUN[i][j] / num_writes_per_LUN[i][j];
+			double average_read_wait_time = sum_bus_wait_time_for_reads_per_LUN[i][j] / num_reads_per_LUN[i][j];
+			if (num_writes_per_LUN[i][j] == 0) {
+				average_write_wait_time = 0;
+			}
+			if (num_reads_per_LUN[i][j] == 0) {
+				average_read_wait_time = 0;
+			}
+			double avg_age = compute_average_age(i, j);
+
+			printf("%d,%d,", i, j);
+
+			printf("%d,", num_writes_per_LUN[i][j]);
+			printf("%d,", num_reads_per_LUN[i][j]);
+
+			printf("%d,", num_gc_writes_per_LUN[i][j]);
+			printf("%d,", num_gc_reads_per_LUN[i][j]);
+			printf("%d,", num_erases_per_LUN[i][j]);
+
+			printf("%f,", average_write_wait_time);
+			printf("%f,", average_read_wait_time);
+
+			//printf("%f\t", avg_age);
 			printf("\n");
 		}
 	}

@@ -21,7 +21,7 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
    free_block_pointers(SSD_SIZE, vector<Address>(PACKAGE_SIZE)),
    free_blocks(SSD_SIZE, vector<vector<vector<Address> > >(PACKAGE_SIZE, vector<vector<Address> >(num_age_classes, vector<Address>(0)) )),
    all_blocks(0),
-   greedy_gc(true),
+   greedy_gc(GREEDY_GC),
    max_age(1),
    min_age(0),
    num_age_classes(num_age_classes),

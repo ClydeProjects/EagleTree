@@ -169,6 +169,15 @@ extern const uint RAID_NUMBER_OF_PHYSICAL_SSDS;
 extern void *page_data;
 extern void *global_buffer;
 
+/*
+ * Controls the block manager to be used
+ */
+extern int BLOCK_MANAGER_ID;
+extern bool GREEDY_GC;
+
+/*
+ * Controls the level of detail of output
+ */
 extern const int PRINT_LEVEL;
 
 /* Enumerations to clarify status integers in simulation
@@ -1560,6 +1569,7 @@ public:
 	static void init(Ssd * ssd);
 	void register_completed_event(Event const& event);
 	void print();
+	void print_csv();
 private:
 	static StatisticsGatherer *inst;
 	Ssd & ssd;

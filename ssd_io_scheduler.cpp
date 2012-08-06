@@ -12,9 +12,20 @@ using namespace ssd;
 
 IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
 	ssd(ssd),
-	ftl(ftl),
-	bm(new Block_manager_parallel_wearwolf_locality(ssd, ftl))
-{}
+	ftl(ftl)
+{
+	if (BLOCK_MANAGER_ID == 0) {
+		bm = new Block_manager_parallel(ssd, ftl);
+	} else if (BLOCK_MANAGER_ID == 1) {
+		bm = new Block_manager_parallel_hot_cold_seperation(ssd, ftl);
+	} else if (BLOCK_MANAGER_ID == 2) {
+		bm = new Block_manager_parallel_wearwolf(ssd, ftl);
+	} else if (BLOCK_MANAGER_ID == 3) {
+		bm = new Block_manager_parallel_wearwolf_locality(ssd, ftl);
+	} else {
+		assert(false);
+	}
+}
 
 IOScheduler::~IOScheduler(){
 	delete bm;
