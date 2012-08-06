@@ -37,7 +37,7 @@ void VisualTracer::register_completed_event(Event const& event) {
 
 	if (event.get_event_type() == WRITE) {
 		write(add.package, add.die, 't', 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY);
-		write(add.package, add.die, 'w', PAGE_WRITE_DELAY - 1);
+		write_with_id(add.package, add.die, 'w', PAGE_WRITE_DELAY - 1, event.get_logical_address());
 	} else if (event.get_event_type() == READ_COMMAND) {
 		write(add.package, add.die, 't', BUS_CTRL_DELAY);
 		write(add.package, add.die, 'r', PAGE_READ_DELAY - 1);
@@ -53,6 +53,27 @@ void VisualTracer::register_completed_event(Event const& event) {
 
 void VisualTracer::write(int package, int die, char symbol, int length) {
 	for (int i = 0; i < length; i++) {
+		trace[package][die].push_back(symbol);
+	}
+}
+
+void VisualTracer::write_with_id(int package, int die, char symbol, int length, int id) {
+
+	char buffer [10];
+	int n = sprintf (buffer, "%d", id);
+
+	if (n > length - 2) {
+		return write(package, die, symbol, length);
+	}
+
+	trace[package][die].push_back(symbol);
+
+	for (int i = 0; i < n; i++) {
+		//printf("%c\n", buffer[i]);
+		trace[package][die].push_back(buffer[i]);
+	}
+
+	for (int i = 0; i < length - 1 - n; i++) {
 		trace[package][die].push_back(symbol);
 	}
 }
