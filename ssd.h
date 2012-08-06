@@ -169,6 +169,8 @@ extern const uint RAID_NUMBER_OF_PHYSICAL_SSDS;
 extern void *page_data;
 extern void *global_buffer;
 
+extern const int PRINT_LEVEL;
+
 /* Enumerations to clarify status integers in simulation
  * Do not use typedefs on enums for reader clarity */
 
@@ -900,7 +902,6 @@ private:
 	void issue_erase(Address a, double time);
 	void remove_as_gc_candidate(Address const& phys_address);
 	void Wear_Level(Event const& event);
-	virtual void invalidate(Event const& event);
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 	bool greedy_gc;
@@ -1531,7 +1532,9 @@ public:
 	static VisualTracer *get_instance();
 	static void init();
 	void register_completed_event(Event const& event);
-	void print();
+	void print_horizontally();
+	void print_horizontally_with_breaks();
+	void print_vertically();
 private:
 	static VisualTracer *inst;
 	VisualTracer();

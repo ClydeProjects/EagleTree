@@ -239,10 +239,11 @@ void IOScheduler::eliminate_conflict_with_any_incoming_gc(Event * event) {
 	if (num_events_eliminated == 2) {
 		ssd.getPackages()[addr_of_original_page.package].getDies()[addr_of_original_page.die].clear_register();
 	}
-
-	printf("Write makes pending GC unnecessary. LBA: %d   removed %d events", event->get_logical_address(), num_events_eliminated);
-	event->get_replace_address().print();
-	printf("\n");
+	if (PRINT_LEVEL > 1) {
+		printf("Write makes pending GC unnecessary. LBA: %d   removed %d events", event->get_logical_address(), num_events_eliminated);
+		event->get_replace_address().print();
+		printf("\n");
+	}
 
 	event->set_garbage_collection_op(true);
 	if (num_events_eliminated == 0) {
@@ -329,10 +330,13 @@ bool IOScheduler::can_schedule_on_die(Event const* event) const {
 }
 
 void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
-	event->print();
+	if (PRINT_LEVEL > 0) {
+		event->print();
+	}
 	if (outcome == FAILURE) {
 		return;
 	}
+
 	VisualTracer::get_instance()->register_completed_event(*event);
 	if (event->get_event_type() == WRITE) {
 		ftl.register_write_completion(*event, outcome);

@@ -59,11 +59,18 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 		return;
 	}
 
+	if (event.get_id() == 5310) {
+		int i = 0;
+		i++;
+	}
+
 	// check if the pointer if full. If it is, find a free block for a new pointer, or trigger GC if there are no free blocks
 	if (block_address.compare(free_block_pointers[package_id][die_id]) == BLOCK) {
-		printf("hot pointer ");
-		free_block_pointers[package_id][die_id].print();
-		printf(" is out of space\n");
+		if (PRINT_LEVEL > 1) {
+			printf("hot pointer ");
+			free_block_pointers[package_id][die_id].print();
+			printf(" is out of space\n");
+		}
 		Address free_block = find_free_unused_block(package_id, die_id, event.get_current_time());
 		if (free_block.valid != NONE) {
 			assert(free_block.package == package_id);
@@ -188,7 +195,9 @@ pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write)
 		if (result.second.valid != NONE) {
 			result.first = in_how_long_can_this_event_be_scheduled(result.second, write.get_current_time());
 		}
-		printf("MAKING A MISTAKE\n");
+		if (PRINT_LEVEL > 1) {
+			printf("MAKING A MISTAKE\n");
+		}
 	}
 
 	return result;

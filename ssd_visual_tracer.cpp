@@ -57,7 +57,7 @@ void VisualTracer::write(int package, int die, char symbol, int length) {
 	}
 }
 
-void VisualTracer::print() {
+void VisualTracer::print_horizontally() {
 	printf("\n");
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
@@ -68,5 +68,39 @@ void VisualTracer::print() {
 			printf("\n");
 		}
 	}
+}
+
+void VisualTracer::print_horizontally_with_breaks() {
+	printf("\n");
+	int chars_to_write_each_time = 300;
+	int cursor = 0;
+	while (cursor < trace[0][0].size()) {
+		for (uint i = 0; i < SSD_SIZE; i++) {
+			for (uint j = 0; j < PACKAGE_SIZE; j++) {
+				printf("p%d d%d :", i, j);
+				for (uint c = 0; c < chars_to_write_each_time; c++) {
+					printf("%c", trace[i][j][cursor + c]);
+				}
+				printf("\n");
+			}
+		}
+		printf("\nLine %d\n", cursor / chars_to_write_each_time);
+		cursor += chars_to_write_each_time;
+	}
+}
+
+void VisualTracer::print_vertically() {
+	printf("\n");
+	for (uint c = 0; c < trace[0][0].size(); c++) {
+		for (uint i = 0; i < SSD_SIZE; i++) {
+			for (uint j = 0; j < PACKAGE_SIZE; j++) {
+				if (trace[i][j].size() > c) {
+					printf("%c", trace[i][j][c]);
+				}
+			}
+		}
+		printf("\n");
+	}
+
 }
 

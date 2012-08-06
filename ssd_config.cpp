@@ -90,6 +90,10 @@ uint PACKAGE_SIZE = 8;
  * 	number of Planes per Die (size) */
 uint DIE_SIZE = 2;
 
+/* PRINT_LEVEL:
+ * 	determines the level of detail of output. From 0 to 2. 0 is the least detailed */
+int PRINT_LEVEL = 0;
+
 /* Plane class:
  * 	number of Blocks per Plane (size)
  * 	delay for reading from plane register

@@ -21,7 +21,7 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
    free_block_pointers(SSD_SIZE, vector<Address>(PACKAGE_SIZE)),
    free_blocks(SSD_SIZE, vector<vector<vector<Address> > >(PACKAGE_SIZE, vector<vector<Address> >(num_age_classes, vector<Address>(0)) )),
    all_blocks(0),
-   greedy_gc(false),
+   greedy_gc(true),
    max_age(1),
    min_age(0),
    num_age_classes(num_age_classes),
@@ -63,11 +63,13 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	Block* b = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 	blocks_being_garbage_collected.erase(b->get_physical_address());
 
-	printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
-    for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
-    	printf("%d  ", (*iter).first);
+	if (PRINT_LEVEL > 1) {
+		printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
+		for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
+			printf("%d  ", (*iter).first);
+		}
+		printf("\n");
 	}
-    printf("\n");
 
 	num_free_pages += BLOCK_SIZE;
 	num_available_pages_for_new_writes += BLOCK_SIZE;
@@ -110,22 +112,33 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 void Block_manager_parent::trim(Event const& event) {
 
 	Address ra = event.get_replace_address();
+
+	if (ra.valid == NONE) {
+		return;
+	}
+
 	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
+	Page const& page = block.getPages()[ra.page];
 	uint age_class = sort_into_age_class(ra);
 	long const phys_addr = block.get_physical_address();
 
-	if (ra.valid != NONE) {
-		assert(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE);
-		invalidate(event);
+	assert(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE);
+
+	assert(page.get_state() == VALID);
+	if (page.get_state() == VALID) {   // TODO: determine if I should remove the if statement
+		block.invalidate_page(ra.page);
 	}
 
-	if (ra.valid != NONE && blocks_being_garbage_collected.count(block.get_physical_address()) == 1) {
+	ra.valid = BLOCK;
+	ra.page = 0;
+
+	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 1) {
 		assert(blocks_being_garbage_collected[block.get_physical_address()] > 0);
 		blocks_being_garbage_collected[block.get_physical_address()]--;
 	}
 
-	// TODO: fix thresholds for inserting blocks into GC lists
-	if (ra.valid > NONE && blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
+	// TODO: fix thresholds for inserting blocks into GC lists. ALSO Revise the condition.
+	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
 			(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE) && block.get_pages_valid() < BLOCK_SIZE) {
 		remove_as_gc_candidate(ra);
 		printf("Inserting as GC candidate: %ld ", phys_addr); ra.print(); printf(" with age_class %d and valid blocks: %d\n", age_class, block.get_pages_valid());
@@ -160,29 +173,20 @@ void Block_manager_parent::remove_as_gc_candidate(Address const& phys_address) {
 void Block_manager_parent::issue_erase(Address ra, double time) {
 	ra.valid = BLOCK;
 	ra.page = 0;
-	printf("block %lu", ra.get_linear_address()); ra.print(); printf(" is now invalid. An erase is issued\n");
-	printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
-    for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
-    	printf("%d  ", (*iter).first);
-	}
-    printf("\n");
-	Event* erase = new Event(ERASE, 0, 1, time);
 
+	if (PRINT_LEVEL > 1) {
+		printf("block %lu", ra.get_linear_address()); ra.print(); printf(" is now invalid. An erase is issued\n");
+		printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
+		for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
+			printf("%d  ", (*iter).first);
+		}
+		printf("\n");
+	}
+
+	Event* erase = new Event(ERASE, 0, 1, time);
 	erase->set_address(ra);
 	erase->set_garbage_collection_op(true);
 	IOScheduler::instance()->schedule_independent_event(erase);
-}
-
-// invalidates the original location of a write
-void Block_manager_parent::invalidate(Event const& event) {
-	assert(event.get_event_type() == WRITE || event.get_event_type() == TRIM);
-	Address ra = event.get_replace_address();
-	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
-	Page const& page = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block].getPages()[ra.page];
-	if (page.get_state() == VALID) {
-		block.invalidate_page(ra.page);
-	}
-
 }
 
 void Block_manager_parent::register_read_outcome(Event const& event, enum status status) {
@@ -403,15 +407,15 @@ void Block_manager_parent::choose_gc_victim(vector<pair<long, uint> > candidates
 		gc_candidates[addr.package][addr.die][best_block_age_class].erase(best_block->get_physical_address());
 		assert(gc_candidates[addr.package][addr.die][best_block_age_class].count(best_block->get_physical_address()) == 0);
 		blocks_being_garbage_collected[best_block->get_physical_address()] = best_block->get_pages_valid();
-		int size = blocks_being_garbage_collected.size();
-		printf("Triggering GC in %ld ", best_block->get_physical_address()); addr.print(); printf(". Migrating %d \n", best_block->get_pages_valid());
 
-		printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
-	    for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
-	    	printf("%d  ", (*iter).first);
+		if (PRINT_LEVEL > 1) {
+			printf("Triggering GC in %ld ", best_block->get_physical_address()); addr.print(); printf(". Migrating %d \n", best_block->get_pages_valid());
+			printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
+			for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
+				printf("%d  ", (*iter).first);
+			}
+			printf("\n");
 		}
-	    printf("\n");
-
 		migrate(best_block, start_time);
 	}
 }
