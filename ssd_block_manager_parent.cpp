@@ -141,7 +141,9 @@ void Block_manager_parent::trim(Event const& event) {
 	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
 			(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE) && block.get_pages_valid() < BLOCK_SIZE) {
 		remove_as_gc_candidate(ra);
-		printf("Inserting as GC candidate: %ld ", phys_addr); ra.print(); printf(" with age_class %d and valid blocks: %d\n", age_class, block.get_pages_valid());
+		if (PRINT_LEVEL > 1) {
+			printf("Inserting as GC candidate: %ld ", phys_addr); ra.print(); printf(" with age_class %d and valid blocks: %d\n", age_class, block.get_pages_valid());
+		}
 		gc_candidates[ra.package][ra.die][age_class].insert(phys_addr);
 		if (gc_candidates[ra.package][ra.die][age_class].size() == 1) {
 			check_if_should_trigger_more_GC(event.get_current_time());

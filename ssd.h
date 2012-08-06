@@ -971,6 +971,7 @@ public:
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual pair<double, Address> write(Event const& write);
+
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
@@ -1027,7 +1028,8 @@ public:
 	Block_manager_parallel_wearwolf_locality(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel_wearwolf_locality();
 	void register_write_arrival(Event const& write);
-	pair<double, Address> write(Event & write);
+	pair<double, Address> write(Event const& write);
+
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
 	void sequential_event_metadata_removed(long key);
@@ -1152,7 +1154,7 @@ private:
 	static IOScheduler *inst;
 	Ssd& ssd;
 	FtlParent& ftl;
-	Block_manager_parallel_wearwolf bm;
+	Block_manager_parent* bm;
 
 	map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations.
 };

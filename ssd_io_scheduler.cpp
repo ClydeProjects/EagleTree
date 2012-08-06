@@ -13,10 +13,12 @@ using namespace ssd;
 IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
 	ssd(ssd),
 	ftl(ftl),
-	bm(ssd, ftl)
+	bm(new Block_manager_parallel_wearwolf_locality(ssd, ftl))
 {}
 
-IOScheduler::~IOScheduler(){}
+IOScheduler::~IOScheduler(){
+	delete bm;
+}
 
 IOScheduler *IOScheduler::inst = NULL;
 
@@ -166,7 +168,7 @@ void IOScheduler::handle_writes(std::vector<Event*>& events) {
 
 
 		if (event->get_bus_wait_time() == 0) {
-			bm.register_write_arrival(*event);
+			bm->register_write_arrival(*event);
 		}
 		assert(event->get_event_type() == WRITE);
 		ftl.set_replace_address(*event);
@@ -174,7 +176,7 @@ void IOScheduler::handle_writes(std::vector<Event*>& events) {
 		if (!event->is_garbage_collection_op()) {
 			eliminate_conflict_with_any_incoming_gc(event);
 		}
-		pair<double, Address> result = bm.write(*event);
+		pair<double, Address> result = bm->write(*event);
 		if (result.first == 0) {
 			event->set_address(result.second);
 			event->set_noop(false);
@@ -272,7 +274,7 @@ void IOScheduler::execute_next_batch(std::vector<Event*>& events) {
 		if (event->get_event_type() == READ_COMMAND || event->get_event_type() == READ_TRANSFER) {
 			ftl.set_read_address(*event);
 		}
-		double time = bm.in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
+		double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
 		bool can_schedule = can_schedule_on_die(event);
 		if (can_schedule && time <= 0) {
 			execute_next(event);
@@ -340,16 +342,16 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	VisualTracer::get_instance()->register_completed_event(*event);
 	if (event->get_event_type() == WRITE) {
 		ftl.register_write_completion(*event, outcome);
-		bm.register_write_outcome(*event, outcome);
+		bm->register_write_outcome(*event, outcome);
 	} else if (event->get_event_type() == ERASE) {
-		bm.register_erase_outcome(*event, outcome);
+		bm->register_erase_outcome(*event, outcome);
 	} else if (event->get_event_type() == READ_COMMAND) {
-		bm.register_read_outcome(*event, outcome);
+		bm->register_read_outcome(*event, outcome);
 	} else if (event->get_event_type() == READ_TRANSFER) {
 		ftl.register_read_completion(*event, outcome);
 	} else if (event->get_event_type() == TRIM) {
 		ftl.register_trim_completion(*event);
-		bm.trim(*event);
+		bm->trim(*event);
 	}
 	StatisticsGatherer::get_instance()->register_completed_event(*event);
 

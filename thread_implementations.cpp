@@ -64,7 +64,7 @@ Event* Asynchronous_Sequential_Thread::issue_next_io() {
 		return NULL;
 	}
 	Event* e = new Event(type, min_LBA + offset, 1, time);
-	time += 3;
+	time += 16;
 	if (min_LBA + offset++ == max_LBA) {
 		finished_round = true;
 	}
@@ -78,6 +78,8 @@ void Asynchronous_Sequential_Thread::register_event_completion(Event* event) {
 		number_of_times_to_repeat--;
 		time = event->get_current_time();
 		number_finished = 0;
+		//StateTracer::print();
+		//StatisticsGatherer::get_instance()->print();
 	}
 	if (number_of_times_to_repeat == 0) {
 		finished = true;

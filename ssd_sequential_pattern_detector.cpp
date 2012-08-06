@@ -13,7 +13,10 @@ using namespace std;
 #define LIFE_TIME 400 // the number of sequential writes before we recognize the pattern as sequential
 
 Sequential_Pattern_Detector::Sequential_Pattern_Detector()
-: registration_counter(0), listener(NULL) {}
+: sequential_writes_key_lookup(),
+  registration_counter(0),
+  listener(NULL),
+  sequential_writes_identification_and_data() {}
 
 Sequential_Pattern_Detector::~Sequential_Pattern_Detector() {
 	delete listener;

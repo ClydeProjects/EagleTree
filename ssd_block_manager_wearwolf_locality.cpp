@@ -9,16 +9,14 @@ using namespace std;
 Block_manager_parallel_wearwolf_locality::Block_manager_parallel_wearwolf_locality(Ssd& ssd, FtlParent& ftl)
 	: Block_manager_parallel_wearwolf(ssd, ftl),
 	  parallel_degree(LUN),
+	  seq_write_key_to_pointers_mapping(),
 	  detector(new Sequential_Pattern_Detector())
-	  //recorder(new Sequential_Pattern_Detector())
 {
 	detector->set_listener(this);
-	//recorder->set_listener(this);
 }
 
 Block_manager_parallel_wearwolf_locality::~Block_manager_parallel_wearwolf_locality(void) {
 	delete detector;
-	//delete recorder;
 }
 
 void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event const& write) {
@@ -29,19 +27,26 @@ void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event cons
 	long lb = write.get_logical_address();
 
 	detector->register_event(lb, write.get_current_time());
-	//printf("arrival: %d  in time: %f\n", write.get_logical_address(), write.get_current_time());
+	printf("arrival: %d  in time: %f\n", write.get_logical_address(), write.get_current_time());
 	if (detector->get_num_times_pattern_has_repeated(lb) == 0 && detector->get_current_offset(lb) == THRESHOLD) {
-		//printf("SEQUENTIAL PATTERN IDENTIFIED!  KEY: %d \n", detector->get_sequential_write_id(lb));
+		if (PRINT_LEVEL > 1) {
+			printf("SEQUENTIAL PATTERN IDENTIFIED!  KEY: %d \n", detector->get_sequential_write_id(lb));
+		}
 		long key = detector->get_sequential_write_id(lb);
 		set_pointers_for_sequential_write(key, write.get_current_time());
 	}
 }
 
 
-pair<double, Address> Block_manager_parallel_wearwolf_locality::write(Event & event) {
+pair<double, Address> Block_manager_parallel_wearwolf_locality::write(Event const& event) {
 	ulong lb = event.get_logical_address();
 	long key = detector->get_sequential_write_id(lb);
 	bool key_exists = seq_write_key_to_pointers_mapping.count(key) == 1;
+
+	if (event.get_id() == 15) {
+		int i = 0;
+		i++;
+	}
 
 	if (!key_exists  || (key_exists && seq_write_key_to_pointers_mapping[key].num_pointers == 0)) {
 		return Block_manager_parallel_wearwolf::write(event);
@@ -107,6 +112,12 @@ void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event cons
 	long lb = event.get_logical_address();
 	//long key = recorder->get_sequential_write_id(lb);
 	long key = detector->get_sequential_write_id(lb);
+
+	if (event.get_id() == 15) {
+		int i = 0;
+		i++;
+	}
+
 	if (seq_write_key_to_pointers_mapping.count(key) == 1 && seq_write_key_to_pointers_mapping[key].num_pointers > 0) {
 		Block_manager_parent::register_write_outcome(event, status);
 		page_hotness_measurer.register_event(event);
