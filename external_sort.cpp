@@ -70,7 +70,7 @@ Event* External_Sort::execute_third_phase() {
 	return NULL;
 }
 
-void External_Sort::register_event_completion(Event* event) {
+void External_Sort::handle_event_completion(Event* event) {
 	number_finished++;
 	if (phase == FIRST_PHASE_READ && number_finished == RAM_available) {
 		counter = number_finished = 0;

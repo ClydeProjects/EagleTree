@@ -45,11 +45,6 @@ pair<double, Address> Block_manager_parallel_wearwolf_locality::write(Event cons
 	long key = detector->get_sequential_write_id(lb);
 	bool key_exists = seq_write_key_to_pointers_mapping.count(key) == 1;
 
-	if (event.get_id() == 15) {
-		int i = 0;
-		i++;
-	}
-
 	if (!key_exists  || (key_exists && seq_write_key_to_pointers_mapping[key].num_pointers == 0)) {
 		return Block_manager_parallel_wearwolf::write(event);
 	} else {
@@ -114,12 +109,6 @@ void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event cons
 	long lb = event.get_logical_address();
 	//long key = recorder->get_sequential_write_id(lb);
 	long key = detector->get_sequential_write_id(lb);
-
-	if (event.get_id() == 15) {
-		int i = 0;
-		i++;
-	}
-
 	if (seq_write_key_to_pointers_mapping.count(key) == 1 && seq_write_key_to_pointers_mapping[key].num_pointers > 0) {
 		Block_manager_parent::register_write_outcome(event, status);
 		page_hotness_measurer.register_event(event);

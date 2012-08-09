@@ -123,7 +123,7 @@ Ssd::~Ssd(void)
 {
 	IOScheduler::instance()->finish(10000000);
 	//StateTracer::print();
-	StatisticsGatherer::get_instance()->print_csv();
+	StatisticsGatherer::get_instance()->print();
 	/* explicitly call destructors and use free
 	 * since we used malloc and placement new */
 	for (uint i = 0; i < size; i++)
@@ -138,9 +138,11 @@ Ssd::~Ssd(void)
 }
 
 void Ssd::event_arrive(Event* event) {
-	//printf("submitted: "); event->print();
+	//printf("submitted: %d\n",  event->get_id());
 	assert(event->get_start_time() >= 0.0);
 	if (event->get_start_time() < last_io_submission_time) {
+		printf("%f  %f\n", event->get_start_time(), last_io_submission_time);
+		event->print();
 		int i = 0;
 		i++;
 	}
@@ -173,9 +175,7 @@ void Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, d
 		fprintf(stderr, "Ssd error: %s: could not allocate Event\n", __func__);
 		exit(MEM_ERR);
 	}
-
 	event->set_payload(buffer);
-
 	event_arrive(event);
 }
 
@@ -184,10 +184,10 @@ void Ssd::progress_since_os_is_idle() {
 }
 
 void Ssd::register_event_completion(Event * event) {
-	if (event->get_event_type() == WRITE || event->get_event_type() == READ_COMMAND) {
+	if (event->is_original_application_io() && (event->get_event_type() == WRITE || event->get_event_type() == READ_COMMAND)) {
 		last_io_submission_time = event->get_start_time();
 	}
-	if (os != NULL && event->is_original_application_io()) {
+	if (os != NULL && (event->is_original_application_io() )) {
 		os->register_event_completion(event);
 	} else {
 		delete event;

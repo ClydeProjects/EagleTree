@@ -52,6 +52,7 @@ OperatingSystem::OperatingSystem(vector<queue<Thread*> > threads_dependencies) :
 
 OperatingSystem::~OperatingSystem() {
 	for (uint i = 0; i < threads.size(); i++) {
+		threads[i]->print_thread_stats();
 		delete threads[i];
 		delete events[i];
 	}
@@ -103,11 +104,14 @@ void OperatingSystem::register_event_completion(Event* event) {
 	LBA_to_thread_id_map.erase(event->get_logical_address());
 	threads[thread_id]->register_event_completion(event);
 
-	if (threads[thread_id]->is_finished() && thread_dependencies[thread_id].size() > 0) {
-		delete threads[thread_id];
-		threads[thread_id] = thread_dependencies[thread_id].front();
-		thread_dependencies[thread_id].pop();
-		threads[thread_id]->set_time(event->get_current_time());
+	if (threads[thread_id]->is_finished()) {
+		//threads[thread_id]->print_thread_stats();
+		if (thread_dependencies[thread_id].size() > 0) {
+			delete threads[thread_id];
+			threads[thread_id] = thread_dependencies[thread_id].front();
+			thread_dependencies[thread_id].pop();
+			threads[thread_id]->set_time(event->get_current_time());
+		}
 	}
 
 	if (events[thread_id] == NULL) {

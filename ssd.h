@@ -1166,6 +1166,7 @@ private:
 	Block_manager_parent* bm;
 
 	map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations.
+
 };
 
 class FtlParent
@@ -1593,22 +1594,28 @@ private:
 class Thread
 {
 public:
-	Thread(double time) : finished(false), time(time) {}
+	Thread(double time) : finished(false), time(time),
+	num_pages_in_each_LUN(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
+	num_writes_to_each_LUN(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)){}
 	virtual ~Thread() {}
 	Event* run() {
 		return finished ? NULL : issue_next_io();
 	}
-	virtual void register_event_completion(Event* event);
+	void register_event_completion(Event* event);
 	bool is_finished() {
 		return finished;
 	}
 	void set_time(double current_time) {
 		time = current_time;
 	}
+	void print_thread_stats();
 protected:
 	virtual Event* issue_next_io() = 0;
+	virtual void handle_event_completion(Event* event) = 0;
 	bool finished;
 	double time;
+	vector<vector<int> > num_pages_in_each_LUN;
+	vector<vector<int> > num_writes_to_each_LUN;
 };
 
 class Synchronous_Sequential_Thread : public Thread
@@ -1616,7 +1623,7 @@ class Synchronous_Sequential_Thread : public Thread
 public:
 	Synchronous_Sequential_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, event_type type, double start_time = 1);
 	Event* issue_next_io();
-	void register_event_completion(Event* event);
+	void handle_event_completion(Event* event);
 private:
 	long min_LBA, max_LBA;
 	bool ready_to_issue_next_write;
@@ -1629,7 +1636,7 @@ class Asynchronous_Sequential_Thread : public Thread
 public:
 	Asynchronous_Sequential_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, event_type type, double start_time = 1);
 	Event* issue_next_io();
-	void register_event_completion(Event* event);
+	void handle_event_completion(Event* event);
 private:
 	long min_LBA, max_LBA;
 	int number_of_times_to_repeat, offset;
@@ -1638,28 +1645,32 @@ private:
 	int number_finished;
 };
 
-class Synchronous_Random_Writer : public Thread
+class Synchronous_Random_Thread : public Thread
 {
 public:
-	Synchronous_Random_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed, double start_time = 1);
+	Synchronous_Random_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed, event_type type = WRITE, double start_time = 1);
 	Event* issue_next_io();
-	void register_event_completion(Event* event);
+	void handle_event_completion(Event* event);
 private:
 	long min_LBA, max_LBA;
 	bool ready_to_issue_next_write;
 	int number_of_times_to_repeat;
 	MTRand_int32 random_number_generator;
+	event_type type;
 };
 
-class Asynchronous_Random_Writer : public Thread
+class Asynchronous_Random_Thread : public Thread
 {
 public:
-	Asynchronous_Random_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed, double start_time = 1);
+	Asynchronous_Random_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed = 0, event_type type = WRITE,  int time_breaks = 5, double start_time = 1);
 	Event* issue_next_io();
+	void handle_event_completion(Event* event);
 private:
 	long min_LBA, max_LBA;
 	int number_of_times_to_repeat;
 	MTRand_int32 random_number_generator;
+	event_type type;
+	int time_breaks;
 };
 
 // assuming the relation is made of contigouse pages
@@ -1673,7 +1684,7 @@ public:
 	Event* execute_first_phase();
 	Event* execute_second_phase();
 	Event* execute_third_phase();
-	void register_event_completion(Event* event);
+	void handle_event_completion(Event* event);
 private:
 	long relation_min_LBA, relation_max_LBA, RAM_available, free_space_min_LBA, free_space_max_LBA, cursor, counter, number_finished;
 	int num_partitions, num_pages_in_last_partition;

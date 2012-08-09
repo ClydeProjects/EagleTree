@@ -170,14 +170,6 @@ void IOScheduler::handle_writes(std::vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
-
-		if (event->get_id() == 179 && event->get_bus_wait_time() > 700) {
-			int i = 0;
-			i++;
-			StateTracer::print();
-		}
-
-
 		if (event->get_bus_wait_time() == 0) {
 			bm->register_write_arrival(*event);
 		}
