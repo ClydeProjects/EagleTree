@@ -100,7 +100,9 @@ void VisualTracer::print_horizontally_with_breaks() {
 			for (uint j = 0; j < PACKAGE_SIZE; j++) {
 				printf("p%d d%d :", i, j);
 				for (uint c = 0; c < chars_to_write_each_time; c++) {
-					printf("%c", trace[i][j][cursor + c]);
+					if (trace[i][j].size() > cursor + c) {
+						printf("%c", trace[i][j][cursor + c]);
+					}
 				}
 				printf("\n");
 			}

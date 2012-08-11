@@ -90,10 +90,6 @@ uint PACKAGE_SIZE = 8;
  * 	number of Planes per Die (size) */
 uint DIE_SIZE = 2;
 
-/* PRINT_LEVEL:
- * 	determines the level of detail of output. From 0 to 2. 0 is the least detailed */
-int PRINT_LEVEL = 0;
-
 /* Plane class:
  * 	number of Blocks per Plane (size)
  * 	delay for reading from plane register
@@ -176,9 +172,13 @@ uint NUMBER_OF_ADDRESSABLE_BLOCKS = 0;
 /* RAISSDs: Number of physical SSDs */
 uint RAID_NUMBER_OF_PHYSICAL_SSDS = 0;
 
-/* Controls the block manager to be used */
+/* Controls the block manager to be used. */
 int BLOCK_MANAGER_ID = 2;
-bool GREEDY_GC = true;
+bool GREEDY_GC = false;
+
+/* PRINT_LEVEL:
+ * 	determines the level of detail of output. From 0 to 2. 0 is the least detailed */
+int PRINT_LEVEL = 2;
 
 void load_entry(char *name, double value, uint line_number) {
 	/* cheap implementation - go through all possibilities and match entry */

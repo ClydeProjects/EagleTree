@@ -43,7 +43,9 @@ void Sequential_Pattern_Detector::register_event(logical_address lb, double time
 }
 
 void Sequential_Pattern_Detector::init_pattern(int key, double time) {
-	printf("init_pattern: %d \n", key);
+	if (PRINT_LEVEL > 1) {
+		printf("init_pattern: %d \n", key);
+	}
 	sequential_writes_key_lookup[key + 1] = key;
 	sequential_writes_identification_and_data[key] = new sequential_writes_tracking(time);
 }
@@ -66,7 +68,9 @@ void Sequential_Pattern_Detector::restart_pattern(int key, double time) {
 	sequential_writes_key_lookup[key + 1] = key;
 	swm.counter = 0;
 	swm.last_LBA_timestamp = time;
-	printf("SEQUENTIAL PATTERN RESTARTED!  key: %d\n", key);
+	if (PRINT_LEVEL > 0) {
+		printf("SEQUENTIAL PATTERN RESTARTED!  key: %d\n", key);
+	}
 }
 
 int Sequential_Pattern_Detector::get_current_offset(logical_address lb) {
@@ -135,7 +139,9 @@ void Sequential_Pattern_Detector::remove_old_sequential_writes_metadata(double t
 	{
 		logical_address key = (*iter).first;
 		if ((*iter).second->last_LBA_timestamp + 400 < time) {
-			printf("deleting seq write with key %d:\n", key);
+			if (PRINT_LEVEL > 1) {
+				printf("deleting seq write with key %d:\n", key);
+			}
 			uint next_expected_lba = (*iter).second->counter + key;
 			sequential_writes_key_lookup.erase(next_expected_lba);
 			delete (*iter).second;;
