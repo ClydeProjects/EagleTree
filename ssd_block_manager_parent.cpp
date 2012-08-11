@@ -188,7 +188,7 @@ void Block_manager_parent::issue_erase(Address ra, double time) {
 	Event* erase = new Event(ERASE, 0, 1, time);
 	erase->set_address(ra);
 	erase->set_garbage_collection_op(true);
-	IOScheduler::instance()->schedule_independent_event(erase);
+	IOScheduler::instance()->schedule_independent_event(erase, -1, ERASE);
 }
 
 void Block_manager_parent::register_read_outcome(Event const& event, enum status status) {
@@ -433,6 +433,7 @@ void Block_manager_parent::migrate(Block const* const block, double start_time) 
 
 	num_available_pages_for_new_writes -= block->get_pages_valid();
 
+	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
 		if (block->getPages()[i].get_state() == VALID) {
 			std::queue<Event*> events;
@@ -450,7 +451,7 @@ void Block_manager_parent::migrate(Block const* const block, double start_time) 
 
 			events.push(read);
 			events.push(write);
-			IOScheduler::instance()->schedule_dependent_events(events);
+			IOScheduler::instance()->schedule_dependent_events(events, logical_address, WRITE);
 		}
 	}
 }

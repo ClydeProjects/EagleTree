@@ -466,6 +466,7 @@ private:
 	// an ID to manage dependencies in the scheduler.
 	uint application_io_id;
 	static uint application_io_id_generator;
+
 };
 
 /* Single bus channel
@@ -1136,8 +1137,8 @@ private:
 
 class IOScheduler {
 public:
-	void schedule_dependent_events(queue<Event*>& events);
-	void schedule_independent_event(Event* events);
+	void schedule_dependent_events(queue<Event*>& events, ulong logical_address, event_type type);
+	void schedule_independent_event(Event* events, ulong logical_address, event_type type);
 	void finish(double start_time);
 	void progess();
 	static IOScheduler *instance();
@@ -1146,7 +1147,6 @@ private:
 	IOScheduler(Ssd& ssd, FtlParent& ftl);
 	~IOScheduler();
 	enum status execute_next(Event* event);
-	vector<Event*> gather_current_waiting_ios();
 	void execute_current_waiting_ios();
 	void execute_next_batch(vector<Event*>& events);
 	void handle_writes(vector<Event*>& events);
@@ -1154,8 +1154,7 @@ private:
 	bool can_schedule_on_die(Event const* event) const;
 	void handle_finished_event(Event *event, enum status outcome);
 
-	void eliminate_conflict_with_any_incoming_gc(Event * event);
-	void adjust_conflict_elimination_structures(Event const*const event);
+	void remove_redundant_events(int index_of_event_in_io_schedule);
 
 	vector<Event*> io_schedule;
 	map<uint, deque<Event*> > dependencies;
@@ -1165,8 +1164,20 @@ private:
 	FtlParent& ftl;
 	Block_manager_parent* bm;
 
-	map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations.
+	//map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations. to be removed
 
+	map<uint, uint> dependency_code_to_LBA;
+	map<uint, event_type> dependency_code_to_type;
+	map<uint, uint> LBA_currently_executing;
+
+	map<uint, vector<uint> > op_code_to_dependent_op_codes;
+
+	vector<Event*> test_for_removing_reduntant_events();
+	int find_scheduled_event(uint dependency_code) const;
+	void remove_operation(uint index_of_event_in_io_schedule);
+	void promote_to_gc(uint index_of_event_in_io_schedule);
+	void nullify_and_add_as_dependent(uint dependency_code_to_be_nullified, uint dependency_code_to_remain);
+	void make_dependent(Event * new_event, uint dependency_code_to_be_made_dependent, uint dependency_code_to_remain);
 };
 
 class FtlParent
