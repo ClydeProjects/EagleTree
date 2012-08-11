@@ -124,6 +124,7 @@ Ssd::~Ssd(void)
 	IOScheduler::instance()->finish(10000000);
 	//StateTracer::print();
 	StatisticsGatherer::get_instance()->print();
+	IOScheduler::instance()->print_stats();
 	/* explicitly call destructors and use free
 	 * since we used malloc and placement new */
 	for (uint i = 0; i < size; i++)

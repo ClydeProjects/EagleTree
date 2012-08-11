@@ -11,7 +11,6 @@ using namespace ssd;
 OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	: ssd(new Ssd()),
 	  events(threads.size()),
-	  LBA_to_thread_id_map(),
 	  currently_executing_ios_counter(0),
 	  currently_pending_ios_counter(0),
 	  last_dispatched_event_minimal_finish_time(1),
@@ -31,7 +30,6 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 OperatingSystem::OperatingSystem(vector<queue<Thread*> > threads_dependencies) :
 	ssd(new Ssd()),
 	events(threads.size()),
-	LBA_to_thread_id_map(),
 	currently_executing_ios_counter(0),
 	currently_pending_ios_counter(0),
 	last_dispatched_event_minimal_finish_time(1),
@@ -77,7 +75,7 @@ int OperatingSystem::pick_event_with_shortest_start_time() {
 
 	for (uint i = 0; i < events.size(); i++) {
 		Event* e = events[i];
-		if (e != NULL && e->get_event_type() != NOT_VALID && e->get_start_time() < soonest_time && LBA_to_thread_id_map.count(e->get_logical_address()) == 0) {
+		if (e != NULL && e->get_event_type() != NOT_VALID && e->get_start_time() < soonest_time && !is_LBA_locked(e->get_logical_address()) ) {
 			soonest_time = events[i]->get_start_time();
 			thread_id = i;
 		}
@@ -90,7 +88,10 @@ void OperatingSystem::dispatch_event(int thread_id) {
 	currently_executing_ios_counter++;
 	currently_pending_ios_counter--;
 	last_dispatched_event_minimal_finish_time = get_event_minimal_completion_time(event);
-	LBA_to_thread_id_map[event->get_logical_address()] = thread_id;
+
+	map<long, queue<uint> >& map = get_relevant_LBA_to_thread_map(event->get_event_type());
+	map[event->get_logical_address()].push(thread_id);
+
 	ssd->event_arrive(event);
 	events[thread_id] = threads[thread_id]->run();
 	if (events[thread_id] != NULL && event->get_event_type() != NOT_VALID) {
@@ -99,9 +100,15 @@ void OperatingSystem::dispatch_event(int thread_id) {
 }
 
 void OperatingSystem::register_event_completion(Event* event) {
-	assert(LBA_to_thread_id_map.count(event->get_logical_address()) == 1);
-	uint thread_id = LBA_to_thread_id_map[event->get_logical_address()];
-	LBA_to_thread_id_map.erase(event->get_logical_address());
+
+	ulong la = event->get_logical_address();
+	map<long, queue<uint> >& map = get_relevant_LBA_to_thread_map(event->get_event_type());
+	uint thread_id = map[la].front();
+	map[la].pop();
+	if (map[la].size() == 0) {
+		map.erase(la);
+	}
+
 	threads[thread_id]->register_event_completion(event);
 
 	if (threads[thread_id]->is_finished()) {
@@ -135,3 +142,22 @@ double OperatingSystem::get_event_minimal_completion_time(Event const*const even
 	return result;
 }
 
+map<long, queue<uint> >& OperatingSystem::get_relevant_LBA_to_thread_map(event_type type) {
+	if (type == READ) {
+		return read_LBA_to_thread_id;
+	}
+	else if (type == WRITE) {
+		return write_LBA_to_thread_id;
+	}
+	else {
+		return trim_LBA_to_thread_id;
+	}
+}
+
+bool OperatingSystem::is_LBA_locked(ulong lba) {
+	if (!OS_LOCK) {
+		return false;
+	} else {
+		return read_LBA_to_thread_id.count(lba) > 0 || write_LBA_to_thread_id.count(lba) > 0 || trim_LBA_to_thread_id.count(lba) > 0;
+	}
+}

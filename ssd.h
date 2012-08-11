@@ -180,6 +180,12 @@ extern bool GREEDY_GC;
  */
 extern const int PRINT_LEVEL;
 
+/*
+ * tells the Operating System class to either lock or not lock LBAs after dispatching IOs to them
+ */
+extern const bool OS_LOCK;
+
+
 /* Enumerations to clarify status integers in simulation
  * Do not use typedefs on enums for reader clarity */
 
@@ -1143,6 +1149,7 @@ public:
 	void progess();
 	static IOScheduler *instance();
 	static void instance_initialize(Ssd& ssd, FtlParent& ftl);
+	void print_stats();
 private:
 	IOScheduler(Ssd& ssd, FtlParent& ftl);
 	~IOScheduler();
@@ -1178,6 +1185,13 @@ private:
 	void promote_to_gc(uint index_of_event_in_io_schedule);
 	void nullify_and_add_as_dependent(uint dependency_code_to_be_nullified, uint dependency_code_to_remain);
 	void make_dependent(Event * new_event, uint dependency_code_to_be_made_dependent, uint dependency_code_to_remain);
+
+	struct io_scheduler_stats {
+		uint num_write_cancellations;
+		io_scheduler_stats() : num_write_cancellations(0)  {}
+	};
+	io_scheduler_stats stats;
+
 };
 
 class FtlParent
@@ -1717,11 +1731,20 @@ private:
 	int pick_event_with_shortest_start_time();
 	void dispatch_event(int thread_id);
 	double get_event_minimal_completion_time(Event const*const event) const;
+	bool is_LBA_locked(ulong lba);
 	Ssd * ssd;
 	vector<Thread*> threads;
 	vector<queue<Thread*> > thread_dependencies;
 	vector<Event*> events;
-	map<long, uint> LBA_to_thread_id_map;
+
+	//map<long, uint> LBA_to_thread_id_map;
+
+	map<long, queue<uint> > write_LBA_to_thread_id;
+	map<long, queue<uint> > read_LBA_to_thread_id;
+	map<long, queue<uint> > trim_LBA_to_thread_id;
+
+	map<long, queue<uint> >& get_relevant_LBA_to_thread_map(event_type);
+
 	int currently_executing_ios_counter;
 	int currently_pending_ios_counter;
 	double last_dispatched_event_minimal_finish_time;

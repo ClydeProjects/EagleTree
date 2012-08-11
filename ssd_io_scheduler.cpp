@@ -14,7 +14,8 @@ IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
 	ssd(ssd),
 	ftl(ftl),
 	dependency_code_to_LBA(),
-	dependency_code_to_type()
+	dependency_code_to_type(),
+	stats()
 {
 	if (BLOCK_MANAGER_ID == 0) {
 		bm = new Block_manager_parallel(ssd, ftl);
@@ -107,6 +108,7 @@ void IOScheduler::schedule_independent_event(Event* event, ulong logical_address
 }
 
 void IOScheduler::finish(double start_time) {
+	std::sort(io_schedule.begin(), io_schedule.end(), myfunction);
 	while (io_schedule.size() > 0 && io_schedule.back()->get_current_time() + 1 < start_time) {
 		execute_current_waiting_ios();
 	}
@@ -256,6 +258,7 @@ void IOScheduler::remove_redundant_events(int index) {
 	else if (new_op_code == WRITE && scheduled_op_code == WRITE) {
 		remove_operation(index_of_other);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
+		stats.num_write_cancellations++;
 	}
 	// if there is a write, but before a read was scheduled, we should read first before making the write
 	else if (new_op_code == WRITE && scheduled_op_code == READ) {
@@ -302,6 +305,7 @@ int IOScheduler::find_scheduled_event(uint dependency_code) const {
 
 void IOScheduler::remove_operation(uint index_of_event_in_io_schedule) {
 	Event * event = io_schedule[index_of_event_in_io_schedule];
+	ssd.register_event_completion(event);
 	deque<Event*>& dependents = dependencies[event->get_application_io_id()];
 	if (event->get_event_type() == READ_TRANSFER) {
 		ssd.getPackages()[event->get_address().package].getDies()[event->get_address().die].clear_register();
@@ -312,7 +316,6 @@ void IOScheduler::remove_operation(uint index_of_event_in_io_schedule) {
 		ssd.register_event_completion(e);
 	}
 	dependencies.erase(event->get_application_io_id());
-	delete io_schedule[index_of_event_in_io_schedule];
 	io_schedule.erase(io_schedule.begin() + index_of_event_in_io_schedule);
 }
 
@@ -546,4 +549,10 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	StatisticsGatherer::get_instance()->register_completed_event(*event);
 
 	ssd.register_event_completion(event);
+}
+
+void IOScheduler::print_stats() {
+	printf("\n");
+	printf("num_write_cancellations %d\n", stats.num_write_cancellations);
+	printf("\n");
 }
