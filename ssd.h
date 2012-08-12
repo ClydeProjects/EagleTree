@@ -210,7 +210,7 @@ enum block_state{FREE, PARTIALLY_FREE, ACTIVE, INACTIVE};
  * 	                                page states set to empty)
  * 	merge - move valid pages from block at address (page state set to invalid)
  * 	           to free pages in block at merge_address */
-enum event_type{NOT_VALID, READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, MERGE, TRIM};
+enum event_type{NOT_VALID, READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, MERGE, TRIM, GARBAGE_COLLECTION};
 
 /* General return status
  * return status for simulator operations that only need to provide general
@@ -881,6 +881,7 @@ public:
 	virtual void register_write_arrival(Event const& write);
 	virtual void trim(Event const& write);
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
+	vector<deque<Event*> > migrate(Event * gc_event);
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 
@@ -911,7 +912,7 @@ protected:
 	FtlParent& ftl;
 	vector<vector<Address> > free_block_pointers;
 private:
-	void migrate(Block const* const block, double start_time);
+
 	void choose_gc_victim(vector<pair<long, uint> > candidates, double start_time);
 	void update_blocks_with_min_age(uint age);
 	uint sort_into_age_class(Address const& address);
@@ -1162,6 +1163,8 @@ private:
 	void handle_finished_event(Event *event, enum status outcome);
 
 	void remove_redundant_events(int index_of_event_in_io_schedule);
+
+	void init_event(uint event_index);
 
 	vector<Event*> io_schedule;
 	map<uint, deque<Event*> > dependencies;

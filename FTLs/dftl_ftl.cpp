@@ -158,8 +158,8 @@ void FtlImpl_Dftl::register_read_completion(Event const& event, enum status resu
 void FtlImpl_Dftl::set_replace_address(Event& event) const {
 	MPage current = trans_map[event.get_logical_address()];
 	assert(event.get_event_type() == WRITE || event.get_event_type() == TRIM);
-	Address a = Address(current.ppn, PAGE);
 	if (current.ppn != -1) {
+		Address a = Address(current.ppn, PAGE);
 		assert(current.cached);
 		event.set_replace_address(a);
 	}

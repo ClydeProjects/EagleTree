@@ -188,7 +188,10 @@ void Ssd::register_event_completion(Event * event) {
 	if (event->is_original_application_io() && (event->get_event_type() == WRITE || event->get_event_type() == READ_COMMAND)) {
 		last_io_submission_time = event->get_start_time();
 	}
-	if (os != NULL && (event->is_original_application_io() )) {
+	if (event->get_event_type() == READ_COMMAND) {
+		return;
+	}
+	if (os != NULL && event->is_original_application_io()) {
 		os->register_event_completion(event);
 	} else {
 		delete event;
