@@ -110,6 +110,12 @@ enum status Package::erase(Event &event)
 	return status;
 }
 
+enum status Package::merge(Event &event)
+{
+	assert(data != NULL && event.get_address().die < size && event.get_address().valid > PACKAGE);
+	return data[event.get_address().die].merge(event);
+}
+
 const Ssd &Package::get_parent(void) const
 {
 	return parent;

@@ -135,6 +135,14 @@ enum status Controller::issue(Event &event_list)
 				|| ssd.erase(*cur) == FAILURE)
 				return FAILURE;
 		}
+		else if(cur -> get_event_type() == MERGE)
+		{
+			assert(cur -> get_address().valid > NONE);
+			assert(cur -> get_merge_address().valid > NONE);
+			if(ssd.bus.lock(cur -> get_address().package, cur -> get_start_time(), BUS_CTRL_DELAY, *cur) == FAILURE
+				|| ssd.merge(*cur) == FAILURE)
+				return FAILURE;
+		}
 		else if(cur -> get_event_type() == TRIM)
 		{
 			return SUCCESS;
