@@ -14,32 +14,10 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	  currently_executing_ios_counter(0),
 	  currently_pending_ios_counter(0),
 	  last_dispatched_event_minimal_finish_time(1),
-	  threads(new_threads),
-	  thread_dependencies(new_threads.size(), queue<Thread*>())
+	  threads(new_threads)
 {
 	assert(threads.size() > 0);
 	for (uint i = 0; i < threads.size(); i++) {
-		events[i] = threads[i]->run();
-		if (events[i]->get_event_type() != NOT_VALID) {
-			currently_pending_ios_counter++;
-		}
-	}
-	ssd->set_operating_system(this);
-}
-
-OperatingSystem::OperatingSystem(vector<queue<Thread*> > threads_dependencies) :
-	ssd(new Ssd()),
-	events(threads.size()),
-	currently_executing_ios_counter(0),
-	currently_pending_ios_counter(0),
-	last_dispatched_event_minimal_finish_time(1),
-	threads(threads_dependencies.size()),
-	thread_dependencies(threads_dependencies)
-{
-	assert(thread_dependencies.size() > 0);
-	for (uint i = 0; i < thread_dependencies.size(); i++) {
-		threads[i] = thread_dependencies[i].front();
-		thread_dependencies[i].pop();
 		events[i] = threads[i]->run();
 		if (events[i]->get_event_type() != NOT_VALID) {
 			currently_pending_ios_counter++;
@@ -109,16 +87,19 @@ void OperatingSystem::register_event_completion(Event* event) {
 		map.erase(la);
 	}
 
-	threads[thread_id]->register_event_completion(event);
+	Thread* thread = threads[thread_id];
+	thread->register_event_completion(event);
 
-	if (threads[thread_id]->is_finished()) {
-		//threads[thread_id]->print_thread_stats();
-		if (thread_dependencies[thread_id].size() > 0) {
-			delete threads[thread_id];
-			threads[thread_id] = thread_dependencies[thread_id].front();
-			thread_dependencies[thread_id].pop();
-			threads[thread_id]->set_time(event->get_current_time());
+	if (thread->is_finished() && thread->get_follow_up_threads().size() > 0) {
+		vector<Thread*> follow_up_threads = thread->get_follow_up_threads();
+		threads[thread_id] = follow_up_threads[0];
+		threads[thread_id]->set_time(event->get_current_time());
+		for (uint i = 1; i < follow_up_threads.size(); i++) {
+			follow_up_threads[i]->set_time(event->get_current_time());
+			threads.push_back(follow_up_threads[i]);
+			events.push_back(follow_up_threads[i]->run());
 		}
+		delete thread;
 	}
 
 	if (events[thread_id] == NULL) {
@@ -143,7 +124,7 @@ double OperatingSystem::get_event_minimal_completion_time(Event const*const even
 }
 
 map<long, queue<uint> >& OperatingSystem::get_relevant_LBA_to_thread_map(event_type type) {
-	if (type == READ) {
+	if (type == READ || type == READ_TRANSFER) {
 		return read_LBA_to_thread_id;
 	}
 	else if (type == WRITE) {

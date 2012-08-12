@@ -68,7 +68,7 @@ void Synchronous_Sequential_Thread::handle_event_completion(Event* event) {
 
 // =================  Asynchronous_Sequential_Writer  =============================
 
-Asynchronous_Sequential_Thread::Asynchronous_Sequential_Thread(long min_LBA, long max_LBA, int repetitions_num, event_type type, double start_time)
+Asynchronous_Sequential_Thread::Asynchronous_Sequential_Thread(long min_LBA, long max_LBA, int repetitions_num, event_type type, double time_breaks, double start_time)
 	: Thread(start_time),
 	  min_LBA(min_LBA),
 	  max_LBA(max_LBA),
@@ -76,7 +76,8 @@ Asynchronous_Sequential_Thread::Asynchronous_Sequential_Thread(long min_LBA, lon
 	  number_of_times_to_repeat(repetitions_num),
 	  finished_round(false),
 	  type(type),
-	  number_finished(0)
+	  number_finished(0),
+	  time_breaks(time_breaks)
 {}
 
 Event* Asynchronous_Sequential_Thread::issue_next_io() {
@@ -84,7 +85,7 @@ Event* Asynchronous_Sequential_Thread::issue_next_io() {
 		return NULL;
 	}
 	Event* e = new Event(type, min_LBA + offset, 1, time);
-	time += 16;
+	time += time_breaks;
 	if (min_LBA + offset++ == max_LBA) {
 		finished_round = true;
 	}
