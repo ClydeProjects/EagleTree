@@ -44,7 +44,7 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 			num_gc_writes_per_LUN[a.package][a.die]++;
 		}
 	} else if (event.get_event_type() == READ_COMMAND || event.get_event_type() == READ_TRANSFER) {
-		sum_bus_wait_time_for_writes_per_LUN[a.package][a.die] += event.get_bus_wait_time();
+		sum_bus_wait_time_for_reads_per_LUN[a.package][a.die] += event.get_bus_wait_time();
 		if (event.get_event_type() == READ_TRANSFER) {
 			if (event.is_original_application_io()) {
 				num_reads_per_LUN[a.package][a.die]++;
