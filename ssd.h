@@ -1144,7 +1144,7 @@ private:
 
 class IOScheduler {
 public:
-	void schedule_dependent_events(queue<Event*>& events, ulong logical_address, event_type type);
+	void schedule_dependent_events(deque<Event*> events, ulong logical_address, event_type type);
 	void schedule_independent_event(Event* events, ulong logical_address, event_type type);
 	void finish(double start_time);
 	void progess();
@@ -1375,7 +1375,7 @@ protected:
 	long currentDataPage;
 	long currentTranslationPage;
 
-	queue<Event*> current_dependent_events;
+	deque<Event*> current_dependent_events;
 
 	map<long, long> global_translation_directory; // a map from virtual translation pages to physical translation pages
 

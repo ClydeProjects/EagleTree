@@ -55,31 +55,25 @@ bool bus_wait_time_comparator (const Event* i, const Event* j) {
 }
 
 // TODO pass a deque dependencies instead of converting from a queue
-void IOScheduler::schedule_dependent_events(queue<Event*>& events, ulong logical_address, event_type type) {
-	uint dependency_code = events.back()->get_application_io_id();
+void IOScheduler::schedule_dependent_events(deque<Event*> events, ulong logical_address, event_type type) {
+	uint dependency_code = events.front()->get_application_io_id();
 	if (type != GARBAGE_COLLECTION && type != ERASE) {
 		dependency_code_to_LBA[dependency_code] = logical_address;
 	}
-
 	dependency_code_to_type[dependency_code] = type;
 	assert(dependencies.count(dependency_code) == 0);
-	while (!events.empty()) {
-		Event* event = events.front();
-		events.pop();
-		dependencies[dependency_code].push_back(event);
-	}
+	dependencies[dependency_code] = events;
 	Event* first = dependencies[dependency_code].front();
 	dependencies[dependency_code].pop_front();
 	io_schedule.push_back(first);
 	while (io_schedule.size() > 0 && io_schedule.back()->get_current_time() + 1 <= first->get_start_time()) {
 		execute_current_waiting_ios();
 	}
-	assert(events.empty());
 }
 
 void IOScheduler::schedule_independent_event(Event* event, ulong logical_address, event_type type) {
-	queue<Event*> eventVec;
-	eventVec.push(event);
+	deque<Event*> eventVec;
+	eventVec.push_back(event);
 	schedule_dependent_events(eventVec, logical_address, type);
 }
 

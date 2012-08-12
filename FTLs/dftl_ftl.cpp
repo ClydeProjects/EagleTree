@@ -55,6 +55,7 @@ FtlImpl_Dftl::~FtlImpl_Dftl(void)
 
 void FtlImpl_Dftl::read(Event *event)
 {
+	current_dependent_events.clear();
 	MPage current = trans_map[event->get_logical_address()];
 	if (current.ppn == -1) {
 		fprintf(stderr, "LBA %d is unwritten, so read will be cancelled\n", event->get_logical_address(), __func__);
@@ -62,18 +63,19 @@ void FtlImpl_Dftl::read(Event *event)
 
 	resolve_mapping(event, false);
 	controller.stats.numFTLRead++;
-	current_dependent_events.push(event);
+	current_dependent_events.push_back(event);
 	IOScheduler::instance()->schedule_dependent_events(current_dependent_events, event->get_logical_address(), READ);
 }
 
 void FtlImpl_Dftl::write(Event *event)
 {
+	current_dependent_events.clear();
 	int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
 	assert(event->get_logical_address() < num_pages - num_mapping_pages);
 
 	resolve_mapping(event, true);
 	controller.stats.numFTLWrite++;
-	current_dependent_events.push(event);
+	current_dependent_events.push_back(event);
 	IOScheduler::instance()->schedule_dependent_events(current_dependent_events, event->get_logical_address(), WRITE);
 }
 
