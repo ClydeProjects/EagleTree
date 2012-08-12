@@ -56,7 +56,15 @@ bool bus_wait_time_comparator (const Event* i, const Event* j) {
 
 void IOScheduler::schedule_dependent_events(std::queue<Event*>& events, ulong logical_address, event_type type) {
 	uint dependency_code = events.back()->get_application_io_id();
-	if (dependency_code == 23) {
+	if (dependency_code == 1436) {
+			int i = 0;
+			i++;
+		}
+	if (dependency_code == 1479) {
+		int i = 0;
+		i++;
+	}
+	if (dependency_code == 1452) {
 		int i = 0;
 		i++;
 	}
@@ -187,10 +195,6 @@ vector<Event*> IOScheduler::test_for_removing_reduntant_events() {
 		}
 	}
 	int num_current_events = io_schedule.size() - 1 - i;
-	if (num_current_events == 2) {
-		int i = 0;
-		i++;
-	}
 	vector<Event*> current_ios;
 	for (int j = 0; j < num_current_events; j++) {
 		Event * event = io_schedule.back();
@@ -239,6 +243,16 @@ void IOScheduler::remove_redundant_events(int index) {
 	Event * currently_scheduled_event = io_schedule[index_of_other];
 	assert(currently_scheduled_event != NULL);
 	bool both_events_are_gc = new_event->is_garbage_collection_op() && currently_scheduled_event->is_garbage_collection_op();
+
+	if (both_events_are_gc) {
+		int i = 0;
+		i++;
+	}
+	if (common_logical_address == 155) {
+			int i = 0;
+			i++;
+		}
+
 	assert(!both_events_are_gc);
 
 	event_type new_op_code = dependency_code_to_type[dependency_code_of_new_event];
@@ -262,7 +276,7 @@ void IOScheduler::remove_redundant_events(int index) {
 	}
 	// if there is a write, but before a read was scheduled, we should read first before making the write
 	else if (new_op_code == WRITE && scheduled_op_code == READ) {
-		make_dependent(new_event, new_op_code, scheduled_op_code);
+		make_dependent(index, dependency_code_of_new_event, dependency_code_of_other_event);
 	}
 	// if there is a read, and a write is scheduled, then the contents of the write must be buffered, so the read can wait
 	else if (new_op_code == READ && scheduled_op_code == WRITE) {
@@ -279,11 +293,11 @@ void IOScheduler::remove_redundant_events(int index) {
 	}
 	// if a trim is scheduled, and a write arrives, may as well let the trim execute first
 	else if (new_op_code == WRITE && scheduled_op_code == TRIM) {
-		make_dependent(new_event, new_op_code, scheduled_op_code);
+		make_dependent(index, new_op_code, scheduled_op_code);
 	}
 	// if a read is scheduled when a trim is received, we must still execute the read. Then we can trim
 	else if (new_op_code == TRIM && scheduled_op_code == READ) {
-		make_dependent(new_event, new_op_code, scheduled_op_code);
+		make_dependent(index, new_op_code, scheduled_op_code);
 	}
 	// if something is to be trimmed, and a read is sent, invalidate the read
 	else if (new_op_code == READ && scheduled_op_code == TRIM) {
@@ -324,7 +338,7 @@ void IOScheduler::promote_to_gc(uint index_of_event_in_io_schedule) {
 	Event * event = io_schedule[index_of_event_in_io_schedule];
 	event->set_garbage_collection_op(true);
 	deque<Event*>& dependents = dependencies[event->get_application_io_id()];
-	for (int i = 0; i < dependents.size(); i++){
+	for (uint i = 0; i < dependents.size(); i++){
 		dependents[i]->set_garbage_collection_op(true);
 	}
 }
@@ -333,116 +347,13 @@ void IOScheduler::nullify_and_add_as_dependent(uint dependency_code_to_be_nullif
 
 }
 
-void IOScheduler::make_dependent(Event * new_event, uint op_code_to_be_made_dependent, uint op_code_to_remain) {
+void IOScheduler::make_dependent(uint new_event_index, uint op_code_to_be_made_dependent, uint op_code_to_remain) {
 	op_code_to_dependent_op_codes[op_code_to_remain] = vector<uint>(0);
 	op_code_to_dependent_op_codes[op_code_to_remain].push_back(op_code_to_be_made_dependent);
-	dependencies[op_code_to_be_made_dependent].push_front(new_event);
+	Event * event = io_schedule[new_event_index];
+	dependencies[op_code_to_be_made_dependent].push_front(event);
+	io_schedule.erase(io_schedule.begin() + new_event_index);
 }
-
-// Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
-/*void IOScheduler::handle_writes(std::vector<Event*>& events) {
-	std::sort(events.begin(), events.end(), bus_wait_time_comparator);
-	//printf("STARTTTTTTTTTTTTTTT\n");
-	while (events.size() > 0) {
-		Event* event = events.back();
-		events.pop_back();
-		if (event->get_bus_wait_time() == 0) {
-			bm->register_write_arrival(*event);
-		}
-		assert(event->get_event_type() == WRITE);
-		ftl.set_replace_address(*event);
-		//bm.register_write_arrival(event);
-		if (!event->is_garbage_collection_op()) {
-			eliminate_conflict_with_any_incoming_gc(event);
-		}
-		pair<double, Address> result = bm->write(*event);
-		if (result.first == 0) {
-			event->set_address(result.second);
-			event->set_noop(false);
-			ftl.set_replace_address(*event);
-			adjust_conflict_elimination_structures(event);
-			execute_next(event);
-		}
-		else {
-			event->incr_bus_wait_time(result.first);
-			event->incr_time_taken(result.first);
-			io_schedule.push_back(event);
-		}
-	}
-}*/
-
-// if a write to LBA X arrives, while there is already a pending GC operation
-// to migrate LBA X, the GC operation becomes redundant, so we cancel it.
-/*void IOScheduler::eliminate_conflict_with_any_incoming_gc(Event * event) {
-	assert(!event->is_garbage_collection_op());
-	//if (LBA_to_dependencies.count(event->get_logical_address()) == 0) {
-		return;
-	}
-	uint dependency_code = LBA_to_dependencies[event->get_logical_address()];
-	deque<Event*> gc_queue = dependencies[dependency_code];
-
-	Address addr_of_original_page;
-	uint num_events_eliminated = 0;
-	for (uint i = 0; i < gc_queue.size(); i++) {
-		Event* gc_event = gc_queue[i];
-		if (gc_event->get_logical_address() == event->get_logical_address()) {
-			gc_queue.erase (gc_queue.begin()+i);
-			i--;
-			num_events_eliminated++;
-			if (addr_of_original_page.valid == NONE) {
-				if (gc_event->get_event_type() == READ_COMMAND || gc_event->get_event_type() == READ_TRANSFER) {
-					addr_of_original_page = gc_event->get_address();
-				} else if (gc_event->get_event_type() == WRITE) {
-					addr_of_original_page = gc_event->get_replace_address();
-				}
-			}
-		}
-	}
-
-	if (num_events_eliminated < 3) {
-		for (uint i = 0; i < io_schedule.size(); i++) {
-			Event* some_event = io_schedule[i];
-			if (some_event->is_garbage_collection_op() && some_event->get_logical_address() == event->get_logical_address()) {
-				io_schedule.erase(io_schedule.begin() + i);
-				i--;
-				num_events_eliminated++;
-				if (addr_of_original_page.valid == NONE) {
-					if (some_event->get_event_type() == READ_COMMAND || some_event->get_event_type() == READ_TRANSFER) {
-						addr_of_original_page = some_event->get_address();
-					} else if (some_event->get_event_type() == WRITE) {
-						addr_of_original_page = some_event->get_replace_address();
-					}
-				}
-				break;
-			}
-		}
-	}
-	if (num_events_eliminated == 2) {
-		ssd.getPackages()[addr_of_original_page.package].getDies()[addr_of_original_page.die].clear_register();
-	}
-	if (PRINT_LEVEL > 1) {
-		printf("Write makes pending GC unnecessary. LBA: %d   removed %d events", event->get_logical_address(), num_events_eliminated);
-		event->get_replace_address().print();
-		printf("\n");
-	}
-
-	event->set_garbage_collection_op(true);
-	if (num_events_eliminated == 0) {
-		int i = 0;
-		i++;
-		event->print();
-	}
-	assert(num_events_eliminated > 0);
-
-	//LBA_to_dependencies.erase(event->get_logical_address());
-}
-
-// invoked upon completion of a write
-void IOScheduler::adjust_conflict_elimination_structures(Event const*const event) {
-	if (event->is_garbage_collection_op()) {
-		//LBA_to_dependencies.erase(event->get_logical_address());
-	}
-}*/
 
 // executes read_commands, read_transfers and erases
 void IOScheduler::execute_next_batch(std::vector<Event*>& events) {
@@ -491,15 +402,19 @@ enum status IOScheduler::execute_next(Event* event) {
 			uint lba = dependency_code_to_LBA[dependency_code];
 			dependency_code_to_LBA.erase(dependency_code);
 			if (event->get_event_type() != ERASE) {
-				if (LBA_currently_executing.count(lba) != 1) {
-					int i = 0;
-					event->print();
-					i++;
-				}
 				assert(LBA_currently_executing.count(lba) == 1);
 				LBA_currently_executing.erase(lba);
 			}
 			dependency_code_to_type.erase(dependency_code);
+			if (op_code_to_dependent_op_codes.count(dependency_code) == 1) {
+				for (uint i = 0; i < op_code_to_dependent_op_codes[dependency_code].size(); i++) {
+					uint dependent_code = op_code_to_dependent_op_codes[dependency_code][i];
+					Event* dependant_event = dependencies[dependent_code].front();
+					dependencies[dependent_code].pop_front();
+					io_schedule.push_back(dependant_event);
+				}
+				op_code_to_dependent_op_codes.erase(dependency_code);
+			}
 		}
 	} else {
 		printf("FAILED!!!! ");
@@ -556,4 +471,10 @@ void IOScheduler::print_stats() {
 	printf("\n");
 	printf("num_write_cancellations %d\n", stats.num_write_cancellations);
 	printf("\n");
+}
+
+void init_event(Event * event) {
+	if (event->get_event_type() == READ) {
+
+	}
 }

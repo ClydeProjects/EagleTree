@@ -1184,7 +1184,7 @@ private:
 	void remove_operation(uint index_of_event_in_io_schedule);
 	void promote_to_gc(uint index_of_event_in_io_schedule);
 	void nullify_and_add_as_dependent(uint dependency_code_to_be_nullified, uint dependency_code_to_remain);
-	void make_dependent(Event * new_event, uint dependency_code_to_be_made_dependent, uint dependency_code_to_remain);
+	void make_dependent(uint new_event_index, uint dependency_code_to_be_made_dependent, uint dependency_code_to_remain);
 
 	struct io_scheduler_stats {
 		uint num_write_cancellations;
@@ -1621,7 +1621,8 @@ class Thread
 public:
 	Thread(double time) : finished(false), time(time),
 	num_pages_in_each_LUN(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
-	num_writes_to_each_LUN(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)){}
+	num_writes_to_each_LUN(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
+	threads_to_start_when_this_thread_finishes() {}
 	virtual ~Thread() {}
 	Event* run() {
 		return finished ? NULL : issue_next_io();
@@ -1634,6 +1635,12 @@ public:
 		time = current_time;
 	}
 	void print_thread_stats();
+	void add_follow_up_thread(Thread* thread) {
+		threads_to_start_when_this_thread_finishes.push_back(thread);
+	}
+	vector<Thread*>& get_follow_up_threads() {
+		return threads_to_start_when_this_thread_finishes;
+	}
 protected:
 	virtual Event* issue_next_io() = 0;
 	virtual void handle_event_completion(Event* event) = 0;
@@ -1641,6 +1648,7 @@ protected:
 	double time;
 	vector<vector<int> > num_pages_in_each_LUN;
 	vector<vector<int> > num_writes_to_each_LUN;
+	vector<Thread*> threads_to_start_when_this_thread_finishes;
 };
 
 class Synchronous_Sequential_Thread : public Thread
@@ -1659,7 +1667,7 @@ private:
 class Asynchronous_Sequential_Thread : public Thread
 {
 public:
-	Asynchronous_Sequential_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, event_type type, double start_time = 1);
+	Asynchronous_Sequential_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, event_type type, double time_breaks = 20, double start_time = 1);
 	Event* issue_next_io();
 	void handle_event_completion(Event* event);
 private:
@@ -1668,6 +1676,7 @@ private:
 	bool finished_round;
 	event_type type;
 	int number_finished;
+	double time_breaks;
 };
 
 class Synchronous_Random_Thread : public Thread
@@ -1722,7 +1731,6 @@ class OperatingSystem
 {
 public:
 	OperatingSystem(vector<Thread*> threads);
-	OperatingSystem(vector<queue<Thread*> > threads_dependencies);
 	~OperatingSystem();
 	void run();
 	void register_event_completion(Event* event);
@@ -1734,7 +1742,6 @@ private:
 	bool is_LBA_locked(ulong lba);
 	Ssd * ssd;
 	vector<Thread*> threads;
-	vector<queue<Thread*> > thread_dependencies;
 	vector<Event*> events;
 
 	//map<long, uint> LBA_to_thread_id_map;
