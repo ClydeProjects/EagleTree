@@ -305,17 +305,18 @@ int IOScheduler::find_scheduled_event(uint dependency_code) const {
 
 void IOScheduler::remove_operation(uint index_of_event_in_io_schedule) {
 	Event * event = io_schedule[index_of_event_in_io_schedule];
-	ssd.register_event_completion(event);
-	deque<Event*>& dependents = dependencies[event->get_application_io_id()];
+	uint dependency_code = event->get_application_io_id();
+	deque<Event*>& dependents = dependencies[dependency_code];
 	if (event->get_event_type() == READ_TRANSFER) {
 		ssd.getPackages()[event->get_address().package].getDies()[event->get_address().die].clear_register();
 	}
+	ssd.register_event_completion(event);
 	while (dependents.size() > 0) {
 		Event *e = dependents.front();
 		dependents.pop_front();
 		ssd.register_event_completion(e);
 	}
-	dependencies.erase(event->get_application_io_id());
+	dependencies.erase(dependency_code);
 	io_schedule.erase(io_schedule.begin() + index_of_event_in_io_schedule);
 }
 
