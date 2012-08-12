@@ -118,11 +118,6 @@ const Address &Event::get_address(void) const
 	return address;
 }
 
-const Address &Event::get_merge_address(void) const
-{
-	return merge_address;
-}
-
 const Address &Event::get_log_address(void) const
 {
 	return log_address;
@@ -206,14 +201,9 @@ void Event::set_address(const Address &address)
 			int i = 0;
 			i++;
 		}
-		//assert(address.valid == PAGE);
+		assert(address.valid == PAGE);
 	}
 	this -> address = address;
-}
-
-void Event::set_merge_address(const Address &address)
-{
-	merge_address = address;
 }
 
 void Event::set_replace_address(const Address &address)
@@ -290,8 +280,6 @@ void Event::print(FILE *stream) const
 		fprintf(stream, "W ");
 	else if(type == ERASE)
 		fprintf(stream, "E ");
-	else if(type == MERGE)
-		fprintf(stream, "M ");
 	else if (type == TRIM)
 		fprintf(stream, "D ");
 	else
@@ -299,8 +287,6 @@ void Event::print(FILE *stream) const
 
 	fprintf(stream, "%d\t", logical_address);
 	address.print(stream);
-	if(type == MERGE)
-		merge_address.print(stream);
 	if(type == WRITE)
 		replace_address.print(stream);
 	fprintf(stream, " Time[%d, %d, %d]", (int)start_time, (int)(start_time + time_taken), (int)bus_wait_time);

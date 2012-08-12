@@ -208,9 +208,8 @@ enum block_state{FREE, PARTIALLY_FREE, ACTIVE, INACTIVE};
  * 	write - write data to address (page state set to valid)
  * 	erase - erase block at address (all pages in block are erased - 
  * 	                                page states set to empty)
- * 	merge - move valid pages from block at address (page state set to invalid)
- * 	           to free pages in block at merge_address */
-enum event_type{NOT_VALID, READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, MERGE, TRIM};
+*/
+enum event_type{NOT_VALID, READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, TRIM};
 
 /* General return status
  * return status for simulator operations that only need to provide general
@@ -411,7 +410,6 @@ public:
 	void consolidate_metaevent(Event &list);
 	ulong get_logical_address(void) const;
 	const Address &get_address(void) const;
-	const Address &get_merge_address(void) const;
 	const Address &get_log_address(void) const;
 	const Address &get_replace_address(void) const;
 	uint get_size(void) const;
@@ -427,7 +425,6 @@ public:
 	uint get_id(void) const;
 	Event *get_next(void) const;
 	void set_address(const Address &address);
-	void set_merge_address(const Address &address);
 	void set_log_address(const Address &address);
 	void set_replace_address(const Address &address);
 	void set_next(Event &next);
@@ -453,7 +450,6 @@ private:
 
 	ulong logical_address;
 	Address address;
-	Address merge_address;
 	Address log_address;
 	Address replace_address;
 	uint size;
@@ -661,8 +657,6 @@ public:
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	enum status replace(Event &event);
-	enum status merge(Event &event);
-	enum status _merge(Event &event);
 	const Package &get_parent(void) const;
 	double get_last_erase_time(const Address &address) const;
 	ulong get_erases_remaining(const Address &address) const;
@@ -706,7 +700,6 @@ public:
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	enum status replace(Event &event);
-	enum status merge(Event &event);
 	const Ssd &get_parent(void) const;
 	double get_last_erase_time (const Address &address) const;
 	ulong get_erases_remaining (const Address &address) const;
@@ -1513,9 +1506,7 @@ private:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	enum status merge(Event &event);
 	enum status replace(Event &event);
-	enum status merge_replacement_block(Event &event);
 	ulong get_erases_remaining(const Address &address) const;
 	void update_wear_stats(const Address &address);
 	void get_least_worn(Address &address) const;
