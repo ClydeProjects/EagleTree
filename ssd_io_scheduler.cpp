@@ -55,31 +55,25 @@ bool bus_wait_time_comparator (const Event* i, const Event* j) {
 }
 
 // TODO pass a deque dependencies instead of converting from a queue
-void IOScheduler::schedule_dependent_events(queue<Event*>& events, ulong logical_address, event_type type) {
-	uint dependency_code = events.back()->get_application_io_id();
+void IOScheduler::schedule_dependent_events(deque<Event*> events, ulong logical_address, event_type type) {
+	uint dependency_code = events.front()->get_application_io_id();
 	if (type != GARBAGE_COLLECTION && type != ERASE) {
 		dependency_code_to_LBA[dependency_code] = logical_address;
 	}
-
 	dependency_code_to_type[dependency_code] = type;
 	assert(dependencies.count(dependency_code) == 0);
-	while (!events.empty()) {
-		Event* event = events.front();
-		events.pop();
-		dependencies[dependency_code].push_back(event);
-	}
+	dependencies[dependency_code] = events;
 	Event* first = dependencies[dependency_code].front();
 	dependencies[dependency_code].pop_front();
 	io_schedule.push_back(first);
 	while (io_schedule.size() > 0 && io_schedule.back()->get_current_time() + 1 <= first->get_start_time()) {
 		execute_current_waiting_ios();
 	}
-	assert(events.empty());
 }
 
 void IOScheduler::schedule_independent_event(Event* event, ulong logical_address, event_type type) {
-	queue<Event*> eventVec;
-	eventVec.push(event);
+	deque<Event*> eventVec;
+	eventVec.push_back(event);
 	schedule_dependent_events(eventVec, logical_address, type);
 }
 
@@ -203,21 +197,15 @@ void IOScheduler::remove_redundant_events(int index) {
 
 
 	uint dependency_code_of_new_event = new_event->get_application_io_id();
+
+
+
 	uint common_logical_address = new_event->get_logical_address();
 	uint dependency_code_of_other_event = LBA_currently_executing[common_logical_address];
 	int index_of_other = find_scheduled_event(dependency_code_of_other_event);
 	Event * currently_scheduled_event = io_schedule[index_of_other];
 	assert(currently_scheduled_event != NULL);
 	bool both_events_are_gc = new_event->is_garbage_collection_op() && currently_scheduled_event->is_garbage_collection_op();
-
-	if (both_events_are_gc) {
-		int i = 0;
-		i++;
-	}
-	if (common_logical_address == 155) {
-			int i = 0;
-			i++;
-		}
 
 	assert(!both_events_are_gc);
 
@@ -242,7 +230,7 @@ void IOScheduler::remove_redundant_events(int index) {
 	}
 	// if there is a write, but before a read was scheduled, we should read first before making the write
 	else if (new_op_code == WRITE && scheduled_op_code == READ) {
-		make_dependent(index, dependency_code_of_new_event, dependency_code_of_other_event);
+		//make_dependent(index, dependency_code_of_new_event, dependency_code_of_other_event);
 	}
 	// if there is a read, and a write is scheduled, then the contents of the write must be buffered, so the read can wait
 	else if (new_op_code == READ && scheduled_op_code == WRITE) {
@@ -347,6 +335,11 @@ enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd.controller.issue(*event);
 	if (result == SUCCESS) {
 		int dependency_code = event->get_application_io_id();
+		if (dependency_code == 3941) {
+			int i = 0;
+			i++;
+			assert(LBA_currently_executing.count(event->get_logical_address()) == 1);
+		}
 		if (dependencies[dependency_code].size() > 0) {
 			Event* dependent = dependencies[dependency_code].front();
 			dependent->set_application_io_id(dependency_code);
@@ -468,6 +461,7 @@ void IOScheduler::init_event(uint event_index) {
 			io_schedule.push_back(first);
 			dependencies[first->get_application_io_id()] = migration;
 			dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
+			dependency_code_to_type[first->get_application_io_id()] = WRITE;
 			init_event(io_schedule.size() - 1);
 
 		}

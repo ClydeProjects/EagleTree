@@ -92,7 +92,7 @@ void FtlImpl_DftlParent::consult_GTD(long dlpn, Event *event)
 		long mapping_virtual_address = get_mapping_virtual_address(event->get_logical_address());
 		Event* readEvent = new Event(READ, mapping_virtual_address, 1, event->get_start_time());
 		readEvent->set_mapping_op(true);
-		current_dependent_events.push(readEvent);
+		current_dependent_events.push_front(readEvent);
 		controller.stats.numFTLRead++;
 	}
 }
@@ -168,15 +168,17 @@ void FtlImpl_DftlParent::evict_page_from_cache(Event *event)
 
 			// if not all entries from the mapping page are cached, need to read the page
 			long virtual_mapping_page_address = get_mapping_virtual_address(evictPage.vpn);
+			deque<Event*> mapping_events;
 			if (evictPage.ppn != -1 && num_cached_entries_in_mapping_page < addressPerPage) {
 				Event* readEvent = new Event(READ, virtual_mapping_page_address, 1, event->get_current_time());
 				readEvent->set_mapping_op(true);
-				current_dependent_events.push(readEvent);
+				mapping_events.push_back(readEvent);
 			}
 
 			Event* write_event = new Event(WRITE, virtual_mapping_page_address, 1, event->get_current_time());
 			write_event->set_mapping_op(true);
-			IOScheduler::instance()->schedule_independent_event(write_event, write_event->get_logical_address(), WRITE);
+			mapping_events.push_back(write_event);
+			IOScheduler::instance()->schedule_dependent_events(mapping_events, write_event->get_logical_address(), WRITE);
 
 			controller.stats.numFTLWrite++;
 			controller.stats.numGCWrite++;
