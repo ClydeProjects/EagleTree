@@ -106,7 +106,9 @@ void IOScheduler::execute_current_waiting_ios() {
 		Event * event = current_ios.back();
 		current_ios.pop_back();
 		event_type type = event->get_event_type();
-		if (type == GARBAGE_COLLECTION) {
+		if (event->get_noop()) {
+			execute_next(event);
+		} else 	if (type == GARBAGE_COLLECTION) {
 			delete event;
 		}
 		else if (type == READ_COMMAND) {
@@ -151,11 +153,11 @@ vector<Event*> IOScheduler::test_for_removing_reduntant_events() {
 
 	vector<Event*> current_ios;
 	i = io_schedule.size() - 1;
-	do {
+	while (i >= 0 && io_schedule[i--]->get_current_time() < start_time + 1) {
 		Event * event = io_schedule.back();
 		io_schedule.pop_back();
 		current_ios.push_back(event);
-	} while (--i >= 0 && io_schedule[i]->get_current_time() < start_time + 1);
+	}
 	return current_ios;
 }
 
@@ -230,7 +232,7 @@ void IOScheduler::remove_redundant_events(int index) {
 	}
 	// if there is a write, but before a read was scheduled, we should read first before making the write
 	else if (new_op_code == WRITE && scheduled_op_code == READ) {
-		//make_dependent(index, dependency_code_of_new_event, dependency_code_of_other_event);
+		make_dependent(index, dependency_code_of_new_event, dependency_code_of_other_event);
 	}
 	// if there is a read, and a write is scheduled, then the contents of the write must be buffered, so the read can wait
 	else if (new_op_code == READ && scheduled_op_code == WRITE) {
@@ -238,8 +240,8 @@ void IOScheduler::remove_redundant_events(int index) {
 	}
 	// if there are two reads to the same address, there is no point reading the same page twice.
 	else if (new_op_code == READ && scheduled_op_code == READ) {
-		assert(false);
-		nullify_and_add_as_dependent(new_op_code, scheduled_op_code);
+		make_dependent(index, dependency_code_of_new_event, dependency_code_of_other_event);
+		new_event->set_noop(true);
 	}
 	// if a write is scheduled when a trim is received, we may as well cancel the write
 	else if (new_op_code == TRIM && scheduled_op_code == WRITE) {
@@ -251,7 +253,7 @@ void IOScheduler::remove_redundant_events(int index) {
 	}
 	// if a read is scheduled when a trim is received, we must still execute the read. Then we can trim
 	else if (new_op_code == TRIM && scheduled_op_code == READ) {
-		make_dependent(index, new_op_code, scheduled_op_code);
+		make_dependent(index, dependency_code_of_new_event, dependency_code_of_other_event);
 	}
 	// if something is to be trimmed, and a read is sent, invalidate the read
 	else if (new_op_code == READ && scheduled_op_code == TRIM) {
@@ -305,8 +307,7 @@ void IOScheduler::nullify_and_add_as_dependent(uint dependency_code_to_be_nullif
 }
 
 void IOScheduler::make_dependent(uint new_event_index, uint op_code_to_be_made_dependent, uint op_code_to_remain) {
-	op_code_to_dependent_op_codes[op_code_to_remain] = vector<uint>(0);
-	op_code_to_dependent_op_codes[op_code_to_remain].push_back(op_code_to_be_made_dependent);
+	op_code_to_dependent_op_codes[op_code_to_remain].push(op_code_to_be_made_dependent);
 	Event * event = io_schedule[new_event_index];
 	dependencies[op_code_to_be_made_dependent].push_front(event);
 	io_schedule.erase(io_schedule.begin() + new_event_index);
@@ -332,18 +333,14 @@ void IOScheduler::execute_next_batch(vector<Event*>& events) {
 }
 
 enum status IOScheduler::execute_next(Event* event) {
-	enum status result = ssd.controller.issue(*event);
+	enum status result = event->get_noop() ? SUCCESS : ssd.controller.issue(*event);
 	if (result == SUCCESS) {
 		int dependency_code = event->get_application_io_id();
-		if (dependency_code == 3941) {
-			int i = 0;
-			i++;
-			assert(LBA_currently_executing.count(event->get_logical_address()) == 1);
-		}
 		if (dependencies[dependency_code].size() > 0) {
 			Event* dependent = dependencies[dependency_code].front();
 			dependent->set_application_io_id(dependency_code);
 			dependent->set_start_time(event->get_current_time());
+			dependent->set_noop(event->get_noop());
 			dependencies[dependency_code].pop_front();
 			io_schedule.push_back(dependent);
 			if (event->get_event_type() == READ_COMMAND && dependent->get_event_type() == READ_TRANSFER) {
@@ -354,30 +351,31 @@ enum status IOScheduler::execute_next(Event* event) {
 			dependencies.erase(dependency_code);
 			uint lba = dependency_code_to_LBA[dependency_code];
 			if (event->get_event_type() != ERASE) {
+				if (LBA_currently_executing.count(lba) == 0) {
+					int i = 0;
+					i++;
+					event->print();
+				}
 				assert(LBA_currently_executing.count(lba) == 1);
 				LBA_currently_executing.erase(lba);
 				assert(dependency_code_to_LBA.count(dependency_code) == 1);
 			}
 			dependency_code_to_LBA.erase(dependency_code);
 			dependency_code_to_type.erase(dependency_code);
-			if (op_code_to_dependent_op_codes.count(dependency_code) == 1) {
-				for (uint i = 0; i < op_code_to_dependent_op_codes[dependency_code].size(); i++) {
-					uint dependent_code = op_code_to_dependent_op_codes[dependency_code][i];
-					Event* dependant_event = dependencies[dependent_code].front();
-					dependencies[dependent_code].pop_front();
-					io_schedule.push_back(dependant_event);
-				}
-				op_code_to_dependent_op_codes.erase(dependency_code);
+			while (op_code_to_dependent_op_codes.count(dependency_code) == 1 && op_code_to_dependent_op_codes[dependency_code].size() > 0) {
+				uint dependent_code = op_code_to_dependent_op_codes[dependency_code].front();
+				op_code_to_dependent_op_codes[dependency_code].pop();
+				Event* dependant_event = dependencies[dependent_code].front();
+				dependencies[dependent_code].pop_front();
+				io_schedule.push_back(dependant_event);
+				init_event(io_schedule.size() - 1);
 			}
+			op_code_to_dependent_op_codes.erase(dependency_code);
 		}
 	} else {
 		printf("FAILED!!!! ");
 		dependencies.erase(event->get_application_io_id()); // possible memory leak here, since events are not deleted
 	}
-
-	/*double io_start_time = event->get_start_time() + event->get_bus_wait_time();
-	assert(io_start_time >=  time_of_last_IO_execution_start);
-	time_of_last_IO_execution_start = io_start_time;*/
 
 	handle_finished_event(event, result);
 	return result;
@@ -465,6 +463,7 @@ void IOScheduler::init_event(uint event_index) {
 			init_event(io_schedule.size() - 1);
 
 		}
+		delete event;
 	}
 	remove_redundant_events(event_index);
 }

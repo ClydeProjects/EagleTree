@@ -59,11 +59,6 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 		return;
 	}
 
-	if (event.get_id() == 5310) {
-		int i = 0;
-		i++;
-	}
-
 	// check if the pointer if full. If it is, find a free block for a new pointer, or trigger GC if there are no free blocks
 	if (block_address.compare(free_block_pointers[package_id][die_id]) == BLOCK) {
 		if (PRINT_LEVEL > 1) {
