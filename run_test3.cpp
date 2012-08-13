@@ -43,7 +43,7 @@ int main() {
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
 
-	Ssd *ssd = new Ssd();
+	Ssd *ssd = new Ssd(os);
 
     printf("Max LBA address: %d\n", SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE);
 
