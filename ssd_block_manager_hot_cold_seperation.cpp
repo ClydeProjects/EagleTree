@@ -18,9 +18,7 @@ void Block_manager_parallel_hot_cold_seperation::register_write_outcome(Event co
 		return;
 	}
 	Block_manager_parent::register_write_outcome(event, status);
-	if (event.is_original_application_io()) {
-		page_hotness_measurer.register_event(event);
-	}
+	page_hotness_measurer.register_event(event);
 
 	// Increment block pointer
 	uint package_id = event.get_address().package;

@@ -25,6 +25,8 @@ IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
 		bm = new Block_manager_parallel_wearwolf(ssd, ftl);
 	} else if (BLOCK_MANAGER_ID == 3) {
 		bm = new Block_manager_parallel_wearwolf_locality(ssd, ftl);
+	} else if (BLOCK_MANAGER_ID == 4) {
+		bm = new Block_manager_roundrobin(ssd, ftl);
 	} else {
 		assert(false);
 	}

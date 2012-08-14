@@ -235,6 +235,7 @@ void BloomFilter_Page_Hotness_Measurer::print_die_stats() const {
 			package_die_stats[package][die].print();
 		}
 	}
+	StateTracer::print(); // DEBUG
 }
 
 // Looks at all dies having less than the average number of WC pages:
@@ -294,42 +295,63 @@ void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 	uint& pos = (type == WRITE ? write_oldest_BF : read_oldest_BF);
 	uint startPos = pos;
 
-	// Decay: Reset oldest filter if the time has come
-	if (++counter >= IOs_before_decay) {
-		filter[oldest_BF].clear();
-		oldest_BF = (oldest_BF + 1) % num_bloom_filters;
-		counter = 0;
-	}
+	if (event.is_original_application_io()) {
+		// Decay: Reset oldest filter if the time has come
+		if (++counter >= IOs_before_decay) {
+			filter[oldest_BF].clear();
+			oldest_BF = (oldest_BF + 1) % num_bloom_filters;
+			counter = 0;
+		}
 
-	// Find a filter where address is not present (if any), starting from newest, and insert
-	do {
-		pos = (pos + num_bloom_filters - 1) % num_bloom_filters; // Move backwards from newest to oldest in a round-robin fashion
-		if (filter[pos].contains(page_address)) continue; // Address already in this filter, try next
-		filter[pos].insert(page_address); // Address not in filter, insert and stop
-		break;
-	} while (pos != startPos);
+		// Find a filter where address is not present (if any), starting from newest, and insert
+		do {
+			pos = (pos + num_bloom_filters - 1) % num_bloom_filters; // Move backwards from newest to oldest in a round-robin fashion
+			if (filter[pos].contains(page_address)) continue; // Address already in this filter, try next
+			filter[pos].insert(page_address); // Address not in filter, insert and stop
+			break;
+		} while (pos != startPos);
+
+		if (type == WRITE) {
+			// If end of window is reached, reset
+			if (current_die_stats.writes > write_counter_window_size) {
+				current_die_stats.writes = 0;
+				current_die_stats.unique_wh_encountered_previous_window = current_die_stats.unique_wh_encountered;
+				current_die_stats.unique_wh_encountered = 0;
+				current_die_stats.wh_counted_already.clear();
+			}
+			current_die_stats.writes += 1;
+		}
+
+		// Keep track of reads targeting WC pages per LUN
+		if (type == READ) {
+			current_die_stats.reads += 1;
+
+			// If end of window is reached, reset
+			if (current_die_stats.reads > read_counter_window_size) {
+				current_die_stats.reads = 0;
+				current_die_stats.reads_targeting_wc_pages_previous_window = current_die_stats.reads_targeting_wc_pages;
+				current_die_stats.reads_targeting_wc_pages = 0;
+			}
+
+			// Count reads targeting WC pages
+			if (!get_write_hotness(page_address)) current_die_stats.reads_targeting_wc_pages += 1;
+		}
+	}
 
 	bool address_write_hot = (get_write_hotness(page_address) == WRITE_HOT);
 	bool address_read_hot  = (get_read_hotness(page_address) == READ_HOT);
 
+	// This is run whether or not event is an original application IO, since we still want to do this bookkeeping even if the write event is garbage collection
 	if (type == WRITE) {
-		// If end of window is reached, reset
-		if (current_die_stats.writes > write_counter_window_size) {
-			current_die_stats.writes = 0;
-			current_die_stats.unique_wh_encountered_previous_window = current_die_stats.unique_wh_encountered;
-			current_die_stats.unique_wh_encountered = 0;
-		}
-
-		current_die_stats.writes += 1;
 		current_die_stats.live_pages += 1;
 
 		// Keep track of live pages per LUN: Increment counter when page is written to LUN, decrement when page is invalidated in another LUN
-		if (event.get_replace_address().valid != NONE) {
+		if (invalidated_address.valid != NONE) {
 			Die_Stats& invalidated_die_stats = package_die_stats[invalidated_address.package][invalidated_address.die];
 			invalidated_die_stats.live_pages -= 1;
 
 			if (invalidated_address.package != physical_address.package || invalidated_address.die != physical_address.die) {
-				/*debug*/// printf("Data moved across LUNs: Written to Package %d, Die %d. Invalidated on Package %d, Die %d.\n", physical_address.package, physical_address.die, invalidated_address.package, invalidated_address.die);
+				/*debug*///printf("Data moved across LUNs: Written to Package %d, Die %d. Invalidated on Package %d, Die %d.\n", physical_address.package, physical_address.die, invalidated_address.package, invalidated_address.die);
 
 				if (address_write_hot) {
 					current_die_stats.unique_wh_encountered += 1;
@@ -347,23 +369,7 @@ void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 			current_die_stats.wh_counted_already.insert(page_address);
 		}
 	}
-
-	// Keep track of reads targeting WC pages per LUN
-	if (type == READ) {
-		current_die_stats.reads += 1;
-
-		// If end of window is reached, reset
-		if (current_die_stats.reads > read_counter_window_size) {
-			current_die_stats.reads = 0;
-			current_die_stats.reads_targeting_wc_pages_previous_window = current_die_stats.reads_targeting_wc_pages;
-			current_die_stats.reads_targeting_wc_pages = 0;
-		}
-
-		// Count reads targeting WC pages
-		if (!get_write_hotness(page_address)) current_die_stats.reads_targeting_wc_pages += 1;
-	}
-
-	//print_die_stats();
+	// print_die_stats();
 }
 
 double BloomFilter_Page_Hotness_Measurer::get_hot_data_index(event_type type, ulong page_address) const {
