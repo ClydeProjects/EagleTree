@@ -31,19 +31,24 @@ int main() {
 	print_config(NULL);
     printf("\n");
 
-//	Ssd *ssd = new Ssd();
-	//Thread* sw1 = new Synchronous_Sequential_Writer(0, 20, 1);
-	//Thread* sw2 = new Asynchronous_Sequential_Writer(50, 70, 1);
-	Thread* sw3 = new Synchronous_Random_Writer(0, 10, 100, time(NULL));
+	for (int rndseed = 0; rndseed < 1; rndseed++) {
+		printf("-----------------RANDSEED: %d-----------------\n", rndseed);
+		vector<Thread*> threads;
+		Thread* t1 = new Synchronous_Random_Thread(0, 63, 10000, rndseed, WRITE, 4); // 799
+		threads.push_back(t1);
+		OperatingSystem* os = new OperatingSystem(threads);
+		os->run();
+		//VisualTracer::get_instance()->print_horizontally_with_breaks();
+		delete os;
+	}
 
-	vector<Thread*> threads;
-	//threads.push_back(sw2);
-	threads.push_back(sw3);
+	return 0;
 
-	OperatingSystem* os = new OperatingSystem(threads);
-	os->run();
+	printf("----------------------------------------------------\n");
 
-	Ssd *ssd = new Ssd(os);
+	Ssd *ssd = new Ssd();
+	//os->set_ssd(ssd);
+	//os->run();
 
     printf("Max LBA address: %d\n", SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE);
 
@@ -62,7 +67,7 @@ int main() {
 
 	delete ssd;
 
-	VisualTracer::get_instance()->print();
+	VisualTracer::get_instance()->print_horizontally_with_breaks();
 
 	return 0;
 }
