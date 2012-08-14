@@ -1183,7 +1183,7 @@ private:
 	map<uint, event_type> dependency_code_to_type;
 	map<uint, uint> LBA_currently_executing;
 
-	map<uint, vector<uint> > op_code_to_dependent_op_codes;
+	map<uint, queue<uint> > op_code_to_dependent_op_codes;
 
 	vector<Event*> test_for_removing_reduntant_events();
 	int find_scheduled_event(uint dependency_code) const;
