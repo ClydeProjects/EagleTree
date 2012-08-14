@@ -729,6 +729,8 @@ private:
 	double last_erase_time;
 };
 
+const int UNDEFINED = -1;
+
 class Page_Hotness_Measurer {
 public:
 //	virtual Page_Hotness_Measurer() = 0;
@@ -780,10 +782,10 @@ public:
 	:	live_pages(0),
 	 	reads(0),
 	 	reads_targeting_wc_pages(0),
-	 	reads_targeting_wc_pages_previous_window(-1),
+	 	reads_targeting_wc_pages_previous_window(UNDEFINED),
 	 	writes(0),
 	 	unique_wh_encountered(0),
-	 	unique_wh_encountered_previous_window(-1),
+	 	unique_wh_encountered_previous_window(UNDEFINED),
 	 	wh_counted_already(bloomfilter_parameters),
 	 	read_counter_window_size(read_window_size),
 	 	write_counter_window_size(write_window_size)
@@ -805,13 +807,14 @@ public:
 
 	// WC = live pages - WH
 	inline uint get_wc_pages() const {
-		int unique_wh = unique_wh_encountered_previous_window == -1 ? unique_wh_encountered : unique_wh_encountered;
+		int unique_wh = unique_wh_encountered_previous_window == UNDEFINED ? unique_wh_encountered : unique_wh_encountered;
 		int diff = live_pages - unique_wh;
-		return diff > 0 ? diff : 0;
+		assert(diff >= 0);
+		return diff;
 	}
 
 	inline uint get_reads_targeting_wc_pages() const {
-		if (reads_targeting_wc_pages_previous_window != -1) return reads_targeting_wc_pages_previous_window;
+		if (reads_targeting_wc_pages_previous_window != UNDEFINED) return reads_targeting_wc_pages_previous_window;
 		if (reads == 0) return 0;
 		return (uint) reads_targeting_wc_pages * ((double) read_counter_window_size / reads); // Compensate for a partially completed 1st window
 	}
@@ -1495,7 +1498,7 @@ private:
 /* The SSD is the single main object that will be created to simulate a real
  * SSD.  Creating a SSD causes all other objects in the SSD to be created.  The
  * event_arrive method is where events will arrive from DiskSim. */
-class Ssd 
+class Ssd
 {
 public:
 	Ssd (uint ssd_size = SSD_SIZE);
