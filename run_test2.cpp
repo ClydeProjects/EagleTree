@@ -40,14 +40,21 @@ void experiement1() {
 }
 
 void experiement2() {
-	vector<Thread*> threads(4);
-	threads.push_back(new Asynchronous_Random_Thread(0, 199, 1000, 1, WRITE, 17, 1));
-	threads.push_back(new Asynchronous_Random_Thread(200, 399, 1000, 2, WRITE, 17, 2));
-	threads.push_back(new Asynchronous_Random_Thread(400, 599, 1000, 3, WRITE, 17, 3));
-	threads.push_back(new Asynchronous_Random_Thread(600, 799, 1000, 4, WRITE, 17, 4));
+	vector<Thread*> threads;
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, 199, 1, WRITE,16);
+	Thread* t2 = new Asynchronous_Sequential_Thread(200, 399, 1, WRITE, 16);
+	Thread* t3 = new Asynchronous_Sequential_Thread(400, 599, 1, WRITE, 16);
+	Thread* t4 = new Asynchronous_Sequential_Thread(600, 799, 1, WRITE, 16);
 
-	//thread_dependencies[2].push(new Synchronous_Sequential_Thread(600, 749, 4, WRITE));
-	//thread_dependencies[3].push(new Synchronous_Sequential_Thread(450, 599, 4, WRITE));
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, 199, 500, 1, WRITE, 20, 1));
+	t2->add_follow_up_thread(new Asynchronous_Random_Thread(200, 399, 500, 2, WRITE, 20, 2));
+	t3->add_follow_up_thread(new Asynchronous_Random_Thread(400, 599, 500, 3, WRITE, 20, 3));
+	t4->add_follow_up_thread(new Asynchronous_Random_Thread(600, 799, 500, 4, WRITE, 20, 4));
+
+	threads.push_back(t1);
+	threads.push_back(t2);
+	threads.push_back(t3);
+	threads.push_back(t4);
 
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
@@ -60,23 +67,20 @@ void experiement2() {
 void DBWorkload() {
 	vector<Thread*> threads;
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, 799, 1, WRITE, 4);
-	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, 799, 200, 1, WRITE, 17, 1));
-	t1->add_follow_up_thread(new Asynchronous_Sequential_Thread(0, 799, 200, WRITE));
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, 799, 200, 2, READ, 17, 2));
-
-
+	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, 799, 799, 1, WRITE, 17, 1));
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, 799, 799, 1, READ, 17, 1));
+	t1->add_follow_up_thread(new Asynchronous_Sequential_Thread(0, 799, 1, WRITE, 20));
 	threads.push_back(t1);
-
-		//thread_dependencies[0].push(new Asynchronous_Random_Thread(0, 199, 1000, 1, WRITE, 17, 1));
-		//thread_dependencies[1].push(new Asynchronous_Random_Thread(200, 199, 1000, 2, READ, 17, 2));
-		//thread_dependencies[2].push(new Synchronous_Sequential_Thread(200, 399, 10, WRITE));
-		//thread_dependencies[3].push(new Asynchronous_Sequential_Thread(400, 599, 1, WRITE));
-		//thread_dependencies[3].push(new Asynchronous_Random_Thread(400, 599, 10, READ));
-		//thread_dependencies[4].push(new External_Sort(400, 599, 40, 600, 799));
-		OperatingSystem* os = new OperatingSystem(threads);
-		os->run();
-		VisualTracer::get_instance()->print_horizontally_with_breaks();
-		delete os;
+	//thread_dependencies[0].push(new Asynchronous_Random_Thread(0, 199, 1000, 1, WRITE, 17, 1));
+	//thread_dependencies[1].push(new Asynchronous_Random_Thread(200, 199, 1000, 2, READ, 17, 2));
+	//thread_dependencies[2].push(new Synchronous_Sequential_Thread(200, 399, 10, WRITE));
+	//thread_dependencies[3].push(new Asynchronous_Sequential_Thread(400, 599, 1, WRITE));
+	//thread_dependencies[3].push(new Asynchronous_Random_Thread(400, 599, 10, READ));
+	//thread_dependencies[4].push(new External_Sort(400, 599, 40, 600, 799));
+	OperatingSystem* os = new OperatingSystem(threads);
+	os->run();
+	VisualTracer::get_instance()->print_horizontally_with_breaks();
+	delete os;
 }
 
 int main()
@@ -87,7 +91,7 @@ int main()
 	//getchar();
 	printf("\n");
 
-	DBWorkload();
+	experiement2();
 
 	// this experiment already shows huge disparity
 
