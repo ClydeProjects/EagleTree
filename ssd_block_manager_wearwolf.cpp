@@ -188,8 +188,9 @@ pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write)
 		if (result.second.valid != NONE) {
 			result.first = in_how_long_can_this_event_be_scheduled(result.second, write.get_current_time());
 		}
+
 		if (PRINT_LEVEL > 1) {
-			printf("MAKING A MISTAKE\n");
+			printf("Trying to migrate a write %s page, but could not find a relevant pointer.\n", w_hotness == WRITE_COLD ? "cold" : "hot");
 		}
 	}
 
