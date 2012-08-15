@@ -325,7 +325,7 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 	double die_finish_time = ssd.getPackages()[package_id].getDies()[die_id].get_currently_executing_io_finish_time();
 	double max = std::max(channel_finish_time, die_finish_time);
 	double time = max - time_taken;
-	return time <= 0 ? 0 : time;
+	return time < 0 ? 0 : time;
 }
 
 // puts free blocks at the very end of the queue

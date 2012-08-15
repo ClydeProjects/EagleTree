@@ -1006,6 +1006,7 @@ private:
 
 class Sequential_Pattern_Detector_Listener {
 public:
+	virtual ~Sequential_Pattern_Detector_Listener() {}
 	virtual void sequential_event_metadata_removed(long key) = 0;
 };
 

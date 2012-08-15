@@ -357,6 +357,7 @@ enum status IOScheduler::execute_next(Event* event) {
 					int i = 0;
 					i++;
 					event->print();
+					assert(false);
 				}
 				assert(LBA_currently_executing.count(lba) == 1);
 				LBA_currently_executing.erase(lba);
