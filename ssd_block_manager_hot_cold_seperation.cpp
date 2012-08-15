@@ -131,8 +131,26 @@ pair<double, Address> Block_manager_parallel_hot_cold_seperation::write(Event co
 		}
 	}
 
-	if (write.is_garbage_collection_op() && relevant_pointer_unavailable) {
-		assert(false);
+	if (!write.is_garbage_collection_op() && relevant_pointer_unavailable && how_many_gc_operations_are_scheduled() == 0) {
+		Block_manager_parent::perform_gc(write.get_current_time());
+	}
+
+	if ((write.is_garbage_collection_op() && relevant_pointer_unavailable) ||
+			(relevant_pointer_unavailable && !write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0)) {
+
+		if (cold_pointer.page < BLOCK_SIZE) {
+			result.second = cold_pointer;
+		} else if (w_hotness == WRITE_COLD) {
+			result.second = get_free_die_with_shortest_IO_queue();
+		}
+
+		if (result.second.valid != NONE) {
+			result.first = in_how_long_can_this_event_be_scheduled(result.second, write.get_current_time());
+		}
+
+		if (PRINT_LEVEL > 1) {
+			printf("Trying to migrate a write %s page, but could not find a relevant pointer.\n", w_hotness == WRITE_COLD ? "cold" : "hot");
+		}
 	}
 
 	return result;
