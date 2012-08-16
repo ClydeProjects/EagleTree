@@ -20,7 +20,6 @@ Block_manager_parallel_wearwolf_locality::~Block_manager_parallel_wearwolf_local
 }
 
 void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event const& write) {
-
 	if (!write.is_original_application_io()) {
 		return;
 	}
@@ -108,7 +107,6 @@ void Block_manager_parallel_wearwolf_locality::set_pointers_for_sequential_write
 
 void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event const& event, enum status status) {
 	long lb = event.get_logical_address();
-	//long key = recorder->get_sequential_write_id(lb);
 	long key = detector->get_sequential_write_id(lb);
 	if (seq_write_key_to_pointers_mapping.count(key) == 1 && seq_write_key_to_pointers_mapping[key].num_pointers > 0) {
 		Block_manager_parent::register_write_outcome(event, status);

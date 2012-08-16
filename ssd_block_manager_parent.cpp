@@ -105,7 +105,6 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	if (num_free_pages <= BLOCK_SIZE && how_many_gc_operations_are_scheduled() == 0) {
 		perform_gc(event.get_current_time());
 	}
-
 	trim(event);
 }
 

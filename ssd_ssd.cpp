@@ -121,7 +121,11 @@ Ssd::Ssd(uint ssd_size):
 
 Ssd::~Ssd(void)
 {
-	IOScheduler::instance()->finish_all_events_until_this_time(10000000);
+
+	if (!IOScheduler::instance()->is_empty()) {
+		IOScheduler::instance()->execute_soonest_events();
+	}
+
 	//StateTracer::print();
 	StatisticsGatherer::get_instance()->print();
 	IOScheduler::instance()->print_stats();
@@ -181,7 +185,7 @@ void Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, d
 }
 
 void Ssd::progress_since_os_is_idle() {
-	IOScheduler::instance()->progess();
+	IOScheduler::instance()->execute_soonest_events();
 }
 
 void Ssd::register_event_completion(Event * event) {
