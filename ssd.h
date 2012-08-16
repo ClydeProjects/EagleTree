@@ -1010,12 +1010,23 @@ public:
 	virtual void sequential_event_metadata_removed(long key) = 0;
 };
 
+struct sequential_writes_tracking {
+	int counter;
+	int num_times_pattern_has_repeated;
+	double last_LBA_timestamp;
+	sequential_writes_tracking(double time);
+	~sequential_writes_tracking();
+};
+
 class Sequential_Pattern_Detector {
 public:
 	typedef ulong logical_address;
-	Sequential_Pattern_Detector();
+	Sequential_Pattern_Detector(uint threshold);
 	~Sequential_Pattern_Detector();
-	void register_event(logical_address lb, double time);
+
+
+
+	sequential_writes_tracking const& register_event(logical_address lb, double time);
 	int get_sequential_write_id(logical_address lb);
 	int get_current_offset(logical_address lb);
 	int get_num_times_pattern_has_repeated(logical_address lb);
@@ -1023,25 +1034,17 @@ public:
 	void set_listener(Sequential_Pattern_Detector_Listener * listener);
 
 private:
-
-	struct sequential_writes_tracking {
-		int counter;
-		int num_times_pattern_has_repeated;
-		double last_LBA_timestamp;
-		sequential_writes_tracking(double time);
-		~sequential_writes_tracking();
-	};
-
 	map<logical_address, logical_address> sequential_writes_key_lookup;  // a map from the next expected LBA in a seqeuntial pattern to the first LBA, which is the key
 	map<logical_address, sequential_writes_tracking*> sequential_writes_identification_and_data;	// a map from the first logical write of a sequential pattern to metadata about the pattern
 
-	void restart_pattern(int key, double time);
-	void process_next_write(int lb, double time);
-	void init_pattern(int lb, double time);
+	sequential_writes_tracking* restart_pattern(int key, double time);
+	sequential_writes_tracking* process_next_write(int lb, double time);
+	sequential_writes_tracking* init_pattern(int lb, double time);
 	void remove_old_sequential_writes_metadata(double time);
 
 	uint registration_counter;
 	Sequential_Pattern_Detector_Listener* listener;
+	uint threshold;
 };
 
 class Block_manager_parallel_wearwolf_locality : public Block_manager_parallel_wearwolf, public Sequential_Pattern_Detector_Listener {

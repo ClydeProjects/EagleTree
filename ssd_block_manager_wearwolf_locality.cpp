@@ -10,7 +10,7 @@ Block_manager_parallel_wearwolf_locality::Block_manager_parallel_wearwolf_locali
 	: Block_manager_parallel_wearwolf(ssd, ftl),
 	  parallel_degree(LUN),
 	  seq_write_key_to_pointers_mapping(),
-	  detector(new Sequential_Pattern_Detector())
+	  detector(new Sequential_Pattern_Detector(THRESHOLD))
 {
 	detector->set_listener(this);
 }
@@ -26,11 +26,12 @@ void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event cons
 	}
 	long lb = write.get_logical_address();
 
-	detector->register_event(lb, write.get_current_time());
+	sequential_writes_tracking const& swt = detector->register_event(lb, write.get_current_time());
 	if (PRINT_LEVEL > 1) {
 		printf("arrival: %d  in time: %f\n", write.get_logical_address(), write.get_current_time());
 	}
-	if (detector->get_num_times_pattern_has_repeated(lb) == 0 && detector->get_current_offset(lb) == THRESHOLD) {
+	// checks if should allocate pointers for the pattern
+	if (swt.num_times_pattern_has_repeated == 0 && swt.counter == THRESHOLD) {
 		if (PRINT_LEVEL > 1) {
 			printf("SEQUENTIAL PATTERN IDENTIFIED!  KEY: %d \n", detector->get_sequential_write_id(lb));
 		}
