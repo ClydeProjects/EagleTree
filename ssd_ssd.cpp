@@ -121,7 +121,7 @@ Ssd::Ssd(uint ssd_size):
 
 Ssd::~Ssd(void)
 {
-	IOScheduler::instance()->finish(10000000);
+	IOScheduler::instance()->finish_all_events_until_this_time(10000000);
 	//StateTracer::print();
 	StatisticsGatherer::get_instance()->print();
 	IOScheduler::instance()->print_stats();
@@ -150,7 +150,7 @@ void Ssd::event_arrive(Event* event) {
 
 	assert(event->get_start_time() >= last_io_submission_time);
 	event->set_original_application_io(true);
-	IOScheduler::instance()->finish(event->get_start_time());
+	IOScheduler::instance()->finish_all_events_until_this_time(event->get_start_time());
 	controller.event_arrive(event);
 }
 

@@ -1150,7 +1150,7 @@ class IOScheduler {
 public:
 	void schedule_dependent_events(deque<Event*> events, ulong logical_address, event_type type);
 	void schedule_independent_event(Event* events, ulong logical_address, event_type type);
-	void finish(double start_time);
+	void finish_all_events_until_this_time(double time);
 	void progess();
 	static IOScheduler *instance();
 	static void instance_initialize(Ssd& ssd, FtlParent& ftl);
@@ -1166,11 +1166,12 @@ private:
 	bool can_schedule_on_die(Event const* event) const;
 	void handle_finished_event(Event *event, enum status outcome);
 
-	void remove_redundant_events(int index_of_event_in_io_schedule);
+	void remove_redundant_events(Event* new_event);
 
-	void init_event(uint event_index);
+	void init_event(Event* event);
 
-	vector<Event*> io_schedule;
+	vector<Event*> future_events;
+	vector<Event*> current_events;
 	map<uint, deque<Event*> > dependencies;
 
 	static IOScheduler *inst;
@@ -1188,10 +1189,11 @@ private:
 
 	vector<Event*> test_for_removing_reduntant_events();
 	int find_scheduled_event(uint dependency_code) const;
-	void remove_operation(uint index_of_event_in_io_schedule);
-	void promote_to_gc(uint index_of_event_in_io_schedule);
+	void remove_current_operation(uint index_of_event_in_io_schedule);
+	void remove_operation(Event* event);
+	void promote_to_gc(Event* event_to_promote);
 	void nullify_and_add_as_dependent(uint dependency_code_to_be_nullified, uint dependency_code_to_remain);
-	void make_dependent(uint new_event_index, uint dependency_code_to_be_made_dependent, uint dependency_code_to_remain);
+	void make_dependent(Event* new_event, uint dependency_code_to_be_made_dependent, uint dependency_code_to_remain);
 
 	struct io_scheduler_stats {
 		uint num_write_cancellations;
