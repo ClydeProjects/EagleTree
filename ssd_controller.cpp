@@ -92,6 +92,7 @@ enum status Controller::issue(Event &event_list)
 			fprintf(stderr, "Controller: %s: Received non-single-page-sized event from FTL.\n", __func__);
 			return FAILURE;
 		}
+/*
 		else if(cur -> get_event_type() == READ)  // kept only for legacy purposes
 		{
 			assert(cur -> get_address().valid > NONE);
@@ -103,6 +104,7 @@ enum status Controller::issue(Event &event_list)
 				|| ssd.replace(*cur) == FAILURE)
 				return FAILURE;
 		}
+*/
 		else if(cur -> get_event_type() == READ_COMMAND)
 		{
 			assert(cur -> get_address().valid > NONE);
