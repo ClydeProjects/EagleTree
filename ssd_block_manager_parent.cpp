@@ -354,6 +354,7 @@ void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, 
 	Event *gc = new Event(GARBAGE_COLLECTION, 0, BLOCK_SIZE, time);
 	gc->set_noop(true);
 	gc->set_address(address);
+	gc->set_age_class(klass);
 	IOScheduler::instance()->schedule_independent_event(gc, 0, GARBAGE_COLLECTION);
 }
 
@@ -372,9 +373,9 @@ vector<pair<long, uint> > Block_manager_parent::get_relevant_gc_candidates(int p
 		num_classes = age_class + 1;
 	}
 	vector<pair<long, uint> > candidates;
-	for (uint package = 0; package < num_packages; package++) {
-		for (uint die = 0; die < PACKAGE_SIZE; die++) {
-			for (uint age_class = 0; age_class < num_classes; age_class++) {
+	for (package = 0; package < num_packages; package++) {
+		for (die = 0; die < num_dies; die++) {
+			for (age_class = 0; age_class < num_classes; age_class++) {
 				set<long>::iterator iter = gc_candidates[package][die][age_class].begin();
 				for (; iter != gc_candidates[package][die][age_class].end(); ++iter) {
 					pair<long, uint> pair(*iter, age_class);
@@ -480,19 +481,27 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	Address a = gc_event->get_address();
 
-	int die_id = a.valid >= die_id ? a.die : -1;
-	int package_id = a.valid >= package_id ? a.package : -1;
+	int die_id = a.valid >= DIE ? a.die : -1;
+	int package_id = a.valid >= PACKAGE ? a.package : -1;
 
-	vector<pair<long, uint> > candidates = get_relevant_gc_candidates(die_id, die_id, gc_event->get_age_class());
+	vector<pair<long, uint> > candidates = get_relevant_gc_candidates(package_id, die_id, gc_event->get_age_class());
 	Block * victim = choose_gc_victim(candidates, gc_event->get_current_time());
 
+	vector<deque<Event*> > migrations;
+
+	// if there is not enough free space to migrate the block into, cancel the GC operation
+	if (victim == NULL) {
+		return migrations;
+	}
 	assert(victim->get_state() != FREE);
 	assert(victim->get_state() != PARTIALLY_FREE);
-	assert(victim->get_pages_valid() <= num_available_pages_for_new_writes);  // this might actually legitimately fail. consider cancelling gc if this condition does not hold
+	if (victim->get_pages_valid() > num_available_pages_for_new_writes) {
+		blocks_being_garbage_collected.erase(victim->get_physical_address());
+		return migrations;
+	}
 
 	num_available_pages_for_new_writes -= victim->get_pages_valid();
 
-	vector<deque<Event*> > migrations;
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
 		if (victim->getPages()[i].get_state() == VALID) {
