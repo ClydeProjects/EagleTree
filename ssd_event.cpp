@@ -288,7 +288,9 @@ double Event::incr_time_taken(double time_incr)
 
 void Event::print(FILE *stream) const
 {
-	if(type == READ)
+	if (type == NOT_VALID)
+		fprintf(stream, "<NOT VALID> ");
+	else if(type == READ)
 		fprintf(stream, "R ");
 	else if(type == READ_COMMAND)
 		fprintf(stream, "C ");
@@ -302,6 +304,8 @@ void Event::print(FILE *stream) const
 		fprintf(stream, "M ");
 	else if (type == TRIM)
 		fprintf(stream, "D ");
+	else if (type == GARBAGE_COLLECTION)
+		fprintf(stream, "GC ");
 	else
 		fprintf(stream, "Unknown event type: ");
 
