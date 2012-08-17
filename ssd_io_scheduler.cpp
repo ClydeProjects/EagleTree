@@ -68,7 +68,6 @@ void IOScheduler::schedule_dependent_events(deque<Event*> events, ulong logical_
 	Event* first = dependencies[dependency_code].front();
 	dependencies[dependency_code].pop_front();
 	future_events.push_back(first);
-	printf("received : "); first->print();
 }
 
 void IOScheduler::schedule_independent_event(Event* event, ulong logical_address, event_type type) {
@@ -193,9 +192,6 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 
 
 void IOScheduler::remove_redundant_events(Event* new_event) {
-	if (new_event->get_event_type() == ERASE || new_event->get_event_type() == GARBAGE_COLLECTION) {
-		return;
-	}
 	uint la = new_event->get_logical_address();
 	if (LBA_currently_executing.count(la) == 0) {
 		LBA_currently_executing[new_event->get_logical_address()] = new_event->get_application_io_id();
@@ -442,42 +438,25 @@ void IOScheduler::print_stats() {
 }
 
 void IOScheduler::init_event(Event* event) {
-
-	if (event->get_id() == 1410) {
-		int i = 0;
-		i++;
-	}
-
+	printf("received : "); event->print();
 	uint dep_code = event->get_application_io_id();
 	if (event->get_event_type() == READ) {
 		event->set_event_type(READ_COMMAND);
-
-		// This (simple copy) ...
 		Event* read_transfer = new Event(*event);
 		read_transfer->set_event_type(READ_TRANSFER);
-
-		// ... replaces this (new event, then copy each attribute):
-		/*
-		Event* read_transfer = new Event(READ_TRANSFER, event->get_logical_address(), event->get_size(), event->get_start_time());
-		read_transfer->set_application_io_id(dep_code);
-		read_transfer->set_garbage_collection_op(event->is_garbage_collection_op());
-		read_transfer->set_mapping_op(event->is_mapping_op());
-		read_transfer->set_original_application_io(event->is_original_application_io());
-		*/
-
 		dependencies[dep_code].push_front(read_transfer);
-		ftl.set_read_address(*event);
-		ftl.set_read_address(*read_transfer);
-		current_events.push_back(event);
+		init_event(event);
 	}
 	else if (event->get_event_type() == READ_COMMAND || event->get_event_type() == READ_TRANSFER) {
 		ftl.set_read_address(*event);
 		current_events.push_back(event);
+		remove_redundant_events(event);
 	}
 	else if (event->get_event_type() == WRITE) {
 		bm->register_write_arrival(*event);
 		ftl.set_replace_address(*event);
 		current_events.push_back(event);
+		remove_redundant_events(event);
 	}
 	else if (event->get_event_type() == GARBAGE_COLLECTION) {
 		vector<deque<Event*> > migrations = bm->migrate(event);
@@ -496,5 +475,4 @@ void IOScheduler::init_event(Event* event) {
 	else if (event->get_event_type() == ERASE) {
 		current_events.push_back(event);
 	}
-	remove_redundant_events(event);
 }
