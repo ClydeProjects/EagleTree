@@ -148,7 +148,15 @@ void Ssd::event_arrive(Event* event) {
 		i++;
 	}
 
-	assert(event->get_start_time() >= last_io_submission_time);
+	// Print error and terminate if start time of event is less than IO submission time
+	// assert(event->get_start_time() >= last_io_submission_time);
+	if (event->get_start_time() < last_io_submission_time) {
+		fprintf(stderr, "Error: Start time of event (%f) less than last IO submission time (%f).\n", event->get_start_time(), last_io_submission_time);
+		fprintf(stderr, "Triggering event: ");
+		event->print(stderr);
+		throw;
+	}
+
 	event->set_original_application_io(true);
 	IOScheduler::instance()->finish(event->get_start_time());
 	controller.event_arrive(event);
