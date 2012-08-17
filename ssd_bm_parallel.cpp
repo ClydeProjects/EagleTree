@@ -39,7 +39,8 @@ void Block_manager_parallel::register_write_outcome(Event const& event, enum sta
 		if (free_block.valid == PAGE) {
 			free_block_pointers[package_id][die_id] = free_block;
 		} else {
-			perform_gc(package_id, die_id, event.get_start_time() + event.get_time_taken());
+			//perform_gc(package_id, die_id, event.get_current_time());
+			schedule_gc(event.get_current_time(), package_id, die_id);
 		}
 	}
 }

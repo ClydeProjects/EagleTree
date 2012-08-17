@@ -10,7 +10,7 @@ Block_manager_parallel_wearwolf_locality::Block_manager_parallel_wearwolf_locali
 	: Block_manager_parallel_wearwolf(ssd, ftl),
 	  parallel_degree(LUN),
 	  seq_write_key_to_pointers_mapping(),
-	  detector(new Sequential_Pattern_Detector())
+	  detector(new Sequential_Pattern_Detector(THRESHOLD))
 {
 	detector->set_listener(this);
 }
@@ -20,17 +20,17 @@ Block_manager_parallel_wearwolf_locality::~Block_manager_parallel_wearwolf_local
 }
 
 void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event const& write) {
-
 	if (!write.is_original_application_io()) {
 		return;
 	}
 	long lb = write.get_logical_address();
 
-	detector->register_event(lb, write.get_current_time());
+	sequential_writes_tracking const& swt = detector->register_event(lb, write.get_current_time());
 	if (PRINT_LEVEL > 1) {
 		printf("arrival: %d  in time: %f\n", write.get_logical_address(), write.get_current_time());
 	}
-	if (detector->get_num_times_pattern_has_repeated(lb) == 0 && detector->get_current_offset(lb) == THRESHOLD) {
+	// checks if should allocate pointers for the pattern
+	if (swt.num_times_pattern_has_repeated == 0 && swt.counter == THRESHOLD) {
 		if (PRINT_LEVEL > 1) {
 			printf("SEQUENTIAL PATTERN IDENTIFIED!  KEY: %d \n", detector->get_sequential_write_id(lb));
 		}
@@ -107,7 +107,6 @@ void Block_manager_parallel_wearwolf_locality::set_pointers_for_sequential_write
 
 void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event const& event, enum status status) {
 	long lb = event.get_logical_address();
-	//long key = recorder->get_sequential_write_id(lb);
 	long key = detector->get_sequential_write_id(lb);
 	if (seq_write_key_to_pointers_mapping.count(key) == 1 && seq_write_key_to_pointers_mapping[key].num_pointers > 0) {
 		Block_manager_parent::register_write_outcome(event, status);
@@ -133,17 +132,20 @@ void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event cons
 			if (parallel_degree == ONE) {
 				free_block = find_free_unused_block(event.get_current_time());
 				if (free_block.valid == NONE) {
-					perform_gc(event.get_current_time());
+					//perform_gc(event.get_current_time());
+					schedule_gc(event.get_current_time());
 				}
 			} else if (parallel_degree == CHANNEL) {
 				free_block = find_free_unused_block(event.get_address().package, event.get_current_time());
 				if (free_block.valid == NONE) {
-					perform_gc(event.get_address().package, event.get_current_time());
+					//perform_gc(event.get_address().package, event.get_current_time());
+					schedule_gc(event.get_current_time(), event.get_address().package);
 				}
 			} else if (parallel_degree == LUN) {
 				free_block = find_free_unused_block(event.get_address().package, event.get_address().die, event.get_current_time());
 				if (free_block.valid == NONE) {
-					perform_gc(event.get_address().package, event.get_address().die, event.get_current_time());
+					//perform_gc(event.get_address().package, event.get_address().die, event.get_current_time());
+					schedule_gc(event.get_current_time(), event.get_address().package, event.get_address().die);
 				}
 			}
 			if (free_block.valid != NONE) {

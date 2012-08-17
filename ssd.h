@@ -438,6 +438,8 @@ public:
 	void set_application_io_id(uint application_io_id);
 	void set_garbage_collection_op(bool value);
 	void set_mapping_op(bool value);
+	void set_age_class(uint value);
+	uint get_age_class();
 	bool is_garbage_collection_op() const;
 	bool is_mapping_op() const;
 	void *get_payload(void) const;
@@ -473,6 +475,7 @@ private:
 	uint application_io_id;
 	static uint application_io_id_generator;
 
+	int age_class;
 };
 
 /* Single bus channel
@@ -890,11 +893,13 @@ protected:
 
 	bool can_write(Event const& write) const;
 
-	void perform_gc(uint package_id, uint die_id, uint klass, double time);
+	void schedule_gc(double time, int package_id = -1, int die_id = -1, int klass = -1);
+	vector<pair<long, uint> > get_relevant_gc_candidates(int package_id, int die_id, int klass);
+
+	/*void perform_gc(uint package_id, uint die_id, uint klass, double time);
 	void perform_gc(uint package_id, uint die_id, double time);
 	void perform_gc(uint package_id, double time);
-	void perform_gc(double time);
-	void perform_gc_for_class(uint klass, double time);
+	void perform_gc(double time);*/
 
 	Address find_free_unused_block(uint package_id, uint die_id, uint klass, double time);
 	Address find_free_unused_block(uint package_id, uint die_id, double time);
@@ -916,7 +921,7 @@ protected:
 	vector<vector<Address> > free_block_pointers;
 private:
 
-	void choose_gc_victim(vector<pair<long, uint> > candidates, double start_time);
+	Block* choose_gc_victim(vector<pair<long, uint> > candidates, double start_time);
 	void update_blocks_with_min_age(uint age);
 	uint sort_into_age_class(Address const& address);
 	void issue_erase(Address a, double time);
@@ -1006,15 +1011,27 @@ private:
 
 class Sequential_Pattern_Detector_Listener {
 public:
+	virtual ~Sequential_Pattern_Detector_Listener() {}
 	virtual void sequential_event_metadata_removed(long key) = 0;
+};
+
+struct sequential_writes_tracking {
+	int counter;
+	int num_times_pattern_has_repeated;
+	double last_LBA_timestamp;
+	sequential_writes_tracking(double time);
+	~sequential_writes_tracking();
 };
 
 class Sequential_Pattern_Detector {
 public:
 	typedef ulong logical_address;
-	Sequential_Pattern_Detector();
+	Sequential_Pattern_Detector(uint threshold);
 	~Sequential_Pattern_Detector();
-	void register_event(logical_address lb, double time);
+
+
+
+	sequential_writes_tracking const& register_event(logical_address lb, double time);
 	int get_sequential_write_id(logical_address lb);
 	int get_current_offset(logical_address lb);
 	int get_num_times_pattern_has_repeated(logical_address lb);
@@ -1022,25 +1039,17 @@ public:
 	void set_listener(Sequential_Pattern_Detector_Listener * listener);
 
 private:
-
-	struct sequential_writes_tracking {
-		int counter;
-		int num_times_pattern_has_repeated;
-		double last_LBA_timestamp;
-		sequential_writes_tracking(double time);
-		~sequential_writes_tracking();
-	};
-
 	map<logical_address, logical_address> sequential_writes_key_lookup;  // a map from the next expected LBA in a seqeuntial pattern to the first LBA, which is the key
 	map<logical_address, sequential_writes_tracking*> sequential_writes_identification_and_data;	// a map from the first logical write of a sequential pattern to metadata about the pattern
 
-	void restart_pattern(int key, double time);
-	void process_next_write(int lb, double time);
-	void init_pattern(int lb, double time);
+	sequential_writes_tracking* restart_pattern(int key, double time);
+	sequential_writes_tracking* process_next_write(int lb, double time);
+	sequential_writes_tracking* init_pattern(int lb, double time);
 	void remove_old_sequential_writes_metadata(double time);
 
 	uint registration_counter;
 	Sequential_Pattern_Detector_Listener* listener;
+	uint threshold;
 };
 
 class Block_manager_parallel_wearwolf_locality : public Block_manager_parallel_wearwolf, public Sequential_Pattern_Detector_Listener {
@@ -1149,8 +1158,9 @@ class IOScheduler {
 public:
 	void schedule_dependent_events(deque<Event*> events, ulong logical_address, event_type type);
 	void schedule_independent_event(Event* events, ulong logical_address, event_type type);
-	void finish(double start_time);
-	void progess();
+	bool is_empty();
+	void finish_all_events_until_this_time(double time);
+	void execute_soonest_events();
 	static IOScheduler *instance();
 	static void instance_initialize(Ssd& ssd, FtlParent& ftl);
 	void print_stats();
@@ -1165,11 +1175,12 @@ private:
 	bool can_schedule_on_die(Event const* event) const;
 	void handle_finished_event(Event *event, enum status outcome);
 
-	void remove_redundant_events(int index_of_event_in_io_schedule);
+	void remove_redundant_events(Event* new_event);
 
-	void init_event(uint event_index);
+	void init_event(Event* event);
 
-	vector<Event*> io_schedule;
+	vector<Event*> future_events;
+	vector<Event*> current_events;
 	map<uint, deque<Event*> > dependencies;
 
 	static IOScheduler *inst;
@@ -1185,12 +1196,14 @@ private:
 
 	map<uint, queue<uint> > op_code_to_dependent_op_codes;
 
-	vector<Event*> test_for_removing_reduntant_events();
+	void update_current_events();
 	int find_scheduled_event(uint dependency_code) const;
-	void remove_operation(uint index_of_event_in_io_schedule);
-	void promote_to_gc(uint index_of_event_in_io_schedule);
+	void remove_current_operation(uint index_of_event_in_io_schedule);
+	void promote_to_gc(Event* event_to_promote);
 	void nullify_and_add_as_dependent(uint dependency_code_to_be_nullified, uint dependency_code_to_remain);
-	void make_dependent(uint new_event_index, uint dependency_code_to_be_made_dependent, uint dependency_code_to_remain);
+	void make_dependent(Event* new_event, uint dependency_code_to_be_made_dependent, uint dependency_code_to_remain);
+
+	double get_current_time() const;
 
 	struct io_scheduler_stats {
 		uint num_write_cancellations;

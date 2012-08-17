@@ -123,10 +123,10 @@ enum status Channel::lock(double start_time, double duration, Event& event) {
 	assert(start_time >= 0.0);
 	assert(duration >= 0.0);
 
-	if (currently_executing_operation_finish_time > event.get_start_time() + event.get_time_taken()) {
-		return FAILURE;
+	if (currently_executing_operation_finish_time > event.get_current_time() + 0.000001) {
+		assert(false);
 	}
-	currently_executing_operation_finish_time = event.get_start_time() + event.get_time_taken() + duration;
+	currently_executing_operation_finish_time = event.get_current_time() + duration;
 
 	if (event.get_event_type() == READ_TRANSFER) {
 		Address adr = event.get_address();

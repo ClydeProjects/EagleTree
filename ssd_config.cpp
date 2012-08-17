@@ -173,14 +173,14 @@ uint NUMBER_OF_ADDRESSABLE_BLOCKS = 0;
 uint RAID_NUMBER_OF_PHYSICAL_SSDS = 0;
 
 /* Controls the block manager to be used. */
-int BLOCK_MANAGER_ID = 2;
+int BLOCK_MANAGER_ID = 3;
 bool GREEDY_GC = true;
 
 /* PRINT_LEVEL:
  * 	determines the level of detail of output. From 0 to 2. 0 is the least detailed */
 int PRINT_LEVEL = 2;
 
-bool OS_LOCK = false;
+bool OS_LOCK = true;
 
 void load_entry(char *name, double value, uint line_number) {
 	/* cheap implementation - go through all possibilities and match entry */

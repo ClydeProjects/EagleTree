@@ -103,9 +103,9 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	}
 	// if there are very few pages left, need to trigger emergency GC
 	if (num_free_pages <= BLOCK_SIZE && how_many_gc_operations_are_scheduled() == 0) {
-		perform_gc(event.get_current_time());
+		//perform_gc(event.get_current_time());
+		schedule_gc(event.get_current_time());
 	}
-
 	trim(event);
 }
 
@@ -201,12 +201,14 @@ bool Block_manager_parent::can_write(Event const& write) const {
 
 void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
 	if (num_free_pages <= BLOCK_SIZE) {
-		perform_gc(start_time);
+		//perform_gc(start_time);
+		schedule_gc(start_time);
 	}
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			if (!has_free_pages(free_block_pointers[i][j])) {
-				perform_gc(i, j, 0, start_time);
+				//perform_gc(i, j, 0, start_time);
+				schedule_gc(start_time, i, j, 0);
 			}
 		}
 	}
@@ -325,7 +327,7 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 	double die_finish_time = ssd.getPackages()[package_id].getDies()[die_id].get_currently_executing_io_finish_time();
 	double max = std::max(channel_finish_time, die_finish_time);
 	double time = max - time_taken;
-	return time <= 0 ? 0 : time;
+	return time < 0 ? 0 : time;
 }
 
 // puts free blocks at the very end of the queue
@@ -336,9 +338,55 @@ struct block_valid_pages_comparator_wearwolf {
 	}
 };
 
+// schedules a garbage collection operation to occur at a given time, and optionally for a given channel, LUN or age class
+// the block to be reclaimed is chosen when the gc operation is initialised
+void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, int klass) {
+	Address address;
+	address.package = package_id;
+	address.die = die_id;
+	if (package_id == -1 && die_id == -1) {
+		address.valid = NONE;
+	} else if (package_id >= 0 && die_id == -1) {
+		address.valid = PACKAGE;
+	} else {
+		address.valid = DIE;
+	}
+	Event *gc = new Event(GARBAGE_COLLECTION, 0, BLOCK_SIZE, time);
+	gc->set_noop(true);
+	gc->set_address(address);
+	IOScheduler::instance()->schedule_independent_event(gc, 0, GARBAGE_COLLECTION);
+}
 
+vector<pair<long, uint> > Block_manager_parent::get_relevant_gc_candidates(int package_id, int die_id, int klass) {
+	int package = 0, die = 0, age_class = 0, num_packages = SSD_SIZE, num_dies = PACKAGE_SIZE, num_classes = num_age_classes;
+	if (package_id != -1) {
+		package = package_id;
+		num_packages = package_id + 1;
+	}
+	if (die_id != -1) {
+		die = die_id;
+		num_dies = die_id + 1;
+	}
+	if (klass != -1) {
+		age_class = klass;
+		num_classes = age_class + 1;
+	}
+	vector<pair<long, uint> > candidates;
+	for (uint package = 0; package < num_packages; package++) {
+		for (uint die = 0; die < PACKAGE_SIZE; die++) {
+			for (uint age_class = 0; age_class < num_classes; age_class++) {
+				set<long>::iterator iter = gc_candidates[package][die][age_class].begin();
+				for (; iter != gc_candidates[package][die][age_class].end(); ++iter) {
+					pair<long, uint> pair(*iter, age_class);
+					candidates.push_back(pair);
+				}
+			}
+		}
+	}
+	return candidates;
+}
 
-void Block_manager_parent::perform_gc(double start_time) {
+/*void Block_manager_parent::perform_gc(double start_time) {
 	vector<pair<long, uint> > candidates;
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
@@ -385,9 +433,11 @@ void Block_manager_parent::perform_gc(uint package_id, uint die_id, uint klass, 
 		candidates.push_back(pair);
 	}
 	choose_gc_victim(candidates, start_time);
-}
+}*/
 
-void Block_manager_parent::choose_gc_victim(vector<pair<long, uint> > candidates, double start_time) {
+
+
+Block* Block_manager_parent::choose_gc_victim(vector<pair<long, uint> > candidates, double start_time) {
 	uint min_valid_pages = BLOCK_SIZE;
 	Block* best_block = NULL;
 	uint best_block_age_class;
@@ -419,32 +469,35 @@ void Block_manager_parent::choose_gc_victim(vector<pair<long, uint> > candidates
 			}
 			printf("\n");
 		}
-		Event *gc = new Event(GARBAGE_COLLECTION, 0, BLOCK_SIZE, start_time);
-		gc->set_address(addr);
-		gc->set_noop(true);
-		IOScheduler::instance()->schedule_independent_event(gc, 0, GARBAGE_COLLECTION);
-		//migrate(best_block, start_time);
 	}
+	return best_block;
 }
 
 // Reads and rewrites all valid pages of a block somewhere else
 // An erase is issued in register_write_completion after the last
 // page from this block has been migrated
 vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
-	Address a = gc_event->get_address();
-	Block* block = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
-	assert(block->get_state() != FREE);
-	assert(block->get_state() != PARTIALLY_FREE);
-	assert(block->get_pages_valid() <= num_available_pages_for_new_writes);
 
-	num_available_pages_for_new_writes -= block->get_pages_valid();
+	Address a = gc_event->get_address();
+
+	int die_id = a.valid >= die_id ? a.die : -1;
+	int package_id = a.valid >= package_id ? a.package : -1;
+
+	vector<pair<long, uint> > candidates = get_relevant_gc_candidates(die_id, die_id, gc_event->get_age_class());
+	Block * victim = choose_gc_victim(candidates, gc_event->get_current_time());
+
+	assert(victim->get_state() != FREE);
+	assert(victim->get_state() != PARTIALLY_FREE);
+	assert(victim->get_pages_valid() <= num_available_pages_for_new_writes);  // this might actually legitimately fail. consider cancelling gc if this condition does not hold
+
+	num_available_pages_for_new_writes -= victim->get_pages_valid();
 
 	vector<deque<Event*> > migrations;
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
-		if (block->getPages()[i].get_state() == VALID) {
+		if (victim->getPages()[i].get_state() == VALID) {
 
-			Address addr = Address(block->physical_address, PAGE);
+			Address addr = Address(victim->physical_address, PAGE);
 			addr.page = i;
 			long logical_address = ftl.get_logical_address(addr.get_linear_address());
 
@@ -507,7 +560,8 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 		to_return = Address(0, NONE);
 	}
 	if (greedy_gc && free_blocks[package_id][die_id][klass].size() < 2) {
-		perform_gc(package_id, die_id, klass, time);
+		//perform_gc(package_id, die_id, klass, time);
+		schedule_gc(time, package_id, die_id, klass);
 	}
 	return to_return;
 }
@@ -519,7 +573,8 @@ Address Block_manager_parent::find_free_unused_block_with_class(uint klass, doub
 			Address a = free_blocks[i][j][klass].back();
 			if (a.valid != NONE) {
 				if (greedy_gc && free_blocks[i][j][klass].size() < 2) {
-					perform_gc(i, j, klass, time);
+					//perform_gc(i, j, klass, time);
+					schedule_gc(time, i, j, klass);
 				}
 				return a;
 			}
