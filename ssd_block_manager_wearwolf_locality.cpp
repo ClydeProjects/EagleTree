@@ -132,17 +132,20 @@ void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event cons
 			if (parallel_degree == ONE) {
 				free_block = find_free_unused_block(event.get_current_time());
 				if (free_block.valid == NONE) {
-					perform_gc(event.get_current_time());
+					//perform_gc(event.get_current_time());
+					schedule_gc(event.get_current_time());
 				}
 			} else if (parallel_degree == CHANNEL) {
 				free_block = find_free_unused_block(event.get_address().package, event.get_current_time());
 				if (free_block.valid == NONE) {
-					perform_gc(event.get_address().package, event.get_current_time());
+					//perform_gc(event.get_address().package, event.get_current_time());
+					schedule_gc(event.get_current_time(), event.get_address().package);
 				}
 			} else if (parallel_degree == LUN) {
 				free_block = find_free_unused_block(event.get_address().package, event.get_address().die, event.get_current_time());
 				if (free_block.valid == NONE) {
-					perform_gc(event.get_address().package, event.get_address().die, event.get_current_time());
+					//perform_gc(event.get_address().package, event.get_address().die, event.get_current_time());
+					schedule_gc(event.get_current_time(), event.get_address().package, event.get_address().die);
 				}
 			}
 			if (free_block.valid != NONE) {

@@ -438,6 +438,8 @@ public:
 	void set_application_io_id(uint application_io_id);
 	void set_garbage_collection_op(bool value);
 	void set_mapping_op(bool value);
+	void set_age_class(uint value);
+	uint get_age_class();
 	bool is_garbage_collection_op() const;
 	bool is_mapping_op() const;
 	void *get_payload(void) const;
@@ -473,6 +475,7 @@ private:
 	uint application_io_id;
 	static uint application_io_id_generator;
 
+	int age_class;
 };
 
 /* Single bus channel
@@ -890,11 +893,13 @@ protected:
 
 	bool can_write(Event const& write) const;
 
-	void perform_gc(uint package_id, uint die_id, uint klass, double time);
+	void schedule_gc(double time, int package_id = -1, int die_id = -1, int klass = -1);
+	vector<pair<long, uint> > get_relevant_gc_candidates(int package_id, int die_id, int klass);
+
+	/*void perform_gc(uint package_id, uint die_id, uint klass, double time);
 	void perform_gc(uint package_id, uint die_id, double time);
 	void perform_gc(uint package_id, double time);
-	void perform_gc(double time);
-	void perform_gc_for_class(uint klass, double time);
+	void perform_gc(double time);*/
 
 	Address find_free_unused_block(uint package_id, uint die_id, uint klass, double time);
 	Address find_free_unused_block(uint package_id, uint die_id, double time);
@@ -916,7 +921,7 @@ protected:
 	vector<vector<Address> > free_block_pointers;
 private:
 
-	void choose_gc_victim(vector<pair<long, uint> > candidates, double start_time);
+	Block* choose_gc_victim(vector<pair<long, uint> > candidates, double start_time);
 	void update_blocks_with_min_age(uint age);
 	uint sort_into_age_class(Address const& address);
 	void issue_erase(Address a, double time);

@@ -46,7 +46,8 @@ void Block_manager_parallel_hot_cold_seperation::register_write_outcome(Event co
 		if (free_block.valid != NONE) {
 			free_block_pointers[package_id][die_id] = free_block;
 		} else {
-			perform_gc(package_id, die_id, 0, event.get_start_time() + event.get_time_taken());
+			schedule_gc(event.get_current_time(), package_id, die_id, 0);
+			//perform_gc(package_id, die_id, 0, event.get_start_time() + event.get_time_taken());
 		}
 	} else if (block_address.compare(cold_pointer) == BLOCK) {
 		handle_cold_pointer_out_of_space(event.get_start_time() + event.get_time_taken());
@@ -58,7 +59,8 @@ void Block_manager_parallel_hot_cold_seperation::handle_cold_pointer_out_of_spac
 	if (free_block.valid != NONE) {
 		cold_pointer = free_block;
 	} else {
-		perform_gc(1, start_time);
+		//perform_gc(1, start_time);
+		schedule_gc(start_time, -1, -1, 1);
 	}
 }
 
@@ -132,7 +134,8 @@ pair<double, Address> Block_manager_parallel_hot_cold_seperation::write(Event co
 	}
 
 	if (!write.is_garbage_collection_op() && relevant_pointer_unavailable && how_many_gc_operations_are_scheduled() == 0) {
-		Block_manager_parent::perform_gc(write.get_current_time());
+		//Block_manager_parent::perform_gc(write.get_current_time());
+		schedule_gc(write.get_current_time());
 	}
 
 	if ((write.is_garbage_collection_op() && relevant_pointer_unavailable) ||

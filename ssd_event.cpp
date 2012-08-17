@@ -246,6 +246,14 @@ void Event::set_mapping_op(bool value) {
 	mapping_op = value;
 }
 
+void Event::set_age_class(uint value) {
+	age_class = value;
+}
+
+uint Event::get_age_class() {
+	return age_class;
+}
+
 bool Event::is_garbage_collection_op() const {
 	return garbage_collection_op;
 }
