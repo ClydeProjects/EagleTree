@@ -409,6 +409,11 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		return;
 	}
 
+	if (event->get_id() == 1267) {
+		int i = 0;
+		i++;
+	}
+
 	VisualTracer::get_instance()->register_completed_event(*event);
 	if (event->get_event_type() == WRITE) {
 		ftl.register_write_completion(*event, outcome);
@@ -437,6 +442,12 @@ void IOScheduler::print_stats() {
 }
 
 void IOScheduler::init_event(Event* event) {
+
+	if (event->get_id() == 1410) {
+		int i = 0;
+		i++;
+	}
+
 	uint dep_code = event->get_application_io_id();
 	if (event->get_event_type() == READ) {
 		event->set_event_type(READ_COMMAND);
