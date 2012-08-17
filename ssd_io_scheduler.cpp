@@ -440,11 +440,20 @@ void IOScheduler::init_event(Event* event) {
 	uint dep_code = event->get_application_io_id();
 	if (event->get_event_type() == READ) {
 		event->set_event_type(READ_COMMAND);
+
+		// This (simple copy) ...
+		Event* read_transfer = new Event(*event);
+		read_transfer->set_event_type(READ_TRANSFER);
+
+		// ... replaces this (new event, then copy each attribute):
+		/*
 		Event* read_transfer = new Event(READ_TRANSFER, event->get_logical_address(), event->get_size(), event->get_start_time());
 		read_transfer->set_application_io_id(dep_code);
 		read_transfer->set_garbage_collection_op(event->is_garbage_collection_op());
 		read_transfer->set_mapping_op(event->is_mapping_op());
 		read_transfer->set_original_application_io(event->is_original_application_io());
+		*/
+
 		dependencies[dep_code].push_front(read_transfer);
 		ftl.set_read_address(*event);
 		ftl.set_read_address(*read_transfer);
