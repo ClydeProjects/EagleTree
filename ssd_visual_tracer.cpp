@@ -26,6 +26,16 @@ VisualTracer *VisualTracer::get_instance()
 	return VisualTracer::inst;
 }
 
+vector<char> get_int_as_char_vector(int num) {
+	char buffer [10];
+	int n = sprintf (buffer, "%d", num);
+	vector<char> vec(n);
+	for (int i = 0; i < n; i++) {
+		vec[i] = buffer[i];
+	}
+	return vec;
+}
+
 void VisualTracer::register_completed_event(Event const& event) {
 	if (event.get_event_type() == TRIM) {
 		return;
@@ -37,7 +47,16 @@ void VisualTracer::register_completed_event(Event const& event) {
 
 	if (event.get_event_type() == WRITE) {
 		write(add.package, add.die, 't', 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY);
-		write_with_id(add.package, add.die, 'w', PAGE_WRITE_DELAY - 1, event.get_logical_address());
+		vector<vector<char> > symbols;
+		vector<char> logical_address = get_int_as_char_vector(event.get_logical_address());
+		symbols.push_back(logical_address);
+		if (event.is_garbage_collection_op()) {
+			vector<char> gc_symbol(2);
+			gc_symbol[0] = 'G';
+			gc_symbol[1] = 'C';
+			symbols.push_back(gc_symbol);
+		}
+		write_with_id(add.package, add.die, 'w', PAGE_WRITE_DELAY - 1, symbols);
 	} else if (event.get_event_type() == READ_COMMAND) {
 		write(add.package, add.die, 't', BUS_CTRL_DELAY);
 		write(add.package, add.die, 'r', PAGE_READ_DELAY - 1);
@@ -57,23 +76,25 @@ void VisualTracer::write(int package, int die, char symbol, int length) {
 	}
 }
 
-void VisualTracer::write_with_id(int package, int die, char symbol, int length, int id) {
 
-	char buffer [10];
-	int n = sprintf (buffer, "%d", id);
 
-	if (n > length - 2) {
-		return write(package, die, symbol, length);
-	}
+void VisualTracer::write_with_id(int package, int die, char symbol, int length, vector<vector<char> > symbols) {
+
+	int length_remaining = length - 1;
 
 	trace[package][die].push_back(symbol);
 
-	for (int i = 0; i < n; i++) {
-		//printf("%c\n", buffer[i]);
-		trace[package][die].push_back(buffer[i]);
+	uint sizef = symbols[0].size();
+
+	for (uint i = 0; i < symbols.size() && symbols[i].size() < length_remaining; i++) {
+		for (uint j = 0; j < symbols[i].size(); j++) {
+			trace[package][die].push_back(symbols[i][j]);
+		}
+		trace[package][die].push_back(symbol);
+		length_remaining -= symbols[i].size() + 1;
 	}
 
-	for (int i = 0; i < length - 1 - n; i++) {
+	for (int i = 0; i < length_remaining; i++) {
 		trace[package][die].push_back(symbol);
 	}
 }

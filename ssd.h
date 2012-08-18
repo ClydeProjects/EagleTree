@@ -1596,7 +1596,7 @@ private:
 	VisualTracer();
 	~VisualTracer();
 	void write(int package, int die, char symbol, int length);
-	void write_with_id(int package, int die, char symbol, int length, int id);
+	void write_with_id(int package, int die, char symbol, int length, vector<vector<char> > symbols);
 	vector<vector<vector<char> > > trace;
 };
 
