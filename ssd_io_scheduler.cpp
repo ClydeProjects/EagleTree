@@ -80,12 +80,6 @@ void IOScheduler::schedule_event(Event* event, ulong logical_address, event_type
 void IOScheduler::finish_all_events_until_this_time(double time) {
 	update_current_events();
 	while ( get_current_time() < time && current_events.size() > 0 ) {
-
-		//printf("\n");
-		for (uint i = 0; i < current_events.size(); i++) {
-			//printf("  %f  ", current_events[i]->get_current_time()); current_events[i]->print();
-		}
-
 		execute_current_waiting_ios();
 		update_current_events();
 	}
@@ -100,6 +94,7 @@ void IOScheduler::execute_soonest_events() {
 bool IOScheduler::is_empty() {
 	return current_events.size() > 0 || future_events.size() > 0;
 }
+
 vector<Event*> IOScheduler::collect_soonest_events() {
 	double current_time = get_current_time();
 	vector<Event*> soonest_events;
@@ -159,11 +154,9 @@ void IOScheduler::execute_current_waiting_ios() {
 }
 
 double get_soonest_event_time(vector<Event*> events) {
-	uint earliest_event = 0;
 	double earliest_time = events[0]->get_current_time();
 	for (uint i = 1; i < events.size(); i++) {
 		if (events[i]->get_current_time() < earliest_time) {
-			earliest_event = i;
 			earliest_time = events[i]->get_current_time();
 		}
 	}
@@ -200,17 +193,10 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 	sort(events.begin(), events.end(), bus_wait_time_comparator);
 	while (events.size() > 0) {
 		Event* event = events.back();
-		if (event->get_id() == 115) {
-			int i = 0;
-			i++;
-			//StateTracer::print();
-		}
 		events.pop_back();
 		pair<double, Address> result = bm->write(*event);
 		if (result.first == 0) {
 			event->set_address(result.second);
-			event->set_noop(false);
-			ftl.set_replace_address(*event);
 			execute_next(event);
 		}
 		else {
@@ -236,7 +222,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	uint dependency_code_of_other_event = LBA_currently_executing[common_logical_address];
 	Event * existing_event = find_scheduled_event(dependency_code_of_other_event);
 	assert(existing_event != NULL);
-	bool both_events_are_gc = new_event->is_garbage_collection_op() && existing_event->is_garbage_collection_op();
+	//bool both_events_are_gc = new_event->is_garbage_collection_op() && existing_event->is_garbage_collection_op();
 	//assert(!both_events_are_gc);
 
 	event_type new_op_code = dependency_code_to_type[dependency_code_of_new_event];
@@ -302,7 +288,7 @@ Event* IOScheduler::find_scheduled_event(uint dependency_code) {
 			return event;
 		}
 	}
-	//assert(false);
+	assert(false);
 	return NULL;
 }
 
