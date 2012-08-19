@@ -64,7 +64,7 @@ void FtlImpl_Dftl::read(Event *event)
 	resolve_mapping(event, false);
 	controller.stats.numFTLRead++;
 	current_dependent_events.push_back(event);
-	IOScheduler::instance()->schedule_dependent_events(current_dependent_events, event->get_logical_address(), READ);
+	IOScheduler::instance()->schedule_events_queue(current_dependent_events, event->get_logical_address(), READ);
 }
 
 void FtlImpl_Dftl::write(Event *event)
@@ -76,12 +76,12 @@ void FtlImpl_Dftl::write(Event *event)
 	resolve_mapping(event, true);
 	controller.stats.numFTLWrite++;
 	current_dependent_events.push_back(event);
-	IOScheduler::instance()->schedule_dependent_events(current_dependent_events, event->get_logical_address(), WRITE);
+	IOScheduler::instance()->schedule_events_queue(current_dependent_events, event->get_logical_address(), WRITE);
 }
 
 void FtlImpl_Dftl::trim(Event *event)
 {
-	IOScheduler::instance()->schedule_independent_event(event, event->get_logical_address(), TRIM);
+	IOScheduler::instance()->schedule_event(event, event->get_logical_address(), TRIM);
 }
 
 void FtlImpl_Dftl::register_trim_completion(Event & event) {

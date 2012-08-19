@@ -178,7 +178,7 @@ void FtlImpl_DftlParent::evict_page_from_cache(Event *event)
 			Event* write_event = new Event(WRITE, virtual_mapping_page_address, 1, event->get_current_time());
 			write_event->set_mapping_op(true);
 			mapping_events.push_back(write_event);
-			IOScheduler::instance()->schedule_dependent_events(mapping_events, write_event->get_logical_address(), WRITE);
+			IOScheduler::instance()->schedule_events_queue(mapping_events, write_event->get_logical_address(), WRITE);
 
 			controller.stats.numFTLWrite++;
 			controller.stats.numGCWrite++;
@@ -228,7 +228,7 @@ void FtlImpl_DftlParent::evict_specific_page_from_cache(Event *event, long lba)
 			long mapping_virtual_address = get_mapping_virtual_address(event->get_logical_address());
 			Event* write_event = new Event(WRITE, mapping_virtual_address, 1, event->get_current_time());
 			write_event->set_mapping_op(true);
-			IOScheduler::instance()->schedule_independent_event(write_event, write_event->get_logical_address(), WRITE);
+			IOScheduler::instance()->schedule_event(write_event, write_event->get_logical_address(), WRITE);
 
 			controller.stats.numFTLWrite++;
 			controller.stats.numGCWrite++;

@@ -327,6 +327,9 @@ void Event::print(FILE *stream) const
 	if (original_application_io) {
 		fprintf(stream, " APP");
 	}
+	if (type == GARBAGE_COLLECTION) {
+		fprintf(stream, " age class: %d", age_class);
+	}
 	fprintf(stream, "\n");
 }
 

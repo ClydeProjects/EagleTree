@@ -1152,8 +1152,8 @@ private:
 
 class IOScheduler {
 public:
-	void schedule_dependent_events(deque<Event*> events, ulong logical_address, event_type type);
-	void schedule_independent_event(Event* events, ulong logical_address, event_type type);
+	void schedule_events_queue(deque<Event*> events, ulong logical_address, event_type type);
+	void schedule_event(Event* events, ulong logical_address, event_type type);
 	bool is_empty();
 	void finish_all_events_until_this_time(double time);
 	void execute_soonest_events();
@@ -1165,7 +1165,8 @@ private:
 	~IOScheduler();
 	enum status execute_next(Event* event);
 	void execute_current_waiting_ios();
-	void execute_next_batch(vector<Event*>& events);
+	vector<Event*> collect_soonest_events();
+	void handle_next_batch(vector<Event*>& events);
 	void handle_writes(vector<Event*>& events);
 
 	bool can_schedule_on_die(Event const* event) const;
@@ -1174,6 +1175,8 @@ private:
 	void remove_redundant_events(Event* new_event);
 
 	void init_event(Event* event);
+
+	void handle_noop_events(vector<Event*>& events);
 
 	vector<Event*> future_events;
 	vector<Event*> current_events;
@@ -1193,8 +1196,8 @@ private:
 	map<uint, queue<uint> > op_code_to_dependent_op_codes;
 
 	void update_current_events();
-	int find_scheduled_event(uint dependency_code) const;
-	void remove_current_operation(uint index_of_event_in_io_schedule);
+	Event* find_scheduled_event(uint dependency_code);
+	void remove_current_operation(Event* event);
 	void promote_to_gc(Event* event_to_promote);
 	void nullify_and_add_as_dependent(uint dependency_code_to_be_nullified, uint dependency_code_to_remain);
 	void make_dependent(Event* new_event, uint dependency_code_to_be_made_dependent, uint dependency_code_to_remain);
