@@ -894,7 +894,7 @@ protected:
 	bool can_write(Event const& write) const;
 
 	void schedule_gc(double time, int package_id = -1, int die_id = -1, int klass = -1);
-	vector<pair<long, uint> > get_relevant_gc_candidates(int package_id, int die_id, int klass);
+	vector<long> get_relevant_gc_candidates(int package_id, int die_id, int klass) const;
 
 	Address find_free_unused_block(uint package_id, uint die_id, uint klass, double time);
 	Address find_free_unused_block(uint package_id, uint die_id, double time);
@@ -916,7 +916,7 @@ protected:
 	vector<vector<Address> > free_block_pointers;
 private:
 
-	Block* choose_gc_victim(vector<pair<long, uint> > candidates, double start_time);
+	Block* choose_gc_victim(vector<long> candidates) const;
 	void update_blocks_with_min_age(uint age);
 	uint sort_into_age_class(Address const& address);
 	void issue_erase(Address a, double time);

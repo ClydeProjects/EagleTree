@@ -164,9 +164,6 @@ void Block_manager_parent::trim(Event const& event) {
 		blocks_being_garbage_collected[phys_addr]--;
 		issue_erase(ra, event.get_current_time());
 	}
-
-
-
 }
 
 void Block_manager_parent::remove_as_gc_candidate(Address const& phys_address) {
@@ -214,7 +211,6 @@ void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
 		}
 	}
 }
-
 
 // TODO, at erase registration, there should be a check for WL queue. If not empty, see if can issue a WL operation. If cannot, issue an emergency GC.
 // if the queue is empty, check if should trigger GC.
@@ -351,6 +347,7 @@ void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, 
 	} else {
 		address.valid = DIE;
 	}
+	printf("scheduling gc in (%d %d %d)\n", package_id, die_id, klass);
 	Event *gc = new Event(GARBAGE_COLLECTION, 0, BLOCK_SIZE, time);
 	gc->set_noop(true);
 	gc->set_address(address);
@@ -358,28 +355,22 @@ void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, 
 	IOScheduler::instance()->schedule_independent_event(gc, 0, GARBAGE_COLLECTION);
 }
 
-vector<pair<long, uint> > Block_manager_parent::get_relevant_gc_candidates(int package_id, int die_id, int klass) {
-	int package = 0, die = 0, age_class = 0, num_packages = SSD_SIZE, num_dies = PACKAGE_SIZE, num_classes = num_age_classes;
-	if (package_id != -1) {
-		package = package_id;
-		num_packages = package_id + 1;
-	}
-	if (die_id != -1) {
-		die = die_id;
-		num_dies = die_id + 1;
-	}
-	if (klass != -1) {
-		age_class = klass;
-		num_classes = age_class + 1;
-	}
-	vector<pair<long, uint> > candidates;
+vector<long> Block_manager_parent::get_relevant_gc_candidates(int package_id, int die_id, int klass) const {
+	//int package = 0, die = 0, age_class = 0, num_packages = SSD_SIZE, num_dies = PACKAGE_SIZE, num_classes = num_age_classes;
+	vector<long > candidates;
+	int package = package_id == -1 ? 0 : package_id;
+	int num_packages = package_id == -1 ? SSD_SIZE : package_id + 1;
+
 	for (; package < num_packages; package++) {
+		int die = die_id == -1 ? 0 : die_id;
+		int num_dies = die_id == -1 ? PACKAGE_SIZE : die_id + 1;
 		for (; die < num_dies; die++) {
+			int age_class = klass == -1 ? 0 : klass;
+			int num_classes = klass == -1 ? num_age_classes : klass + 1;
 			for (; age_class < num_classes; age_class++) {
 				set<long>::iterator iter = gc_candidates[package][die][age_class].begin();
 				for (; iter != gc_candidates[package][die][age_class].end(); ++iter) {
-					pair<long, uint> pair(*iter, age_class);
-					candidates.push_back(pair);
+					candidates.push_back(*iter);
 				}
 			}
 		}
@@ -387,20 +378,16 @@ vector<pair<long, uint> > Block_manager_parent::get_relevant_gc_candidates(int p
 	return candidates;
 }
 
-Block* Block_manager_parent::choose_gc_victim(vector<pair<long, uint> > candidates, double start_time) {
+Block* Block_manager_parent::choose_gc_victim(vector<long> candidates) const {
 	uint min_valid_pages = BLOCK_SIZE;
 	Block* best_block = NULL;
-	uint best_block_age_class;
 	for (uint i = 0; i < candidates.size(); i++) {
-		pair<long, uint> candidate = candidates[i];
-		long physical_address = candidate.first;
+		long physical_address = candidates[i];
 		Address a = Address(physical_address, BLOCK);
 		Block* block = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
-		uint age_class = candidate.second;
 		if (block->get_pages_valid() < min_valid_pages && block->get_state() == ACTIVE) {
 			min_valid_pages = block->get_pages_valid();
 			best_block = block;
-			best_block_age_class = age_class;
 			assert(min_valid_pages < BLOCK_SIZE);
 		}
 	}
@@ -416,8 +403,8 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 	int die_id = a.valid >= DIE ? a.die : -1;
 	int package_id = a.valid >= PACKAGE ? a.package : -1;
 
-	vector<pair<long, uint> > candidates = get_relevant_gc_candidates(package_id, die_id, gc_event->get_age_class());
-	Block * victim = choose_gc_victim(candidates, gc_event->get_current_time());
+	vector<long> candidates = get_relevant_gc_candidates(package_id, die_id, gc_event->get_age_class());
+	Block * victim = choose_gc_victim(candidates);
 
 	if (victim == NULL) {
 		return vector<deque<Event*> >();
