@@ -72,7 +72,7 @@ pair<double, Address> Block_manager_parallel::write(Event const& write) {
 		result.first = 1;
 		return result;
 	}
-	result.second = get_free_die_with_shortest_IO_queue();
+	result.second = get_free_block_pointer_with_shortest_IO_queue();
 	if (result.second.valid == NONE) {
 		result.first = 1;
 		return result;

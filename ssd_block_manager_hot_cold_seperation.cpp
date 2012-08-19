@@ -116,7 +116,7 @@ pair<double, Address> Block_manager_parallel_hot_cold_seperation::write(Event co
 	bool relevant_pointer_unavailable = false;
 
 	if (w_hotness == WRITE_HOT) {
-		result.second = get_free_die_with_shortest_IO_queue();
+		result.second = get_free_block_pointer_with_shortest_IO_queue();
 		if (result.second.valid == NONE) {
 			result.first = 1;
 			relevant_pointer_unavailable = true;
@@ -144,7 +144,7 @@ pair<double, Address> Block_manager_parallel_hot_cold_seperation::write(Event co
 		if (cold_pointer.page < BLOCK_SIZE) {
 			result.second = cold_pointer;
 		} else if (w_hotness == WRITE_COLD) {
-			result.second = get_free_die_with_shortest_IO_queue();
+			result.second = get_free_block_pointer_with_shortest_IO_queue();
 		}
 
 		if (result.second.valid != NONE) {

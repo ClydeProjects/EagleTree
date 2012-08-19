@@ -896,11 +896,6 @@ protected:
 	void schedule_gc(double time, int package_id = -1, int die_id = -1, int klass = -1);
 	vector<pair<long, uint> > get_relevant_gc_candidates(int package_id, int die_id, int klass);
 
-	/*void perform_gc(uint package_id, uint die_id, uint klass, double time);
-	void perform_gc(uint package_id, uint die_id, double time);
-	void perform_gc(uint package_id, double time);
-	void perform_gc(double time);*/
-
 	Address find_free_unused_block(uint package_id, uint die_id, uint klass, double time);
 	Address find_free_unused_block(uint package_id, uint die_id, double time);
 	Address find_free_unused_block(uint package_id, double time);
@@ -909,8 +904,8 @@ protected:
 
 	void return_unfilled_block(Address block_address);
 
-	pair<bool, pair<uint, uint> > get_free_die_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
-	Address get_free_die_with_shortest_IO_queue() const;
+	pair<bool, pair<uint, uint> > get_free_block_pointer_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
+	Address get_free_block_pointer_with_shortest_IO_queue() const;
 
 	uint how_many_gc_operations_are_scheduled() const;
 
@@ -939,6 +934,7 @@ private:
 	uint num_available_pages_for_new_writes;
 	map<int, int> blocks_being_garbage_collected;   // maps block physical address to the number of pages that still need to be migrated
 	vector<vector<vector<set<long> > > > gc_candidates;  // each age class has a vector of candidates for GC
+	vector<vector<uint> > num_blocks_being_garbaged_collected_per_LUN;
 };
 
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation

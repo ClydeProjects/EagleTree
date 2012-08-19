@@ -56,7 +56,7 @@ bool bus_wait_time_comparator (const Event* i, const Event* j) {
 	return i->get_bus_wait_time() < j->get_bus_wait_time();
 }
 
-// TODO pass a deque dependencies instead of converting from a queue
+//
 void IOScheduler::schedule_dependent_events(deque<Event*> events, ulong logical_address, event_type type) {
 	uint dependency_code = events.front()->get_application_io_id();
 	if (type != GARBAGE_COLLECTION && type != ERASE) {
@@ -84,16 +84,17 @@ void IOScheduler::finish_all_events_until_this_time(double time) {
 	}
 }
 
+
 void IOScheduler::execute_soonest_events() {
 	finish_all_events_until_this_time(get_current_time() + 1);
 }
 
+// this is used to signal the SSD object when all events have finished executing
 bool IOScheduler::is_empty() {
 	return current_events.size() > 0 || future_events.size() > 0;
 }
 
-// takes the pending events from io_schedule whose start_time + wait_time is soonest, are that are all within 1 microsecond of eachother.
-// divides them into structures based on type. Gives piorities to different types of operations
+// tries to execute all current events. Some events may be put back in the queue if they cannot be executed.
 void IOScheduler::execute_current_waiting_ios() {
 	vector<Event*> read_commands;
 	vector<Event*> read_transfers;
@@ -105,12 +106,7 @@ void IOScheduler::execute_current_waiting_ios() {
 		Event * event = current_events.back();
 		current_events.pop_back();
 		event_type type = event->get_event_type();
-		if (event->get_noop()) {
-			execute_next(event);
-		} else 	if (type == GARBAGE_COLLECTION) {
-			delete event;
-		}
-		else if (type == READ_COMMAND) {
+		if (type == READ_COMMAND) {
 			read_commands.push_back(event);
 		}
 		else if (type == READ_TRANSFER) {
@@ -130,7 +126,6 @@ void IOScheduler::execute_current_waiting_ios() {
 			handle_finished_event(event, SUCCESS);
 		}
 	}
-	//printf("\n -------------------------------- \n");
 	execute_next_batch(erases);
 	execute_next_batch(read_commands);
 	execute_next_batch(read_transfers);
@@ -274,7 +269,7 @@ int IOScheduler::find_scheduled_event(uint dependency_code) const {
 			return i;
 		}
 	}
-	//assert(false);
+	assert(false);
 	return -1;
 }
 
@@ -355,12 +350,6 @@ enum status IOScheduler::execute_next(Event* event) {
 			dependencies.erase(dependency_code);
 			uint lba = dependency_code_to_LBA[dependency_code];
 			if (event->get_event_type() != ERASE) {
-				if (LBA_currently_executing.count(lba) == 0) {
-					int i = 0;
-					i++;
-					event->print();
-					assert(false);
-				}
 				assert(LBA_currently_executing.count(lba) == 1);
 				LBA_currently_executing.erase(lba);
 				assert(dependency_code_to_LBA.count(dependency_code) == 1);
@@ -402,18 +391,19 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		event->print();
 	}
 	if (outcome == FAILURE) {
-		return;
+		assert(false); // events should not fail at this point. Any failure indicates application error
 	}
-
-	if (event->get_id() == 1267) {
+	if (event->get_id() == 713) {
 		int i = 0;
 		i++;
+		//StateTracer::print();
 	}
 
 	VisualTracer::get_instance()->register_completed_event(*event);
 	if (event->get_event_type() == WRITE) {
 		ftl.register_write_completion(*event, outcome);
 		bm->register_write_outcome(*event, outcome);
+		StateTracer::print();
 	} else if (event->get_event_type() == ERASE) {
 		bm->register_erase_outcome(*event, outcome);
 	} else if (event->get_event_type() == READ_COMMAND) {
@@ -423,8 +413,6 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	} else if (event->get_event_type() == TRIM) {
 		ftl.register_trim_completion(*event);
 		bm->trim(*event);
-	} else {
-		assert(false);
 	}
 	StatisticsGatherer::get_instance()->register_completed_event(*event);
 
@@ -438,7 +426,6 @@ void IOScheduler::print_stats() {
 }
 
 void IOScheduler::init_event(Event* event) {
-	printf("received : "); event->print();
 	uint dep_code = event->get_application_io_id();
 	if (event->get_event_type() == READ) {
 		event->set_event_type(READ_COMMAND);
@@ -459,6 +446,10 @@ void IOScheduler::init_event(Event* event) {
 		remove_redundant_events(event);
 	}
 	else if (event->get_event_type() == GARBAGE_COLLECTION) {
+
+		if (event->get_id() == 137) {
+			event->print();
+		}
 		vector<deque<Event*> > migrations = bm->migrate(event);
 		while (migrations.size() > 0) {
 			deque<Event*> migration = migrations.back();

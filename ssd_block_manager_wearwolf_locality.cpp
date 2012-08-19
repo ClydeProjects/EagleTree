@@ -57,7 +57,7 @@ pair<double, Address> Block_manager_parallel_wearwolf_locality::perform_sequenti
 	pair<double, Address> to_return;
 	vector<vector<Address> > pointers = seq_write_key_to_pointers_mapping[key].pointers;
 	//printf("num seq pointers left: %d\n", seq_write_key_to_pointers_mapping[key].num_pointers);
-	pair<bool, pair<uint, uint> > best_die_id = Block_manager_parent::get_free_die_with_shortest_IO_queue(pointers);
+	pair<bool, pair<uint, uint> > best_die_id = Block_manager_parent::get_free_block_pointer_with_shortest_IO_queue(pointers);
 	bool can_write = best_die_id.first;
 
 	if (can_write) {
