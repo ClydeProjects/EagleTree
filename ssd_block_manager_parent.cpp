@@ -476,6 +476,8 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 				}
 			}
 
+			do_copy_back = false; // Tempoary disabled.
+
 			// If a free page on the same die is found, do copy back, else just traditional and more expensive READ - WRITE garbage collection
 			if (do_copy_back) {
 				Event* copy_back = new Event(COPY_BACK, logical_address, 1, gc_event->get_start_time());
