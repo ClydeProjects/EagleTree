@@ -210,7 +210,7 @@ enum block_state{FREE, PARTIALLY_FREE, ACTIVE, INACTIVE};
  * 	                                page states set to empty)
  * 	merge - move valid pages from block at address (page state set to invalid)
  * 	           to free pages in block at merge_address */
-enum event_type{NOT_VALID, READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, MERGE, TRIM, GARBAGE_COLLECTION};
+enum event_type{NOT_VALID, READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, MERGE, TRIM, GARBAGE_COLLECTION, COPY_BACK};
 
 /* General return status
  * return status for simulator operations that only need to provide general
@@ -455,12 +455,12 @@ private:
 
 	ulong logical_address;
 	Address address;
-	Address merge_address;
-	Address log_address;
 	Address replace_address;
+	Address merge_address; // Deprecated
+	Address log_address;   // Deprecated
 	uint size;
 	void *payload;
-	Event *next;
+	Event *next;           // Deprecated
 	bool noop;
 
 	bool garbage_collection_op;
@@ -914,6 +914,8 @@ protected:
 	Ssd& ssd;
 	FtlParent& ftl;
 	vector<vector<Address> > free_block_pointers;
+
+	map<Address, int> page_copyback_count; // Pages that have experienced a copy-back, mapped to a count of the number of copy-backs
 private:
 
 	Block* choose_gc_victim(vector<long> candidates) const;
