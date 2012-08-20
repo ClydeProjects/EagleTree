@@ -482,7 +482,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 			if (do_copy_back) {
 				Event* copy_back = new Event(COPY_BACK, logical_address, 1, gc_event->get_start_time());
 				copy_back->set_address(copy_back_target);
-				copy_back->set_replace_address(Address(victim->physical_address));
+				//copy_back->set_replace_address(Address(victim->physical_address));
 				copy_back->set_garbage_collection_op(true);
 				migration.push_back(copy_back);
 			} else {
