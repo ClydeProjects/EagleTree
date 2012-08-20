@@ -410,16 +410,6 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 	int die_id = a.valid >= DIE ? a.die : -1;
 	int package_id = a.valid >= PACKAGE ? a.package : -1;
 
-	if (a.valid == DIE && a.package == 1 && a.die == 1) {
-		int i = 0;
-		i++;
-	}
-
-	if (gc_event->get_id() == 631) {
-		int i = 0;
-		i++;
-	}
-
 	vector<long> candidates = get_relevant_gc_candidates(package_id, die_id, gc_event->get_age_class());
 	Block * victim = choose_gc_victim(candidates);
 
@@ -469,17 +459,42 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 			addr.page = i;
 			long logical_address = ftl.get_logical_address(addr.get_linear_address());
 
-			Event* read = new Event(READ, logical_address, 1, gc_event->get_start_time());
-			read->set_address(addr);
-			read->set_garbage_collection_op(true);
-
-			Event* write = new Event(WRITE, logical_address, 1, gc_event->get_start_time());
-			write->set_garbage_collection_op(true);
-			write->set_replace_address(addr);
-
 			deque<Event*> migration;
-			migration.push_back(read);
-			migration.push_back(write);
+
+			// Try to find a free page on the same die (should actually be plane!), so that a fast copy back can be done
+			bool do_copy_back = false;
+			Address copy_back_target = free_block_pointers[addr.package][addr.die];
+			if (has_free_pages(copy_back_target)) { // If there is a free page
+				do_copy_back = true;
+			} else {
+				Address free_block = find_free_unused_block(package_id, die_id, gc_event->get_current_time());
+				if (free_block.valid != NONE) {
+					assert(free_block.package == package_id);
+					assert(free_block.die == die_id);
+					free_block_pointers[package_id][die_id] = copy_back_target = free_block;
+					do_copy_back = true;
+				}
+			}
+
+			// If a free page on the same die is found, do copy back, else just traditional and more expensive READ - WRITE garbage collection
+			if (do_copy_back) {
+				Event* copy_back = new Event(COPY_BACK, logical_address, 1, gc_event->get_start_time());
+				copy_back->set_address(copy_back_target);
+				copy_back->set_replace_address(Address(victim->physical_address));
+				copy_back->set_garbage_collection_op(true);
+				migration.push_back(copy_back);
+			} else {
+				Event* read = new Event(READ, logical_address, 1, gc_event->get_start_time());
+				read->set_address(addr);
+				read->set_garbage_collection_op(true);
+
+				Event* write = new Event(WRITE, logical_address, 1, gc_event->get_start_time());
+				write->set_garbage_collection_op(true);
+				write->set_replace_address(addr);
+
+				migration.push_back(read);
+				migration.push_back(write);
+			}
 			migrations.push_back(migration);
 		}
 	}
