@@ -5,7 +5,7 @@
  *      Author: niv
  */
 
-#include "ssd.h"
+#include "../ssd.h"
 #include "MTRand/mtrand.h"
 
 using namespace ssd;
@@ -33,7 +33,7 @@ Event* External_Sort::issue_next_io() {
 		return execute_second_phase();
 	} else if (phase == THIRD_PHASE) {
 		return execute_third_phase();
-	} else if (phase == FINISHED) {
+	} else /* if (phase == FINISHED) */ {
 		return NULL;
 	}
 }
