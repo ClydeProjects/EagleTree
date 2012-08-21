@@ -1047,6 +1047,7 @@ private:
 	struct sequential_writes_pointers {
 		int num_pointers;
 		vector<vector<Address> > pointers;
+		uint cursor;
 		sequential_writes_pointers();
 	};
 
@@ -1056,7 +1057,9 @@ private:
 	Address perform_sequential_write(long key);
 
 	Sequential_Pattern_Detector* detector;
-	//Sequential_Pattern_Detector* recorder;
+
+	enum strategy {SHOREST_QUEUE, ROUND_ROBIN};
+	strategy strat;
 };
 
 class IOScheduler {

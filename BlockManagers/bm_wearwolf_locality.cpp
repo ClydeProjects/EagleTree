@@ -10,7 +10,8 @@ Block_manager_parallel_wearwolf_locality::Block_manager_parallel_wearwolf_locali
 	: Block_manager_parallel_wearwolf(ssd, ftl),
 	  parallel_degree(LUN),
 	  seq_write_key_to_pointers_mapping(),
-	  detector(new Sequential_Pattern_Detector(THRESHOLD))
+	  detector(new Sequential_Pattern_Detector(THRESHOLD)),
+	  strat(ROUND_ROBIN)
 {
 	detector->set_listener(this);
 }
@@ -45,6 +46,11 @@ Address Block_manager_parallel_wearwolf_locality::write(Event const& event) {
 	long key = detector->get_sequential_write_id(lb);
 	bool key_exists = seq_write_key_to_pointers_mapping.count(key) == 1;
 
+	if (event.get_id() == 36) {
+		int i = 0;
+		i++;
+	}
+
 	if (!key_exists  || (key_exists && seq_write_key_to_pointers_mapping[key].num_pointers == 0)) {
 		return Block_manager_parallel_wearwolf::write(event);
 	} else {
@@ -55,12 +61,20 @@ Address Block_manager_parallel_wearwolf_locality::write(Event const& event) {
 
 Address Block_manager_parallel_wearwolf_locality::perform_sequential_write(long key) {
 	Address to_return;
-	vector<vector<Address> > pointers = seq_write_key_to_pointers_mapping[key].pointers;
+	sequential_writes_pointers& swp = seq_write_key_to_pointers_mapping[key];
+	vector<vector<Address> > pointers = swp.pointers;
 	//printf("num seq pointers left: %d\n", seq_write_key_to_pointers_mapping[key].num_pointers);
-	pair<bool, pair<uint, uint> > best_die_id = Block_manager_parent::get_free_block_pointer_with_shortest_IO_queue(pointers);
-	bool can_write = best_die_id.first;
-	if (can_write) {
-		to_return = pointers[best_die_id.second.first][best_die_id.second.second];
+
+	if (strat == SHOREST_QUEUE) {
+		pair<bool, pair<uint, uint> > best_die_id = Block_manager_parent::get_free_block_pointer_with_shortest_IO_queue(pointers);
+		bool can_write = best_die_id.first;
+		if (can_write) {
+			to_return = pointers[best_die_id.second.first][best_die_id.second.second];
+		}
+	} else if (strat == ROUND_ROBIN) {
+		uint package = swp.cursor % pointers.size();
+		uint die = (swp.cursor / pointers.size()) % pointers[package].size();
+		to_return = pointers[package][die];
 	}
 	return to_return;
 }
@@ -107,6 +121,7 @@ void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event cons
 	if (seq_write_key_to_pointers_mapping.count(key) == 1 && seq_write_key_to_pointers_mapping[key].num_pointers > 0) {
 		Block_manager_parent::register_write_outcome(event, status);
 		page_hotness_measurer.register_event(event);
+		sequential_writes_pointers& swp = seq_write_key_to_pointers_mapping[key];
 
 		int i, j;
 		if (parallel_degree == ONE) {
@@ -119,9 +134,13 @@ void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event cons
 			j = event.get_address().die;
 		}
 
-		Address selected_pointer = seq_write_key_to_pointers_mapping[key].pointers[i][j];
+		if (strat == ROUND_ROBIN) {
+			swp.cursor++;
+		}
+
+		Address selected_pointer = swp.pointers[i][j];
 		selected_pointer.page++;
-		seq_write_key_to_pointers_mapping[key].pointers[i][j] = selected_pointer;
+		swp.pointers[i][j] = selected_pointer;
 
 		if (selected_pointer.page == BLOCK_SIZE) {
 			Address free_block;
@@ -145,9 +164,9 @@ void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event cons
 				}
 			}
 			if (free_block.valid != NONE) {
-				seq_write_key_to_pointers_mapping[key].pointers[i][j] = free_block;
+				swp.pointers[i][j] = free_block;
 			} else {
-				seq_write_key_to_pointers_mapping[key].num_pointers--;
+				swp.num_pointers--;
 			}
 		}
 
@@ -209,7 +228,8 @@ void Block_manager_parallel_wearwolf_locality::register_erase_outcome(Event cons
 
 Block_manager_parallel_wearwolf_locality::sequential_writes_pointers::sequential_writes_pointers()
 	: num_pointers(0),
-	  pointers()
+	  pointers(),
+	  cursor(rand() % 100)
 {}
 
 
