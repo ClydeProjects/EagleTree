@@ -80,11 +80,9 @@ void VisualTracer::write(int package, int die, char symbol, int length) {
 
 void VisualTracer::write_with_id(int package, int die, char symbol, int length, vector<vector<char> > symbols) {
 
-	int length_remaining = length - 1;
+	uint length_remaining = length - 1;
 
 	trace[package][die].push_back(symbol);
-
-	uint sizef = symbols[0].size();
 
 	for (uint i = 0; i < symbols.size() && symbols[i].size() < length_remaining; i++) {
 		for (uint j = 0; j < symbols[i].size(); j++) {
@@ -94,7 +92,7 @@ void VisualTracer::write_with_id(int package, int die, char symbol, int length, 
 		length_remaining -= symbols[i].size() + 1;
 	}
 
-	for (int i = 0; i < length_remaining; i++) {
+	for (uint i = 0; i < length_remaining; i++) {
 		trace[package][die].push_back(symbol);
 	}
 }
@@ -114,7 +112,7 @@ void VisualTracer::print_horizontally() {
 
 void VisualTracer::print_horizontally_with_breaks() {
 	printf("\n");
-	int chars_to_write_each_time = 300;
+	int chars_to_write_each_time = 200;
 	int cursor = 0;
 	while (cursor < trace[0][0].size()) {
 		for (uint i = 0; i < SSD_SIZE; i++) {
