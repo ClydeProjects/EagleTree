@@ -40,7 +40,7 @@ void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event cons
 }
 
 
-pair<double, Address> Block_manager_parallel_wearwolf_locality::write(Event const& event) {
+Address Block_manager_parallel_wearwolf_locality::write(Event const& event) {
 	ulong lb = event.get_logical_address();
 	long key = detector->get_sequential_write_id(lb);
 	bool key_exists = seq_write_key_to_pointers_mapping.count(key) == 1;
@@ -49,22 +49,18 @@ pair<double, Address> Block_manager_parallel_wearwolf_locality::write(Event cons
 		return Block_manager_parallel_wearwolf::write(event);
 	} else {
 		//printf("performing seq write for: %d  key: %d  id: %d \n", event.get_logical_address(), key, event.get_id());
-		return perform_sequential_write(key, event.get_current_time());
+		return perform_sequential_write(key);
 	}
 }
 
-pair<double, Address> Block_manager_parallel_wearwolf_locality::perform_sequential_write(long key, double current_time) {
-	pair<double, Address> to_return;
+Address Block_manager_parallel_wearwolf_locality::perform_sequential_write(long key) {
+	Address to_return;
 	vector<vector<Address> > pointers = seq_write_key_to_pointers_mapping[key].pointers;
 	//printf("num seq pointers left: %d\n", seq_write_key_to_pointers_mapping[key].num_pointers);
 	pair<bool, pair<uint, uint> > best_die_id = Block_manager_parent::get_free_block_pointer_with_shortest_IO_queue(pointers);
 	bool can_write = best_die_id.first;
-
 	if (can_write) {
-		to_return.second = pointers[best_die_id.second.first][best_die_id.second.second];
-		to_return.first = in_how_long_can_this_event_be_scheduled(to_return.second, current_time);
-	} else {
-		to_return.first = 1;
+		to_return = pointers[best_die_id.second.first][best_die_id.second.second];
 	}
 	return to_return;
 }

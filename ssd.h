@@ -883,7 +883,7 @@ public:
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write) = 0;
+	virtual Address write(Event const& write) = 0;
 	virtual void register_write_arrival(Event const& write);
 	virtual void trim(Event const& write);
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
@@ -915,7 +915,6 @@ protected:
 	FtlParent& ftl;
 	vector<vector<Address> > free_block_pointers;
 private:
-
 	Block* choose_gc_victim(vector<long> candidates) const;
 	void update_blocks_with_min_age(uint age);
 	uint sort_into_age_class(Address const& address);
@@ -941,12 +940,10 @@ private:
 class Block_manager_parallel : public Block_manager_parent {
 public:
 	Block_manager_parallel(Ssd& ssd, FtlParent& ftl);
-	~Block_manager_parallel();
+	~Block_manager_parallel() {}
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
-	pair<double, Address> write(Event const& write);
-private:
-	bool has_free_pages(uint package_id, uint die_id) const;
+	Address write(Event const& write);
 };
 
 // A simple BM that assigns writes sequentially to dies in a round-robin fashion. No hot-cold separation or anything else intelligent
@@ -956,9 +953,8 @@ public:
 	~Block_manager_roundrobin();
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
-	pair<double, Address> write(Event const& write);
+	Address write(Event const& write);
 private:
-	bool has_free_pages(uint package_id, uint die_id) const;
 	void move_address_cursor();
 	Address address_cursor;
 	bool channel_alternation;
@@ -972,7 +968,7 @@ public:
 	void register_write_outcome(Event const& event, enum status status);
 	void register_read_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
-	pair<double, Address> write(Event const& write);
+	Address write(Event const& write);
 protected:
 	void check_if_should_trigger_more_GC(double start_time);
 private:
@@ -991,7 +987,7 @@ public:
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write);
+	virtual Address write(Event const& write);
 
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
@@ -1053,7 +1049,7 @@ public:
 	Block_manager_parallel_wearwolf_locality(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel_wearwolf_locality();
 	void register_write_arrival(Event const& write);
-	pair<double, Address> write(Event const& write);
+	Address write(Event const& write);
 
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
@@ -1073,7 +1069,7 @@ private:
 	map<long, sequential_writes_pointers> seq_write_key_to_pointers_mapping;
 
 	void set_pointers_for_sequential_write(long key, double time);
-	pair<double, Address> perform_sequential_write(long key, double time);
+	Address perform_sequential_write(long key);
 
 	Sequential_Pattern_Detector* detector;
 	//Sequential_Pattern_Detector* recorder;

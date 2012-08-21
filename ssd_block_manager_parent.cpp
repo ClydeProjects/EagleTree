@@ -95,8 +95,16 @@ uint Block_manager_parent::sort_into_age_class(Address const& a) {
 	return klass;
 }
 
+/*bool Block_manager_parent::increment_block_pointer(Address& pointer, Address& block_written_on) {
+	if (pointer.compare(pointer) == BLOCK) {
+		Address temp = free_block_pointers[pointer.package][pointer.die];
+		temp.page = temp.page + 1;
+		pointer = temp;
+	}
+	return !has_free_pages(pointer);
+}*/
+
 void Block_manager_parent::register_write_outcome(Event const& event, enum status status) {
-	// Update stats about free pages
 	assert(num_free_pages > 0);
 	num_free_pages--;
 	if (!event.is_garbage_collection_op()) {
@@ -105,10 +113,19 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	}
 	// if there are very few pages left, need to trigger emergency GC
 	if (num_free_pages <= BLOCK_SIZE && how_many_gc_operations_are_scheduled() == 0) {
-		//perform_gc(event.get_current_time());
 		schedule_gc(event.get_current_time());
 	}
 	trim(event);
+
+	Address ba = Address(event.get_address().get_linear_address(), BLOCK);
+	if (ba.compare(free_block_pointers[ba.package][ba.die]) == BLOCK) {
+		Address pointer = free_block_pointers[ba.package][ba.die];
+		pointer.page = pointer.page + 1;
+		free_block_pointers[ba.package][ba.die] = pointer;
+	}
+	if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
+		free_block_pointers[ba.package][ba.die] = find_free_unused_block(ba.package, ba.die, event.get_current_time());
+	}
 }
 
 void Block_manager_parent::trim(Event const& event) {
@@ -320,6 +337,9 @@ bool Block_manager_parent::has_free_pages(Address const& address) const {
 
 // gives time until both the channel and die are clear
 double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const {
+	if (die_address.valid == NONE) {
+		return 1;
+	}
 	uint package_id = die_address.package;
 	uint die_id = die_address.die;
 	double channel_finish_time = ssd.bus.get_channel(package_id).get_currently_executing_operation_finish_time();
@@ -435,7 +455,8 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	Address addr = Address(victim->get_physical_address(), BLOCK);
 
-	if (num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die] > 0) {
+	uint max_num_gc_per_LUN = GREEDY_GC ? 2 : 1;
+	if (num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die] >= max_num_gc_per_LUN) {
 		return migrations;
 	}
 
@@ -519,16 +540,15 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 }
 
 Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_id, uint klass, double time) {
-	assert(klass < num_age_classes);
 	Address to_return;
-	if (free_blocks[package_id][die_id][klass].size() > 0) {
+	uint num_free_blocks_left = free_blocks[package_id][die_id][klass].size();
+	if (num_free_blocks_left > 0) {
 		to_return = free_blocks[package_id][die_id][klass].back();
 		free_blocks[package_id][die_id][klass].pop_back();
-	} else {
-		to_return = Address(0, NONE);
+		num_free_blocks_left--;
 	}
-	if (greedy_gc && free_blocks[package_id][die_id][klass].size() < 2) {
-		//perform_gc(package_id, die_id, klass, time);
+	uint num_free_blocks_before_gc = GREEDY_GC ? 1 : 0;
+	if (num_free_blocks_left <= num_free_blocks_before_gc) {
 		schedule_gc(time, package_id, die_id, klass);
 	}
 	return to_return;

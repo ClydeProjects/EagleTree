@@ -154,7 +154,7 @@ void IOScheduler::execute_current_waiting_ios() {
 }
 
 double get_soonest_event_time(vector<Event*> events) {
-	double earliest_time = events[0]->get_current_time();
+	double earliest_time = events.front()->get_current_time();
 	for (uint i = 1; i < events.size(); i++) {
 		if (events[i]->get_current_time() < earliest_time) {
 			earliest_time = events[i]->get_current_time();
@@ -194,14 +194,15 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
-		pair<double, Address> result = bm->write(*event);
-		if (result.first == 0) {
-			event->set_address(result.second);
+		Address result = bm->write(*event);
+		double wait_time = bm->in_how_long_can_this_event_be_scheduled(result, event->get_current_time());
+		if (wait_time == 0) {
+			event->set_address(result);
 			execute_next(event);
 		}
 		else {
-			event->incr_bus_wait_time(result.first);
-			event->incr_time_taken(result.first);
+			event->incr_bus_wait_time(wait_time);
+			event->incr_time_taken(wait_time);
 			current_events.push_back(event);
 		}
 	}
@@ -420,7 +421,7 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	if (event->get_event_type() == WRITE) {
 		ftl.register_write_completion(*event, outcome);
 		bm->register_write_outcome(*event, outcome);
-		StateTracer::print();
+		//StateTracer::print();
 	} else if (event->get_event_type() == ERASE) {
 		bm->register_erase_outcome(*event, outcome);
 	} else if (event->get_event_type() == READ_COMMAND) {

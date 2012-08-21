@@ -35,47 +35,17 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;
 	Address block_address = Address(event.get_address().get_linear_address(), BLOCK);
-	uint num_pages_written = -1;
 
-	if (block_address.compare(free_block_pointers[package_id][die_id]) == BLOCK) {
-		Address pointer = free_block_pointers[package_id][die_id];
-		pointer.page = num_pages_written = pointer.page + 1;
-		free_block_pointers[package_id][die_id] = pointer;
-	}
-	else if (block_address.compare(wcrh_pointer) == BLOCK) {
-		wcrh_pointer.page = num_pages_written = wcrh_pointer.page + 1;
+	if (block_address.compare(wcrh_pointer) == BLOCK) {
+		wcrh_pointer.page = wcrh_pointer.page + 1;
 	} else if (block_address.compare(wcrc_pointer) == BLOCK) {
-		wcrc_pointer.page = num_pages_written = wcrc_pointer.page + 1;
-	} else {
-		event.print();
-		StateTracer::print();
-		assert(false);
+		wcrc_pointer.page = wcrc_pointer.page + 1;
 	}
 
-	// there is still more room in this pointer, so no need to trigger GC
-	if (num_pages_written < BLOCK_SIZE) {
-		return;
-	}
-
-	// check if the pointer if full. If it is, find a free block for a new pointer, or trigger GC if there are no free blocks
-	if (block_address.compare(free_block_pointers[package_id][die_id]) == BLOCK) {
-		if (PRINT_LEVEL > 1) {
-			printf("hot pointer ");
-			free_block_pointers[package_id][die_id].print();
-			printf(" is out of space\n");
-		}
-		Address free_block = find_free_unused_block(package_id, die_id, event.get_current_time());
-		if (free_block.valid != NONE) {
-			assert(free_block.package == package_id);
-			assert(free_block.die == die_id);
-			free_block_pointers[package_id][die_id] = free_block;
-		} else {
-			//perform_gc(package_id, die_id, 0, event.get_current_time());
-			schedule_gc(event.get_current_time(), package_id, die_id, 0);
-		}
-	} else if (block_address.compare(wcrh_pointer) == BLOCK) {
+	if (!has_free_pages(wcrh_pointer)) {
 		handle_cold_pointer_out_of_space(READ_HOT, event.get_current_time());
-	} else if (block_address.compare(wcrc_pointer) == BLOCK) {
+	}
+	else if (!has_free_pages(wcrc_pointer)) {
 		handle_cold_pointer_out_of_space(READ_COLD, event.get_current_time());
 	}
 }
@@ -134,69 +104,46 @@ bool Block_manager_parallel_wearwolf::at_least_one_available_write_hot_pointer()
 	return false;
 }
 
-pair<double, Address> Block_manager_parallel_wearwolf::write(Event const& write) {
-	pair<double, Address> result;
+Address Block_manager_parallel_wearwolf::write(Event const& write) {
+	Address result;
 	bool can_write = Block_manager_parent::can_write(write);
 	if (!can_write) {
-		result.first = 1;
 		return result;
 	}
 
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
 	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(write.get_logical_address());
-	bool relevant_pointer_unavailable = false;
 
 	if (w_hotness == WRITE_HOT) {
-		result.second = get_free_block_pointer_with_shortest_IO_queue();
-		if (result.second.valid == NONE) {
-			result.first = 1;
-			relevant_pointer_unavailable = true;
-		} else {
-			result.first = in_how_long_can_this_event_be_scheduled(result.second, write.get_current_time());
-		}
+		result = get_free_block_pointer_with_shortest_IO_queue();
 	} else if (w_hotness == WRITE_COLD && r_hotness == READ_COLD) {
-		if (wcrc_pointer.page >= BLOCK_SIZE) {
-			result.first = 1;
-			relevant_pointer_unavailable = true;
-		} else {
-			result.first = in_how_long_can_this_event_be_scheduled(wcrc_pointer, write.get_current_time());
-			result.second = wcrc_pointer;
-		}
+		result = wcrc_pointer;
 	} else if (w_hotness == WRITE_COLD && r_hotness == READ_HOT) {
-		if (wcrh_pointer.page >= BLOCK_SIZE) {
-			result.first = 1;
-			relevant_pointer_unavailable = true;
-		} else {
-			result.first = in_how_long_can_this_event_be_scheduled(wcrh_pointer, write.get_current_time());
-			result.second = wcrh_pointer;
-		}
+		result = wcrh_pointer;
+	}
+	if (result.valid == PAGE && result.page < BLOCK_SIZE) {
+		return result;
 	}
 
-	if (!write.is_garbage_collection_op() && relevant_pointer_unavailable && how_many_gc_operations_are_scheduled() == 0) {
-		//Block_manager_parent::perform_gc(write.get_current_time());
+	if (!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0) {
 		schedule_gc(write.get_current_time());
 	}
 
-	if ((write.is_garbage_collection_op() && relevant_pointer_unavailable) ||
-			(relevant_pointer_unavailable && !write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0)) {
+	if ((write.is_garbage_collection_op()) ||
+			(!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0)) {
 
 		if (wcrh_pointer.page < BLOCK_SIZE) {
-			result.second = wcrh_pointer;
+			result = wcrh_pointer;
 		} else if (wcrc_pointer.page < BLOCK_SIZE) {
-			result.second = wcrc_pointer;
+			result = wcrc_pointer;
 		} else if (w_hotness == WRITE_COLD) {
-			result.second = get_free_block_pointer_with_shortest_IO_queue();
-		}
-
-		if (result.second.valid != NONE) {
-			result.first = in_how_long_can_this_event_be_scheduled(result.second, write.get_current_time());
+			result = get_free_block_pointer_with_shortest_IO_queue();
 		}
 
 		if (PRINT_LEVEL > 1) {
 			printf("Trying to migrate a write %s page, but could not find a relevant pointer.\n", w_hotness == WRITE_COLD ? "cold" : "hot");
 		}
 	}
-
 	return result;
 }
 
