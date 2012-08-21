@@ -80,80 +80,48 @@ void Controller::event_arrive(Event *event)
 		fprintf(stderr, "Controller: %s: Invalid event type\n", __func__);
 }
 
-enum status Controller::issue(Event &event_list)
+enum status Controller::issue(Event *event)
 {
-	Event *cur;
-
-	/* go through event list and issue each to the hardware
-	 * stop processing events and return failure status if any event in the 
-	 *    list fails */
-	for(cur = &event_list; cur != NULL; cur = cur -> get_next()){
-		if(cur -> get_size() != 1){
-			fprintf(stderr, "Controller: %s: Received non-single-page-sized event from FTL.\n", __func__);
+	if(event -> get_event_type() == READ_COMMAND)
+	{
+		assert(event -> get_address().valid > NONE);
+		if(ssd.bus.lock(event -> get_address().package, event -> get_start_time(), BUS_CTRL_DELAY, *event) == FAILURE
+			|| ssd.read(*event) == FAILURE)
 			return FAILURE;
-		}
-/*
-		else if(cur -> get_event_type() == READ)  // kept only for legacy purposes
-		{
-			assert(cur -> get_address().valid > NONE);
-			if(ssd.bus.lock(cur -> get_address().package, cur -> get_start_time(), BUS_CTRL_DELAY, *cur) == FAILURE
-				|| ssd.read(*cur) == FAILURE
-				|| ssd.bus.lock(cur -> get_address().package, cur -> get_start_time(), BUS_CTRL_DELAY + BUS_DATA_DELAY, *cur) == FAILURE
-				|| ssd.ram.write(*cur) == FAILURE
-				|| ssd.ram.read(*cur) == FAILURE
-				|| ssd.replace(*cur) == FAILURE)
-				return FAILURE;
-		}
-*/
-		else if(cur -> get_event_type() == READ_COMMAND)
-		{
-			assert(cur -> get_address().valid > NONE);
-			if(ssd.bus.lock(cur -> get_address().package, cur -> get_start_time(), BUS_CTRL_DELAY, *cur) == FAILURE
-				|| ssd.read(*cur) == FAILURE)
-				return FAILURE;
-		}
-		else if(cur -> get_event_type() == READ_TRANSFER)
-		{
-			assert(cur -> get_address().valid > NONE);
-			if(ssd.bus.lock(cur -> get_address().package, cur -> get_start_time(), BUS_CTRL_DELAY + BUS_DATA_DELAY, *cur) == FAILURE
-				|| ssd.ram.write(*cur) == FAILURE
-				|| ssd.ram.read(*cur) == FAILURE)
-				return FAILURE;
-		}
-		else if(cur -> get_event_type() == WRITE)
-		{
-			assert(cur -> get_address().valid > NONE);
-			if(ssd.bus.lock(cur -> get_address().package, cur -> get_start_time(), 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY, *cur) == FAILURE
-				|| ssd.ram.write(*cur) == FAILURE
-				|| ssd.ram.read(*cur) == FAILURE
-				|| ssd.write(*cur) == FAILURE
-				/*|| ssd.replace(*cur) == FAILURE*/)
-				return FAILURE;
-		}
-		else if(cur -> get_event_type() == ERASE)
-		{
-			assert(cur -> get_address().valid > NONE);
-			if(ssd.bus.lock(cur -> get_address().package, cur -> get_start_time(), BUS_CTRL_DELAY, *cur) == FAILURE
-				|| ssd.erase(*cur) == FAILURE)
-				return FAILURE;
-		}
-		else if(cur -> get_event_type() == MERGE)
-		{
-			assert(cur -> get_address().valid > NONE);
-			assert(cur -> get_merge_address().valid > NONE);
-			if(ssd.bus.lock(cur -> get_address().package, cur -> get_start_time(), BUS_CTRL_DELAY, *cur) == FAILURE
-				|| ssd.merge(*cur) == FAILURE)
-				return FAILURE;
-		}
-		else if(cur -> get_event_type() == TRIM)
-		{
-			return SUCCESS;
-		}
-		else
-		{
-			fprintf(stderr, "Controller: %s: Invalid event type\n", __func__);
+	}
+	else if(event -> get_event_type() == READ_TRANSFER)
+	{
+		assert(event -> get_address().valid > NONE);
+		if(ssd.bus.lock(event -> get_address().package, event -> get_start_time(), BUS_CTRL_DELAY + BUS_DATA_DELAY, *event) == FAILURE
+			|| ssd.ram.write(*event) == FAILURE
+			|| ssd.ram.read(*event) == FAILURE)
 			return FAILURE;
-		}
+	}
+	else if(event -> get_event_type() == WRITE)
+	{
+		assert(event -> get_address().valid > NONE);
+		if(ssd.bus.lock(event -> get_address().package, event -> get_start_time(), 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY, *event) == FAILURE
+			|| ssd.ram.write(*event) == FAILURE
+			|| ssd.ram.read(*event) == FAILURE
+			|| ssd.write(*event) == FAILURE
+			/*|| ssd.replace(*cur) == FAILURE*/)
+			return FAILURE;
+	}
+	else if(event -> get_event_type() == ERASE)
+	{
+		assert(event -> get_address().valid > NONE);
+		if(ssd.bus.lock(event -> get_address().package, event -> get_start_time(), BUS_CTRL_DELAY, *event) == FAILURE
+			|| ssd.erase(*event) == FAILURE)
+			return FAILURE;
+	}
+	else if(event -> get_event_type() == TRIM)
+	{
+		return SUCCESS;
+	}
+	else
+	{
+		fprintf(stderr, "Controller: %s: Invalid event type\n", __func__);
+		return FAILURE;
 	}
 	return SUCCESS;
 }

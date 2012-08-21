@@ -408,7 +408,6 @@ public:
 	Event(enum event_type type, ulong logical_address, uint size, double start_time);
 	Event();
 	~Event(void);
-	void consolidate_metaevent(Event &list);
 	ulong get_logical_address(void) const;
 	const Address &get_address(void) const;
 	const Address &get_merge_address(void) const;
@@ -425,12 +424,10 @@ public:
 	double get_bus_wait_time(void) const;
 	bool get_noop(void) const;
 	uint get_id(void) const;
-	Event *get_next(void) const;
 	void set_address(const Address &address);
 	void set_merge_address(const Address &address);
 	void set_log_address(const Address &address);
 	void set_replace_address(const Address &address);
-	void set_next(Event &next);
 	void set_start_time(double start_time);
 	void set_payload(void *payload);
 	void set_event_type(const enum event_type &type);
@@ -460,7 +457,6 @@ private:
 	Address replace_address;
 	uint size;
 	void *payload;
-	Event *next;
 	bool noop;
 
 	bool garbage_collection_op;
@@ -1071,77 +1067,6 @@ private:
 	//Sequential_Pattern_Detector* recorder;
 };
 
-class Block_manager
-{
-public:
-	Block_manager(FtlParent *ftl);
-	~Block_manager(void);
-
-	// Usual suspects
-	Address get_free_block(Event &event);
-	Address get_free_block(block_type btype, Event &event);
-	void invalidate(Address address, block_type btype);
-	void print_statistics();
-	void insert_events(Event &event);
-	void promote_block(block_type to_type);
-	bool is_log_full();
-	void erase_and_invalidate(Event &event, Address &address, block_type btype);
-	int get_num_free_blocks();
-
-	// Used to update GC on used pages in blocks.
-	void update_block(Block * b);
-
-	// Singleton
-	static Block_manager *instance();
-	static void instance_initialize(FtlParent *ftl);
-	static Block_manager *inst;
-
-	void cost_insert(Block *b);
-	void print_cost_status();
-private:
-	void get_page_block(Address &address, Event &event);
-	static bool block_comparitor_simple (Block const *x,Block const *y);
-
-	FtlParent *ftl;
-
-	ulong data_active;
-	ulong log_active;
-	ulong logseq_active;
-
-	ulong max_log_blocks;
-	ulong max_blocks;
-
-	ulong max_map_pages;
-	ulong map_space_capacity;
-
-	// Cost/Benefit priority queue.
-	typedef boost::multi_index_container<
-			Block*,
-			boost::multi_index::indexed_by<
-				boost::multi_index::random_access<>,
-				boost::multi_index::ordered_non_unique<BOOST_MULTI_INDEX_MEMBER(Block,uint,pages_invalid) >
-		  >
-		> active_set;
-
-	typedef active_set::nth_index<0>::type ActiveBySeq;
-	typedef active_set::nth_index<1>::type ActiveByCost;
-	active_set active_cost;
-	// Usual block lists
-	vector<Block*> active_list;
-	vector<Block*> free_list;
-	vector<Block*> invalid_list;
-	// Counter for returning the next free page.
-	ulong directoryCurrentPage;
-	// Address on the current cached page in SRAM.
-	ulong directoryCachedPage;
-	ulong simpleCurrentFree;
-	// Counter for handling periodic sort of active_list
-	uint num_insert_events;
-	uint current_writing_block;
-	bool inited;
-	bool out_of_blocks;
-};
-
 class IOScheduler {
 public:
 	void schedule_events_queue(deque<Event*> events, ulong logical_address, event_type type);
@@ -1483,7 +1408,7 @@ public:
 	void print_ftl_statistics();
 	FtlParent &get_ftl(void) const;
 private:
-	enum status issue(Event &event_list);
+	enum status issue(Event *event);
 	void translate_address(Address &address);
 	ulong get_erases_remaining(const Address &address) const;
 	void get_least_worn(Address &address) const;
@@ -1766,6 +1691,77 @@ private:
 	int currently_pending_ios_counter;
 	double last_dispatched_event_minimal_finish_time;
 };
+
+/*class Block_manager
+{
+public:
+	Block_manager(FtlParent *ftl);
+	~Block_manager(void);
+
+	// Usual suspects
+	Address get_free_block(Event &event);
+	Address get_free_block(block_type btype, Event &event);
+	void invalidate(Address address, block_type btype);
+	void print_statistics();
+	void insert_events(Event &event);
+	void promote_block(block_type to_type);
+	bool is_log_full();
+	void erase_and_invalidate(Event &event, Address &address, block_type btype);
+	int get_num_free_blocks();
+
+	// Used to update GC on used pages in blocks.
+	void update_block(Block * b);
+
+	// Singleton
+	static Block_manager *instance();
+	static void instance_initialize(FtlParent *ftl);
+	static Block_manager *inst;
+
+	void cost_insert(Block *b);
+	void print_cost_status();
+private:
+	void get_page_block(Address &address, Event &event);
+	static bool block_comparitor_simple (Block const *x,Block const *y);
+
+	FtlParent *ftl;
+
+	ulong data_active;
+	ulong log_active;
+	ulong logseq_active;
+
+	ulong max_log_blocks;
+	ulong max_blocks;
+
+	ulong max_map_pages;
+	ulong map_space_capacity;
+
+	// Cost/Benefit priority queue.
+	typedef boost::multi_index_container<
+			Block*,
+			boost::multi_index::indexed_by<
+				boost::multi_index::random_access<>,
+				boost::multi_index::ordered_non_unique<BOOST_MULTI_INDEX_MEMBER(Block,uint,pages_invalid) >
+		  >
+		> active_set;
+
+	typedef active_set::nth_index<0>::type ActiveBySeq;
+	typedef active_set::nth_index<1>::type ActiveByCost;
+	active_set active_cost;
+	// Usual block lists
+	vector<Block*> active_list;
+	vector<Block*> free_list;
+	vector<Block*> invalid_list;
+	// Counter for returning the next free page.
+	ulong directoryCurrentPage;
+	// Address on the current cached page in SRAM.
+	ulong directoryCachedPage;
+	ulong simpleCurrentFree;
+	// Counter for handling periodic sort of active_list
+	uint num_insert_events;
+	uint current_writing_block;
+	bool inited;
+	bool out_of_blocks;
+};*/
 
 } /* end namespace ssd */
 
