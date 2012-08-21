@@ -1,5 +1,5 @@
 
-#include "ssd.h"
+#include "../ssd.h"
 
 using namespace ssd;
 using namespace std;

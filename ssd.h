@@ -983,7 +983,7 @@ private:
 class Block_manager_parallel_wearwolf : public Block_manager_parent {
 public:
 	Block_manager_parallel_wearwolf(Ssd& ssd, FtlParent& ftl);
-	~Block_manager_parallel_wearwolf();
+	~Block_manager_parallel_wearwolf() {}
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
@@ -1020,16 +1020,12 @@ public:
 	typedef ulong logical_address;
 	Sequential_Pattern_Detector(uint threshold);
 	~Sequential_Pattern_Detector();
-
-
-
 	sequential_writes_tracking const& register_event(logical_address lb, double time);
 	int get_sequential_write_id(logical_address lb);
 	int get_current_offset(logical_address lb);
 	int get_num_times_pattern_has_repeated(logical_address lb);
 	double get_arrival_time_of_last_io_in_pattern(logical_address lb);
 	void set_listener(Sequential_Pattern_Detector_Listener * listener);
-
 private:
 	map<logical_address, logical_address> sequential_writes_key_lookup;  // a map from the next expected LBA in a seqeuntial pattern to the first LBA, which is the key
 	map<logical_address, sequential_writes_tracking*> sequential_writes_identification_and_data;	// a map from the first logical write of a sequential pattern to metadata about the pattern

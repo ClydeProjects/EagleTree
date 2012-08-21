@@ -1,5 +1,5 @@
 
-#include "ssd.h"
+#include "../ssd.h"
 
 using namespace ssd;
 
@@ -15,13 +15,7 @@ Block_manager_parallel_wearwolf::Block_manager_parallel_wearwolf(Ssd& ssd, FtlPa
 	} else {
 		wcrc_pointer = find_free_unused_block(0, 0, 0);
 	}
-	wcrh_pointer.print();
-	printf("\n");
-	wcrc_pointer.print();
-	printf("\n");
 }
-
-Block_manager_parallel_wearwolf::~Block_manager_parallel_wearwolf(void) {}
 
 void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event, enum status status) {
 	assert(event.get_event_type() == WRITE);

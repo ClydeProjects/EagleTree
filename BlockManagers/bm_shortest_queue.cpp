@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <stdexcept>
 #include <algorithm>
-#include "ssd.h"
+#include "../ssd.h"
 
 using namespace ssd;
 
