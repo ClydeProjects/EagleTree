@@ -44,15 +44,15 @@ void experiement1() {
 
 void experiement2() {
 	vector<Thread*> threads;
-	Thread* t1 = new Asynchronous_Sequential_Thread(0, 199, 1, WRITE,17);
-	Thread* t2 = new Asynchronous_Sequential_Thread(200, 399, 1, WRITE, 17);
-	Thread* t3 = new Asynchronous_Sequential_Thread(400, 599, 1, WRITE, 17);
-	Thread* t4 = new Asynchronous_Sequential_Thread(600, 799, 1, WRITE, 17);
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, 49, 1, WRITE,17);
+	Thread* t2 = new Asynchronous_Sequential_Thread(50, 99, 1, WRITE, 17);
+	Thread* t3 = new Asynchronous_Sequential_Thread(100, 149, 1, WRITE, 17);
+	Thread* t4 = new Asynchronous_Sequential_Thread(150, 199, 1, WRITE, 17);
 
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, 199, 500, 1, WRITE, 20, 1));
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(200, 399, 500, 2, WRITE, 20, 2));
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(400, 599, 500, 3, WRITE, 20, 3));
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(600, 799, 500, 4, WRITE, 20, 4));
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, 49, 100, 1, WRITE, 100, 1));
+	t2->add_follow_up_thread(new Asynchronous_Random_Thread(50, 99, 100, 2, WRITE, 100, 2));
+	t3->add_follow_up_thread(new Asynchronous_Random_Thread(100, 149, 100, 3, WRITE, 100, 3));
+	t4->add_follow_up_thread(new Asynchronous_Random_Thread(150, 199, 100, 4, WRITE, 100, 4));
 
 	threads.push_back(t1);
 	threads.push_back(t2);

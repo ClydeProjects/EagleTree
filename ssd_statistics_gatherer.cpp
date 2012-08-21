@@ -64,15 +64,37 @@ void StatisticsGatherer::print() {
 	printf("GC writes\t");
 	printf("GC reads\t");
 	printf("erases\t\t");
-	printf("write wait\t");
-	printf("read wait\t");
+	printf("avg write wait\t");
+	printf("avg read wait\t");
 	//printf("age\t");
 
 	printf("\n");
+
+
+	uint total_writes = 0;
+	uint total_reads = 0;
+	uint total_gc_writes = 0;
+	uint total_gc_reads = 0;
+	uint total_erases = 0;
+	double avg_overall_write_wait_time = 0;
+	double avg_overall_read_wait_time = 0;
+
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			total_writes += num_writes_per_LUN[i][j];
+			total_reads += num_reads_per_LUN[i][j];
+			total_gc_writes += num_gc_writes_per_LUN[i][j];
+			total_gc_reads += num_gc_reads_per_LUN[i][j];
+			total_erases += num_erases_per_LUN[i][j];
+
 			double average_write_wait_time = sum_bus_wait_time_for_writes_per_LUN[i][j] / num_writes_per_LUN[i][j];
+
+			avg_overall_write_wait_time += average_write_wait_time;
+
 			double average_read_wait_time = sum_bus_wait_time_for_reads_per_LUN[i][j] / num_reads_per_LUN[i][j];
+
+			avg_overall_read_wait_time += average_read_wait_time;
+
 			if (num_writes_per_LUN[i][j] == 0) {
 				average_write_wait_time = 0;
 			}
@@ -97,6 +119,17 @@ void StatisticsGatherer::print() {
 			printf("\n");
 		}
 	}
+	avg_overall_write_wait_time /= SSD_SIZE * PACKAGE_SIZE;
+	avg_overall_read_wait_time /= SSD_SIZE * PACKAGE_SIZE;
+	printf("\nTotals:\t");
+	printf("%d\t\t", total_writes);
+	printf("%d\t\t", total_reads);
+	printf("%d\t\t", total_gc_writes);
+	printf("%d\t\t", total_gc_reads);
+	printf("%d\t\t", total_erases);
+	printf("%f\t\t", avg_overall_write_wait_time);
+	printf("%f\t\t", avg_overall_read_wait_time);
+	printf("\n");
 }
 
 void StatisticsGatherer::print_csv() {

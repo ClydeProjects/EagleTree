@@ -49,7 +49,8 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	application_io_id(application_io_id_generator++),
 	garbage_collection_op(false),
 	mapping_op(false),
-	original_application_io(false)
+	original_application_io(false),
+	age_class(0)
 {
 	assert(start_time >= 0.0);
 	if (VIRTUAL_PAGE_SIZE == 1)

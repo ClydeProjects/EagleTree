@@ -173,7 +173,7 @@ uint NUMBER_OF_ADDRESSABLE_BLOCKS = 0;
 uint RAID_NUMBER_OF_PHYSICAL_SSDS = 0;
 
 /* Controls the block manager to be used. */
-int BLOCK_MANAGER_ID = 3;
+int BLOCK_MANAGER_ID = 2;
 bool GREEDY_GC = true;
 
 /* PRINT_LEVEL:

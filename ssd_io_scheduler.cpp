@@ -443,9 +443,6 @@ void IOScheduler::print_stats() {
 }
 
 void IOScheduler::init_event(Event* event) {
-	if (event->get_id() == 245) {
-		event->print();
-	}
 	uint dep_code = event->get_application_io_id();
 	if (event->get_event_type() == READ) {
 		event->set_event_type(READ_COMMAND);
