@@ -473,12 +473,19 @@ void IOScheduler::init_event(Event* event) {
 			migrations.pop_back();
 			Event * first = migration.front();
 			migration.pop_front();
-			dependencies[first->get_application_io_id()] = migration;
-			dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
-			dependency_code_to_type[first->get_application_io_id()] = WRITE;
-			init_event(first);
+			if (first->get_event_type() == COPY_BACK) { // A single copy-back command
+				init_event(first);
+			} else { // A write preceded by a read
+				dependencies[first->get_application_io_id()] = migration;
+				dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
+				dependency_code_to_type[first->get_application_io_id()] = WRITE;
+				init_event(first);
+			}
 		}
 		delete event;
+	}
+	else if (event->get_event_type() == COPY_BACK) {
+		current_events.push_back(event);
 	}
 	else if (event->get_event_type() == ERASE) {
 		current_events.push_back(event);
