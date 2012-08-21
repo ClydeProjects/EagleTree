@@ -5,8 +5,8 @@
  *      Author: niv
  */
 
-#include "ssd.h"
-#include "MTRand/mtrand.h"
+#include "../ssd.h"
+#include "../MTRand/mtrand.h"
 
 using namespace ssd;
 
@@ -62,6 +62,7 @@ void Synchronous_Sequential_Thread::handle_event_completion(Event* event) {
 		//StateTracer::print();
 		if (--number_of_times_to_repeat == 0) {
 			finished = true;
+			StateTracer::print();
 		}
 	}
 }

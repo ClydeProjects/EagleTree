@@ -43,7 +43,7 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	logical_address(logical_address),
 	size(size),
 	payload(NULL),
-	next(NULL),
+	//next(NULL),
 	noop(false),
 	id(id_generator++),
 	application_io_id(application_io_id_generator++),
@@ -61,48 +61,6 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 }
 
 Event::Event() : type(NOT_VALID) {}
-
-/*
-Event::Event(enum event_type type, ulong logical_address, uint size, double start_time, uint hi)
-{
-	Event(type, logical_address, size, start_time);
-	application_io_id = hi;
-	assert(start_time >= 0.0);
-}*/
-
-Event::~Event(void)
-{
-}
-
-/* find the last event in the list to finish and use that event's finish time
- * 	to calculate time_taken
- * add bus_wait_time for all events in the list to bus_wait_time
- * all events in the list do not need to start at the same time
- * bus_wait_time can potentially exceed time_taken with long event lists
- * 	because bus_wait_time is a sum while time_taken is a max
- * be careful to only call this method once when the metaevent is finished */
-void Event::consolidate_metaevent(Event &list)
-{
-	Event *cur;
-	double max;
-	double tmp;
-
-	assert(start_time >= 0);
-
-	/* find max time taken with respect to this event's start_time */
-	max = start_time - list.start_time + list.time_taken;
-	for(cur = list.next; cur != NULL; cur = cur -> next)
-	{
-		tmp = start_time - cur -> start_time + cur -> time_taken;
-		if(tmp > max)
-			max = tmp;
-		bus_wait_time += cur -> get_bus_wait_time();
-	}
-	time_taken = max;
-
-	assert(time_taken >= 0);
-	assert(bus_wait_time >= 0);
-}
 
 ulong Event::get_logical_address(void) const
 {
@@ -185,11 +143,6 @@ bool Event::get_noop(void) const
 	return noop;
 }
 
-Event *Event::get_next(void) const
-{
-	return next;
-}
-
 void Event::set_payload(void *payload)
 {
 	this->payload = payload;
@@ -203,11 +156,7 @@ void *Event::get_payload(void) const
 void Event::set_address(const Address &address)
 {
 	if (type == WRITE || type == READ || type == READ_COMMAND || type == READ_TRANSFER) {
-		if (address.valid != PAGE) {
-			int i = 0;
-			i++;
-		}
-		//assert(address.valid == PAGE);
+		assert(address.valid == PAGE);
 	}
 	this -> address = address;
 }
@@ -266,11 +215,6 @@ bool Event::is_mapping_op() const {
 void Event::set_start_time(double value) {
 	assert(value > 0);
 	start_time = value;
-}
-
-void Event::set_next(Event &next)
-{
-	this -> next = &next;
 }
 
 double Event::incr_bus_wait_time(double time_incr)

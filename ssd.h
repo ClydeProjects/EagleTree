@@ -210,7 +210,7 @@ enum block_state{FREE, PARTIALLY_FREE, ACTIVE, INACTIVE};
  * 	                                page states set to empty)
  * 	merge - move valid pages from block at address (page state set to invalid)
  * 	           to free pages in block at merge_address */
-enum event_type{NOT_VALID, READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, MERGE, TRIM, GARBAGE_COLLECTION};
+enum event_type{NOT_VALID, READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, MERGE, TRIM, GARBAGE_COLLECTION, COPY_BACK};
 
 /* General return status
  * return status for simulator operations that only need to provide general
@@ -407,8 +407,7 @@ class Event
 public:
 	Event(enum event_type type, ulong logical_address, uint size, double start_time);
 	Event();
-	~Event(void);
-	void consolidate_metaevent(Event &list);
+	~Event() {}
 	ulong get_logical_address(void) const;
 	const Address &get_address(void) const;
 	const Address &get_merge_address(void) const;
@@ -425,12 +424,10 @@ public:
 	double get_bus_wait_time(void) const;
 	bool get_noop(void) const;
 	uint get_id(void) const;
-	Event *get_next(void) const;
 	void set_address(const Address &address);
 	void set_merge_address(const Address &address);
 	void set_log_address(const Address &address);
 	void set_replace_address(const Address &address);
-	void set_next(Event &next);
 	void set_start_time(double start_time);
 	void set_payload(void *payload);
 	void set_event_type(const enum event_type &type);
@@ -455,12 +452,11 @@ private:
 
 	ulong logical_address;
 	Address address;
-	Address merge_address;
-	Address log_address;
 	Address replace_address;
+	Address merge_address; // Deprecated
+	Address log_address;   // Deprecated
 	uint size;
 	void *payload;
-	Event *next;
 	bool noop;
 
 	bool garbage_collection_op;
@@ -624,11 +620,9 @@ public:
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	enum status replace(Event &event);
-	enum status _merge(Event &event);
 	const Die &get_parent(void) const;
 	double get_last_erase_time(const Address &address) const;
 	ulong get_erases_remaining(const Address &address) const;
-	void get_least_worn(Address &address) const;
 	uint get_size(void) const;
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
@@ -644,7 +638,6 @@ private:
 	uint size;
 	Block * const data;
 	const Die &parent;
-	uint least_worn;
 	ulong erases_remaining;
 	double last_erase_time;
 	double reg_read_delay;
@@ -664,12 +657,9 @@ public:
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	enum status replace(Event &event);
-	enum status merge(Event &event);
-	enum status _merge(Event &event);
 	const Package &get_parent(void) const;
 	double get_last_erase_time(const Address &address) const;
 	ulong get_erases_remaining(const Address &address) const;
-	void get_least_worn(Address &address) const;
 	double get_currently_executing_io_finish_time();
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
@@ -709,11 +699,9 @@ public:
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	enum status replace(Event &event);
-	enum status merge(Event &event);
 	const Ssd &get_parent(void) const;
 	double get_last_erase_time (const Address &address) const;
 	ulong get_erases_remaining (const Address &address) const;
-	void get_least_worn (Address &address) const;
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
 	void get_free_page(Address &address) const;
@@ -883,7 +871,7 @@ public:
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write) = 0;
+	virtual Address write(Event const& write) = 0;
 	virtual void register_write_arrival(Event const& write);
 	virtual void trim(Event const& write);
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
@@ -914,8 +902,9 @@ protected:
 	Ssd& ssd;
 	FtlParent& ftl;
 	vector<vector<Address> > free_block_pointers;
-private:
 
+	map<Address, int> page_copyback_count; // Pages that have experienced a copy-back, mapped to a count of the number of copy-backs
+private:
 	Block* choose_gc_victim(vector<long> candidates) const;
 	void update_blocks_with_min_age(uint age);
 	uint sort_into_age_class(Address const& address);
@@ -941,12 +930,10 @@ private:
 class Block_manager_parallel : public Block_manager_parent {
 public:
 	Block_manager_parallel(Ssd& ssd, FtlParent& ftl);
-	~Block_manager_parallel();
+	~Block_manager_parallel() {}
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
-	pair<double, Address> write(Event const& write);
-private:
-	bool has_free_pages(uint package_id, uint die_id) const;
+	Address write(Event const& write);
 };
 
 // A simple BM that assigns writes sequentially to dies in a round-robin fashion. No hot-cold separation or anything else intelligent
@@ -956,9 +943,8 @@ public:
 	~Block_manager_roundrobin();
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
-	pair<double, Address> write(Event const& write);
+	Address write(Event const& write);
 private:
-	bool has_free_pages(uint package_id, uint die_id) const;
 	void move_address_cursor();
 	Address address_cursor;
 	bool channel_alternation;
@@ -972,7 +958,7 @@ public:
 	void register_write_outcome(Event const& event, enum status status);
 	void register_read_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
-	pair<double, Address> write(Event const& write);
+	Address write(Event const& write);
 protected:
 	void check_if_should_trigger_more_GC(double start_time);
 private:
@@ -987,11 +973,11 @@ private:
 class Block_manager_parallel_wearwolf : public Block_manager_parent {
 public:
 	Block_manager_parallel_wearwolf(Ssd& ssd, FtlParent& ftl);
-	~Block_manager_parallel_wearwolf();
+	~Block_manager_parallel_wearwolf() {}
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual pair<double, Address> write(Event const& write);
+	virtual Address write(Event const& write);
 
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
@@ -1024,16 +1010,12 @@ public:
 	typedef ulong logical_address;
 	Sequential_Pattern_Detector(uint threshold);
 	~Sequential_Pattern_Detector();
-
-
-
 	sequential_writes_tracking const& register_event(logical_address lb, double time);
 	int get_sequential_write_id(logical_address lb);
 	int get_current_offset(logical_address lb);
 	int get_num_times_pattern_has_repeated(logical_address lb);
 	double get_arrival_time_of_last_io_in_pattern(logical_address lb);
 	void set_listener(Sequential_Pattern_Detector_Listener * listener);
-
 private:
 	map<logical_address, logical_address> sequential_writes_key_lookup;  // a map from the next expected LBA in a seqeuntial pattern to the first LBA, which is the key
 	map<logical_address, sequential_writes_tracking*> sequential_writes_identification_and_data;	// a map from the first logical write of a sequential pattern to metadata about the pattern
@@ -1053,7 +1035,7 @@ public:
 	Block_manager_parallel_wearwolf_locality(Ssd& ssd, FtlParent& ftl);
 	~Block_manager_parallel_wearwolf_locality();
 	void register_write_arrival(Event const& write);
-	pair<double, Address> write(Event const& write);
+	Address write(Event const& write);
 
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
@@ -1067,87 +1049,19 @@ private:
 	struct sequential_writes_pointers {
 		int num_pointers;
 		vector<vector<Address> > pointers;
+		uint cursor;
 		sequential_writes_pointers();
 	};
 
 	map<long, sequential_writes_pointers> seq_write_key_to_pointers_mapping;
 
 	void set_pointers_for_sequential_write(long key, double time);
-	pair<double, Address> perform_sequential_write(long key, double time);
+	Address perform_sequential_write(long key);
 
 	Sequential_Pattern_Detector* detector;
-	//Sequential_Pattern_Detector* recorder;
-};
 
-class Block_manager
-{
-public:
-	Block_manager(FtlParent *ftl);
-	~Block_manager(void);
-
-	// Usual suspects
-	Address get_free_block(Event &event);
-	Address get_free_block(block_type btype, Event &event);
-	void invalidate(Address address, block_type btype);
-	void print_statistics();
-	void insert_events(Event &event);
-	void promote_block(block_type to_type);
-	bool is_log_full();
-	void erase_and_invalidate(Event &event, Address &address, block_type btype);
-	int get_num_free_blocks();
-
-	// Used to update GC on used pages in blocks.
-	void update_block(Block * b);
-
-	// Singleton
-	static Block_manager *instance();
-	static void instance_initialize(FtlParent *ftl);
-	static Block_manager *inst;
-
-	void cost_insert(Block *b);
-	void print_cost_status();
-private:
-	void get_page_block(Address &address, Event &event);
-	static bool block_comparitor_simple (Block const *x,Block const *y);
-
-	FtlParent *ftl;
-
-	ulong data_active;
-	ulong log_active;
-	ulong logseq_active;
-
-	ulong max_log_blocks;
-	ulong max_blocks;
-
-	ulong max_map_pages;
-	ulong map_space_capacity;
-
-	// Cost/Benefit priority queue.
-	typedef boost::multi_index_container<
-			Block*,
-			boost::multi_index::indexed_by<
-				boost::multi_index::random_access<>,
-				boost::multi_index::ordered_non_unique<BOOST_MULTI_INDEX_MEMBER(Block,uint,pages_invalid) >
-		  >
-		> active_set;
-
-	typedef active_set::nth_index<0>::type ActiveBySeq;
-	typedef active_set::nth_index<1>::type ActiveByCost;
-	active_set active_cost;
-	// Usual block lists
-	vector<Block*> active_list;
-	vector<Block*> free_list;
-	vector<Block*> invalid_list;
-	// Counter for returning the next free page.
-	ulong directoryCurrentPage;
-	// Address on the current cached page in SRAM.
-	ulong directoryCachedPage;
-	ulong simpleCurrentFree;
-	// Counter for handling periodic sort of active_list
-	uint num_insert_events;
-	uint current_writing_block;
-	bool inited;
-	bool out_of_blocks;
+	enum strategy {SHOREST_QUEUE, ROUND_ROBIN};
+	strategy strat;
 };
 
 class IOScheduler {
@@ -1228,7 +1142,6 @@ public:
 	friend class Block_manager_parallel;
 
 	ulong get_erases_remaining(const Address &address) const;
-	void get_least_worn(Address &address) const;
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
@@ -1491,10 +1404,9 @@ public:
 	void print_ftl_statistics();
 	FtlParent &get_ftl(void) const;
 private:
-	enum status issue(Event &event_list);
+	enum status issue(Event *event);
 	void translate_address(Address &address);
 	ulong get_erases_remaining(const Address &address) const;
-	void get_least_worn(Address &address) const;
 	double get_last_erase_time(const Address &address) const;
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
@@ -1531,12 +1443,9 @@ private:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	enum status merge(Event &event);
 	enum status replace(Event &event);
-	enum status merge_replacement_block(Event &event);
 	ulong get_erases_remaining(const Address &address) const;
 	void update_wear_stats(const Address &address);
-	void get_least_worn(Address &address) const;
 	double get_last_erase_time(const Address &address) const;	
 	Package &get_data(void);
 	enum page_state get_state(const Address &address) const;
@@ -1774,6 +1683,77 @@ private:
 	int currently_pending_ios_counter;
 	double last_dispatched_event_minimal_finish_time;
 };
+
+/*class Block_manager
+{
+public:
+	Block_manager(FtlParent *ftl);
+	~Block_manager(void);
+
+	// Usual suspects
+	Address get_free_block(Event &event);
+	Address get_free_block(block_type btype, Event &event);
+	void invalidate(Address address, block_type btype);
+	void print_statistics();
+	void insert_events(Event &event);
+	void promote_block(block_type to_type);
+	bool is_log_full();
+	void erase_and_invalidate(Event &event, Address &address, block_type btype);
+	int get_num_free_blocks();
+
+	// Used to update GC on used pages in blocks.
+	void update_block(Block * b);
+
+	// Singleton
+	static Block_manager *instance();
+	static void instance_initialize(FtlParent *ftl);
+	static Block_manager *inst;
+
+	void cost_insert(Block *b);
+	void print_cost_status();
+private:
+	void get_page_block(Address &address, Event &event);
+	static bool block_comparitor_simple (Block const *x,Block const *y);
+
+	FtlParent *ftl;
+
+	ulong data_active;
+	ulong log_active;
+	ulong logseq_active;
+
+	ulong max_log_blocks;
+	ulong max_blocks;
+
+	ulong max_map_pages;
+	ulong map_space_capacity;
+
+	// Cost/Benefit priority queue.
+	typedef boost::multi_index_container<
+			Block*,
+			boost::multi_index::indexed_by<
+				boost::multi_index::random_access<>,
+				boost::multi_index::ordered_non_unique<BOOST_MULTI_INDEX_MEMBER(Block,uint,pages_invalid) >
+		  >
+		> active_set;
+
+	typedef active_set::nth_index<0>::type ActiveBySeq;
+	typedef active_set::nth_index<1>::type ActiveByCost;
+	active_set active_cost;
+	// Usual block lists
+	vector<Block*> active_list;
+	vector<Block*> free_list;
+	vector<Block*> invalid_list;
+	// Counter for returning the next free page.
+	ulong directoryCurrentPage;
+	// Address on the current cached page in SRAM.
+	ulong directoryCachedPage;
+	ulong simpleCurrentFree;
+	// Counter for handling periodic sort of active_list
+	uint num_insert_events;
+	uint current_writing_block;
+	bool inited;
+	bool out_of_blocks;
+};*/
 
 } /* end namespace ssd */
 

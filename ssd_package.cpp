@@ -110,12 +110,6 @@ enum status Package::erase(Event &event)
 	return status;
 }
 
-enum status Package::merge(Event &event)
-{
-	assert(data != NULL && event.get_address().die < size && event.get_address().valid > PACKAGE);
-	return data[event.get_address().die].merge(event);
-}
-
 const Ssd &Package::get_parent(void) const
 {
 	return parent;
@@ -161,16 +155,6 @@ void Package::update_wear_stats(const Address &address)
 	least_worn = max_index;
 	erases_remaining = max;
 	last_erase_time = data[max_index].get_last_erase_time(address);
-	return;
-}
-
-/* update given address -> package to least worn package */
-void Package::get_least_worn(Address &address) const
-{
-	assert(least_worn < size);
-	address.die = least_worn;
-	address.valid = DIE;
-	data[least_worn].get_least_worn(address);
 	return;
 }
 

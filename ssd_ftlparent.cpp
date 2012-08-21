@@ -25,13 +25,9 @@
 
 using namespace ssd;
 
-// Initialization of the block layer.
-Block_manager *Block_manager::inst = NULL;
-
 
 FtlParent::FtlParent(Controller &controller) : controller(controller)
 {
-	//Block_manager::instance_initialize(this);
 	printf("Number of addressable blocks: %u\n", NUMBER_OF_ADDRESSABLE_BLOCKS);
 }
 
@@ -39,12 +35,6 @@ FtlParent::FtlParent(Controller &controller) : controller(controller)
 ulong FtlParent::get_erases_remaining(const Address &address) const
 {
 	return controller.get_erases_remaining(address);
-}
-
-void FtlParent::get_least_worn(Address &address) const
-{
-	controller.get_least_worn(address);
-	return;
 }
 
 enum page_state FtlParent::get_state(const Address &address) const
