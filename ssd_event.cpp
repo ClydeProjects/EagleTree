@@ -61,18 +61,6 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 
 Event::Event() : type(NOT_VALID) {}
 
-/*
-Event::Event(enum event_type type, ulong logical_address, uint size, double start_time, uint hi)
-{
-	Event(type, logical_address, size, start_time);
-	application_io_id = hi;
-	assert(start_time >= 0.0);
-}*/
-
-Event::~Event(void)
-{
-}
-
 ulong Event::get_logical_address(void) const
 {
 	return logical_address;
@@ -167,11 +155,7 @@ void *Event::get_payload(void) const
 void Event::set_address(const Address &address)
 {
 	if (type == WRITE || type == READ || type == READ_COMMAND || type == READ_TRANSFER) {
-		if (address.valid != PAGE) {
-			int i = 0;
-			i++;
-		}
-		//assert(address.valid == PAGE);
+		assert(address.valid == PAGE);
 	}
 	this -> address = address;
 }

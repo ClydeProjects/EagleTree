@@ -407,7 +407,7 @@ class Event
 public:
 	Event(enum event_type type, ulong logical_address, uint size, double start_time);
 	Event();
-	~Event(void);
+	~Event() {}
 	ulong get_logical_address(void) const;
 	const Address &get_address(void) const;
 	const Address &get_merge_address(void) const;
@@ -620,7 +620,6 @@ public:
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	enum status replace(Event &event);
-	enum status _merge(Event &event);
 	const Die &get_parent(void) const;
 	double get_last_erase_time(const Address &address) const;
 	ulong get_erases_remaining(const Address &address) const;
@@ -660,8 +659,6 @@ public:
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	enum status replace(Event &event);
-	enum status merge(Event &event);
-	enum status _merge(Event &event);
 	const Package &get_parent(void) const;
 	double get_last_erase_time(const Address &address) const;
 	ulong get_erases_remaining(const Address &address) const;
@@ -705,7 +702,6 @@ public:
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	enum status replace(Event &event);
-	enum status merge(Event &event);
 	const Ssd &get_parent(void) const;
 	double get_last_erase_time (const Address &address) const;
 	ulong get_erases_remaining (const Address &address) const;
@@ -1448,7 +1444,6 @@ private:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	enum status merge(Event &event);
 	enum status replace(Event &event);
 	enum status merge_replacement_block(Event &event);
 	ulong get_erases_remaining(const Address &address) const;

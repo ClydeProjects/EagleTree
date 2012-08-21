@@ -258,12 +258,6 @@ enum status Ssd::erase(Event &event)
 	return status;
 }
 
-enum status Ssd::merge(Event &event)
-{
-	assert(data != NULL && event.get_address().package < size && event.get_address().valid >= PACKAGE);
-	return data[event.get_address().package].merge(event);
-}
-
 enum status Ssd::merge_replacement_block(Event &event)
 {
 	//assert(data != NULL && event.get_address().package < size && event.get_address().valid >= PACKAGE && event.get_log_address().valid >= PACKAGE);
