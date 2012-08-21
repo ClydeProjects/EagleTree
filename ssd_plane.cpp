@@ -40,9 +40,6 @@ Plane::Plane(const Die &parent, uint plane_size, double reg_read_delay, double r
 
 	parent(parent),
 
-	/* assume all Blocks are same so first one can start as least worn */
-	least_worn(0),
-
 	/* set erases remaining to BLOCK_ERASES to match Block constructor args */
 	erases_remaining(BLOCK_ERASES),
 
@@ -205,18 +202,8 @@ void Plane::update_wear_stats(void)
 	for(i = 1; i < size; i++)
 		if(data[i].get_erases_remaining() > max)
 			max_index = i;
-	least_worn = max_index;
 	erases_remaining = max;
 	last_erase_time = data[max_index].get_last_erase_time();
-	return;
-}
-
-/* update given address.block to least worn block */
-void Plane::get_least_worn(Address &address) const
-{
-	assert(least_worn < size);
-	address.block = least_worn;
-	address.valid = BLOCK;
 	return;
 }
 

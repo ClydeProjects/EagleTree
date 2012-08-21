@@ -623,7 +623,6 @@ public:
 	const Die &get_parent(void) const;
 	double get_last_erase_time(const Address &address) const;
 	ulong get_erases_remaining(const Address &address) const;
-	void get_least_worn(Address &address) const;
 	uint get_size(void) const;
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
@@ -639,7 +638,6 @@ private:
 	uint size;
 	Block * const data;
 	const Die &parent;
-	uint least_worn;
 	ulong erases_remaining;
 	double last_erase_time;
 	double reg_read_delay;
@@ -662,7 +660,6 @@ public:
 	const Package &get_parent(void) const;
 	double get_last_erase_time(const Address &address) const;
 	ulong get_erases_remaining(const Address &address) const;
-	void get_least_worn(Address &address) const;
 	double get_currently_executing_io_finish_time();
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
@@ -705,7 +702,6 @@ public:
 	const Ssd &get_parent(void) const;
 	double get_last_erase_time (const Address &address) const;
 	ulong get_erases_remaining (const Address &address) const;
-	void get_least_worn (Address &address) const;
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
 	void get_free_page(Address &address) const;
@@ -1141,7 +1137,6 @@ public:
 	friend class Block_manager_parallel;
 
 	ulong get_erases_remaining(const Address &address) const;
-	void get_least_worn(Address &address) const;
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
@@ -1407,7 +1402,6 @@ private:
 	enum status issue(Event *event);
 	void translate_address(Address &address);
 	ulong get_erases_remaining(const Address &address) const;
-	void get_least_worn(Address &address) const;
 	double get_last_erase_time(const Address &address) const;
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
@@ -1445,10 +1439,8 @@ private:
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	enum status replace(Event &event);
-	enum status merge_replacement_block(Event &event);
 	ulong get_erases_remaining(const Address &address) const;
 	void update_wear_stats(const Address &address);
-	void get_least_worn(Address &address) const;
 	double get_last_erase_time(const Address &address) const;	
 	Package &get_data(void);
 	enum page_state get_state(const Address &address) const;

@@ -258,12 +258,6 @@ enum status Ssd::erase(Event &event)
 	return status;
 }
 
-enum status Ssd::merge_replacement_block(Event &event)
-{
-	//assert(data != NULL && event.get_address().package < size && event.get_address().valid >= PACKAGE && event.get_log_address().valid >= PACKAGE);
-	return SUCCESS;
-}
-
 /* add up the erases remaining for all packages in the ssd*/
 ulong Ssd::get_erases_remaining(const Address &address) const
 {
@@ -286,15 +280,6 @@ void Ssd::update_wear_stats(const Address &address)
 	least_worn = max_index;
 	erases_remaining = max;
 	last_erase_time = data[max_index].get_last_erase_time(address);
-	return;
-}
-
-void Ssd::get_least_worn(Address &address) const
-{
-	assert(data != NULL && least_worn < size);
-	address.package = least_worn;
-	address.valid = PACKAGE;
-	data[least_worn].get_least_worn(address);
 	return;
 }
 

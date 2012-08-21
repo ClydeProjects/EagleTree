@@ -138,12 +138,6 @@ ulong Controller::get_erases_remaining(const Address &address) const
 	return ssd.get_erases_remaining(address);
 }
 
-void Controller::get_least_worn(Address &address) const
-{
-	assert(address.valid > NONE);
-	return ssd.get_least_worn(address);
-}
-
 double Controller::get_last_erase_time(const Address &address) const
 {
 	assert(address.valid > NONE);

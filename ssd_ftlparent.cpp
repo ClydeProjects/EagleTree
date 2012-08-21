@@ -37,12 +37,6 @@ ulong FtlParent::get_erases_remaining(const Address &address) const
 	return controller.get_erases_remaining(address);
 }
 
-void FtlParent::get_least_worn(Address &address) const
-{
-	controller.get_least_worn(address);
-	return;
-}
-
 enum page_state FtlParent::get_state(const Address &address) const
 {
 	return controller.get_state(address);

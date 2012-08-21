@@ -193,16 +193,6 @@ void Die::update_wear_stats(const Address &address)
 	return;
 }
 
-/* update given address -> die to least worn die */
-void Die::get_least_worn(Address &address) const
-{
-	assert(data != NULL && least_worn < size);
-	address.plane = least_worn;
-	address.valid = PLANE;
-	data[least_worn].get_least_worn(address);
-	return;
-}
-
 enum page_state Die::get_state(const Address &address) const
 {  
 	assert(data != NULL && address.plane < size && address.valid >= DIE);

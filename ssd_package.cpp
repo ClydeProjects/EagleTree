@@ -158,16 +158,6 @@ void Package::update_wear_stats(const Address &address)
 	return;
 }
 
-/* update given address -> package to least worn package */
-void Package::get_least_worn(Address &address) const
-{
-	assert(least_worn < size);
-	address.die = least_worn;
-	address.valid = DIE;
-	data[least_worn].get_least_worn(address);
-	return;
-}
-
 enum page_state Package::get_state(const Address &address) const
 {
 	assert(data != NULL && address.die < size && address.valid >= PACKAGE);
