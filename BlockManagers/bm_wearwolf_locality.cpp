@@ -45,12 +45,6 @@ Address Block_manager_parallel_wearwolf_locality::write(Event const& event) {
 	ulong lb = event.get_logical_address();
 	long key = detector->get_sequential_write_id(lb);
 	bool key_exists = seq_write_key_to_pointers_mapping.count(key) == 1;
-
-	if (event.get_id() == 36) {
-		int i = 0;
-		i++;
-	}
-
 	if (!key_exists  || (key_exists && seq_write_key_to_pointers_mapping[key].num_pointers == 0)) {
 		return Block_manager_parallel_wearwolf::write(event);
 	} else {

@@ -1652,6 +1652,85 @@ private:
 	bool can_start_next_read;
 };
 
+// This is a file manager that writes one file at a time sequentially
+// files might be fragmented across logical space
+// files have a random size determined by the file manager
+// fragmentation will eventually happen
+class File_Manager : public Thread
+{
+public:
+	File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, double time_breaks = 10, ulong randseed = 0);
+	Event* issue_next_io();
+	void handle_event_completion(Event* event);
+private:
+
+	struct Address_Range {
+		long min;
+		long max;
+		Address_Range(long min, long max);
+		//Address_Range(long min, long max) : min(min), max(max) { assert( min <= max); }
+		long get_size() { return max - min + 1; }
+		long get_min() { return min; }
+		long get_max() { return max; }
+		Address_Range split(long num_pages_in_new_part) {
+			Address_Range new_range(min, min + num_pages_in_new_part - 1);
+			min += num_pages_in_new_part;
+			return new_range;
+		}
+		bool is_contiguously_followed_by(Address_Range other) const;
+		bool is_followed_by(Address_Range other) const;
+		void merge(Address_Range other);
+	};
+
+	struct File {
+		const uint lifetime_token;
+		double time_finished;
+		static int file_id_generator;
+		const uint size;
+		int file_id;
+		uint num_pages_written;
+		vector<Address_Range > ranges_comprising_file;
+		Address_Range current_range_being_written;
+		set<long> logical_addresses_to_be_written_in_current_range;
+		int num_pages_allocated_so_far;
+
+		File(uint size, uint lifetime_token);
+
+		long get_num_pages_left_to_write() const;
+		uint get_lifetime_token() const;
+		bool needs_new_range() const;
+		bool is_finished() const;
+		vector<Address_Range > get_address_ranges() const {
+			return ranges_comprising_file;
+		}
+		long get_size();
+		long get_next_lba_to_be_written();
+		void register_new_range(Address_Range range);
+		void register_write_completion();
+		void finish(double time_finished);
+		bool has_issued_last_io();
+	};
+
+	void schedule_to_trim_file(File* file);
+	void write_next_file();
+	void assign_new_range();
+	void delete_some_file();
+	Event* issue_trim();
+	Event* issue_write();
+	void reclaim_file_space(File* file);
+
+	long num_free_pages;
+	vector<Address_Range> free_ranges;
+	vector<File*> files;
+	File* current_file;
+	long min_LBA, max_LBA;
+	int num_files_to_write;
+	MTRand_int32 random_number_generator;
+	MTRand_open double_generator;
+	double time_breaks;
+	set<long> addresses_to_trim;
+};
+
 class OperatingSystem
 {
 public:
