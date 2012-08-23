@@ -116,7 +116,6 @@ void IOScheduler::execute_current_waiting_ios() {
 	vector<Event*> gc_writes;
 	vector<Event*> writes;
 	vector<Event*> erases;
-	vector<Event*> trims;
 	vector<Event*> noop_events;
 	while (events.size() > 0) {
 		Event * event = events.back();
@@ -141,7 +140,6 @@ void IOScheduler::execute_current_waiting_ios() {
 			erases.push_back(event);
 		}
 		else if (type == TRIM) {
-			ftl.set_replace_address(*event);
 			handle_finished_event(event, SUCCESS);
 		}
 	}
@@ -416,7 +414,6 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		assert(false); // events should not fail at this point. Any failure indicates application error
 	}
 
-
 	VisualTracer::get_instance()->register_completed_event(*event);
 	if (event->get_event_type() == WRITE) {
 		ftl.register_write_completion(*event, outcome);
@@ -465,6 +462,10 @@ void IOScheduler::init_event(Event* event) {
 		ftl.set_replace_address(*event);
 		current_events.push_back(event);
 		remove_redundant_events(event);
+	}
+	else if (event->get_event_type() == TRIM) {
+		ftl.set_replace_address(*event);
+		current_events.push_back(event);
 	}
 	else if (event->get_event_type() == GARBAGE_COLLECTION) {
 		vector<deque<Event*> > migrations = bm->migrate(event);
