@@ -1670,10 +1670,7 @@ private:
 		long min;
 		long max;
 		Address_Range(long min, long max);
-		//Address_Range(long min, long max) : min(min), max(max) { assert( min <= max); }
 		long get_size() { return max - min + 1; }
-		long get_min() { return min; }
-		long get_max() { return max; }
 		Address_Range split(long num_pages_in_new_part) {
 			Address_Range new_range(min, min + num_pages_in_new_part - 1);
 			min += num_pages_in_new_part;
@@ -1685,7 +1682,7 @@ private:
 	};
 
 	struct File {
-		const uint lifetime_token;
+		const double death_probability;
 		double time_finished;
 		static int file_id_generator;
 		const uint size;
@@ -1696,16 +1693,14 @@ private:
 		set<long> logical_addresses_to_be_written_in_current_range;
 		int num_pages_allocated_so_far;
 
-		File(uint size, uint lifetime_token);
+		File(uint size, double death_probability);
 
 		long get_num_pages_left_to_write() const;
-		uint get_lifetime_token() const;
 		bool needs_new_range() const;
 		bool is_finished() const;
 		vector<Address_Range > get_address_ranges() const {
 			return ranges_comprising_file;
 		}
-		long get_size();
 		long get_next_lba_to_be_written();
 		void register_new_range(Address_Range range);
 		void register_write_completion();
@@ -1720,6 +1715,7 @@ private:
 	Event* issue_trim();
 	Event* issue_write();
 	void reclaim_file_space(File* file);
+	void delete_file(File* victim);
 
 	long num_free_pages;
 	vector<Address_Range> free_ranges;

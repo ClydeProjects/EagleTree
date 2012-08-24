@@ -70,7 +70,7 @@ void experiement2() {
 
 void file_manager_experiment() {
 	vector<Thread*> threads;
-	Thread* fm = new File_Manager(0, 800, 10, 10, 1);
+	Thread* fm = new File_Manager(0, 800, 20, 10, 1);
 	threads.push_back(fm);
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
