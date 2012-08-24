@@ -43,7 +43,7 @@ void experiement1() {
 }
 
 void experiement2() {
-	vector<Thread*> threads;
+
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, 50, 1, WRITE, 17);
 	Thread* t2 = new Asynchronous_Sequential_Thread(200, 250, 1, WRITE, 17);
 	Thread* t3 = new Asynchronous_Sequential_Thread(400, 450, 1, WRITE, 17);
@@ -54,6 +54,7 @@ void experiement2() {
 	//t3->add_follow_up_thread(new Asynchronous_Random_Thread(400, 599, 1000, 3, WRITE, 100, 3));
 	//t4->add_follow_up_thread(new Asynchronous_Random_Thread(600, 799, 1000, 4, WRITE, 100, 4));
 
+	vector<Thread*> threads;
 	threads.push_back(t1);
 	threads.push_back(t2);
 	threads.push_back(t3);
@@ -62,6 +63,17 @@ void experiement2() {
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
 
+	VisualTracer::get_instance()->print_horizontally_with_breaks();
+	StateTracer::print();
+	delete os;
+}
+
+void file_manager_experiment() {
+	vector<Thread*> threads;
+	Thread* fm = new File_Manager(0, 800, 20, 10, 1);
+	threads.push_back(fm);
+	OperatingSystem* os = new OperatingSystem(threads);
+	os->run();
 	VisualTracer::get_instance()->print_horizontally_with_breaks();
 	StateTracer::print();
 	delete os;
@@ -119,7 +131,7 @@ int main()
 	//getchar();
 	printf("\n");
 
-	experiement2();
+	file_manager_experiment();
 
 	// this experiment already shows huge disparity
 

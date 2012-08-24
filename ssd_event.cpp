@@ -258,7 +258,7 @@ void Event::print(FILE *stream) const
 	address.print(stream);
 	if(type == MERGE)
 		merge_address.print(stream);
-	if(type == WRITE)
+	if(type == WRITE || type == TRIM)
 		replace_address.print(stream);
 	fprintf(stream, " Time[%d, %d, %d]", (int)start_time, (int)(start_time + time_taken), (int)bus_wait_time);
 	fprintf(stream, " ID: %d ", id);
