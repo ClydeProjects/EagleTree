@@ -89,8 +89,8 @@ void FtlImpl_Dftl::register_trim_completion(Event & event) {
 	MPage current = trans_map[dlpn];
 	if (current.ppn != -1)
 	{
-		Address address = Address(current.ppn, PAGE);
-		evict_specific_page_from_cache(&event, dlpn);
+		remove_from_cache(dlpn);
+		update_mapping_on_flash(dlpn, event.get_current_time());
 		current.ppn = -1;
 		trans_map.replace(trans_map.begin()+dlpn, current);
 	}
@@ -136,8 +136,6 @@ void FtlImpl_Dftl::register_write_completion(Event const& event, enum status res
 	current.ppn = event.get_address().get_linear_address();
 	reverse_trans_map[current.ppn] = current.vpn;
 	trans_map.replace(trans_map.begin() + event.get_logical_address(), current);
-
-
 }
 
 
@@ -171,7 +169,7 @@ void FtlImpl_Dftl::set_replace_address(Event& event) const {
 // to ensure that the address has not been changed by GC in the meanwhile
 void FtlImpl_Dftl::set_read_address(Event& event) {
 	if (event.is_mapping_op()) {
-		assert(global_translation_directory.count(event.get_logical_address() == 1));
+		assert(global_translation_directory.count(event.get_logical_address()) == 1);
 		long physical_addr = global_translation_directory[event.get_logical_address()];
 		Address a = Address(physical_addr, PAGE);
 		event.set_address(a);

@@ -38,49 +38,28 @@ FtlImpl_Page::FtlImpl_Page(Controller &controller):
 }
 
 FtlImpl_Page::~FtlImpl_Page(void)
+{}
+
+void FtlImpl_Page::read(Event *event)
 {
-
-	return;
-}
-
-enum status FtlImpl_Page::read(Event *event)
-{
-	event.set_address(Address(0, PAGE));
-	event.set_noop(true);
-
 	controller.stats.numFTLRead++;
-
-	return controller.issue(event);
+	IOScheduler::instance()->schedule_event(event, event->get_logical_address(), READ);
 }
 
-enum status FtlImpl_Page::write(Event *event)
+void FtlImpl_Page::write(Event *event)
 {
-	event->set_address(Address(1, PAGE));
-	event->set_noop(true);
-
 	controller.stats.numFTLWrite++;
-
-	if (numPagesActive == NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE)
-	{
-		numPagesActive -= BLOCK_SIZE;
-
-		Event eraseEvent = Event(ERASE, event->get_logical_address(), 1, event->get_start_time());
-		eraseEvent.set_address(Address(0, PAGE));
-
-		if (controller.issue(eraseEvent) == FAILURE) printf("Erase failed");
-
-		event->incr_time_taken(eraseEvent.get_time_taken());
-
-		controller.stats.numFTLErase++;
-	}
-
-	numPagesActive++;
-
-
-	return controller.issue(event);
+	IOScheduler::instance()->schedule_event(event, event->get_logical_address(), WRITE);
 }
 
-enum status FtlImpl_Page::trim(Event *event)
+void FtlImpl_Page::trim(Event *event)
+{
+	IOScheduler::instance()->schedule_event(event, event->get_logical_address(), TRIM);
+}
+
+
+
+/*void FtlImpl_Page::trim(Event *event)
 {
 	controller.stats.numFTLTrim++;
 
@@ -117,3 +96,4 @@ enum status FtlImpl_Page::trim(Event *event)
 
 	return SUCCESS;
 }
+*/

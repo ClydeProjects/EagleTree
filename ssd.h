@@ -1254,8 +1254,8 @@ protected:
 		double create_ts;		//when its added to the CTM
 		double modified_ts;		//when its modified within the CTM
 		bool cached;
-
 		MPage(long vpn);
+		bool has_been_modified();
 	};
 
 	long int cmt;
@@ -1286,12 +1286,15 @@ protected:
 
 	bool lookup_CMT(long dlpn, Event *event);
 
-	void evict_page_from_cache( Event * event);
-	void evict_specific_page_from_cache(Event *event, long lba);
+	void evict_page_from_cache(double time);
 
 	long get_logical_address(uint physical_address) const;
 
 	long get_mapping_virtual_address(long event_lba);
+
+	void update_mapping_on_flash(long lba, double time);
+
+	void remove_from_cache(long lba);
 
 	// Mapping information
 	int addressSize;
@@ -1299,18 +1302,9 @@ protected:
 	int num_mapping_pages;
 	uint totalCMTentries;
 
-	// Current storage
-	long currentDataPage;
-	long currentTranslationPage;
-
 	deque<Event*> current_dependent_events;
 
 	map<long, long> global_translation_directory; // a map from virtual translation pages to physical translation pages
-
-	// Translation blocks, and mapping from logical translation pages to physical translation pages
-	//vector<Address> translationBlocks;
-	//map<ulong, Address> logicalToPhysicalTranslationPageMapping;
-	//Address compute_logical_translation_page(long logical_page_address);
 };
 
 class FtlImpl_Dftl : public FtlImpl_DftlParent
