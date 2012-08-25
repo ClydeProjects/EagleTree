@@ -203,7 +203,7 @@ File_Manager::File::File(uint size, double death_probability)
 	: death_probability(death_probability), size(size), file_id(file_id_generator++),
 	  num_pages_written(0), current_range_being_written(-1, -1), num_pages_allocated_so_far(0)
 {
-	printf("creating file: %d  %d   %d\n", file_id, size, death_probability);
+	printf("creating file: %d  %d   %f\n", file_id, size, death_probability);
 	assert(death_probability >= 0 && death_probability <= 1);
 	assert(size > 0);
 }

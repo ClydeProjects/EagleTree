@@ -67,12 +67,12 @@ FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
 	addressSize(log(NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE)/log(2)),
 	addressPerPage(PAGE_SIZE / ( (ceil(addressSize / 8.0) * 2) )),
 	num_mapping_pages(ceil((double)(NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE) / addressPerPage)),
-	global_translation_directory( )
+	global_translation_directory( ),
+	totalCMTentries(CACHE_DFTL_LIMIT * addressPerPage)
 {
 	//addressPerPage = 0;
 	cmt = 0;
 	printf("Total required bits for representation: Address size: %i Total per page: %i \n", addressSize, addressPerPage);
-	totalCMTentries = CACHE_DFTL_LIMIT * addressPerPage;
 	printf("Number of elements in Cached Mapping Table (CMT): %i\n", totalCMTentries);
 
 	// Initialise block mapping table.
@@ -90,15 +90,15 @@ FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
 void FtlImpl_DftlParent::consult_GTD(long dlpn, Event *event)
 {
 	long mapping_address = get_mapping_virtual_address(event->get_logical_address());
-	if (global_translation_directory.count(mapping_address) == 1 && ongoing_mapping_reads.count(mapping_address) == 0) {
+	if (num_pages_written > cmt && global_translation_directory.count(mapping_address) == 1 && ongoing_mapping_reads.count(mapping_address) == 0) {
 		Event* readEvent = new Event(READ, mapping_address, 1, event->get_start_time());
 		readEvent->set_mapping_op(true);
 		//readEvent->set_application_io_id(event->get_application_io_id());
-		if (readEvent->get_id() == 244 || readEvent->get_id() == 248) {
+		if (readEvent->get_id() == 244 || readEvent->get_id() == 246) {
 			int i = 0;
 			i++;
 		}
-		current_dependent_events.push_front(readEvent);
+		//current_dependent_events.push_front(readEvent);
 		controller.stats.numFTLRead++;
 		ongoing_mapping_reads[mapping_address].push_back(event->get_logical_address());
 	}
@@ -192,16 +192,18 @@ void FtlImpl_DftlParent::update_mapping_on_flash(long lba, double time) {
 	long virtual_mapping_page_address = get_mapping_virtual_address(lba);
 	deque<Event*> mapping_events;
 
+	Event* write_event = new Event(WRITE, virtual_mapping_page_address, 1, time);
+	write_event->set_mapping_op(true);
+
 	if (global_translation_directory.count(virtual_mapping_page_address) == 1 && num_cached_entries_in_mapping_page < addressPerPage) {
 		Event* readEvent = new Event(READ, virtual_mapping_page_address, 1, time);
 		readEvent->set_mapping_op(true);
+		readEvent->set_application_io_id(write_event->get_application_io_id());
 		mapping_events.push_back(readEvent);
 	}
 
-	Event* write_event = new Event(WRITE, virtual_mapping_page_address, 1, time);
-	write_event->set_mapping_op(true);
 	mapping_events.push_back(write_event);
-	IOScheduler::instance()->schedule_events_queue(mapping_events);
+	//IOScheduler::instance()->schedule_events_queue(mapping_events);
 	controller.stats.numFTLWrite++;
 	controller.stats.numGCWrite++;
 }

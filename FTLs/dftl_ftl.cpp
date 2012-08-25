@@ -93,9 +93,11 @@ void FtlImpl_Dftl::register_trim_completion(Event & event) {
 		update_mapping_on_flash(dlpn, event.get_current_time());
 		current.ppn = -1;
 		trans_map.replace(trans_map.begin()+dlpn, current);
+		num_pages_written--;
 	}
 
 	controller.stats.numFTLTrim++;
+
 }
 
 
@@ -108,29 +110,20 @@ void FtlImpl_Dftl::register_write_completion(Event const& event, enum status res
 	}
 	MPage current = trans_map[event.get_logical_address()];
 
-	if (event.is_original_application_io()) {
-		if (current.ppn == -1) {
-			current.modified_ts = event.get_current_time();
-			current.create_ts = event.get_current_time();
-			current.cached = true;
-			cmt++;
-		} else {
-			assert(current.cached);
-			current.modified_ts = event.get_current_time();
-		}
+	if (event.is_original_application_io() && event.get_replace_address().valid == NONE && num_pages_written == cmt) {
+		num_pages_written++;
+		cmt++;
+		current.cached = true;
+		current.create_ts = current.modified_ts = event.get_current_time();
+	}
+	else if (event.is_original_application_io() && event.get_replace_address().valid == PAGE) {
+		assert(current.cached);
+		current.modified_ts = event.get_current_time();
 	}
 
 	// if it's a GC, it may already be in cache, in which case we update it. Else, we add it to the cache.
-	if (event.is_garbage_collection_op()) {
-		if (current.cached) {
-			current.modified_ts = event.get_current_time();
-		}
-		else {
-			current.modified_ts = event.get_current_time();
-			current.create_ts = event.get_current_time();
-			current.cached = true;
-			cmt++;
-		}
+	else if (event.is_garbage_collection_op() && current.cached) {
+		current.modified_ts = event.get_current_time();
 	}
 
 	current.ppn = event.get_address().get_linear_address();
@@ -141,7 +134,7 @@ void FtlImpl_Dftl::register_write_completion(Event const& event, enum status res
 
 void FtlImpl_Dftl::register_read_completion(Event const& event, enum status result) {
 	if (event.is_mapping_op()) {
-		assert(ongoing_mapping_reads.count(event.get_logical_address()) == 1);
+		//assert(ongoing_mapping_reads.count(event.get_logical_address()) == 1);
 		MPage current = trans_map[event.get_logical_address()];
 		current.modified_ts = event.get_current_time();
 		current.create_ts = event.get_current_time();

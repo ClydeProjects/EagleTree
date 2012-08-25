@@ -1298,7 +1298,7 @@ protected:
 	map<long, long> global_translation_directory; // a map from virtual translation pages to physical translation pages
 	map<long, vector<long> > ongoing_mapping_reads; // maps the address of ongoing mapping reads to LBAs that need to be inserted into the cache
 
-	//long num_pages_written;
+	long num_pages_written;
 };
 
 class FtlImpl_Dftl : public FtlImpl_DftlParent

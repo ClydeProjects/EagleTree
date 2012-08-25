@@ -67,7 +67,7 @@ void IOScheduler::schedule_events_queue(deque<Event*> events) {
 	Event* first = dependencies[operation_code].front();
 	dependencies[operation_code].pop_front();
 
-	if (first->is_mapping_op() && first->get_event_type() == READ) {
+	if (events.back()->is_original_application_io() && first->is_mapping_op() && first->get_event_type() == READ) {
 		first->set_application_io_id(first->get_id());
 		dependency_code_to_type[first->get_id()] = READ;
 		dependency_code_to_LBA[first->get_id()] = first->get_logical_address();
@@ -229,6 +229,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	uint common_logical_address = new_event->get_logical_address();
 	uint dependency_code_of_other_event = LBA_currently_executing[common_logical_address];
 	Event * existing_event = find_scheduled_event(dependency_code_of_other_event);
+
 	assert(existing_event != NULL);
 	//bool both_events_are_gc = new_event->is_garbage_collection_op() && existing_event->is_garbage_collection_op();
 	//assert(!both_events_are_gc);
@@ -252,6 +253,11 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 		stats.num_write_cancellations++;
 	}
+	else if (new_op_code == WRITE && scheduled_op_code == READ && existing_event->is_mapping_op()) {
+		remove_current_operation(existing_event);
+		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
+		//make_dependent(new_event, dependency_code_of_new_event, dependency_code_of_other_event);
+	}
 	// if there is a write, but before a read was scheduled, we should read first before making the write
 	else if (new_op_code == WRITE && scheduled_op_code == READ) {
 		assert(false);
@@ -263,7 +269,9 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if there are two reads to the same address, there is no point reading the same page twice.
 	else if (new_op_code == READ && scheduled_op_code == READ) {
-		assert(false);
+		//assert(false);
+		new_event->print();
+		existing_event->print();
 		make_dependent(new_event, existing_event);
 		new_event->set_noop(true);
 	}
@@ -367,10 +375,6 @@ void IOScheduler::handle_next_batch(vector<Event*>& events) {
 
 enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd.controller.issue(event);
-	if (event->get_logical_address() == 1023) {
-		int i = 0;
-		i++;
-	}
 	if (result == SUCCESS) {
 		int dependency_code = event->get_application_io_id();
 		if (dependencies[dependency_code].size() > 0) {
