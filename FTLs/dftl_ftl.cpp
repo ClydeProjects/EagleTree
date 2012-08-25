@@ -64,7 +64,7 @@ void FtlImpl_Dftl::read(Event *event)
 	resolve_mapping(event, false);
 	controller.stats.numFTLRead++;
 	current_dependent_events.push_back(event);
-	IOScheduler::instance()->schedule_events_queue(current_dependent_events, event->get_logical_address(), READ);
+	IOScheduler::instance()->schedule_events_queue(current_dependent_events);
 }
 
 void FtlImpl_Dftl::write(Event *event)
@@ -76,12 +76,12 @@ void FtlImpl_Dftl::write(Event *event)
 	resolve_mapping(event, true);
 	controller.stats.numFTLWrite++;
 	current_dependent_events.push_back(event);
-	IOScheduler::instance()->schedule_events_queue(current_dependent_events, event->get_logical_address(), WRITE);
+	IOScheduler::instance()->schedule_events_queue(current_dependent_events);
 }
 
 void FtlImpl_Dftl::trim(Event *event)
 {
-	IOScheduler::instance()->schedule_event(event, event->get_logical_address(), TRIM);
+	IOScheduler::instance()->schedule_event(event);
 }
 
 void FtlImpl_Dftl::register_trim_completion(Event & event) {
@@ -141,12 +141,22 @@ void FtlImpl_Dftl::register_write_completion(Event const& event, enum status res
 
 void FtlImpl_Dftl::register_read_completion(Event const& event, enum status result) {
 	if (event.is_mapping_op()) {
+		assert(ongoing_mapping_reads.count(event.get_logical_address()) == 1);
 		MPage current = trans_map[event.get_logical_address()];
 		current.modified_ts = event.get_current_time();
 		current.create_ts = event.get_current_time();
 		current.cached = true;
-		trans_map.replace(trans_map.begin()+event.get_logical_address(), current);
-		cmt++;
+		vector<long>& entries_to_be_inserted_into_cache = ongoing_mapping_reads[event.get_logical_address()];
+		cmt += entries_to_be_inserted_into_cache.size();
+		while (entries_to_be_inserted_into_cache.size() > 0) {
+			long lba = entries_to_be_inserted_into_cache.back();
+			entries_to_be_inserted_into_cache.pop_back();
+			MPage page = trans_map[lba];
+			page.cached = true;
+			page.create_ts = page.modified_ts = event.get_current_time();
+			trans_map.replace(trans_map.begin() + lba, page);
+		}
+		ongoing_mapping_reads.erase(event.get_logical_address());
 	}
 }
 

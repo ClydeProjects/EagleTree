@@ -208,7 +208,7 @@ void Block_manager_parent::issue_erase(Address ra, double time) {
 	}
 
 
-	IOScheduler::instance()->schedule_event(erase, -1, ERASE);
+	IOScheduler::instance()->schedule_event(erase);
 }
 
 void Block_manager_parent::register_read_outcome(Event const& event, enum status status) {
@@ -378,7 +378,7 @@ void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, 
 	if (PRINT_LEVEL > 1) {
 		printf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
 	}
-	IOScheduler::instance()->schedule_event(gc, 0, GARBAGE_COLLECTION);
+	IOScheduler::instance()->schedule_event(gc);
 }
 
 vector<long> Block_manager_parent::get_relevant_gc_candidates(int package_id, int die_id, int klass) const {

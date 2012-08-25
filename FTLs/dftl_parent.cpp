@@ -89,12 +89,21 @@ FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
 // we need to get the mapping page that it is written on.
 void FtlImpl_DftlParent::consult_GTD(long dlpn, Event *event)
 {
-	long mapping_virtual_address = get_mapping_virtual_address(event->get_logical_address());
-	if (global_translation_directory.count(mapping_virtual_address) == 1) {
-		Event* readEvent = new Event(READ, mapping_virtual_address, 1, event->get_start_time());
+	long mapping_address = get_mapping_virtual_address(event->get_logical_address());
+	if (global_translation_directory.count(mapping_address) == 1 && ongoing_mapping_reads.count(mapping_address) == 0) {
+		Event* readEvent = new Event(READ, mapping_address, 1, event->get_start_time());
 		readEvent->set_mapping_op(true);
+		//readEvent->set_application_io_id(event->get_application_io_id());
+		if (readEvent->get_id() == 244 || readEvent->get_id() == 248) {
+			int i = 0;
+			i++;
+		}
 		current_dependent_events.push_front(readEvent);
 		controller.stats.numFTLRead++;
+		ongoing_mapping_reads[mapping_address].push_back(event->get_logical_address());
+	}
+	else if (global_translation_directory.count(mapping_address) == 1 && ongoing_mapping_reads.count(mapping_address) == 1) {
+		ongoing_mapping_reads[mapping_address].push_back(dlpn);
 	}
 }
 
@@ -192,7 +201,7 @@ void FtlImpl_DftlParent::update_mapping_on_flash(long lba, double time) {
 	Event* write_event = new Event(WRITE, virtual_mapping_page_address, 1, time);
 	write_event->set_mapping_op(true);
 	mapping_events.push_back(write_event);
-	IOScheduler::instance()->schedule_events_queue(mapping_events, write_event->get_logical_address(), WRITE);
+	IOScheduler::instance()->schedule_events_queue(mapping_events);
 	controller.stats.numFTLWrite++;
 	controller.stats.numGCWrite++;
 }

@@ -1066,8 +1066,9 @@ private:
 
 class IOScheduler {
 public:
-	void schedule_events_queue(deque<Event*> events, ulong logical_address, event_type type);
-	void schedule_event(Event* events, ulong logical_address, event_type type);
+	//void schedule_dependent_events_queue(deque<deque<Event*> > events);
+	void schedule_events_queue(deque<Event*> events);
+	void schedule_event(Event* events);
 	bool is_empty();
 	void finish_all_events_until_this_time(double time);
 	void execute_soonest_events();
@@ -1077,6 +1078,7 @@ public:
 private:
 	IOScheduler(Ssd& ssd, FtlParent& ftl);
 	~IOScheduler();
+	void setup_structures(deque<Event*> events);
 	enum status execute_next(Event* event);
 	void execute_current_waiting_ios();
 	vector<Event*> collect_soonest_events();
@@ -1085,12 +1087,10 @@ private:
 
 	bool can_schedule_on_die(Event const* event) const;
 	void handle_finished_event(Event *event, enum status outcome);
-
 	void remove_redundant_events(Event* new_event);
-
 	void init_event(Event* event);
-
 	void handle_noop_events(vector<Event*>& events);
+
 
 	vector<Event*> future_events;
 	vector<Event*> current_events;
@@ -1114,8 +1114,7 @@ private:
 	void remove_current_operation(Event* event);
 	void promote_to_gc(Event* event_to_promote);
 	void nullify_and_add_as_dependent(uint dependency_code_to_be_nullified, uint dependency_code_to_remain);
-	void make_dependent(Event* new_event, uint dependency_code_to_be_made_dependent, uint dependency_code_to_remain);
-
+	void make_dependent(Event* dependent_event, Event* independent_event);
 	double get_current_time() const;
 
 	struct io_scheduler_stats {
@@ -1280,31 +1279,26 @@ protected:
 
 	void consult_GTD(long dppn, Event *event);
 	void reset_MPage(FtlImpl_DftlParent::MPage &mpage);
-
 	void resolve_mapping(Event *event, bool isWrite);
 	void update_translation_map(FtlImpl_DftlParent::MPage &mpage, long ppn);
-
 	bool lookup_CMT(long dlpn, Event *event);
-
 	void evict_page_from_cache(double time);
-
 	long get_logical_address(uint physical_address) const;
-
 	long get_mapping_virtual_address(long event_lba);
-
 	void update_mapping_on_flash(long lba, double time);
-
 	void remove_from_cache(long lba);
 
 	// Mapping information
-	int addressSize;
-	int addressPerPage;
-	int num_mapping_pages;
-	uint totalCMTentries;
+	const int addressSize;
+	const int addressPerPage;
+	const int num_mapping_pages;
+	const uint totalCMTentries;
 
 	deque<Event*> current_dependent_events;
-
 	map<long, long> global_translation_directory; // a map from virtual translation pages to physical translation pages
+	map<long, vector<long> > ongoing_mapping_reads; // maps the address of ongoing mapping reads to LBAs that need to be inserted into the cache
+
+	//long num_pages_written;
 };
 
 class FtlImpl_Dftl : public FtlImpl_DftlParent

@@ -48,33 +48,42 @@ IOScheduler *IOScheduler::instance()
 	return IOScheduler::inst;
 }
 
-bool current_time_comparator (const Event* i, const Event* j) {
-	return i->get_current_time() > j->get_current_time();
-}
-
 bool bus_wait_time_comparator (const Event* i, const Event* j) {
 	return i->get_bus_wait_time() < j->get_bus_wait_time();
 }
 
-//
-void IOScheduler::schedule_events_queue(deque<Event*> events, ulong logical_address, event_type type) {
-	uint dependency_code = events.front()->get_application_io_id();
+// assumption is that all events within an operation have the same LBA
+void IOScheduler::schedule_events_queue(deque<Event*> events) {
+	long logical_address = events.back()->get_logical_address();
+	event_type type = events.back()->get_event_type();
+	uint operation_code = events.back()->get_application_io_id();
 	if (type != GARBAGE_COLLECTION && type != ERASE) {
-		dependency_code_to_LBA[dependency_code] = logical_address;
+		dependency_code_to_LBA[operation_code] = logical_address;
 	}
-	dependency_code_to_type[dependency_code] = type;
-	assert(dependencies.count(dependency_code) == 0);
-	dependencies[dependency_code] = events;
-	Event* first = dependencies[dependency_code].front();
-	dependencies[dependency_code].pop_front();
+	dependency_code_to_type[operation_code] = type;
+	assert(dependencies.count(operation_code) == 0);
+	dependencies[operation_code] = events;
+
+	Event* first = dependencies[operation_code].front();
+	dependencies[operation_code].pop_front();
+
+	if (first->is_mapping_op() && first->get_event_type() == READ) {
+		first->set_application_io_id(first->get_id());
+		dependency_code_to_type[first->get_id()] = READ;
+		dependency_code_to_LBA[first->get_id()] = first->get_logical_address();
+		queue<uint> dependency;
+		dependency.push(operation_code);
+		op_code_to_dependent_op_codes[first->get_id()] = dependency;
+	}
+
 	future_events.push_back(first);
 }
 
 // TODO: make this not call the schedule_events_queue method, but simply put the event in future events
-void IOScheduler::schedule_event(Event* event, ulong logical_address, event_type type) {
+void IOScheduler::schedule_event(Event* event) {
 	deque<Event*> eventVec;
 	eventVec.push_back(event);
-	schedule_events_queue(eventVec, logical_address, type);
+	schedule_events_queue(eventVec);
 }
 
 void IOScheduler::finish_all_events_until_this_time(double time) {
@@ -255,7 +264,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	// if there are two reads to the same address, there is no point reading the same page twice.
 	else if (new_op_code == READ && scheduled_op_code == READ) {
 		assert(false);
-		//make_dependent(new_event, dependency_code_of_new_event, dependency_code_of_other_event);
+		make_dependent(new_event, existing_event);
 		new_event->set_noop(true);
 	}
 	// if a write is scheduled when a trim is received, we may as well cancel the write
@@ -287,7 +296,9 @@ Event* IOScheduler::find_scheduled_event(uint dependency_code) {
 			return event;
 		}
 	}
-	assert(false);
+	//assert(false);
+	int i = 0;
+	i++;
 	return NULL;
 }
 
@@ -328,11 +339,11 @@ void IOScheduler::nullify_and_add_as_dependent(uint dependency_code_to_be_nullif
 
 }
 
-void IOScheduler::make_dependent(Event* new_event, uint op_code_to_be_made_dependent, uint op_code_to_remain) {
-	/*op_code_to_dependent_op_codes[op_code_to_remain].push(op_code_to_be_made_dependent);
-	Event * event = future_events[new_event_index];
-	dependencies[op_code_to_be_made_dependent].push_front(event);
-	future_events.erase(future_events.begin() + new_event_index);*/
+void IOScheduler::make_dependent(Event* dependent_event, Event* independent_event) {
+	uint dependent_code = dependent_event->get_application_io_id();
+	uint independent_code = independent_event->get_application_io_id();
+	op_code_to_dependent_op_codes[independent_code].push(dependent_code);
+	dependencies[dependent_code].push_front(dependent_event);
 }
 
 // executes read_commands, read_transfers and erases
@@ -356,6 +367,10 @@ void IOScheduler::handle_next_batch(vector<Event*>& events) {
 
 enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd.controller.issue(event);
+	if (event->get_logical_address() == 1023) {
+		int i = 0;
+		i++;
+	}
 	if (result == SUCCESS) {
 		int dependency_code = event->get_application_io_id();
 		if (dependencies[dependency_code].size() > 0) {
@@ -448,6 +463,7 @@ void IOScheduler::init_event(Event* event) {
 		read_transfer->set_event_type(READ_TRANSFER);
 		dependencies[dep_code].push_front(read_transfer);
 		init_event(event);
+		//remove_redundant_events(event);
 	}
 	else if (event->get_event_type() == READ_COMMAND || event->get_event_type() == READ_TRANSFER) {
 		ftl.set_read_address(*event);
