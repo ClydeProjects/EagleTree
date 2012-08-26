@@ -190,7 +190,7 @@ bool GREEDY_GC = false;
  * 1 -> Semi-detailed
  * 2 -> Detailed
  */
-int PRINT_LEVEL = 1;
+int PRINT_LEVEL = 2;
 
 bool OS_LOCK = true;
 

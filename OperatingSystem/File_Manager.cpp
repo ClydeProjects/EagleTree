@@ -10,8 +10,10 @@
 
 using namespace ssd;
 
-File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, double time_breaks, ulong randseed)
-	: Thread(1), min_LBA(min_LBA), max_LBA(max_LBA), num_files_to_write(num_files_to_write), time_breaks(time_breaks)
+File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, double time_breaks, double start_time, ulong randseed)
+	: Thread(start_time), min_LBA(min_LBA), max_LBA(max_LBA),
+	  num_files_to_write(num_files_to_write), time_breaks(time_breaks),
+	  max_file_size(max_file_size)
 {
 	random_number_generator.seed(randseed);
 	double_generator.seed(randseed * 17);
@@ -52,9 +54,11 @@ void File_Manager::handle_event_completion(Event*event) {
 	if (current_file->is_finished()) {
 		current_file->finish(event->get_current_time());
 		files.push_back(current_file);
+		time = max(time, event->get_current_time());
 		if (num_files_to_write-- == 0) {
 			finished = true;
-		} else {
+		}
+		else {
 			delete_some_file();
 			write_next_file();
 		}
@@ -66,8 +70,8 @@ void File_Manager::handle_event_completion(Event*event) {
 }
 
 void File_Manager::write_next_file() {
-	double death_probability = double_generator(); // times max lifetime. Should be configurable
-	long max_file_size = (NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * 0.8) / 5;
+	assert(num_free_pages > 0); // deal with this problem later
+	double death_probability = double_generator();
 	uint size;
 	if (max_file_size > num_free_pages) {
 		size = num_free_pages;
@@ -126,7 +130,7 @@ void File_Manager::schedule_to_trim_file(File* file) {
 
 // merges two sorted vectors of address ranges into one sorted vector, while merging contiguous ranges
 void File_Manager::reclaim_file_space(File* file) {
-	if (file->file_id == 13) {
+	if (file->file_id == 5) {
 		int i = 0;
 		i++;
 	}
@@ -169,12 +173,6 @@ void File_Manager::reclaim_file_space(File* file) {
 		}
 	}
 	free_ranges = new_list;
-	printf("\n");
-	for (uint i = 0; i < free_ranges.size(); i++) {
-		Address_Range r = free_ranges[i];
-		printf("min %d      max %d\n", r.min, r.max);
-	}
-	printf("\n");
 }
 
 // ----------------- Address_Range ---------------------------
@@ -221,6 +219,10 @@ void File_Manager::File::finish(double time) {
 	time_finished = time;
 	ranges_comprising_file.push_back(current_range_being_written);
 	printf("finished with file  %d\n", file_id);
+	if (file_id == 2) {
+		int i = 0;
+		i++;
+	}
 }
 
 bool File_Manager::File::is_finished() const {

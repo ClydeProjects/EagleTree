@@ -53,7 +53,7 @@ int OperatingSystem::pick_event_with_shortest_start_time() {
 
 	for (uint i = 0; i < events.size(); i++) {
 		Event* e = events[i];
-		if (e != NULL && e->get_event_type() != NOT_VALID && e->get_start_time() < soonest_time && !is_LBA_locked(e->get_logical_address()) ) {
+		if (e != NULL && e->get_start_time() < soonest_time && !is_LBA_locked(e->get_logical_address()) ) {
 			soonest_time = events[i]->get_start_time();
 			thread_id = i;
 		}
@@ -63,9 +63,12 @@ int OperatingSystem::pick_event_with_shortest_start_time() {
 
 void OperatingSystem::dispatch_event(int thread_id) {
 	Event* event = events[thread_id];
+
 	currently_executing_ios_counter++;
 	currently_pending_ios_counter--;
-	last_dispatched_event_minimal_finish_time = get_event_minimal_completion_time(event);
+
+	double min_completion_time = get_event_minimal_completion_time(event);
+	last_dispatched_event_minimal_finish_time = max(last_dispatched_event_minimal_finish_time, min_completion_time);
 
 	map<long, queue<uint> >& map = get_relevant_LBA_to_thread_map(event->get_event_type());
 	map[event->get_logical_address()].push(thread_id);

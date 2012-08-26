@@ -70,8 +70,10 @@ void experiement2() {
 
 void file_manager_experiment() {
 	vector<Thread*> threads;
-	Thread* fm = new File_Manager(0, 800, 50, 10, 1);
-	threads.push_back(fm);
+	Thread* fm1 = new File_Manager(0, 399, 10, 100, 10, 1, 1);
+	Thread* fm2 = new File_Manager(400, 799, 10, 100, 10, 2, 2);
+	threads.push_back(fm1);
+	threads.push_back(fm2);
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
 	VisualTracer::get_instance()->print_horizontally_with_breaks();

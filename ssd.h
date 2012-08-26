@@ -1649,7 +1649,7 @@ private:
 class File_Manager : public Thread
 {
 public:
-	File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, double time_breaks = 10, ulong randseed = 0);
+	File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, double time_breaks = 10, double start_time = 1, ulong randseed = 0);
 	Event* issue_next_io();
 	void handle_event_completion(Event* event);
 private:
@@ -1712,6 +1712,7 @@ private:
 	MTRand_open double_generator;
 	double time_breaks;
 	set<long> addresses_to_trim;
+	const long max_file_size;
 };
 
 class OperatingSystem
