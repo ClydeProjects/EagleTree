@@ -181,7 +181,7 @@ uint RAID_NUMBER_OF_PHYSICAL_SSDS = 0;
  * 3 -> Wearwolf with Locality
  * 4 -> Round Robin
  */
-int BLOCK_MANAGER_ID = 3;
+int BLOCK_MANAGER_ID = 2;
 
 bool GREEDY_GC = false;
 
@@ -190,7 +190,7 @@ bool GREEDY_GC = false;
  * 1 -> Semi-detailed
  * 2 -> Detailed
  */
-int PRINT_LEVEL = 2;
+int PRINT_LEVEL = 1;
 
 bool OS_LOCK = true;
 
