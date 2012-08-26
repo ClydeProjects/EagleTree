@@ -1679,7 +1679,7 @@ private:
 		deque<Address_Range > ranges_comprising_file;
 		Address_Range current_range_being_written;
 		set<long> logical_addresses_to_be_written_in_current_range;
-		int num_pages_allocated_so_far;
+		uint num_pages_allocated_so_far;
 
 		File(uint size, double death_probability);
 

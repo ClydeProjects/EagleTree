@@ -26,7 +26,7 @@ File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, 
 Event* File_Manager::issue_next_io() {
 	if (addresses_to_trim.size() > 0) {
 		return issue_trim();
-	} else if (!current_file->has_issued_last_io()) {
+	} else if (!current_file->has_issued_last_io() && !current_file->needs_new_range()) {
 		return issue_write();
 	} else {
 		return NULL;
@@ -130,10 +130,6 @@ void File_Manager::schedule_to_trim_file(File* file) {
 
 // merges two sorted vectors of address ranges into one sorted vector, while merging contiguous ranges
 void File_Manager::reclaim_file_space(File* file) {
-	if (file->file_id == 5) {
-		int i = 0;
-		i++;
-	}
 	deque<Address_Range> freed_ranges = file->ranges_comprising_file;
 	deque<Address_Range> new_list;
 	if (free_ranges.size() == 0) {
@@ -219,10 +215,6 @@ void File_Manager::File::finish(double time) {
 	time_finished = time;
 	ranges_comprising_file.push_back(current_range_being_written);
 	printf("finished with file  %d\n", file_id);
-	if (file_id == 2) {
-		int i = 0;
-		i++;
-	}
 }
 
 bool File_Manager::File::is_finished() const {
@@ -242,6 +234,7 @@ bool File_Manager::File::has_issued_last_io() {
 }
 
 long File_Manager::File::get_next_lba_to_be_written() {
+	assert(logical_addresses_to_be_written_in_current_range.size() > 0);
 	long lba = *logical_addresses_to_be_written_in_current_range.begin();
 	logical_addresses_to_be_written_in_current_range.erase(lba);
 	return lba;

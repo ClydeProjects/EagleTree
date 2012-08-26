@@ -144,14 +144,6 @@ Ssd::~Ssd(void)
 
 void Ssd::event_arrive(Event* event) {
 	//printf("submitted: %d\n",  event->get_id());
-	assert(event->get_start_time() >= 0.0);
-	if (event->get_start_time() < last_io_submission_time) {
-		printf("%f  %f\n", event->get_start_time(), last_io_submission_time);
-		event->print();
-		int i = 0;
-		i++;
-	}
-
 	// Print error and terminate if start time of event is less than IO submission time
 	// assert(event->get_start_time() >= last_io_submission_time);
 	if (event->get_start_time() < last_io_submission_time + 0.00001) {

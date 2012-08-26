@@ -70,8 +70,8 @@ void experiement2() {
 
 void file_manager_experiment() {
 	vector<Thread*> threads;
-	Thread* fm1 = new File_Manager(0, 399, 10, 100, 10, 1, 1);
-	Thread* fm2 = new File_Manager(400, 799, 10, 100, 10, 2, 2);
+	Thread* fm1 = new File_Manager(0, 399, 40, 100, 10, 1, 1);
+	Thread* fm2 = new File_Manager(400, 799, 40, 100, 10, 2, 2);
 	threads.push_back(fm1);
 	threads.push_back(fm2);
 	OperatingSystem* os = new OperatingSystem(threads);
@@ -135,61 +135,6 @@ int main()
 
 	file_manager_experiment();
 
-	// this experiment already shows huge disparity
-
-	/*threads.push_back(new Synchronous_Sequential_Writer(0, 40, 1));
-	threads.push_back(new Synchronous_Sequential_Writer(40, 80, 1));
-	threads.push_back(new Synchronous_Sequential_Writer(80, 120, 1));
-	threads.push_back(new Synchronous_Sequential_Writer(120, 160, 10));
-	threads.push_back(new Synchronous_Sequential_Writer(160, 200, 10));*/
-
-
-
-	/*vector<queue<Thread*> > thread_dependencies(2, queue<Thread*>());
-
-	thread_dependencies[0].push(new Asynchronous_Sequential_Thread(0, 49, 1, WRITE));
-	thread_dependencies[0].push(new External_Sort(0, 49, 10, 50, 99));
-	thread_dependencies[0].push(new External_Sort(0, 49, 10, 50, 99));
-	thread_dependencies[0].push(new External_Sort(0, 49, 10, 50, 99));
-	thread_dependencies[0].push(new External_Sort(0, 49, 10, 50, 99));
-	thread_dependencies[0].push(new External_Sort(0, 49, 10, 50, 99));
-	thread_dependencies[0].push(new External_Sort(0, 49, 10, 50, 99));
-
-	thread_dependencies[1].push(new Asynchronous_Sequential_Thread(100, 189, 1, WRITE));
-	thread_dependencies[1].push(new Asynchronous_Sequential_Thread(100, 189, 10, READ));
-	thread_dependencies[1].push(new Asynchronous_Sequential_Thread(100, 189, 1, WRITE));*/
-	//thread_dependencies[1].push(new Asynchronous_Sequential_Thread(100, 189, 10, READ));
-
-
-	//thread_dependencies[0].push(new External_Sort(0, 49, 10, 50, 99));
-	//thread_dependencies[0].push(new External_Sort(0, 49, 10, 50, 99));
-
-
-
-
-	/*thread_dependencies[0].push(new Asynchronous_Sequential_Writer(0, 49, 1));
-
-	threads.push_back(new Asynchronous_Sequential_Writer(0, 49, 1));
-	threads.push_back(new External_Sort(0, 49, 10, 50, 99, 500));*/
-
-
-
-	//threads.push_back(new External_Sort(0, 49, 10, 50, 99, 3000));
-	//threads.push_back(new Asynchronous_Sequential_Writer(100, 110, 1, 3000));
-
-
-
-	for (int i = 0; i < 10; i++)
-	{
-		//ssd -> event_arrive(WRITE, i, 1, 1 + i * 1  );
-	}
-
-	//os.run();
-
-
-	//VisualTracer::get_instance()->print_horizontally_with_breaks();
-	//StateTracer::print();
-	//StatisticsGatherer::get_instance()->print();
 	return 0;
 }
 
