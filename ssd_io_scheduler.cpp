@@ -149,7 +149,7 @@ void IOScheduler::execute_current_waiting_ios() {
 			erases.push_back(event);
 		}
 		else if (type == TRIM) {
-			handle_finished_event(event, SUCCESS);
+			execute_next(event);
 		}
 	}
 	handle_noop_events(noop_events);
@@ -277,7 +277,8 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if a write is scheduled when a trim is received, we may as well cancel the write
 	else if (new_op_code == TRIM && scheduled_op_code == WRITE) {
-		remove_current_operation(new_event);
+		remove_current_operation(existing_event);
+		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 	}
 	// if a trim is scheduled, and a write arrives, may as well let the trim execute first
 	else if (new_op_code == WRITE && scheduled_op_code == TRIM) {
@@ -483,6 +484,7 @@ void IOScheduler::init_event(Event* event) {
 	else if (event->get_event_type() == TRIM) {
 		ftl.set_replace_address(*event);
 		current_events.push_back(event);
+		remove_redundant_events(event);
 	}
 	else if (event->get_event_type() == GARBAGE_COLLECTION) {
 		vector<deque<Event*> > migrations = bm->migrate(event);
