@@ -47,26 +47,27 @@ Event* File_Manager::issue_write() {
 }
 
 void File_Manager::handle_event_completion(Event*event) {
-	if (event->get_event_type() == TRIM) {
+	if (event->get_event_type() == TRIM)
+		return;
+	current_file->register_write_completion();
+	if (current_file->is_finished())
+		handle_file_completion(event->get_current_time());
+	else if (current_file->needs_new_range())
+		assign_new_range();
+}
+
+void File_Manager::handle_file_completion(double current_time) {
+	current_file->finish(current_time);
+	files.push_back(current_file);
+	time = max(time, current_time);
+	if (num_files_to_write-- == 0) {
+		finished = true;
 		return;
 	}
-	current_file->register_write_completion();
-	if (current_file->is_finished()) {
-		current_file->finish(event->get_current_time());
-		files.push_back(current_file);
-		time = max(time, event->get_current_time());
-		if (num_files_to_write-- == 0) {
-			finished = true;
-		}
-		else {
-			delete_some_file();
-			write_next_file();
-		}
-	}
-	else if (current_file->needs_new_range()) {
-		assign_new_range();
-	}
-
+	do {
+		randomly_delete_files();
+	} while (free_ranges.size() == 0);
+	write_next_file();
 }
 
 void File_Manager::write_next_file() {
@@ -86,7 +87,7 @@ void File_Manager::write_next_file() {
 void File_Manager::assign_new_range() {
 	Address_Range range = free_ranges.front();
 	free_ranges.pop_front();
-	long num_pages_left_to_write = current_file->get_num_pages_left_to_write();
+	long num_pages_left_to_write = current_file->get_num_pages_left_to_allocate();
 	if (num_pages_left_to_write < range.get_size()) {
 		Address_Range sub_range = range.split(num_pages_left_to_write);
 		free_ranges.push_front(range);
@@ -96,7 +97,7 @@ void File_Manager::assign_new_range() {
 	}
 }
 
-void File_Manager::delete_some_file() {
+void File_Manager::randomly_delete_files() {
 	for (uint i = 0; i < files.size(); ) {
 		File* file = files[i];
 		double random_num = double_generator();
@@ -240,12 +241,12 @@ long File_Manager::File::get_next_lba_to_be_written() {
 	return lba;
 }
 
-long File_Manager::File::get_num_pages_left_to_write() const {
-	return size - num_pages_written;
+long File_Manager::File::get_num_pages_left_to_allocate() const {
+	return size - num_pages_allocated_so_far;
 }
 
 void File_Manager::File::register_new_range(Address_Range range) {
-	printf("new range for file: %d    (%d - %d)\n", file_id, range.min, range.max);
+	printf("new range for file: %d    (%d - %d)  in total: %d\n", file_id, range.min, range.max, range.get_size());
 	assert(logical_addresses_to_be_written_in_current_range.size() == 0);
 	if (num_pages_written > 0) {
 		ranges_comprising_file.push_back(current_range_being_written);
@@ -253,6 +254,7 @@ void File_Manager::File::register_new_range(Address_Range range) {
 	}
 	current_range_being_written = range;
 	num_pages_allocated_so_far += range.get_size();
+	assert(num_pages_allocated_so_far <= size);
 	for (int i = range.min; i <= range.max; i++) {
 		logical_addresses_to_be_written_in_current_range.insert(i);
 	}

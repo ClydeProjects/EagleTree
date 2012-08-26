@@ -1683,7 +1683,7 @@ private:
 
 		File(uint size, double death_probability);
 
-		long get_num_pages_left_to_write() const;
+		long get_num_pages_left_to_allocate() const;
 		bool needs_new_range() const;
 		bool is_finished() const;
 		long get_next_lba_to_be_written();
@@ -1696,11 +1696,12 @@ private:
 	void schedule_to_trim_file(File* file);
 	void write_next_file();
 	void assign_new_range();
-	void delete_some_file();
+	void randomly_delete_files();
 	Event* issue_trim();
 	Event* issue_write();
 	void reclaim_file_space(File* file);
 	void delete_file(File* victim);
+	void handle_file_completion(double current_time);
 
 	long num_free_pages;
 	deque<Address_Range> free_ranges;
