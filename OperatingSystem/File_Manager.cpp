@@ -16,7 +16,7 @@ File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, 
 	random_number_generator.seed(randseed);
 	double_generator.seed(randseed * 17);
 	Address_Range free_range(min_LBA, max_LBA);
-	free_ranges.push_back(free_range);
+	free_ranges.push_front(free_range);
 	num_free_pages = max_LBA - min_LBA + 1;
 	write_next_file();
 }
@@ -80,13 +80,12 @@ void File_Manager::write_next_file() {
 }
 
 void File_Manager::assign_new_range() {
-	Address_Range range = free_ranges.back();
-
-	free_ranges.pop_back();
+	Address_Range range = free_ranges.front();
+	free_ranges.pop_front();
 	long num_pages_left_to_write = current_file->get_num_pages_left_to_write();
 	if (num_pages_left_to_write < range.get_size()) {
 		Address_Range sub_range = range.split(num_pages_left_to_write);
-		free_ranges.push_back(range);
+		free_ranges.push_front(range);
 		current_file->register_new_range(sub_range);
 	} else {
 		current_file->register_new_range(range);
@@ -116,7 +115,7 @@ void File_Manager::delete_file(File* victim) {
 
 // merges the
 void File_Manager::schedule_to_trim_file(File* file) {
-	vector<Address_Range> freed_ranges = file->get_address_ranges();
+	deque<Address_Range> freed_ranges = file->ranges_comprising_file;
 	for (uint i = 0; i < freed_ranges.size(); i++) {
 		Address_Range range = freed_ranges[i];
 		for (uint j = range.min; j <= range.max; j++) {
@@ -127,45 +126,55 @@ void File_Manager::schedule_to_trim_file(File* file) {
 
 // merges two sorted vectors of address ranges into one sorted vector, while merging contiguous ranges
 void File_Manager::reclaim_file_space(File* file) {
-	vector<Address_Range> freed_ranges = file->get_address_ranges();
-	vector<Address_Range> new_list;
+	if (file->file_id == 13) {
+		int i = 0;
+		i++;
+	}
+	deque<Address_Range> freed_ranges = file->ranges_comprising_file;
+	deque<Address_Range> new_list;
 	if (free_ranges.size() == 0) {
 		free_ranges = freed_ranges;
 		return;
 	}
 	uint i = 0, j = 0;
 	while (i < freed_ranges.size() || j < free_ranges.size()) {
-			Address_Range& freed_range = freed_ranges[i];
-			Address_Range& existing_range = free_ranges[j];
-			if (i == freed_ranges.size()) {
-				new_list.push_back(existing_range);
-				j++;
-			}
-			else if (j == freed_ranges.size()) {
-				new_list.push_back(freed_range);
-				i++;
-			}
-			else if (existing_range.is_contiguously_followed_by(freed_range)) {
-				freed_range.merge(existing_range);
-				j++;
-			}
-			else if (existing_range.is_followed_by(freed_range)) {
-				new_list.push_back(existing_range);
-				j++;
-			}
-			else if(freed_range.is_contiguously_followed_by(existing_range)) {
-				existing_range.merge(freed_range);
-				i++;
-			}
-			else if (freed_range.is_followed_by(existing_range)) {
-				new_list.push_back(freed_range);
-				i++;
-			}
-			else {
-				assert(false);
-			}
+		Address_Range& freed_range = freed_ranges[i];
+		Address_Range& existing_range = free_ranges[j];
+		if (j == free_ranges.size()) {
+			new_list.push_back(freed_range);
+			i++;
+		}
+		else if (i == freed_ranges.size()) {
+			new_list.push_back(existing_range);
+			j++;
+		}
+		else if (existing_range.is_contiguously_followed_by(freed_range)) {
+			freed_range.merge(existing_range);
+			j++;
+		}
+		else if (existing_range.is_followed_by(freed_range)) {
+			new_list.push_back(existing_range);
+			j++;
+		}
+		else if(freed_range.is_contiguously_followed_by(existing_range)) {
+			existing_range.merge(freed_range);
+			i++;
+		}
+		else if (freed_range.is_followed_by(existing_range)) {
+			new_list.push_back(freed_range);
+			i++;
+		}
+		else {
+			assert(false);
+		}
 	}
 	free_ranges = new_list;
+	printf("\n");
+	for (uint i = 0; i < free_ranges.size(); i++) {
+		Address_Range r = free_ranges[i];
+		printf("min %d      max %d\n", r.min, r.max);
+	}
+	printf("\n");
 }
 
 // ----------------- Address_Range ---------------------------
@@ -245,6 +254,7 @@ void File_Manager::File::register_new_range(Address_Range range) {
 	assert(logical_addresses_to_be_written_in_current_range.size() == 0);
 	if (num_pages_written > 0) {
 		ranges_comprising_file.push_back(current_range_being_written);
+		assert(range.max > current_range_being_written.min);
 	}
 	current_range_being_written = range;
 	num_pages_allocated_so_far += range.get_size();

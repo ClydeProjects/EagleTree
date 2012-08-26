@@ -1676,7 +1676,7 @@ private:
 		const uint size;
 		int file_id;
 		uint num_pages_written;
-		vector<Address_Range > ranges_comprising_file;
+		deque<Address_Range > ranges_comprising_file;
 		Address_Range current_range_being_written;
 		set<long> logical_addresses_to_be_written_in_current_range;
 		int num_pages_allocated_so_far;
@@ -1686,9 +1686,6 @@ private:
 		long get_num_pages_left_to_write() const;
 		bool needs_new_range() const;
 		bool is_finished() const;
-		vector<Address_Range > get_address_ranges() const {
-			return ranges_comprising_file;
-		}
 		long get_next_lba_to_be_written();
 		void register_new_range(Address_Range range);
 		void register_write_completion();
@@ -1706,7 +1703,7 @@ private:
 	void delete_file(File* victim);
 
 	long num_free_pages;
-	vector<Address_Range> free_ranges;
+	deque<Address_Range> free_ranges;
 	vector<File*> files;
 	File* current_file;
 	long min_LBA, max_LBA;
