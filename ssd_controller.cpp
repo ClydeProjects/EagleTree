@@ -130,6 +130,16 @@ enum status Controller::issue(Event &event_list)
 				/*|| ssd.replace(*cur) == FAILURE*/)
 				return FAILURE;
 		}
+		else if(cur -> get_event_type() == COPY_BACK)
+		{
+			assert(cur -> get_address().valid > NONE);
+			assert(cur -> get_replace_address().valid > NONE);
+			if(ssd.bus.lock(cur -> get_address().package, cur -> get_start_time(), 2 * BUS_CTRL_DELAY + PAGE_READ_DELAY, *cur) == FAILURE
+				|| ssd.read(*cur) == FAILURE
+				|| ssd.write(*cur) == FAILURE
+				/*|| ssd.replace(*cur) == FAILURE*/)
+				return FAILURE;
+		}
 		else if(cur -> get_event_type() == ERASE)
 		{
 			assert(cur -> get_address().valid > NONE);

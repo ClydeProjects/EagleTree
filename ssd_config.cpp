@@ -182,6 +182,13 @@ int PRINT_LEVEL = 2;
 
 bool OS_LOCK = true;
 
+/* Defines the max number of copy back operations on a page before ECC check is performed.
+ * Set to zero to disable copy back GC operations */
+uint MAX_REPEATED_COPY_BACKS_ALLOWED = 1;
+
+/* Defines the max number of page addresses in map keeping track of each pages copy back count */
+uint MAX_ITEMS_IN_COPY_BACK_MAP = 16;
+
 void load_entry(char *name, double value, uint line_number) {
 	/* cheap implementation - go through all possibilities and match entry */
 	if (!strcmp(name, "RAM_READ_DELAY"))
@@ -242,6 +249,10 @@ void load_entry(char *name, double value, uint line_number) {
 		VIRTUAL_PAGE_SIZE = value;
 	else if (!strcmp(name, "RAID_NUMBER_OF_PHYSICAL_SSDS"))
 		RAID_NUMBER_OF_PHYSICAL_SSDS = value;
+	else if (!strcmp(name, "MAX_REPEATED_COPY_BACKS_ALLOWED"))
+		MAX_REPEATED_COPY_BACKS_ALLOWED = value;
+	else if (!strcmp(name, "MAX_ITEMS_IN_COPY_BACK_MAP"))
+		MAX_ITEMS_IN_COPY_BACK_MAP = value;
 	else
 		fprintf(stderr, "Config file parsing error on line %u\n", line_number);
 	return;
@@ -312,6 +323,8 @@ void print_config(FILE *stream) {
 	fprintf(stream, "FTL_IMPLEMENTATION: %i\n", FTL_IMPLEMENTATION);
 	fprintf(stream, "PARALLELISM_MODE: %i\n", PARALLELISM_MODE);
 	fprintf(stream, "RAID_NUMBER_OF_PHYSICAL_SSDS: %i\n", RAID_NUMBER_OF_PHYSICAL_SSDS);
+	fprintf(stream, "MAX_REPEATED_COPY_BACKS_ALLOWED: %i\n", MAX_REPEATED_COPY_BACKS_ALLOWED);
+	fprintf(stream, "MAX_ITEMS_IN_COPY_BACK_MAP: %i\n", MAX_ITEMS_IN_COPY_BACK_MAP);
 
 	return;
 }

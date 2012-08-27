@@ -116,6 +116,7 @@ void IOScheduler::execute_current_waiting_ios() {
 	vector<Event*> gc_writes;
 	vector<Event*> writes;
 	vector<Event*> erases;
+	vector<Event*> copy_backs;
 	vector<Event*> trims;
 	vector<Event*> noop_events;
 	while (events.size() > 0) {
@@ -140,12 +141,16 @@ void IOScheduler::execute_current_waiting_ios() {
 		else if (type == ERASE) {
 			erases.push_back(event);
 		}
+		else if (type == COPY_BACK) {
+			copy_backs.push_back(event);
+		}
 		else if (type == TRIM) {
 			ftl.set_replace_address(*event);
 			handle_finished_event(event, SUCCESS);
 		}
 	}
 	handle_noop_events(noop_events);
+	handle_next_batch(copy_backs); // Copy backs should be prioritized first to avoid conflict
 	handle_next_batch(erases);
 	handle_next_batch(read_commands);
 	handle_next_batch(read_transfers);
@@ -228,12 +233,12 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	event_type new_op_code = dependency_code_to_type[dependency_code_of_new_event];
 	event_type scheduled_op_code = dependency_code_to_type[dependency_code_of_other_event];
 
-	if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
+	if (new_event->is_garbage_collection_op() && (scheduled_op_code == WRITE || scheduled_op_code == COPY_BACK)) {
 		promote_to_gc(existing_event);
 		remove_current_operation(new_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 	}
-	else if (existing_event->is_garbage_collection_op() && new_op_code == WRITE) {
+	else if (existing_event->is_garbage_collection_op() && (new_op_code == WRITE || new_op_code == COPY_BACK)) {
 		promote_to_gc(new_event);
 		remove_current_operation(existing_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
@@ -485,6 +490,7 @@ void IOScheduler::init_event(Event* event) {
 	}
 	else if (event->get_event_type() == COPY_BACK) {
 		current_events.push_back(event);
+		remove_redundant_events(event);
 	}
 	else if (event->get_event_type() == ERASE) {
 		current_events.push_back(event);

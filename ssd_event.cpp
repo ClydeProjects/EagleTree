@@ -306,6 +306,8 @@ void Event::print(FILE *stream) const
 		fprintf(stream, "D ");
 	else if (type == GARBAGE_COLLECTION)
 		fprintf(stream, "GC ");
+	else if (type == COPY_BACK)
+		fprintf(stream, "CB ");
 	else
 		fprintf(stream, "Unknown event type: ");
 

@@ -461,28 +461,50 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 			deque<Event*> migration;
 
-			// Try to find a free page on the same die (should actually be plane!), so that a fast copy back can be done
-			bool do_copy_back = false;
-			Address copy_back_target = free_block_pointers[addr.package][addr.die];
-			if (has_free_pages(copy_back_target)) { // If there is a free page
-				do_copy_back = true;
-			} else {
-				Address free_block = find_free_unused_block(package_id, die_id, gc_event->get_current_time());
-				if (free_block.valid != NONE) {
-					assert(free_block.package == package_id);
-					assert(free_block.die == die_id);
-					free_block_pointers[package_id][die_id] = copy_back_target = free_block;
-					do_copy_back = true;
+			// Decide whether a copy back should be allowed
+			bool copy_back_allowed = false;
+			Address copy_back_target;
+			if (MAX_REPEATED_COPY_BACKS_ALLOWED > 0) {
+				// Try to find a free page on the same die (should actually be plane!), so that a fast copy back can be done
+				copy_back_target = free_block_pointers[addr.package][addr.die];
+				if (has_free_pages(copy_back_target)) { // If there is a free page
+					copy_back_allowed = true;
+				} else {
+					Address free_block = find_free_unused_block(package_id, die_id, gc_event->get_current_time());
+					if (free_block.valid != NONE) {
+						assert(free_block.package == package_id);
+						assert(free_block.die == die_id);
+						free_block_pointers[package_id][die_id] = copy_back_target = free_block;
+						copy_back_allowed = true;
+					}
+				}
+
+				// Check if the pages copy back count is within bounds an and there is space in page_copy_back_count map for a new operation
+				if (copy_back_allowed) {
+					map<long, uint>::iterator copy_back_count = page_copy_back_count.find(logical_address);
+					bool address_in_map = (copy_back_count != page_copy_back_count.end());
+					// If address is not in map and map is full, or if page has already been copy backed as many times as allowed, do not copy back
+					if ((!address_in_map && page_copy_back_count.size() >= MAX_ITEMS_IN_COPY_BACK_MAP) ||
+						( address_in_map && copy_back_count->second >= MAX_REPEATED_COPY_BACKS_ALLOWED)
+					) copy_back_allowed = false;
+					// Else increment copy back counter for page (if address is not yet in map, it will be inserted and count will become 1)
+					else page_copy_back_count[logical_address]++;
 				}
 			}
 
-			// If a free page on the same die is found, do copy back, else just traditional and more expensive READ - WRITE garbage collection
-			if (do_copy_back) {
+			// If a copy back is allowed, do it. Otherwise, just do a traditional and more expensive READ - WRITE garbage collection
+			if (copy_back_allowed) {
 				Event* copy_back = new Event(COPY_BACK, logical_address, 1, gc_event->get_start_time());
 				copy_back->set_address(copy_back_target);
-				copy_back->set_replace_address(Address(victim->physical_address));
+				copy_back->set_replace_address(Address(victim->physical_address, PAGE));
 				copy_back->set_garbage_collection_op(true);
 				migration.push_back(copy_back);
+				printf("Doing COPY_BACK migration. Map content:\n");
+				for (map<long, uint>::iterator it = page_copy_back_count.begin(); it != page_copy_back_count.end(); it++) {
+					printf("lba %d\t: %d\n", it->first, it->second);
+				}
+				printf("COPY_BACK details: ");
+				copy_back->print(stdout);
 			} else {
 				Event* read = new Event(READ, logical_address, 1, gc_event->get_start_time());
 				read->set_address(addr);

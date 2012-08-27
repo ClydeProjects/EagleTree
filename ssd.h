@@ -185,6 +185,12 @@ extern const int PRINT_LEVEL;
  */
 extern const bool OS_LOCK;
 
+/* Defines the max number of copy back operations on a page before ECC check is performed.
+ * Set to zero to disable copy back GC operations */
+extern const uint MAX_REPEATED_COPY_BACKS_ALLOWED;
+
+/* Defines the max number of page addresses in map keeping track of each pages copy back count */
+extern const uint MAX_ITEMS_IN_COPY_BACK_MAP;
 
 /* Enumerations to clarify status integers in simulation
  * Do not use typedefs on enums for reader clarity */
@@ -915,7 +921,7 @@ protected:
 	FtlParent& ftl;
 	vector<vector<Address> > free_block_pointers;
 
-	map<Address, int> page_copyback_count; // Pages that have experienced a copy-back, mapped to a count of the number of copy-backs
+	map<long, uint> page_copy_back_count; // Pages that have experienced a copy-back, mapped to a count of the number of copy-backs
 private:
 
 	Block* choose_gc_victim(vector<long> candidates) const;

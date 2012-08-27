@@ -112,7 +112,7 @@ enum status Die::write(Event &event)
 	}
 	//last_read_io = event.get_application_io_id();
 	enum status result = data[event.get_address().plane].write(event);
-	currently_executing_io_finish_time = event.get_start_time() + event.get_time_taken();
+	currently_executing_io_finish_time = event.get_current_time();
 	return result;
 }
 
@@ -137,7 +137,7 @@ enum status Die::erase(Event &event)
 	}
 	//last_read_io = event.get_application_io_id();
 	enum status status = data[event.get_address().plane].erase(event);
-	currently_executing_io_finish_time = event.get_start_time() + event.get_time_taken();
+	currently_executing_io_finish_time = event.get_current_time();
 	/* update values if no errors */
 	if(status == SUCCESS)
 		update_wear_stats(event.get_address());
