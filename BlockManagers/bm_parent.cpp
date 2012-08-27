@@ -131,7 +131,11 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 		//free_block_pointers[ba.package][ba.die] = pointer;
 	}
 	if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
-		free_block_pointers[ba.package][ba.die] = find_free_unused_block(ba.package, ba.die, event.get_current_time());
+		printf("hot pointer ");
+		free_block_pointers[ba.package][ba.die].print();
+		printf("  is out of space.\n ");
+		Address free_pointer = find_free_unused_block(ba.package, ba.die, event.get_current_time());
+		free_block_pointers[ba.package][ba.die] = free_pointer;
 	}
 }
 
@@ -321,7 +325,7 @@ pair<bool, pair<uint, uint> > Block_manager_parent::get_free_block_pointer_with_
 			}
 		}
 	}
-	assert(at_least_one_address);
+	//assert(at_least_one_address);
 	return pair<bool, pair<uint, uint> >(can_write, pair<uint, uint>(best_channel_id, best_die_id));
 }
 
