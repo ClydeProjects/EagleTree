@@ -1057,6 +1057,8 @@ private:
 
 	void set_pointers_for_sequential_write(long key, double time);
 	Address perform_sequential_write(long key);
+	Address perform_sequential_write_shortest_queue(sequential_writes_pointers& swp);
+	Address perform_sequential_write_round_robin(sequential_writes_pointers& swp);
 
 	Sequential_Pattern_Detector* detector;
 
