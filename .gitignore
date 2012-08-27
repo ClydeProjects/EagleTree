@@ -5,4 +5,8 @@
 /Correctness
 .project
 .cproject
+*.o
+*.d
+*.mk
+*~
 
