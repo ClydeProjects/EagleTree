@@ -18,7 +18,6 @@ Block_manager_parallel_wearwolf::Block_manager_parallel_wearwolf(Ssd& ssd, FtlPa
 }
 
 void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event, enum status status) {
-	assert(event.get_event_type() == WRITE);
 	if (status == FAILURE) {
 		return;
 	}

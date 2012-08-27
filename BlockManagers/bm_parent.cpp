@@ -104,6 +104,12 @@ uint Block_manager_parent::sort_into_age_class(Address const& a) {
 	return !has_free_pages(pointer);
 }*/
 
+void Block_manager_parent::increment_pointer(Address& pointer) {
+	Address p = pointer;
+	p.page = p.page + 1;
+	pointer = p;
+}
+
 void Block_manager_parent::register_write_outcome(Event const& event, enum status status) {
 	assert(num_free_pages > 0);
 	num_free_pages--;
@@ -119,9 +125,10 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 
 	Address ba = Address(event.get_address().get_linear_address(), BLOCK);
 	if (ba.compare(free_block_pointers[ba.package][ba.die]) == BLOCK) {
-		Address pointer = free_block_pointers[ba.package][ba.die];
-		pointer.page = pointer.page + 1;
-		free_block_pointers[ba.package][ba.die] = pointer;
+		increment_pointer(free_block_pointers[ba.package][ba.die]);
+		//Address pointer = free_block_pointers[ba.package][ba.die];
+		//pointer.page = pointer.page + 1;
+		//free_block_pointers[ba.package][ba.die] = pointer;
 	}
 	if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
 		free_block_pointers[ba.package][ba.die] = find_free_unused_block(ba.package, ba.die, event.get_current_time());
@@ -518,6 +525,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 				Event* copy_back = new Event(COPY_BACK, logical_address, 1, gc_event->get_start_time());
 				copy_back->set_address(copy_back_target);
 				copy_back->set_replace_address(Address(victim->physical_address, PAGE));
+
 				copy_back->set_garbage_collection_op(true);
 				migration.push_back(copy_back);
 				printf("Doing COPY_BACK migration. Map content:\n");
@@ -526,6 +534,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 				}
 				printf("COPY_BACK details: ");
 				copy_back->print(stdout);
+				increment_pointer(free_block_pointers[addr.package][addr.die]);
 			} else {
 				Event* read = new Event(READ, logical_address, 1, gc_event->get_start_time());
 				read->set_address(addr);

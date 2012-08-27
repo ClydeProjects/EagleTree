@@ -242,12 +242,12 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	event_type new_op_code = dependency_code_to_type[dependency_code_of_new_event];
 	event_type scheduled_op_code = dependency_code_to_type[dependency_code_of_other_event];
 
-	if (new_event->is_garbage_collection_op() && (scheduled_op_code == WRITE || scheduled_op_code == COPY_BACK)) {
+	if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
 		promote_to_gc(existing_event);
 		remove_current_operation(new_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 	}
-	else if (existing_event->is_garbage_collection_op() && (new_op_code == WRITE || new_op_code == COPY_BACK)) {
+	else if (existing_event->is_garbage_collection_op() && new_op_code == WRITE) {
 		promote_to_gc(new_event);
 		remove_current_operation(existing_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
@@ -440,7 +440,7 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	}
 
 	VisualTracer::get_instance()->register_completed_event(*event);
-	if (event->get_event_type() == WRITE) {
+	if (event->get_event_type() == WRITE || event->get_event_type() == COPY_BACK) {
 		ftl.register_write_completion(*event, outcome);
 		bm->register_write_outcome(*event, outcome);
 		//StateTracer::print();
@@ -498,12 +498,12 @@ void IOScheduler::init_event(Event* event) {
 			migrations.pop_back();
 			Event * first = migration.front();
 			migration.pop_front();
+			dependencies[first->get_application_io_id()] = migration;
+			dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
+			dependency_code_to_type[first->get_application_io_id()] = WRITE;
 			if (first->get_event_type() == COPY_BACK) { // A single copy-back command
 				init_event(first);
 			} else { // A write preceded by a read
-				dependencies[first->get_application_io_id()] = migration;
-				dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
-				dependency_code_to_type[first->get_application_io_id()] = WRITE;
 				init_event(first);
 			}
 		}

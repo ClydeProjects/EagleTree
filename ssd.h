@@ -884,6 +884,7 @@ public:
 	vector<deque<Event*> > migrate(Event * gc_event);
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
+	void increment_pointer(Address& pointer);
 
 	bool can_write(Event const& write) const;
 
