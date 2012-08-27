@@ -40,9 +40,6 @@ Plane::Plane(const Die &parent, uint plane_size, double reg_read_delay, double r
 
 	parent(parent),
 
-	/* assume all Blocks are same so first one can start as least worn */
-	least_worn(0),
-
 	/* set erases remaining to BLOCK_ERASES to match Block constructor args */
 	erases_remaining(BLOCK_ERASES),
 
@@ -164,115 +161,6 @@ enum status Plane::erase(Event &event)
 	return status;
 }
 
-/* handle everything for a merge operation
- * 	address.block and address_merge.block must be valid
- * 	move event::address valid pages to event::address_merge empty pages
- * creates own events for resulting read/write operations
- * supports blocks that have different sizes */
-enum status Plane::_merge(Event &event)
-{
-	assert(event.get_address().block < size && event.get_address().valid > PLANE);
-	assert(reg_read_delay >= 0.0 && reg_write_delay >= 0.0);
-	uint i;
-	uint merge_count = 0;
-	uint merge_avail = 0;
-	uint num_merged = 0;
-	double total_delay = 0;
-
-	/* get and check address validity and size of blocks involved in the merge */
-	const Address &address = event.get_address();
-	const Address &merge_address = event.get_merge_address();
-	assert(address.compare(merge_address) >= BLOCK);
-	assert(address.block < size && merge_address.block < size);
-	uint block_size = data[address.block].get_size();
-	uint merge_block_size = data[merge_address.block].get_size();
-
-	/* how many pages must be moved */
-	for(i = 0; i < block_size; i++)
-		if(data[address.block].get_state(i) == VALID)
-			merge_count++;
-	
-	/* how many pages are available */
-	for(i = 0; i < merge_block_size; i++)
-		if(data[merge_address.block].get_state(i) == EMPTY)
-			merge_avail++;
-
-	/* fail if not enough space to do the merge */
-	if(merge_count > merge_avail)
-	{
-		fprintf(stderr, "Plane error: %s: Not enough space to merge block %d into block %d\n", __func__, address.block, merge_address.block);
-		return FAILURE;
-	}
-
-	/* create event classes to handle read and write events for the merge */
-	Address read(address);
-	Address write(merge_address);
-	read.page = 0;
-	read.valid = PAGE;
-	write.page = 0;
-	write.valid = PAGE;
-	Event read_event(READ, 0, 1, event.get_start_time());
-	Event write_event(WRITE, 0, 1, event.get_start_time());
-	read_event.set_address(read);
-	write_event.set_address(write);
-	
-	/* calculate merge delay and add to event time
-	 * use i as an error counter */
-	for(i = 0; num_merged < merge_count && read.page < block_size; read.page++)
-	{
-		/* find next page to read from */
-		if(data[read.block].get_state(read.page) == VALID)
-		{
-			/* read from page and set status to invalid */
-			if(data[read.block].read(read_event) == 0)
-			{
-				fprintf(stderr, "Plane error: %s: Read for merge block %d into %d failed\n", __func__, read.block, write.block);
-				i++;
-			}
-			data[read.block].invalidate_page(read.page);
-
-			/* get time taken for read and plane register write
-			 * read event time will accumulate and be added at end */
-			total_delay += reg_write_delay;
-
-			/* keep advancing from last page written to */
-			for(; write.page < merge_block_size; write.page++)
-			{
-				/* find next page to write to */
-				if(data[write.block].get_state(write.page) == EMPTY)
-				{
-					/* write to page (page::_write() sets status to valid) */
-					if(data[merge_address.block].write(write_event) == 0)
-					{
-						fprintf(stderr, "Plane error: %s: Write for merge block %d into %d failed\n", __func__, address.block, merge_address.block);
-						i++;
-					}
-
-					/* get time taken for plane register read
-					 * write event time will accumulate and be added at end */
-					total_delay += reg_read_delay;
-					num_merged++;
-					break;
-				}
-			}
-		}
-	}
-	total_delay += read_event.get_time_taken() + write_event.get_time_taken();
-	event.incr_time_taken(total_delay);
-
-	/* update next_page for the get_free_page method if we used the page */
-	if(next_page.valid < PAGE)
-		(void) get_next_page();
-
-	if(i == 0)
-		return SUCCESS;
-	else
-	{
-		fprintf(stderr, "Plane error: %s: %u failures during merge operation\n", __func__, i);
-		return FAILURE;
-	}
-}
-
 uint Plane::get_size(void) const
 {
 	return size;
@@ -314,18 +202,8 @@ void Plane::update_wear_stats(void)
 	for(i = 1; i < size; i++)
 		if(data[i].get_erases_remaining() > max)
 			max_index = i;
-	least_worn = max_index;
 	erases_remaining = max;
 	last_erase_time = data[max_index].get_last_erase_time();
-	return;
-}
-
-/* update given address.block to least worn block */
-void Plane::get_least_worn(Address &address) const
-{
-	assert(least_worn < size);
-	address.block = least_worn;
-	address.valid = BLOCK;
 	return;
 }
 

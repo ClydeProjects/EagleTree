@@ -144,27 +144,6 @@ enum status Die::erase(Event &event)
 	return status;
 }
 
-/* TODO: move Plane::_merge() to Die and make generic to handle merge across
- * 	both cases: 2 separate planes or within 1 plane */
-enum status Die::merge(Event &event)
-{
-	assert(data != NULL);
-	assert(event.get_address().plane < size && event.get_address().valid > DIE && event.get_merge_address().plane < size && event.get_merge_address().valid > DIE);
-	if(event.get_address().plane != event.get_merge_address().plane)
-		return _merge(event);
-	else return data[event.get_address().plane]._merge(event);
-}
-
-/* TODO: update stub as per Die::merge() comment above
- * to support Die-level merge operations */
-enum status Die::_merge(Event &event)
-{
-	assert(data != NULL);
-	assert(event.get_address().plane < size && event.get_address().valid > DIE && event.get_merge_address().plane < size && event.get_merge_address().valid > DIE);
-	assert(event.get_address().plane != event.get_merge_address().plane);
-	return SUCCESS;
-}
-
 double Die::get_currently_executing_io_finish_time() {
 	return currently_executing_io_finish_time;
 }
@@ -211,16 +190,6 @@ void Die::update_wear_stats(const Address &address)
 	least_worn = max_index;
 	erases_remaining = max;
 	last_erase_time = data[max_index].get_last_erase_time(address);
-	return;
-}
-
-/* update given address -> die to least worn die */
-void Die::get_least_worn(Address &address) const
-{
-	assert(data != NULL && least_worn < size);
-	address.plane = least_worn;
-	address.valid = PLANE;
-	data[least_worn].get_least_worn(address);
 	return;
 }
 

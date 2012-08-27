@@ -144,17 +144,9 @@ Ssd::~Ssd(void)
 
 void Ssd::event_arrive(Event* event) {
 	//printf("submitted: %d\n",  event->get_id());
-	assert(event->get_start_time() >= 0.0);
-	if (event->get_start_time() < last_io_submission_time) {
-		printf("%f  %f\n", event->get_start_time(), last_io_submission_time);
-		event->print();
-		int i = 0;
-		i++;
-	}
-
 	// Print error and terminate if start time of event is less than IO submission time
 	// assert(event->get_start_time() >= last_io_submission_time);
-	if (event->get_start_time() < last_io_submission_time) {
+	if (event->get_start_time() < last_io_submission_time + 0.00001) {
 		fprintf(stderr, "Error: Start time of event (%f) less than last IO submission time (%f).\n", event->get_start_time(), last_io_submission_time);
 		fprintf(stderr, "Triggering event: ");
 		event->print(stderr);
@@ -258,18 +250,6 @@ enum status Ssd::erase(Event &event)
 	return status;
 }
 
-enum status Ssd::merge(Event &event)
-{
-	assert(data != NULL && event.get_address().package < size && event.get_address().valid >= PACKAGE);
-	return data[event.get_address().package].merge(event);
-}
-
-enum status Ssd::merge_replacement_block(Event &event)
-{
-	//assert(data != NULL && event.get_address().package < size && event.get_address().valid >= PACKAGE && event.get_log_address().valid >= PACKAGE);
-	return SUCCESS;
-}
-
 /* add up the erases remaining for all packages in the ssd*/
 ulong Ssd::get_erases_remaining(const Address &address) const
 {
@@ -292,15 +272,6 @@ void Ssd::update_wear_stats(const Address &address)
 	least_worn = max_index;
 	erases_remaining = max;
 	last_erase_time = data[max_index].get_last_erase_time(address);
-	return;
-}
-
-void Ssd::get_least_worn(Address &address) const
-{
-	assert(data != NULL && least_worn < size);
-	address.package = least_worn;
-	address.valid = PACKAGE;
-	data[least_worn].get_least_worn(address);
 	return;
 }
 

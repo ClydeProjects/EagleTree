@@ -172,13 +172,25 @@ uint NUMBER_OF_ADDRESSABLE_BLOCKS = 0;
 /* RAISSDs: Number of physical SSDs */
 uint RAID_NUMBER_OF_PHYSICAL_SSDS = 0;
 
-/* Controls the block manager to be used. */
-int BLOCK_MANAGER_ID = 3;
-bool GREEDY_GC = true;
 
-/* PRINT_LEVEL:
- * 	determines the level of detail of output. From 0 to 2. 0 is the least detailed */
-int PRINT_LEVEL = 2;
+/*
+ * Block manager
+ * 0 -> Shortest Queues
+ * 1 -> Shortest Queues with Hot/Cold data deperation
+ * 2 -> Wearwolf
+ * 3 -> Wearwolf with Locality
+ * 4 -> Round Robin
+ */
+int BLOCK_MANAGER_ID = 2;
+
+bool GREEDY_GC = false;
+
+/* Output level of detail:
+ * 0 -> Nothing
+ * 1 -> Semi-detailed
+ * 2 -> Detailed
+ */
+int PRINT_LEVEL = 1;
 
 bool OS_LOCK = true;
 

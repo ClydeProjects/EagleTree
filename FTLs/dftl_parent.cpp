@@ -50,6 +50,10 @@ FtlImpl_DftlParent::MPage::MPage(long vpn)
 	this->cached = false;
 }
 
+bool FtlImpl_DftlParent::MPage::has_been_modified() {
+	return create_ts != modified_ts;
+}
+
 double FtlImpl_DftlParent::mpage_modified_ts_compare(const FtlImpl_DftlParent::MPage& mpage)
 {
 	if (!mpage.cached)
@@ -63,14 +67,12 @@ FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
 	addressSize(log(NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE)/log(2)),
 	addressPerPage(PAGE_SIZE / ( (ceil(addressSize / 8.0) * 2) )),
 	num_mapping_pages(ceil((double)(NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE) / addressPerPage)),
-	global_translation_directory( )
+	global_translation_directory( ),
+	totalCMTentries(CACHE_DFTL_LIMIT * addressPerPage)
 {
 	//addressPerPage = 0;
 	cmt = 0;
-	currentDataPage = -1;
-	currentTranslationPage = -1;
 	printf("Total required bits for representation: Address size: %i Total per page: %i \n", addressSize, addressPerPage);
-	totalCMTentries = CACHE_DFTL_LIMIT * addressPerPage;
 	printf("Number of elements in Cached Mapping Table (CMT): %i\n", totalCMTentries);
 
 	// Initialise block mapping table.
@@ -87,13 +89,21 @@ FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
 // we need to get the mapping page that it is written on.
 void FtlImpl_DftlParent::consult_GTD(long dlpn, Event *event)
 {
-	long mapping_virtual_address = get_mapping_virtual_address(event->get_logical_address());
-	if (global_translation_directory.count(mapping_virtual_address) == 1) {
-		long mapping_virtual_address = get_mapping_virtual_address(event->get_logical_address());
-		Event* readEvent = new Event(READ, mapping_virtual_address, 1, event->get_start_time());
+	long mapping_address = get_mapping_virtual_address(event->get_logical_address());
+	if (num_pages_written > cmt && global_translation_directory.count(mapping_address) == 1 && ongoing_mapping_reads.count(mapping_address) == 0) {
+		Event* readEvent = new Event(READ, mapping_address, 1, event->get_start_time());
 		readEvent->set_mapping_op(true);
-		current_dependent_events.push_front(readEvent);
+		//readEvent->set_application_io_id(event->get_application_io_id());
+		if (readEvent->get_id() == 244 || readEvent->get_id() == 246) {
+			int i = 0;
+			i++;
+		}
+		//current_dependent_events.push_front(readEvent);
 		controller.stats.numFTLRead++;
+		ongoing_mapping_reads[mapping_address].push_back(event->get_logical_address());
+	}
+	else if (global_translation_directory.count(mapping_address) == 1 && ongoing_mapping_reads.count(mapping_address) == 1) {
+		ongoing_mapping_reads[mapping_address].push_back(dlpn);
 	}
 }
 
@@ -129,115 +139,73 @@ void FtlImpl_DftlParent::resolve_mapping(Event *event, bool isWrite)
 {
 	if (lookup_CMT(event->get_logical_address(), event)) {
 		controller.stats.numCacheHits++;
-		evict_page_from_cache(event);
+
 	} else {
 		controller.stats.numCacheFaults++;
-		evict_page_from_cache(event);
 		uint dlpn = event->get_logical_address();
 		consult_GTD(dlpn, event);
 	}
+	evict_page_from_cache(event->get_current_time());
 }
 
-void FtlImpl_DftlParent::evict_page_from_cache(Event *event)
+// while there are too many pages in the cache, find a page that has not been accessed for
+void FtlImpl_DftlParent::evict_page_from_cache(double time)
 {
 	while (cmt >= totalCMTentries)
 	{
-		// Find page to evict
 		MpageByModified::iterator evictit = boost::multi_index::get<1>(trans_map).begin();
 		MPage evictPage = *evictit;
-
 		assert(evictPage.cached && evictPage.create_ts >= 0 && evictPage.modified_ts >= 0);
-
-		bool page_has_been_modified_and_should_be_updated_in_gmt = evictPage.create_ts != evictPage.modified_ts;
-		if (page_has_been_modified_and_should_be_updated_in_gmt)
+		if (evictPage.has_been_modified())
 		{
-			// we take the opportunity to also update all cached entries from the same mapping page.
-			// this means that when other entires from the same mapping page are evicted, they will not trigger a write.
-			int vpnBase = evictPage.vpn - evictPage.vpn % addressPerPage;
-			int num_cached_entries_in_mapping_page = 1;
-			for (int i=0;i<addressPerPage;i++)
-			{
-				MPage cur = trans_map[vpnBase+i];
-				if (cur.cached)
-				{
-					cur.create_ts = cur.modified_ts;
-					trans_map.replace(trans_map.begin()+vpnBase+i, cur);
-					num_cached_entries_in_mapping_page++;
-				}
-			}
-
-			// if not all entries from the mapping page are cached, need to read the page
-			long virtual_mapping_page_address = get_mapping_virtual_address(evictPage.vpn);
-			deque<Event*> mapping_events;
-			if (evictPage.ppn != -1 && num_cached_entries_in_mapping_page < addressPerPage) {
-				Event* readEvent = new Event(READ, virtual_mapping_page_address, 1, event->get_current_time());
-				readEvent->set_mapping_op(true);
-				mapping_events.push_back(readEvent);
-			}
-
-			Event* write_event = new Event(WRITE, virtual_mapping_page_address, 1, event->get_current_time());
-			write_event->set_mapping_op(true);
-			mapping_events.push_back(write_event);
-			IOScheduler::instance()->schedule_events_queue(mapping_events, write_event->get_logical_address(), WRITE);
-
-			controller.stats.numFTLWrite++;
-			controller.stats.numGCWrite++;
+			update_mapping_on_flash(evictPage.vpn, time);
 		}
-
-		// Remove page from cache.
-		cmt--;
-
-		evictPage.cached = false;
-		reset_MPage(evictPage);
-		trans_map.replace(trans_map.begin()+evictPage.vpn, evictPage);
+		remove_from_cache(evictPage.vpn);
 	}
 }
 
-// This method is called during a trim
-void FtlImpl_DftlParent::evict_specific_page_from_cache(Event *event, long lba)
-{
-		// Find page to evict
-		MPage evictPage = trans_map[lba];
+void FtlImpl_DftlParent::remove_from_cache(long lba) {
+	MPage victim = trans_map[lba];
+	cmt--;
+	victim.cached = false;
+	reset_MPage(victim);
+	trans_map.replace(trans_map.begin() + lba, victim);
+}
 
-		if (!evictPage.cached)
-			return;
-
-		assert(evictPage.cached && evictPage.create_ts >= 0 && evictPage.modified_ts >= 0);
-
-		if (evictPage.create_ts != evictPage.modified_ts)
+void FtlImpl_DftlParent::update_mapping_on_flash(long lba, double time) {
+	int vpnBase = lba - lba % addressPerPage;
+	int num_cached_entries_in_mapping_page = 1;
+	int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
+ 	int limit = addressPerPage < num_pages ? addressPerPage : num_pages;
+	for (int i = 0; i < limit; i++)
+	{
+		MPage cur = trans_map[vpnBase+i];
+		if (cur.cached)
 		{
-			// Evict page
-			// Inform the ssd model that it should invalidate the previous page.
-			// Calculate the start address of the translation page.
-			int vpnBase = evictPage.vpn - evictPage.vpn % addressPerPage;
-
-			int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
-			int limit = addressPerPage < num_pages ? addressPerPage : num_pages;
-
-			for (int i = 0; i < limit; i++)
-			{
-				MPage cur = trans_map[vpnBase+i];
-				if (cur.cached)
-				{
-					cur.create_ts = cur.modified_ts;
-					trans_map.replace(trans_map.begin()+vpnBase+i, cur);
-				}
-			}
-
-			// Simulate the write to translate page
-			long mapping_virtual_address = get_mapping_virtual_address(event->get_logical_address());
-			Event* write_event = new Event(WRITE, mapping_virtual_address, 1, event->get_current_time());
-			write_event->set_mapping_op(true);
-			IOScheduler::instance()->schedule_event(write_event, write_event->get_logical_address(), WRITE);
-
-			controller.stats.numFTLWrite++;
-			controller.stats.numGCWrite++;
+			cur.create_ts = cur.modified_ts;
+			trans_map.replace(trans_map.begin()+vpnBase+i, cur);
+			num_cached_entries_in_mapping_page++;
 		}
-		// Remove page from cache.
-		cmt--;
-		evictPage.cached = false;
-		reset_MPage(evictPage);
-		trans_map.replace(trans_map.begin()+evictPage.vpn, evictPage);
+	}
+
+	// if not all entries from the mapping page are cached, need to read the page
+	long virtual_mapping_page_address = get_mapping_virtual_address(lba);
+	deque<Event*> mapping_events;
+
+	Event* write_event = new Event(WRITE, virtual_mapping_page_address, 1, time);
+	write_event->set_mapping_op(true);
+
+	if (global_translation_directory.count(virtual_mapping_page_address) == 1 && num_cached_entries_in_mapping_page < addressPerPage) {
+		Event* readEvent = new Event(READ, virtual_mapping_page_address, 1, time);
+		readEvent->set_mapping_op(true);
+		readEvent->set_application_io_id(write_event->get_application_io_id());
+		mapping_events.push_back(readEvent);
+	}
+
+	mapping_events.push_back(write_event);
+	//IOScheduler::instance()->schedule_events_queue(mapping_events);
+	controller.stats.numFTLWrite++;
+	controller.stats.numGCWrite++;
 }
 
 long FtlImpl_DftlParent::get_logical_address(uint physical_address) const {
