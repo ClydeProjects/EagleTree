@@ -206,6 +206,9 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
+		if (event->get_id() == 3260) {
+			StateTracer::print();
+		}
 		Address result = bm->write(*event);
 		double wait_time = bm->in_how_long_can_this_event_be_scheduled(result, event->get_current_time());
 		if (wait_time == 0) {
@@ -275,8 +278,6 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	// if there are two reads to the same address, there is no point reading the same page twice.
 	else if (new_op_code == READ && scheduled_op_code == READ) {
 		//assert(false);
-		new_event->print();
-		existing_event->print();
 		make_dependent(new_event, existing_event);
 		new_event->set_noop(true);
 	}
@@ -292,7 +293,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if a read is scheduled when a trim is received, we must still execute the read. Then we can trim
 	else if (new_op_code == TRIM && scheduled_op_code == READ) {
-		assert(false);
+		make_dependent(new_event, existing_event);
 		//make_dependent(new_event, dependency_code_of_new_event, dependency_code_of_other_event);
 	}
 	// if something is to be trimmed, and a read is sent, invalidate the read
@@ -365,6 +366,9 @@ void IOScheduler::handle_next_batch(vector<Event*>& events) {
 	sort(events.begin(), events.end(), bus_wait_time_comparator);
 	for(uint i = 0; i < events.size(); i++) {
 		Event* event = events[i];
+		if (event->get_id() == 8323) {
+			event->print();
+		}
 		double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
 		bool can_schedule = can_schedule_on_die(event);
 		if (can_schedule && time == 0) {
@@ -381,6 +385,9 @@ void IOScheduler::handle_next_batch(vector<Event*>& events) {
 
 enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd.controller.issue(event);
+	if (event->get_logical_address() == 95 && event->get_event_type() == TRIM) {
+		event->print();
+	}
 	if (result == SUCCESS) {
 		int dependency_code = event->get_application_io_id();
 		if (dependencies[dependency_code].size() > 0) {
@@ -395,6 +402,9 @@ enum status IOScheduler::execute_next(Event* event) {
 			dependencies.erase(dependency_code);
 			uint lba = dependency_code_to_LBA[dependency_code];
 			if (event->get_event_type() != ERASE) {
+				if (LBA_currently_executing.count(lba) == 0) {
+					event->print();
+				}
 				assert(LBA_currently_executing.count(lba) == 1);
 				LBA_currently_executing.erase(lba);
 				assert(LBA_currently_executing.count(lba) == 0);
@@ -406,6 +416,9 @@ enum status IOScheduler::execute_next(Event* event) {
 				uint dependent_code = op_code_to_dependent_op_codes[dependency_code].front();
 				op_code_to_dependent_op_codes[dependency_code].pop();
 				Event* dependant_event = dependencies[dependent_code].front();
+				if (dependant_event->get_event_type() == TRIM) {
+					dependant_event->print();
+				}
 				dependencies[dependent_code].pop_front();
 				future_events.push_back(dependant_event);
 			}
@@ -500,12 +513,8 @@ void IOScheduler::init_event(Event* event) {
 			migration.pop_front();
 			dependencies[first->get_application_io_id()] = migration;
 			dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
-			dependency_code_to_type[first->get_application_io_id()] = WRITE;
-			if (first->get_event_type() == COPY_BACK) { // A single copy-back command
-				init_event(first);
-			} else { // A write preceded by a read
-				init_event(first);
-			}
+			dependency_code_to_type[first->get_application_io_id()] = /*WRITE*/first->get_event_type(); // Seems more generic to just use event type of whatever event is in from on deque
+			init_event(first);
 		}
 		delete event;
 	}

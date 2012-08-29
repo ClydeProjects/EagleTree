@@ -23,7 +23,7 @@ Block_manager_roundrobin::~Block_manager_roundrobin(void)
 {}
 
 void Block_manager_roundrobin::register_write_outcome(Event const& event, enum status status) {
-	assert(event.get_event_type() == WRITE);
+	// assert(event.get_event_type() == WRITE);
 	if (status == FAILURE) {
 		return;
 	}
@@ -47,6 +47,7 @@ void Block_manager_roundrobin::register_erase_outcome(Event const& event, enum s
 	check_if_should_trigger_more_GC(event.get_current_time());
 }
 
+// TODO handle situation where the next LUN to write to does not have space
 Address Block_manager_roundrobin::write(Event const& write) { // const
 	Address result;
 	bool can_write = Block_manager_parent::can_write(write);

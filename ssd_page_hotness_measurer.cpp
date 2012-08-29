@@ -282,7 +282,7 @@ Address BloomFilter_Page_Hotness_Measurer::get_best_target_die_for_WC(enum read_
 void BloomFilter_Page_Hotness_Measurer::register_event(Event const& event) {
 	// Fetch page address information and type (read/write) from event
 	enum event_type type = event.get_event_type();
-	assert(type == WRITE || type == READ_COMMAND);
+	assert(type == WRITE || type == READ_COMMAND || type == COPY_BACK);
 	ulong page_address = event.get_logical_address();
 	Address invalidated_address = event.get_replace_address(); // The physical address of page being invalidated
 	Address physical_address = event.get_address(); // The physical address of page written

@@ -125,7 +125,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 
 	Address ba = Address(event.get_address().get_linear_address(), BLOCK);
 	if (ba.compare(free_block_pointers[ba.package][ba.die]) == BLOCK) {
-		increment_pointer(free_block_pointers[ba.package][ba.die]);
+		if (event.get_event_type() == WRITE) increment_pointer(free_block_pointers[ba.package][ba.die]);
 		//Address pointer = free_block_pointers[ba.package][ba.die];
 		//pointer.page = pointer.page + 1;
 		//free_block_pointers[ba.package][ba.die] = pointer;
@@ -474,8 +474,6 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 		printf("\n");
 	}
 
-
-
 	// if there is not enough free space to migrate the block into, cancel the GC operation
 
 	assert(victim->get_state() != FREE);
@@ -528,13 +526,14 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 			if (copy_back_allowed) {
 				Event* copy_back = new Event(COPY_BACK, logical_address, 1, gc_event->get_start_time());
 				copy_back->set_address(copy_back_target);
-				copy_back->set_replace_address(Address(victim->physical_address, PAGE));
-
+				copy_back->set_replace_address(addr);
 				copy_back->set_garbage_collection_op(true);
+
 				migration.push_back(copy_back);
+
 				printf("Doing COPY_BACK migration. Map content:\n");
 				for (map<long, uint>::iterator it = page_copy_back_count.begin(); it != page_copy_back_count.end(); it++) {
-					printf("lba %d\t: %d\n", it->first, it->second);
+					printf("  lba %d\t: %d\n", it->first, it->second);
 				}
 				printf("COPY_BACK details: ");
 				copy_back->print(stdout);

@@ -97,7 +97,10 @@ enum status Die::read(Event &event)
 	if (event.get_start_time() + event.get_time_taken() < currently_executing_io_finish_time) {
 		return FAILURE;
 	}
-	last_read_io = event.get_application_io_id();
+	if (event.get_event_type() == READ_COMMAND) {
+		last_read_io = event.get_application_io_id();
+	}
+
 	enum status result = data[event.get_address().plane].read(event);
 	currently_executing_io_finish_time = event.get_start_time() + event.get_time_taken();
 	return result;
