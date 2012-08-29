@@ -49,16 +49,14 @@ Address Block_manager_parallel_wearwolf_locality::write(Event const& event) {
 		return Block_manager_parallel_wearwolf::write(event);
 	} else {
 		//printf("performing seq write for: %d  key: %d  id: %d \n", event.get_logical_address(), key, event.get_id());
-		return perform_sequential_write(key);
+		return perform_sequential_write(event, key);
 	}
 }
 
-Address Block_manager_parallel_wearwolf_locality::perform_sequential_write(long key) {
+Address Block_manager_parallel_wearwolf_locality::perform_sequential_write(Event const& event, long key) {
 	Address to_return;
 	sequential_writes_pointers& swp = seq_write_key_to_pointers_mapping[key];
-	vector<vector<Address> >& pointers = swp.pointers;
 	//printf("num seq pointers left: %d\n", seq_write_key_to_pointers_mapping[key].num_pointers);
-
 	if (strat == SHOREST_QUEUE) {
 		to_return = perform_sequential_write_shortest_queue(swp);
 	} else if (strat == ROUND_ROBIN) {
@@ -67,7 +65,10 @@ Address Block_manager_parallel_wearwolf_locality::perform_sequential_write(long 
 			to_return = perform_sequential_write_shortest_queue(swp);
 		}
 	}
-
+	if (!has_free_pages(to_return)) {
+		schedule_gc(event.get_current_time(), -1, -1, -1);
+		to_return = Block_manager_parallel_wearwolf::write(event);
+	}
 	return to_return;
 }
 

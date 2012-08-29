@@ -1056,7 +1056,7 @@ private:
 	map<long, sequential_writes_pointers> seq_write_key_to_pointers_mapping;
 
 	void set_pointers_for_sequential_write(long key, double time);
-	Address perform_sequential_write(long key);
+	Address perform_sequential_write(Event const& event, long key);
 	Address perform_sequential_write_shortest_queue(sequential_writes_pointers& swp);
 	Address perform_sequential_write_round_robin(sequential_writes_pointers& swp);
 
