@@ -223,6 +223,11 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 	}
 }
 
+bool IOScheduler::should_event_be_scheduled(Event* event) {
+	remove_redundant_events(event);
+	uint la = event->get_logical_address();
+	return LBA_currently_executing.count(la) == 1 && LBA_currently_executing[la] == event->get_application_io_id();
+}
 
 void IOScheduler::remove_redundant_events(Event* new_event) {
 	uint la = new_event->get_logical_address();
@@ -300,8 +305,6 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	else if (new_op_code == READ && scheduled_op_code == TRIM) {
 		remove_current_operation(new_event);
 	}
-
-
 }
 
 Event* IOScheduler::find_scheduled_event(uint dependency_code) {
@@ -480,31 +483,32 @@ void IOScheduler::print_stats() {
 
 void IOScheduler::init_event(Event* event) {
 	uint dep_code = event->get_application_io_id();
+	event_type type = event->get_event_type();
+
+	if (type == TRIM || type == READ_COMMAND || type == READ_TRANSFER || type == WRITE || type == COPY_BACK) {
+		if (should_event_be_scheduled(event)) {
+			current_events.push_back(event);
+		}
+	}
+
 	if (event->get_event_type() == READ) {
 		event->set_event_type(READ_COMMAND);
 		Event* read_transfer = new Event(*event);
 		read_transfer->set_event_type(READ_TRANSFER);
 		dependencies[dep_code].push_front(read_transfer);
 		init_event(event);
-		//remove_redundant_events(event);
 	}
-	else if (event->get_event_type() == READ_COMMAND || event->get_event_type() == READ_TRANSFER) {
+	else if (type == READ_COMMAND || type == READ_TRANSFER) {
 		ftl.set_read_address(*event);
-		current_events.push_back(event);
-		remove_redundant_events(event);
 	}
-	else if (event->get_event_type() == WRITE) {
+	else if (type == WRITE) {
 		bm->register_write_arrival(*event);
 		ftl.set_replace_address(*event);
-		current_events.push_back(event);
-		remove_redundant_events(event);
 	}
-	else if (event->get_event_type() == TRIM) {
+	else if (type == TRIM) {
 		ftl.set_replace_address(*event);
-		current_events.push_back(event);
-		remove_redundant_events(event);
 	}
-	else if (event->get_event_type() == GARBAGE_COLLECTION) {
+	else if (type == GARBAGE_COLLECTION) {
 		vector<deque<Event*> > migrations = bm->migrate(event);
 		while (migrations.size() > 0) {
 			deque<Event*> migration = migrations.back();
@@ -518,11 +522,10 @@ void IOScheduler::init_event(Event* event) {
 		}
 		delete event;
 	}
-	else if (event->get_event_type() == COPY_BACK) {
-		current_events.push_back(event);
-		remove_redundant_events(event);
+	else if (type == COPY_BACK) {
+		//current_events.push_back(event);
 	}
-	else if (event->get_event_type() == ERASE) {
+	else if (type == ERASE) {
 		current_events.push_back(event);
 	}
 }

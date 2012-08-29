@@ -1097,6 +1097,7 @@ private:
 	bool can_schedule_on_die(Event const* event) const;
 	void handle_finished_event(Event *event, enum status outcome);
 	void remove_redundant_events(Event* new_event);
+	bool should_event_be_scheduled(Event* event);
 	void init_event(Event* event);
 	void handle_noop_events(vector<Event*>& events);
 
