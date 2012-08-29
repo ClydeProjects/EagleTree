@@ -45,7 +45,8 @@ void VisualTracer::register_completed_event(Event const& event) {
 	int i = event.get_start_time() + event.get_bus_wait_time() - trace[add.package][add.die].size();
 	write(add.package, add.die, ' ', i);
 
-	if (event.get_event_type() == WRITE) {
+	event_type type = event.get_event_type();
+	if (type == WRITE) {
 		write(add.package, add.die, 't', 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY);
 		vector<vector<char> > symbols;
 		vector<char> logical_address = get_int_as_char_vector(event.get_logical_address());
@@ -57,14 +58,29 @@ void VisualTracer::register_completed_event(Event const& event) {
 			symbols.push_back(gc_symbol);
 		}
 		write_with_id(add.package, add.die, 'w', PAGE_WRITE_DELAY - 1, symbols);
-	} else if (event.get_event_type() == READ_COMMAND) {
+	} else if (type == READ_COMMAND) {
 		write(add.package, add.die, 't', BUS_CTRL_DELAY);
 		write(add.package, add.die, 'r', PAGE_READ_DELAY - 1);
-	} else if (event.get_event_type() == READ_TRANSFER) {
+	} else if (type == READ_TRANSFER) {
 		write(add.package, add.die, 't', BUS_CTRL_DELAY + BUS_DATA_DELAY - 1);
-	} else if (event.get_event_type() == ERASE) {
+	} else if (type == ERASE) {
 		write(add.package, add.die, 't', BUS_CTRL_DELAY);
 		write(add.package, add.die, 'e', BLOCK_ERASE_DELAY - 1);
+	} else if (type == COPY_BACK) {
+		vector<vector<char> > symbols;
+		vector<char> logical_address = get_int_as_char_vector(event.get_logical_address());
+		symbols.push_back(logical_address);
+		if (event.is_garbage_collection_op()) {
+			vector<char> gc_symbol(2);
+			gc_symbol[0] = 'C';
+			gc_symbol[1] = 'B';
+			symbols.push_back(gc_symbol);
+		}
+
+		write(add.package, add.die, 't', BUS_CTRL_DELAY);
+		write(add.package, add.die, 'r', PAGE_READ_DELAY);
+		write(add.package, add.die, 't', BUS_CTRL_DELAY);
+		write_with_id(add.package, add.die, 'w', PAGE_WRITE_DELAY - 1, symbols);
 	}
 	trace[add.package][add.die].push_back('|');
 }

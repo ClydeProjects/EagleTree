@@ -432,6 +432,43 @@ Block* Block_manager_parent::choose_gc_victim(vector<long> candidates) const {
 	return best_block;
 }
 
+// Returns true if a copy back is allowed on a given logical address
+bool Block_manager_parent::copy_back_allowed_on(long logical_address) {
+	if (MAX_REPEATED_COPY_BACKS_ALLOWED <= 0 || MAX_ITEMS_IN_COPY_BACK_MAP <= 0) return false;
+	map<long, uint>::iterator copy_back_count = page_copy_back_count.find(logical_address);
+	bool address_in_map = (copy_back_count != page_copy_back_count.end());
+	// If address is not in map and map is full, or if page has already been copy backed as many times as allowed, copy back is not allowed
+	if ((!address_in_map && page_copy_back_count.size() >= MAX_ITEMS_IN_COPY_BACK_MAP) ||
+		( address_in_map && copy_back_count->second >= MAX_REPEATED_COPY_BACKS_ALLOWED)) return false;
+	else return true;
+}
+
+// Returns a reserved address from a free block on a chosen package/die
+Address Block_manager_parent::reserve_page_on(uint package, uint die, double time) {
+	Address free_block;
+	// Try to find a free page on the same die (should actually be plane!), so that a fast copy back can be done
+	free_block = free_block_pointers[package][die];
+	if (!has_free_pages(free_block)) { // If there is a free page
+		Address free_block = find_free_unused_block(package, die, time);
+		if (free_block.valid == NONE) return Address(0, NONE); // No free block could be found
+		assert(free_block.package == package);
+		assert(free_block.die == die);
+		free_block_pointers[package][die] = free_block;
+	}
+	increment_pointer(free_block_pointers[package][die]); // Increment pointer so the returned page is not used again in the future (it is reserved)
+	return free_block;
+}
+
+// Updates map keeping track of performed copy backs for each logical address
+void Block_manager_parent::register_copy_back_operation_on(uint logical_address) {
+	page_copy_back_count[logical_address]++; // Increment copy back counter for target page (if address is not yet in map, it will be inserted and count will become 1)
+}
+
+// Signals than an ECC check has been performed on a page, meaning that it can be copy backed again in the future
+void Block_manager_parent::register_ECC_check_on(uint logical_address) {
+	page_copy_back_count.erase(logical_address);
+}
+
 // Reads and rewrites all valid pages of a block somewhere else
 // An erase is issued in register_write_completion after the last
 // page from this block has been migrated
@@ -491,53 +528,18 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 			deque<Event*> migration;
 
-			// Decide whether a copy back should be allowed
-			bool copy_back_allowed = false;
-			Address copy_back_target;
-			if (MAX_REPEATED_COPY_BACKS_ALLOWED > 0) {
-				// Try to find a free page on the same die (should actually be plane!), so that a fast copy back can be done
-				copy_back_target = free_block_pointers[addr.package][addr.die];
-				if (has_free_pages(copy_back_target)) { // If there is a free page
-					copy_back_allowed = true;
-				} else {
-					Address free_block = find_free_unused_block(package_id, die_id, gc_event->get_current_time());
-					if (free_block.valid != NONE) {
-						assert(free_block.package == package_id);
-						assert(free_block.die == die_id);
-						free_block_pointers[package_id][die_id] = copy_back_target = free_block;
-						copy_back_allowed = true;
-					}
-				}
+			// If a copy back is allowed, try to reserve a page on the same die
+			Address copy_back_target = copy_back_allowed_on(logical_address) ? reserve_page_on(addr.package, addr.die, gc_event->get_current_time()) : Address(0, NONE);
 
-				// Check if the pages copy back count is within bounds an and there is space in page_copy_back_count map for a new operation
-				if (copy_back_allowed) {
-					map<long, uint>::iterator copy_back_count = page_copy_back_count.find(logical_address);
-					bool address_in_map = (copy_back_count != page_copy_back_count.end());
-					// If address is not in map and map is full, or if page has already been copy backed as many times as allowed, do not copy back
-					if ((!address_in_map && page_copy_back_count.size() >= MAX_ITEMS_IN_COPY_BACK_MAP) ||
-						( address_in_map && copy_back_count->second >= MAX_REPEATED_COPY_BACKS_ALLOWED)
-					) copy_back_allowed = false;
-					// Else increment copy back counter for page (if address is not yet in map, it will be inserted and count will become 1)
-					else page_copy_back_count[logical_address]++;
-				}
-			}
-
-			// If a copy back is allowed, do it. Otherwise, just do a traditional and more expensive READ - WRITE garbage collection
-			if (copy_back_allowed) {
+			// If a copy back is allowed, and a target page could be reserved, do it. Otherwise, just do a traditional and more expensive READ - WRITE garbage collection
+			if (copy_back_target.valid != NONE) {
 				Event* copy_back = new Event(COPY_BACK, logical_address, 1, gc_event->get_start_time());
 				copy_back->set_address(copy_back_target);
 				copy_back->set_replace_address(addr);
 				copy_back->set_garbage_collection_op(true);
-
 				migration.push_back(copy_back);
-
-				printf("Doing COPY_BACK migration. Map content:\n");
-				for (map<long, uint>::iterator it = page_copy_back_count.begin(); it != page_copy_back_count.end(); it++) {
-					printf("  lba %d\t: %d\n", it->first, it->second);
-				}
-				printf("COPY_BACK details: ");
-				copy_back->print(stdout);
-				increment_pointer(free_block_pointers[addr.package][addr.die]);
+				register_copy_back_operation_on(logical_address);
+				//printf("COPY_BACK MAP (Size: %d):\n", page_copy_back_count.size()); for (map<long, uint>::iterator it = page_copy_back_count.begin(); it != page_copy_back_count.end(); it++) printf(" lba %d\t: %d\n", it->first, it->second);
 			} else {
 				Event* read = new Event(READ, logical_address, 1, gc_event->get_start_time());
 				read->set_address(addr);
@@ -549,6 +551,8 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 				migration.push_back(read);
 				migration.push_back(write);
+
+				register_ECC_check_on(logical_address); // An ECC check happens in a normal read-write GC operation
 			}
 			migrations.push_back(migration);
 		}

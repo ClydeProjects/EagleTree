@@ -206,9 +206,6 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
-		if (event->get_id() == 3260) {
-			StateTracer::print();
-		}
 		Address result = bm->write(*event);
 		double wait_time = bm->in_how_long_can_this_event_be_scheduled(result, event->get_current_time());
 		if (wait_time == 0) {
@@ -252,22 +249,26 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 
 	if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
 		promote_to_gc(existing_event);
-		remove_current_operation(new_event);
+		//remove_current_operation(new_event);
+		new_event->set_noop(true);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 	}
 	else if (existing_event->is_garbage_collection_op() && new_op_code == WRITE) {
 		promote_to_gc(new_event);
-		remove_current_operation(existing_event);
+		//remove_current_operation(existing_event);
+		existing_event->set_noop(true);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 	}
 	// if two writes are scheduled, the one before is irrelevant and may as well be cancelled
 	else if (new_op_code == WRITE && scheduled_op_code == WRITE) {
-		remove_current_operation(existing_event);
+		//remove_current_operation(existing_event);
+		existing_event->set_noop(true);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 		stats.num_write_cancellations++;
 	}
 	else if (new_op_code == WRITE && scheduled_op_code == READ && existing_event->is_mapping_op()) {
-		remove_current_operation(existing_event);
+		//remove_current_operation(existing_event);
+		existing_event->set_noop(true);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 		//make_dependent(new_event, dependency_code_of_new_event, dependency_code_of_other_event);
 	}
@@ -278,7 +279,8 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if there is a read, and a write is scheduled, then the contents of the write must be buffered, so the read can wait
 	else if (new_op_code == READ && scheduled_op_code == WRITE) {
-		remove_current_operation(new_event);
+		//remove_current_operation(new_event);
+		new_event->set_noop(true);
 	}
 	// if there are two reads to the same address, there is no point reading the same page twice.
 	else if (new_op_code == READ && scheduled_op_code == READ) {
@@ -288,7 +290,8 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if a write is scheduled when a trim is received, we may as well cancel the write
 	else if (new_op_code == TRIM && scheduled_op_code == WRITE) {
-		remove_current_operation(existing_event);
+		//remove_current_operation(existing_event);
+		existing_event->set_noop(true);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 	}
 	// if a trim is scheduled, and a write arrives, may as well let the trim execute first
@@ -303,7 +306,13 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if something is to be trimmed, and a read is sent, invalidate the read
 	else if (new_op_code == READ && scheduled_op_code == TRIM) {
-		remove_current_operation(new_event);
+		//remove_current_operation(new_event);
+		new_event->set_noop(true);
+	}
+	// if something is to be trimmed, and a copy back is sent, the copy back is unnecessary to perform; however, since the copy back destination
+	// address is already reserved, we need to use it
+	else if (new_op_code == TRIM && scheduled_op_code == COPY_BACK) {
+		make_dependent(new_event, existing_event);
 	}
 }
 
@@ -369,9 +378,6 @@ void IOScheduler::handle_next_batch(vector<Event*>& events) {
 	sort(events.begin(), events.end(), bus_wait_time_comparator);
 	for(uint i = 0; i < events.size(); i++) {
 		Event* event = events[i];
-		if (event->get_id() == 8323) {
-			event->print();
-		}
 		double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
 		bool can_schedule = can_schedule_on_die(event);
 		if (can_schedule && time == 0) {
@@ -523,7 +529,7 @@ void IOScheduler::init_event(Event* event) {
 		delete event;
 	}
 	else if (type == COPY_BACK) {
-		//current_events.push_back(event);
+		// current_events.push_back(event);
 	}
 	else if (type == ERASE) {
 		current_events.push_back(event);

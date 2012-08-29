@@ -77,7 +77,7 @@ void file_manager_experiment() {
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
 	VisualTracer::get_instance()->print_horizontally_with_breaks();
-	StateTracer::print();
+	//StateTracer::print();
 	delete os;
 }
 

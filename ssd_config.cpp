@@ -199,7 +199,7 @@ bool OS_LOCK = true;
 uint MAX_REPEATED_COPY_BACKS_ALLOWED = 1;
 
 /* Defines the max number of page addresses in map keeping track of each pages copy back count */
-uint MAX_ITEMS_IN_COPY_BACK_MAP = 16;
+uint MAX_ITEMS_IN_COPY_BACK_MAP = 1;
 
 void load_entry(char *name, double value, uint line_number) {
 	/* cheap implementation - go through all possibilities and match entry */

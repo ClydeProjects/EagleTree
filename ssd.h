@@ -918,6 +918,12 @@ private:
 	void issue_erase(Address a, double time);
 	void remove_as_gc_candidate(Address const& phys_address);
 	void Wear_Level(Event const& event);
+
+	bool copy_back_allowed_on(long logical_address);
+	Address reserve_page_on(uint package, uint die, double time);
+	void register_copy_back_operation_on(uint logical_address);
+	void register_ECC_check_on(uint logical_address);
+
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 	bool greedy_gc;
@@ -1538,6 +1544,8 @@ private:
 	vector<vector<uint> > num_gc_reads_per_LUN;
 	vector<vector<uint> > num_gc_writes_per_LUN;
 
+	vector<vector<uint> > num_copy_backs_per_LUN;
+
 	vector<vector<uint> > num_erases_per_LUN;
 };
 
@@ -1754,6 +1762,8 @@ private:
 	int currently_executing_ios_counter;
 	int currently_pending_ios_counter;
 	double last_dispatched_event_minimal_finish_time;
+
+	set<uint> currently_executing_ios;
 };
 
 /*class Block_manager
