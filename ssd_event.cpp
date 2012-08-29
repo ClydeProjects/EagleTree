@@ -50,7 +50,8 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	garbage_collection_op(false),
 	mapping_op(false),
 	original_application_io(false),
-	age_class(0)
+	age_class(0),
+	tag(-1)
 {
 	assert(start_time >= 0.0);
 	if (VIRTUAL_PAGE_SIZE == 1)
@@ -70,6 +71,14 @@ ulong Event::get_logical_address(void) const
 uint Event::get_id(void) const
 {
 	return id;
+}
+
+int Event::get_tag() const {
+	return tag;
+}
+
+void Event::set_tag(int new_tag) {
+	tag = new_tag;
 }
 
 const Address &Event::get_address(void) const

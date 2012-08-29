@@ -26,6 +26,14 @@ void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event cons
 	}
 	long lb = write.get_logical_address();
 
+	int tag = write.get_tag();
+	if (tag != -1 && tag_map.count(tag) == 0 && write.get_size() > THRESHOLD) {
+		tagged_sequential_write tsw(tag, write.get_size());
+		tag_map[tag] = tsw;
+		set_pointers_for_sequential_write(lb, write.get_current_time());
+		return;
+	}
+
 	sequential_writes_tracking const& swt = detector->register_event(lb, write.get_current_time());
 	if (PRINT_LEVEL > 1) {
 		printf("arrival: %d  in time: %f\n", write.get_logical_address(), write.get_current_time());
@@ -42,15 +50,18 @@ void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event cons
 
 
 Address Block_manager_parallel_wearwolf_locality::write(Event const& event) {
-	ulong lb = event.get_logical_address();
-	long key = detector->get_sequential_write_id(lb);
-	bool key_exists = seq_write_key_to_pointers_mapping.count(key) == 1;
-	if (!key_exists  || (key_exists && seq_write_key_to_pointers_mapping[key].num_pointers == 0)) {
-		return Block_manager_parallel_wearwolf::write(event);
-	} else {
-		//printf("performing seq write for: %d  key: %d  id: %d \n", event.get_logical_address(), key, event.get_id());
+	long key = detector->get_sequential_write_id(event.get_logical_address());
+
+	if (seq_write_key_to_pointers_mapping.count(key) == 1 && seq_write_key_to_pointers_mapping[key].num_pointers > 0) {
 		return perform_sequential_write(event, key);
 	}
+
+	int tag = event.get_tag();
+	if (tag != -1 && tag_map.count(tag) == 1) {
+		return perform_sequential_write(event, tag_map[tag].key);
+	}
+
+	return Block_manager_parallel_wearwolf::write(event);
 }
 
 Address Block_manager_parallel_wearwolf_locality::perform_sequential_write(Event const& event, long key) {
@@ -120,14 +131,30 @@ void Block_manager_parallel_wearwolf_locality::set_pointers_for_sequential_write
 	}
 }
 
+void Block_manager_parallel_wearwolf_locality::set_pointers_for_tagged_sequential_write(int tag, double time) {
+	int num_blocks_needed = ceil(tag_map[tag].size / (double)BLOCK_SIZE);
 
+	int num_LUNs = SSD_SIZE * PACKAGE_SIZE;
+	int num_blocks_to_allocate_now = max(num_blocks_needed, num_LUNs);
+
+	int key = tag_map[tag].key;
+
+	if (num_blocks_needed >= num_LUNs) {
+		seq_write_key_to_pointers_mapping[key].pointers = vector<vector<Address> >(SSD_SIZE, vector<Address>(PACKAGE_SIZE));
+	}
+
+	for (uint i = 0; i < num_blocks_to_allocate_now; i++) {
+		uint package = i % SSD_SIZE;
+		uint die = (i / SSD_SIZE) % PACKAGE_SIZE;
+		Address free_block = find_free_unused_block(package, die, time);
+
+
+
+	}
+}
 
 void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event const& event, enum status status) {
 	long lb = event.get_logical_address();
-	if (event.get_id() == 14071) {
-		int i = 0;
-		i++;
-	}
 	long key = detector->get_sequential_write_id(lb);
 	if (seq_write_key_to_pointers_mapping.count(key) == 1 && seq_write_key_to_pointers_mapping[key].num_pointers > 0) {
 		Block_manager_parent::register_write_outcome(event, status);

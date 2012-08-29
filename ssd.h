@@ -424,6 +424,8 @@ public:
 	double get_bus_wait_time(void) const;
 	bool get_noop(void) const;
 	uint get_id(void) const;
+	int get_tag() const;
+	void set_tag(int new_tag);
 	void set_address(const Address &address);
 	void set_merge_address(const Address &address);
 	void set_log_address(const Address &address);
@@ -472,6 +474,7 @@ private:
 	static uint application_io_id_generator;
 
 	int age_class;
+	int tag;
 };
 
 /* Single bus channel
@@ -1053,9 +1056,16 @@ private:
 		sequential_writes_pointers();
 	};
 
+	struct tagged_sequential_write {
+		int size;
+		int key;
+		tagged_sequential_write(int key, int size) : key(key), size(size) {}
+	};
+
 	map<long, sequential_writes_pointers> seq_write_key_to_pointers_mapping;
 
 	void set_pointers_for_sequential_write(long key, double time);
+	void set_pointers_for_tagged_sequential_write(int tag, double time);
 	Address perform_sequential_write(Event const& event, long key);
 	Address perform_sequential_write_shortest_queue(sequential_writes_pointers& swp);
 	Address perform_sequential_write_round_robin(sequential_writes_pointers& swp);
@@ -1064,6 +1074,8 @@ private:
 
 	enum strategy {SHOREST_QUEUE, ROUND_ROBIN};
 	strategy strat;
+
+	map<long, tagged_sequential_write> tag_map; // maps from tags of sequential writes to the size of the sequential write
 };
 
 class IOScheduler {
@@ -1677,7 +1689,7 @@ private:
 		double time_finished;
 		static int file_id_generator;
 		const uint size;
-		int file_id;
+		int id;
 		uint num_pages_written;
 		deque<Address_Range > ranges_comprising_file;
 		Address_Range current_range_being_written;
