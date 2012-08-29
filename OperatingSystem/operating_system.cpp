@@ -40,6 +40,14 @@ void OperatingSystem::run() {
 		int thread_id = pick_event_with_shortest_start_time();
 		if (thread_id == -1 || (currently_executing_ios_counter > 0 && last_dispatched_event_minimal_finish_time < events[thread_id]->get_start_time())) {
 			ssd->progress_since_os_is_idle();
+
+			/*
+			printf("Idle. Events running (%d) (%d):", currently_executing_ios_counter, currently_pending_ios_counter);
+			for (set<uint>::iterator it = currently_executing_ios.begin(); it != currently_executing_ios.end(); it++) {
+				printf(" %d", *it);
+			}
+			printf("\n");
+			*/
 		}
 		else {
 			dispatch_event(thread_id);
@@ -48,7 +56,7 @@ void OperatingSystem::run() {
 }
 
 int OperatingSystem::pick_event_with_shortest_start_time() {
-	double soonest_time = 1000000000;
+	double soonest_time = numeric_limits<double>::max();
 	int thread_id = -1;
 
 	for (uint i = 0; i < events.size(); i++) {
@@ -65,6 +73,7 @@ void OperatingSystem::dispatch_event(int thread_id) {
 	Event* event = events[thread_id];
 
 	currently_executing_ios_counter++;
+	currently_executing_ios.insert(event->get_id());
 	currently_pending_ios_counter--;
 
 	double min_completion_time = get_event_minimal_completion_time(event);
@@ -113,6 +122,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 		}
 	}
 	currently_executing_ios_counter--;
+	currently_executing_ios.erase(event->get_id());
 	delete event;
 }
 
