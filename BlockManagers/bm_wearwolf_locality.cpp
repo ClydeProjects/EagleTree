@@ -24,20 +24,22 @@ void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event cons
 	if (!write.is_original_application_io()) {
 		return;
 	}
-	long lb = write.get_logical_address();
-
+	if (PRINT_LEVEL > 1) {
+		printf("arrival: %d  in time: %f\n", write.get_logical_address(), write.get_current_time());
+	}
 	int tag = write.get_tag();
 	if (tag != -1 && tag_map.count(tag) == 0 && write.get_size() > THRESHOLD) {
 		tagged_sequential_write tsw(tag, write.get_size());
 		tag_map[tag] = tsw;
-		set_pointers_for_sequential_write(lb, write.get_current_time());
+		set_pointers_for_tagged_sequential_write(tag, write.get_current_time());
+		return;
+	}
+	else if (tag != -1) {
 		return;
 	}
 
+	uint lb = write.get_logical_address();
 	sequential_writes_tracking const& swt = detector->register_event(lb, write.get_current_time());
-	if (PRINT_LEVEL > 1) {
-		printf("arrival: %d  in time: %f\n", write.get_logical_address(), write.get_current_time());
-	}
 	// checks if should allocate pointers for the pattern
 	if (swt.num_times_pattern_has_repeated == 0 && swt.counter == THRESHOLD) {
 		if (PRINT_LEVEL > 1) {
@@ -77,7 +79,7 @@ Address Block_manager_parallel_wearwolf_locality::perform_sequential_write(Event
 		}
 	}
 	if (!has_free_pages(to_return)) {
-		schedule_gc(event.get_current_time(), -1, -1, -1);
+		schedule_gc(event.get_current_time(), -1, -1, -1);  // TODO only trigger GC if tagged need more space
 		to_return = Block_manager_parallel_wearwolf::write(event);
 	}
 	return to_return;
@@ -133,29 +135,33 @@ void Block_manager_parallel_wearwolf_locality::set_pointers_for_sequential_write
 
 void Block_manager_parallel_wearwolf_locality::set_pointers_for_tagged_sequential_write(int tag, double time) {
 	int num_blocks_needed = ceil(tag_map[tag].size / (double)BLOCK_SIZE);
-
 	int num_LUNs = SSD_SIZE * PACKAGE_SIZE;
-	int num_blocks_to_allocate_now = max(num_blocks_needed, num_LUNs);
-
+	int num_blocks_to_allocate_now = min(num_blocks_needed, num_LUNs);
 	int key = tag_map[tag].key;
-
-	if (num_blocks_needed >= num_LUNs) {
-		seq_write_key_to_pointers_mapping[key].pointers = vector<vector<Address> >(SSD_SIZE, vector<Address>(PACKAGE_SIZE));
-	}
-
-	for (uint i = 0; i < num_blocks_to_allocate_now; i++) {
+	vector<vector<Address> >& pointers = seq_write_key_to_pointers_mapping[key].pointers;
+	for (int i = 0; i < num_blocks_to_allocate_now; i++) {
 		uint package = i % SSD_SIZE;
 		uint die = (i / SSD_SIZE) % PACKAGE_SIZE;
 		Address free_block = find_free_unused_block(package, die, time);
-
-
-
+		if (pointers.size() <= package) {
+			pointers.push_back(vector<Address>(0));
+		}
+		pointers[package].push_back(free_block);
+		if (has_free_pages(free_block)) {
+			tag_map[tag].free_allocated_space += BLOCK_SIZE;
+			seq_write_key_to_pointers_mapping[key].num_pointers++;
+		}
 	}
 }
 
 void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event const& event, enum status status) {
 	long lb = event.get_logical_address();
-	long key = detector->get_sequential_write_id(lb);
+	long key;
+	if (event.get_tag() != -1) {
+		key = tag_map[event.get_tag()].key;
+	} else {
+		key = detector->get_sequential_write_id(lb);
+	}
 	if (seq_write_key_to_pointers_mapping.count(key) == 1 && seq_write_key_to_pointers_mapping[key].num_pointers > 0) {
 		Block_manager_parent::register_write_outcome(event, status);
 		page_hotness_measurer.register_event(event);
@@ -179,25 +185,29 @@ void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event cons
 		Address selected_pointer = swp.pointers[i][j];
 		selected_pointer.page++;
 		swp.pointers[i][j] = selected_pointer;
+		bool allocate_more_blocks = !has_free_pages(selected_pointer);
 
-		if (selected_pointer.page == BLOCK_SIZE) {
+		if (event.get_tag() != -1) {
+			tag_map[event.get_tag()].pages_to_write--;
+			if (!tag_map[event.get_tag()].need_more_space())
+				allocate_more_blocks = false;
+		}
+
+		if (allocate_more_blocks) {
 			Address free_block;
 			if (parallel_degree == ONE) {
 				free_block = find_free_unused_block(event.get_current_time());
 				if (free_block.valid == NONE) {
-					//perform_gc(event.get_current_time());
 					schedule_gc(event.get_current_time());
 				}
 			} else if (parallel_degree == CHANNEL) {
 				free_block = find_free_unused_block(event.get_address().package, event.get_current_time());
 				if (free_block.valid == NONE) {
-					//perform_gc(event.get_address().package, event.get_current_time());
 					schedule_gc(event.get_current_time(), event.get_address().package);
 				}
 			} else if (parallel_degree == LUN) {
 				free_block = find_free_unused_block(event.get_address().package, event.get_address().die, event.get_current_time());
 				if (free_block.valid == NONE) {
-					//perform_gc(event.get_address().package, event.get_address().die, event.get_current_time());
 					schedule_gc(event.get_current_time(), event.get_address().package, event.get_address().die);
 				}
 			}
@@ -211,9 +221,6 @@ void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event cons
 	} else {
 		Block_manager_parallel_wearwolf::register_write_outcome(event, status);
 	}
-	/*if (event.is_original_application_io()) {
-		recorder->register_event(lb, event.get_current_time());
-	}*/
 }
 
 void Block_manager_parallel_wearwolf_locality::sequential_event_metadata_removed(long key) {
@@ -233,10 +240,12 @@ void Block_manager_parallel_wearwolf_locality::sequential_event_metadata_removed
 }
 
 void Block_manager_parallel_wearwolf_locality::register_erase_outcome(Event const& event, enum status status) {
-
-
-
 	Block_manager_parallel_wearwolf::register_erase_outcome(event, status);
+
+	if (event.get_id() == 241) {
+		int i = 0;
+		i++;
+	}
 
 	int i, j;
 	if (parallel_degree == ONE) {
@@ -249,9 +258,12 @@ void Block_manager_parallel_wearwolf_locality::register_erase_outcome(Event cons
 		j = event.get_address().die;
 	}
 
+	//if ()
+
 	map<long, sequential_writes_pointers >::iterator iter = seq_write_key_to_pointers_mapping.begin();
 	for (; iter != seq_write_key_to_pointers_mapping.end(); iter++) {
-		if (!has_free_pages((*iter).second.pointers[i][j])) {
+		Address& pointer = (*iter).second.pointers[i][j];
+		if (!has_free_pages(pointer)) {
 			if (parallel_degree == ONE) {
 				(*iter).second.pointers[i][j] = find_free_unused_block(event.get_current_time());
 			} else if (parallel_degree == CHANNEL) {
@@ -259,7 +271,7 @@ void Block_manager_parallel_wearwolf_locality::register_erase_outcome(Event cons
 			} else if (parallel_degree == LUN) {
 				(*iter).second.pointers[i][j] = find_free_unused_block(i, j, event.get_current_time());
 			}
-			if (has_free_pages((*iter).second.pointers[i][j])) {
+			if (has_free_pages(pointer)) {
 				(*iter).second.num_pointers++;
 			}
 		}
@@ -273,7 +285,6 @@ Block_manager_parallel_wearwolf_locality::sequential_writes_pointers::sequential
 	  pointers(),
 	  cursor(rand() % 100)
 {}
-
 
 /*void Block_manager_parallel_wearwolf_locality::check_if_should_trigger_more_GC(double start_time) {
 	map<long, vector<vector<Address> > >::iterator iter = seq_write_key_to_pointers_mapping.begin();

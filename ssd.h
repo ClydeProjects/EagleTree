@@ -1057,9 +1057,13 @@ private:
 	};
 
 	struct tagged_sequential_write {
-		int size;
 		int key;
-		tagged_sequential_write(int key, int size) : key(key), size(size) {}
+		int size;
+		int free_allocated_space;
+		int pages_to_write;
+		tagged_sequential_write() : key(-1), size(-1), free_allocated_space(0), pages_to_write(size) {}
+		tagged_sequential_write(int key, int size) : key(key), size(size), free_allocated_space(0), pages_to_write(size) {}
+		bool need_more_space() {	return pages_to_write > free_allocated_space; }
 	};
 
 	map<long, sequential_writes_pointers> seq_write_key_to_pointers_mapping;
