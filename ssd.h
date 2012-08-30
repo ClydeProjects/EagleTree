@@ -1053,14 +1053,12 @@ private:
 		int num_pointers;
 		vector<vector<Address> > pointers;
 		uint cursor;
+		int tag;
 		sequential_writes_pointers();
 	};
 
 	struct tagged_sequential_write {
-		int key;
-		int size;
-		int free_allocated_space;
-		int pages_to_write;
+		int key, size, free_allocated_space, pages_to_write;
 		tagged_sequential_write() : key(-1), size(-1), free_allocated_space(0), pages_to_write(size) {}
 		tagged_sequential_write(int key, int size) : key(key), size(size), free_allocated_space(0), pages_to_write(size) {}
 		bool need_more_space() {	return pages_to_write > free_allocated_space; }

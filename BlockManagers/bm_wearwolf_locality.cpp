@@ -75,6 +75,7 @@ Address Block_manager_parallel_wearwolf_locality::perform_sequential_write(Event
 	} else if (strat == ROUND_ROBIN) {
 		to_return = perform_sequential_write_round_robin(swp);
 		if (to_return.page == BLOCK_SIZE) {
+			swp.cursor++;
 			to_return = perform_sequential_write_shortest_queue(swp);
 		}
 	}
@@ -138,6 +139,7 @@ void Block_manager_parallel_wearwolf_locality::set_pointers_for_tagged_sequentia
 	int num_LUNs = SSD_SIZE * PACKAGE_SIZE;
 	int num_blocks_to_allocate_now = min(num_blocks_needed, num_LUNs);
 	int key = tag_map[tag].key;
+	seq_write_key_to_pointers_mapping[key].tag = tag;
 	vector<vector<Address> >& pointers = seq_write_key_to_pointers_mapping[key].pointers;
 	for (int i = 0; i < num_blocks_to_allocate_now; i++) {
 		uint package = i % SSD_SIZE;
@@ -258,7 +260,8 @@ void Block_manager_parallel_wearwolf_locality::register_erase_outcome(Event cons
 		j = event.get_address().die;
 	}
 
-	//if ()
+	// need to figure out if a pointer is actually needed, only when there is a tag
+	// need to ensure I don't crash
 
 	map<long, sequential_writes_pointers >::iterator iter = seq_write_key_to_pointers_mapping.begin();
 	for (; iter != seq_write_key_to_pointers_mapping.end(); iter++) {
@@ -283,7 +286,8 @@ void Block_manager_parallel_wearwolf_locality::register_erase_outcome(Event cons
 Block_manager_parallel_wearwolf_locality::sequential_writes_pointers::sequential_writes_pointers()
 	: num_pointers(0),
 	  pointers(),
-	  cursor(rand() % 100)
+	  cursor(rand() % 100),
+	  tag(-1)
 {}
 
 /*void Block_manager_parallel_wearwolf_locality::check_if_should_trigger_more_GC(double start_time) {
