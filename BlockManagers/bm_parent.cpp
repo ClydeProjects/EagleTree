@@ -113,6 +113,7 @@ void Block_manager_parent::increment_pointer(Address& pointer) {
 void Block_manager_parent::register_write_outcome(Event const& event, enum status status) {
 	assert(num_free_pages > 0);
 	num_free_pages--;
+
 	if (!event.is_garbage_collection_op()) {
 		assert(num_available_pages_for_new_writes > 0);
 		num_available_pages_for_new_writes--;
@@ -124,11 +125,8 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	trim(event);
 
 	Address ba = Address(event.get_address().get_linear_address(), BLOCK);
-	if (ba.compare(free_block_pointers[ba.package][ba.die]) == BLOCK) {
-		if (event.get_event_type() == WRITE) increment_pointer(free_block_pointers[ba.package][ba.die]);
-		//Address pointer = free_block_pointers[ba.package][ba.die];
-		//pointer.page = pointer.page + 1;
-		//free_block_pointers[ba.package][ba.die] = pointer;
+	if (ba.compare(free_block_pointers[ba.package][ba.die]) == BLOCK && event.get_event_type() == WRITE) {
+		increment_pointer(free_block_pointers[ba.package][ba.die]);
 	}
 	if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
 		printf("hot pointer ");
@@ -445,17 +443,17 @@ bool Block_manager_parent::copy_back_allowed_on(long logical_address) {
 
 // Returns a reserved address from a free block on a chosen package/die
 Address Block_manager_parent::reserve_page_on(uint package, uint die, double time) {
-	Address free_block;
 	// Try to find a free page on the same die (should actually be plane!), so that a fast copy back can be done
-	free_block = free_block_pointers[package][die];
-	if (!has_free_pages(free_block)) { // If there is a free page
-		Address free_block = find_free_unused_block(package, die, time);
-		if (free_block.valid == NONE) return Address(0, NONE); // No free block could be found
+	Address free_block = free_block_pointers[package][die];
+	if (!has_free_pages(free_block)) { // If there is no free pages left, try to find another block
+		free_block = find_free_unused_block(package, die, time);
+		if (free_block.valid == NONE) return Address(0, NONE); // Another free block could not be found, return FAIL
 		assert(free_block.package == package);
 		assert(free_block.die == die);
 		free_block_pointers[package][die] = free_block;
 	}
 	increment_pointer(free_block_pointers[package][die]); // Increment pointer so the returned page is not used again in the future (it is reserved)
+	assert(free_block.page < BLOCK_SIZE);
 	return free_block;
 }
 

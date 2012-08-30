@@ -314,6 +314,9 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	else if (new_op_code == TRIM && scheduled_op_code == COPY_BACK) {
 		make_dependent(new_event, existing_event);
 	}
+	else if (new_op_code == COPY_BACK && scheduled_op_code == TRIM) {
+		make_dependent(existing_event, new_event);
+	}
 }
 
 Event* IOScheduler::find_scheduled_event(uint dependency_code) {
@@ -394,9 +397,6 @@ void IOScheduler::handle_next_batch(vector<Event*>& events) {
 
 enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd.controller.issue(event);
-	if (event->get_logical_address() == 95 && event->get_event_type() == TRIM) {
-		event->print();
-	}
 	if (result == SUCCESS) {
 		int dependency_code = event->get_application_io_id();
 		if (dependencies[dependency_code].size() > 0) {
