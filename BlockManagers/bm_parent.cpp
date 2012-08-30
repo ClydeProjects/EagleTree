@@ -336,6 +336,11 @@ uint Block_manager_parent::how_many_gc_operations_are_scheduled() const {
 }
 
 bool Block_manager_parent::has_free_pages(Address const& address) const {
+	if (address.valid == NONE && address.page != 0) {
+		int i = 0;
+		i++;
+	}
+
 	return address.valid == PAGE && address.page < BLOCK_SIZE;
 }
 
@@ -380,7 +385,7 @@ void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, 
 	gc->set_address(address);
 	gc->set_age_class(klass);
 	if (PRINT_LEVEL > 1) {
-		printf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
+		//intf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
 	}
 	IOScheduler::instance()->schedule_event(gc);
 }
