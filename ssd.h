@@ -1019,6 +1019,7 @@ public:
 	int get_num_times_pattern_has_repeated(logical_address lb);
 	double get_arrival_time_of_last_io_in_pattern(logical_address lb);
 	void set_listener(Sequential_Pattern_Detector_Listener * listener);
+	void remove_old_sequential_writes_metadata(double time);
 private:
 	map<logical_address, logical_address> sequential_writes_key_lookup;  // a map from the next expected LBA in a seqeuntial pattern to the first LBA, which is the key
 	map<logical_address, sequential_writes_tracking*> sequential_writes_identification_and_data;	// a map from the first logical write of a sequential pattern to metadata about the pattern
@@ -1026,7 +1027,7 @@ private:
 	sequential_writes_tracking* restart_pattern(int key, double time);
 	sequential_writes_tracking* process_next_write(int lb, double time);
 	sequential_writes_tracking* init_pattern(int lb, double time);
-	void remove_old_sequential_writes_metadata(double time);
+
 
 	uint registration_counter;
 	Sequential_Pattern_Detector_Listener* listener;

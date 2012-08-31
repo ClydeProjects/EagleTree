@@ -384,8 +384,8 @@ void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, 
 	gc->set_noop(true);
 	gc->set_address(address);
 	gc->set_age_class(klass);
-	if (PRINT_LEVEL > 1) {
-		//intf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
+	if (PRINT_LEVEL > 0) {
+		printf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
 	}
 	IOScheduler::instance()->schedule_event(gc);
 }

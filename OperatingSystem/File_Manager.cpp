@@ -10,6 +10,8 @@
 
 using namespace ssd;
 
+#define ENABLE_TAGGING false
+
 File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, double time_breaks, double start_time, ulong randseed)
 	: Thread(start_time), min_LBA(min_LBA), max_LBA(max_LBA),
 	  num_files_to_write(num_files_to_write), time_breaks(time_breaks),
@@ -41,8 +43,11 @@ Event* File_Manager::issue_trim() {
 
 Event* File_Manager::issue_write() {
 	long lba = current_file->get_next_lba_to_be_written();
-	Event* event = new Event(WRITE, lba, 1, time);
-	//event->set_tag(current_file->id);
+	long size = ENABLE_TAGGING ? current_file->size : 1;
+	Event* event = new Event(WRITE, lba, current_file->size, time);
+	if (ENABLE_TAGGING) {
+		event->set_tag(current_file->id);
+	}
 	time += time_breaks;
 	return event;
 }
@@ -68,6 +73,8 @@ void File_Manager::handle_file_completion(double current_time) {
 	do {
 		randomly_delete_files();
 	} while (free_ranges.size() == 0);
+	StateTracer::print();
+	StatisticsGatherer::get_instance()->print();
 	write_next_file();
 }
 

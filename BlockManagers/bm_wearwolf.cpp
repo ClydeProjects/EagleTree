@@ -4,7 +4,7 @@
 using namespace ssd;
 
 Block_manager_parallel_wearwolf::Block_manager_parallel_wearwolf(Ssd& ssd, FtlParent& ftl)
-	: Block_manager_parent(ssd, ftl, 2),
+	: Block_manager_parent(ssd, ftl, 1),
 	  page_hotness_measurer()
 {
 	wcrh_pointer = find_free_unused_block(0, 0, 0);
@@ -133,6 +133,10 @@ Address Block_manager_parallel_wearwolf::write(Event const& write) {
 	if ((write.is_garbage_collection_op()) ||
 			(!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0)) {
 
+		if (PRINT_LEVEL > 1) {
+			printf("Trying to migrate a write %s page, but could not find a relevant pointer.\n", w_hotness == WRITE_COLD ? "cold" : "hot");
+		}
+
 		if (wcrh_pointer.page < BLOCK_SIZE) {
 			result = wcrh_pointer;
 		} else if (wcrc_pointer.page < BLOCK_SIZE) {
@@ -141,17 +145,7 @@ Address Block_manager_parallel_wearwolf::write(Event const& write) {
 			result = get_free_block_pointer_with_shortest_IO_queue();
 		}
 
-		if (PRINT_LEVEL > 1) {
-			printf("Trying to migrate a write %s page, but could not find a relevant pointer.\n", w_hotness == WRITE_COLD ? "cold" : "hot");
 
-			if (write.get_current_time() > 46000) {
-				int i = 0;
-				i++;
-			}
-
-			StateTracer::print();
-			write.print();
-		}
 	}
 	return result;
 }
