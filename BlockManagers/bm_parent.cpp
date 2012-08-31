@@ -117,6 +117,11 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	}
 	trim(event);
 
+	if (event.get_id() == 17789) {
+		int f = 0;
+		f++;
+	}
+
 	Address ba = Address(event.get_address().get_linear_address(), BLOCK);
 	if (ba.compare(free_block_pointers[ba.package][ba.die]) == BLOCK) {
 		Address pointer = free_block_pointers[ba.package][ba.die];
@@ -336,11 +341,6 @@ uint Block_manager_parent::how_many_gc_operations_are_scheduled() const {
 }
 
 bool Block_manager_parent::has_free_pages(Address const& address) const {
-	if (address.valid == NONE && address.page != 0) {
-		int i = 0;
-		i++;
-	}
-
 	return address.valid == PAGE && address.page < BLOCK_SIZE;
 }
 
@@ -473,13 +473,17 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 	}
 
 
-
 	// if there is not enough free space to migrate the block into, cancel the GC operation
 
 	assert(victim->get_state() != FREE);
 	assert(victim->get_state() != PARTIALLY_FREE);
 
 	num_available_pages_for_new_writes -= victim->get_pages_valid();
+
+	if (gc_event->get_id() == 18213) {
+		int i = 0;
+		i++;
+	}
 
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
@@ -493,28 +497,28 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 			// Try to find a free page on the same die (should actually be plane!), so that a fast copy back can be done
 			bool do_copy_back = false;
-			Address copy_back_target = free_block_pointers[addr.package][addr.die];
-			if (has_free_pages(copy_back_target)) { // If there is a free page
-				do_copy_back = true;
-			} else {
-				Address free_block = find_free_unused_block(package_id, die_id, gc_event->get_current_time());
-				if (free_block.valid != NONE) {
-					assert(free_block.package == package_id);
-					assert(free_block.die == die_id);
-					free_block_pointers[package_id][die_id] = copy_back_target = free_block;
-					do_copy_back = true;
-				}
-			}
+			//Address copy_back_target = free_block_pointers[addr.package][addr.die];
+			//if (has_free_pages(copy_back_target)) { // If there is a free page
+			//	do_copy_back = true;
+			//} else {
+			//	Address free_block = find_free_unused_block(package_id, die_id, gc_event->get_current_time());
+			//	if (has_free_pages(free_block)) {
+			//		assert(free_block.package == package_id);
+			//		assert(free_block.die == die_id);
+			//		free_block_pointers[package_id][die_id] = copy_back_target = free_block;
+			//		do_copy_back = true;
+			//	}
+			//}
 
-			do_copy_back = false; // Tempoary disabled.
+			//do_copy_back = false; // Tempoary disabled.
 
 			// If a free page on the same die is found, do copy back, else just traditional and more expensive READ - WRITE garbage collection
 			if (do_copy_back) {
-				Event* copy_back = new Event(COPY_BACK, logical_address, 1, gc_event->get_start_time());
-				copy_back->set_address(copy_back_target);
+			//Event* copy_back = new Event(COPY_BACK, logical_address, 1, gc_event->get_start_time());
+			//copy_back->set_address(copy_back_target);
 				//copy_back->set_replace_address(Address(victim->physical_address));
-				copy_back->set_garbage_collection_op(true);
-				migration.push_back(copy_back);
+			//	copy_back->set_garbage_collection_op(true);
+				//	migration.push_back(copy_back);
 			} else {
 				Event* read = new Event(READ, logical_address, 1, gc_event->get_start_time());
 				read->set_address(addr);
@@ -545,6 +549,7 @@ Address Block_manager_parent::find_free_unused_block(double time) {
 }
 
 Address Block_manager_parent::find_free_unused_block(uint package_id, double time) {
+	assert(package_id < SSD_SIZE);
 	for (uint i = 0; i < PACKAGE_SIZE; i++) {
 		Address address = find_free_unused_block(package_id, i, time);
 		if (address.valid != NONE) {
@@ -556,6 +561,7 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, double tim
 
 // finds and returns a free block from a particular die in the SSD
 Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_id, double time) {
+	assert(package_id < SSD_SIZE && die_id < PACKAGE_SIZE);
 	for (uint i = 0; i < free_blocks[package_id][die_id].size(); i++) {
 		Address address = find_free_unused_block(package_id, die_id, i, time);
 		if (address.valid != NONE) {
@@ -566,6 +572,7 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 }
 
 Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_id, uint klass, double time) {
+	assert(package_id < SSD_SIZE && die_id < PACKAGE_SIZE && klass < num_age_classes);
 	Address to_return;
 	uint num_free_blocks_left = free_blocks[package_id][die_id][klass].size();
 	if (num_free_blocks_left > 0) {

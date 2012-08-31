@@ -1058,10 +1058,11 @@ private:
 	};
 
 	struct tagged_sequential_write {
-		int key, size, free_allocated_space, pages_to_write;
-		tagged_sequential_write() : key(-1), size(-1), free_allocated_space(0), pages_to_write(size) {}
-		tagged_sequential_write(int key, int size) : key(key), size(size), free_allocated_space(0), pages_to_write(size) {}
-		bool need_more_space() {	return pages_to_write > free_allocated_space; }
+		int key, size, free_allocated_space, num_written;
+		tagged_sequential_write() : key(-1), size(-1), free_allocated_space(0), num_written(0) {}
+		tagged_sequential_write(int key, int size) : key(key), size(size), free_allocated_space(0), num_written(0) {}
+		bool need_more_space() {	return is_finished() ? false : size > free_allocated_space; }
+		bool is_finished() {	return num_written == size; }
 	};
 
 	map<long, sequential_writes_pointers> seq_write_key_to_pointers_mapping;

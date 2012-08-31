@@ -41,8 +41,8 @@ Event* File_Manager::issue_trim() {
 
 Event* File_Manager::issue_write() {
 	long lba = current_file->get_next_lba_to_be_written();
-	Event* event = new Event(WRITE, lba, current_file->size, time);
-	event->set_tag(current_file->id);
+	Event* event = new Event(WRITE, lba, 1, time);
+	//event->set_tag(current_file->id);
 	time += time_breaks;
 	return event;
 }

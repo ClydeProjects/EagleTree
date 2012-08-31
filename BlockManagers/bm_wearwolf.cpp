@@ -26,14 +26,17 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 	page_hotness_measurer.register_event(event);
 
 	// Increment block pointer
-	uint package_id = event.get_address().package;
-	uint die_id = event.get_address().die;
 	Address block_address = Address(event.get_address().get_linear_address(), BLOCK);
 
-	if (block_address.compare(wcrh_pointer) == BLOCK) {
+	if (block_address.compare(wcrh_pointer) == BLOCK && has_free_pages(wcrh_pointer)) {
 		wcrh_pointer.page = wcrh_pointer.page + 1;
-	} else if (block_address.compare(wcrc_pointer) == BLOCK) {
+		if (wcrh_pointer.page > BLOCK_SIZE) {
+			event.print();
+		}
+		assert(wcrh_pointer.page <= BLOCK_SIZE);
+	} else if (block_address.compare(wcrc_pointer) == BLOCK && has_free_pages(wcrc_pointer)) {
 		wcrc_pointer.page = wcrc_pointer.page + 1;
+		assert(wcrc_pointer.page <= BLOCK_SIZE);
 	}
 
 	if (!has_free_pages(wcrh_pointer)) {
@@ -105,6 +108,10 @@ Address Block_manager_parallel_wearwolf::write(Event const& write) {
 		return result;
 	}
 
+	if (write.get_id() == 17790 && write.get_bus_wait_time() > 934) {
+		write.print();
+	}
+
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
 	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(write.get_logical_address());
 
@@ -136,6 +143,14 @@ Address Block_manager_parallel_wearwolf::write(Event const& write) {
 
 		if (PRINT_LEVEL > 1) {
 			printf("Trying to migrate a write %s page, but could not find a relevant pointer.\n", w_hotness == WRITE_COLD ? "cold" : "hot");
+
+			if (write.get_current_time() > 46000) {
+				int i = 0;
+				i++;
+			}
+
+			StateTracer::print();
+			write.print();
 		}
 	}
 	return result;

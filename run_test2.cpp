@@ -73,7 +73,7 @@ void file_manager_experiment() {
 	Thread* fm1 = new File_Manager(0, 399, 60, 100, 10, 1, 1);
 	Thread* fm2 = new File_Manager(400, 799, 60, 100, 10, 2, 2);
 	threads.push_back(fm1);
-	//threads.push_back(fm2);
+	threads.push_back(fm2);
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
 	VisualTracer::get_instance()->print_horizontally_with_breaks();
