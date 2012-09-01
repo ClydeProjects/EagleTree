@@ -5,4 +5,4 @@
 /Correctness
 .project
 .cproject
-
+*.o
