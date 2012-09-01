@@ -385,6 +385,7 @@ void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, 
 	gc->set_address(address);
 	gc->set_age_class(klass);
 	if (PRINT_LEVEL > 0) {
+		//StateTracer::print();
 		printf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
 	}
 	IOScheduler::instance()->schedule_event(gc);
@@ -579,6 +580,7 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 		to_return = free_blocks[package_id][die_id][klass].back();
 		free_blocks[package_id][die_id][klass].pop_back();
 		num_free_blocks_left--;
+		assert(has_free_pages(to_return));
 	}
 	uint num_free_blocks_before_gc = GREEDY_GC ? 1 : 0;
 	if (num_free_blocks_left <= num_free_blocks_before_gc) {
@@ -592,7 +594,8 @@ Address Block_manager_parent::find_free_unused_block_with_class(uint klass, doub
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			Address a = free_blocks[i][j][klass].back();
-			if (a.valid != NONE) {
+			if (has_free_pages(a)) {
+				free_blocks[i][j][klass].pop_back();
 				if (greedy_gc && free_blocks[i][j][klass].size() < 2) {
 					//perform_gc(i, j, klass, time);
 					schedule_gc(time, i, j, klass);
@@ -605,7 +608,7 @@ Address Block_manager_parent::find_free_unused_block_with_class(uint klass, doub
 }
 
 void Block_manager_parent::return_unfilled_block(Address pba) {
-	if (pba.page < BLOCK_SIZE) {
+	if (has_free_pages(pba)) {
 		int age_class = sort_into_age_class(pba);
 		free_blocks[pba.package][pba.die][age_class].push_back(pba);
 	}

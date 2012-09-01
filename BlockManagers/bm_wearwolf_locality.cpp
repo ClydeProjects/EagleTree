@@ -27,9 +27,10 @@ void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event cons
 	if (PRINT_LEVEL > 1) {
 		printf("arrival: %d  in time: %f\n", write.get_logical_address(), write.get_current_time());
 	}
+	ulong lb = write.get_logical_address();
 	int tag = write.get_tag();
 	if (tag != -1 && tag_map.count(tag) == 0) {
-		tagged_sequential_write tsw(tag, write.get_size());
+		tagged_sequential_write tsw(lb, write.get_size());
 		tag_map[tag] = tsw;
 		set_pointers_for_tagged_sequential_write(tag, write.get_current_time());
 		return;
@@ -38,7 +39,6 @@ void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event cons
 		return;
 	}
 
-	uint lb = write.get_logical_address();
 	sequential_writes_tracking const& swt = detector->register_event(lb, write.get_current_time());
 	// checks if should allocate pointers for the pattern
 	if (swt.num_times_pattern_has_repeated == 0 && swt.counter == THRESHOLD) {
