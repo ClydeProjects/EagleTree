@@ -6,7 +6,6 @@
 .project
 .cproject
 *.o
-<<<<<<< HEAD
 *.d
 *.mk
 *~
