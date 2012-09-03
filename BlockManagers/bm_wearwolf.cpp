@@ -54,7 +54,7 @@ void Block_manager_parallel_wearwolf::handle_cold_pointer_out_of_space(enum read
 		pointer = free_block;
 	} else {
 		//perform_gc(addr.package, addr.die, 1, start_time);
-		schedule_gc(start_time, addr.package, addr.die, 1);
+		schedule_gc(start_time, addr.package, addr.die, 0);
 	}
 }
 

@@ -397,10 +397,6 @@ void IOScheduler::handle_next_batch(vector<Event*>& events) {
 
 enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd.controller.issue(event);
-	if (event->get_id() == 3788) {
-		int i = 0;
-		i++;
-	}
 	if (result == SUCCESS) {
 		int dependency_code = event->get_application_io_id();
 		if (dependencies[dependency_code].size() > 0) {

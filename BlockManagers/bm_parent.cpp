@@ -124,27 +124,22 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	}
 	trim(event);
 
-	if (event.get_id() == 17789) {
-		int f = 0;
-		f++;
-	}
-
 	Address ba = Address(event.get_address().get_linear_address(), BLOCK);
 	if (ba.compare(free_block_pointers[ba.package][ba.die]) == BLOCK && event.get_event_type() == WRITE) {
 		increment_pointer(free_block_pointers[ba.package][ba.die]);
-	}
-	if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
-		printf("hot pointer ");
-		free_block_pointers[ba.package][ba.die].print();
-		printf(" is out of space");
-		Address free_pointer = find_free_unused_block(ba.package, ba.die, event.get_current_time());
-		if (free_pointer.valid != NONE) {
-			free_block_pointers[ba.package][ba.die] = free_pointer;
-		} else { // If no free pointer could be found, schedule GC
-			schedule_gc(event.get_current_time(), ba.package, ba.die);
+		if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
+			printf("hot pointer ");
+			free_block_pointers[ba.package][ba.die].print();
+			printf(" is out of space");
+			Address free_pointer = find_free_unused_block(ba.package, ba.die, event.get_current_time());
+			if (free_pointer.valid != NONE) {
+				free_block_pointers[ba.package][ba.die] = free_pointer;
+			} else { // If no free pointer could be found, schedule GC
+				schedule_gc(event.get_current_time(), ba.package, ba.die);
+			}
+			if (free_pointer.valid == NONE) printf(", and a new unused block could not be found.\n");
+			else printf(".\n");
 		}
-		if (free_pointer.valid == NONE) printf(", and a new unused block could not be found.\n");
-		else printf(".\n");
 	}
 }
 
@@ -380,6 +375,13 @@ struct block_valid_pages_comparator_wearwolf {
 // schedules a garbage collection operation to occur at a given time, and optionally for a given channel, LUN or age class
 // the block to be reclaimed is chosen when the gc operation is initialised
 void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, int klass) {
+
+	if ( klass >= num_age_classes || package_id >= SSD_SIZE || die_id >= PACKAGE_SIZE) {
+		int i = 0;
+		i++;
+	}
+	//assert(package_id < SSD_SIZE && package_id < PACKAGE_SIZE && klass < num_age_classes);
+
 	Address address;
 	address.package = package_id;
 	address.die = die_id;
@@ -397,7 +399,7 @@ void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, 
 	gc->set_age_class(klass);
 	if (PRINT_LEVEL > 0) {
 		//StateTracer::print();
-		printf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
+		//printf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
 	}
 	IOScheduler::instance()->schedule_event(gc);
 }
@@ -415,6 +417,7 @@ vector<long> Block_manager_parent::get_relevant_gc_candidates(int package_id, in
 			for (; age_class < num_classes; age_class++) {
 				set<long>::iterator iter = gc_candidates[package][die][age_class].begin();
 				for (; iter != gc_candidates[package][die][age_class].end(); ++iter) {
+					long g = *iter;
 					candidates.push_back(*iter);
 				}
 			}

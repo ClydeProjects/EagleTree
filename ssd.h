@@ -933,7 +933,7 @@ private:
 	// WL structures
 	uint max_age;
 	uint min_age;
-	uint num_age_classes;
+	int num_age_classes;
 	set<Block*> blocks_with_min_age;
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
@@ -1014,11 +1014,11 @@ public:
 };
 
 struct sequential_writes_tracking {
-	int counter;
-	int num_times_pattern_has_repeated;
-	double last_LBA_timestamp;
-	sequential_writes_tracking(double time);
-	~sequential_writes_tracking();
+	int counter, num_times_pattern_has_repeated;
+	long key;
+	double last_arrival_timestamp;
+	double const init_timestamp;
+	sequential_writes_tracking(double time, long key);
 };
 
 class Sequential_Pattern_Detector {
@@ -1027,21 +1027,14 @@ public:
 	Sequential_Pattern_Detector(uint threshold);
 	~Sequential_Pattern_Detector();
 	sequential_writes_tracking const& register_event(logical_address lb, double time);
-	int get_sequential_write_id(logical_address lb);
-	int get_current_offset(logical_address lb);
-	int get_num_times_pattern_has_repeated(logical_address lb);
-	double get_arrival_time_of_last_io_in_pattern(logical_address lb);
 	void set_listener(Sequential_Pattern_Detector_Listener * listener);
 	void remove_old_sequential_writes_metadata(double time);
 private:
 	map<logical_address, logical_address> sequential_writes_key_lookup;  // a map from the next expected LBA in a seqeuntial pattern to the first LBA, which is the key
 	map<logical_address, sequential_writes_tracking*> sequential_writes_identification_and_data;	// a map from the first logical write of a sequential pattern to metadata about the pattern
-
 	sequential_writes_tracking* restart_pattern(int key, double time);
 	sequential_writes_tracking* process_next_write(int lb, double time);
 	sequential_writes_tracking* init_pattern(int lb, double time);
-
-
 	uint registration_counter;
 	Sequential_Pattern_Detector_Listener* listener;
 	uint threshold;
@@ -1093,6 +1086,7 @@ private:
 	strategy strat;
 
 	map<long, tagged_sequential_write> tag_map; // maps from tags of sequential writes to the size of the sequential write
+	map<long, long> arrived_writes_to_sequential_key_mapping;
 };
 
 class IOScheduler {
