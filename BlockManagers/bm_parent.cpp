@@ -123,9 +123,11 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 		pointer.page = pointer.page + 1;
 		free_block_pointers[ba.package][ba.die] = pointer;
 		if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
-			printf("hot pointer ");
-			free_block_pointers[ba.package][ba.die].print();
-			printf("  is out of space.\n ");
+			if (PRINT_LEVEL > 1) {
+				printf("hot pointer ");
+				free_block_pointers[ba.package][ba.die].print();
+				printf("  is out of space.\n ");
+			}
 			Address free_pointer = find_free_unused_block(ba.package, ba.die, event.get_current_time());
 			free_block_pointers[ba.package][ba.die] = free_pointer;
 		}
@@ -388,8 +390,8 @@ void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, 
 	gc->set_address(address);
 	gc->set_age_class(klass);
 	if (PRINT_LEVEL > 0) {
-		//StateTracer::print();
-		//printf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
+		StateTracer::print();
+		printf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
 	}
 	IOScheduler::instance()->schedule_event(gc);
 }
@@ -582,7 +584,7 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 		assert(has_free_pages(to_return));
 	}
 	uint num_free_blocks_before_gc = GREEDY_GC ? 1 : 0;
-	if (num_free_blocks_left <= num_free_blocks_before_gc) {
+	if (num_free_blocks_left < num_free_blocks_before_gc) {
 		schedule_gc(time, package_id, die_id, klass);
 	}
 	return to_return;

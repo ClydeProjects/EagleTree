@@ -265,11 +265,11 @@ void Block_manager_parallel_wearwolf_locality::sequential_event_metadata_removed
 		return;
 	}
 	sequential_writes_pointers& a = seq_write_key_to_pointers_mapping[key];
-	printf("Returning key %d: \n", key );
+	//printf("Returning key %d: \n", key );
 	for (uint i = 0; i < a.pointers.size(); i++) {
 		for (uint j = 0; j < a.pointers[i].size(); j++) {
 			Address& pointer = a.pointers[i][j];
-			printf("  "); pointer.print(); printf("\n");
+			//printf("  "); pointer.print(); printf("\n");
 			Block_manager_parent::return_unfilled_block(pointer);
 		}
 	}
