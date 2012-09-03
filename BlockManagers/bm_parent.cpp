@@ -531,11 +531,6 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	num_available_pages_for_new_writes -= victim->get_pages_valid();
 
-	if (gc_event->get_id() == 18213) {
-		int i = 0;
-		i++;
-	}
-
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
 		if (victim->getPages()[i].get_state() == VALID) {
