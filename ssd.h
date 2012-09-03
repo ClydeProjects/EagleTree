@@ -430,6 +430,8 @@ public:
 	double get_bus_wait_time(void) const;
 	bool get_noop(void) const;
 	uint get_id(void) const;
+	int get_tag() const;
+	void set_tag(int new_tag);
 	void set_address(const Address &address);
 	void set_merge_address(const Address &address);
 	void set_log_address(const Address &address);
@@ -478,6 +480,7 @@ private:
 	static uint application_io_id_generator;
 
 	int age_class;
+	int tag;
 };
 
 /* Single bus channel
@@ -1029,6 +1032,7 @@ public:
 	int get_num_times_pattern_has_repeated(logical_address lb);
 	double get_arrival_time_of_last_io_in_pattern(logical_address lb);
 	void set_listener(Sequential_Pattern_Detector_Listener * listener);
+	void remove_old_sequential_writes_metadata(double time);
 private:
 	map<logical_address, logical_address> sequential_writes_key_lookup;  // a map from the next expected LBA in a seqeuntial pattern to the first LBA, which is the key
 	map<logical_address, sequential_writes_tracking*> sequential_writes_identification_and_data;	// a map from the first logical write of a sequential pattern to metadata about the pattern
@@ -1036,7 +1040,7 @@ private:
 	sequential_writes_tracking* restart_pattern(int key, double time);
 	sequential_writes_tracking* process_next_write(int lb, double time);
 	sequential_writes_tracking* init_pattern(int lb, double time);
-	void remove_old_sequential_writes_metadata(double time);
+
 
 	uint registration_counter;
 	Sequential_Pattern_Detector_Listener* listener;
@@ -1063,13 +1067,23 @@ private:
 		int num_pointers;
 		vector<vector<Address> > pointers;
 		uint cursor;
+		int tag;
 		sequential_writes_pointers();
+	};
+
+	struct tagged_sequential_write {
+		int key, size, free_allocated_space, num_written;
+		tagged_sequential_write() : key(-1), size(-1), free_allocated_space(0), num_written(0) {}
+		tagged_sequential_write(int key, int size) : key(key), size(size), free_allocated_space(0), num_written(0) {}
+		bool need_more_space() {	return is_finished() ? false : size > free_allocated_space; }
+		bool is_finished() {	return num_written == size; }
 	};
 
 	map<long, sequential_writes_pointers> seq_write_key_to_pointers_mapping;
 
 	void set_pointers_for_sequential_write(long key, double time);
-	Address perform_sequential_write(long key);
+	void set_pointers_for_tagged_sequential_write(int tag, double time);
+	Address perform_sequential_write(Event const& event, long key);
 	Address perform_sequential_write_shortest_queue(sequential_writes_pointers& swp);
 	Address perform_sequential_write_round_robin(sequential_writes_pointers& swp);
 
@@ -1077,6 +1091,8 @@ private:
 
 	enum strategy {SHOREST_QUEUE, ROUND_ROBIN};
 	strategy strat;
+
+	map<long, tagged_sequential_write> tag_map; // maps from tags of sequential writes to the size of the sequential write
 };
 
 class IOScheduler {
@@ -1692,7 +1708,7 @@ private:
 		double time_finished;
 		static int file_id_generator;
 		const uint size;
-		int file_id;
+		int id;
 		uint num_pages_written;
 		deque<Address_Range > ranges_comprising_file;
 		Address_Range current_range_being_written;

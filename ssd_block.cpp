@@ -107,6 +107,11 @@ enum status Block::read(Event &event)
 enum status Block::write(Event &event)
 {
 	assert(data != NULL);
+	if (event.get_address().page > 0 && data[event.get_address().page - 1].get_state() == EMPTY) {
+		printf("\n");
+		event.print();
+		assert(data[event.get_address().page - 1].get_state() != EMPTY);
+	}
 	enum status ret = data[event.get_address().page]._write(event);
 
 	if(event.get_noop() == false)

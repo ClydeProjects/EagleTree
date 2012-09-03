@@ -120,7 +120,6 @@ void FtlImpl_Dftl::register_write_completion(Event const& event, enum status res
 		assert(current.cached);
 		current.modified_ts = event.get_current_time();
 	}
-
 	// if it's a GC, it may already be in cache, in which case we update it. Else, we add it to the cache.
 	else if (event.is_garbage_collection_op() && current.cached) {
 		current.modified_ts = event.get_current_time();
@@ -131,7 +130,7 @@ void FtlImpl_Dftl::register_write_completion(Event const& event, enum status res
 	trans_map.replace(trans_map.begin() + event.get_logical_address(), current);
 }
 
-
+// TODO: fix so that current gets updated.
 void FtlImpl_Dftl::register_read_completion(Event const& event, enum status result) {
 	if (event.is_mapping_op()) {
 		//assert(ongoing_mapping_reads.count(event.get_logical_address()) == 1);
@@ -139,6 +138,7 @@ void FtlImpl_Dftl::register_read_completion(Event const& event, enum status resu
 		current.modified_ts = event.get_current_time();
 		current.create_ts = event.get_current_time();
 		current.cached = true;
+		//trans_map[event.get_logical_address()] = current;
 		vector<long>& entries_to_be_inserted_into_cache = ongoing_mapping_reads[event.get_logical_address()];
 		cmt += entries_to_be_inserted_into_cache.size();
 		while (entries_to_be_inserted_into_cache.size() > 0) {

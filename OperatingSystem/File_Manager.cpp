@@ -10,6 +10,8 @@
 
 using namespace ssd;
 
+#define ENABLE_TAGGING false
+
 File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, double time_breaks, double start_time, ulong randseed)
 	: Thread(start_time), min_LBA(min_LBA), max_LBA(max_LBA),
 	  num_files_to_write(num_files_to_write), time_breaks(time_breaks),
@@ -41,7 +43,11 @@ Event* File_Manager::issue_trim() {
 
 Event* File_Manager::issue_write() {
 	long lba = current_file->get_next_lba_to_be_written();
-	Event* event = new Event(WRITE, lba, 1, time);
+	long size = ENABLE_TAGGING ? current_file->size : 1;
+	Event* event = new Event(WRITE, lba, current_file->size, time);
+	if (ENABLE_TAGGING) {
+		event->set_tag(current_file->id);
+	}
 	time += time_breaks;
 	return event;
 }
@@ -67,6 +73,8 @@ void File_Manager::handle_file_completion(double current_time) {
 	do {
 		randomly_delete_files();
 	} while (free_ranges.size() == 0);
+	StateTracer::print();
+	StatisticsGatherer::get_instance()->print();
 	write_next_file();
 }
 
@@ -111,7 +119,7 @@ void File_Manager::randomly_delete_files() {
 }
 
 void File_Manager::delete_file(File* victim) {
-	printf("deleting file  %d\n", victim->file_id);
+	printf("deleting file  %d\n", victim->id);
 	num_free_pages += victim->size;
 	schedule_to_trim_file(victim);
 	reclaim_file_space(victim);
@@ -204,10 +212,10 @@ void File_Manager::Address_Range::merge(Address_Range other) {
 int File_Manager::File::file_id_generator = 0;
 
 File_Manager::File::File(uint size, double death_probability)
-	: death_probability(death_probability), size(size), file_id(file_id_generator++),
+	: death_probability(death_probability), size(size), id(file_id_generator++),
 	  num_pages_written(0), current_range_being_written(-1, -1), num_pages_allocated_so_far(0)
 {
-	printf("creating file: %d  %d   %f\n", file_id, size, death_probability);
+	printf("creating file: %d  %d   %f\n", id, size, death_probability);
 	assert(death_probability >= 0 && death_probability <= 1);
 	assert(size > 0);
 }
@@ -215,7 +223,7 @@ File_Manager::File::File(uint size, double death_probability)
 void File_Manager::File::finish(double time) {
 	time_finished = time;
 	ranges_comprising_file.push_back(current_range_being_written);
-	printf("finished with file  %d\n", file_id);
+	printf("finished with file  %d\n", id);
 }
 
 bool File_Manager::File::is_finished() const {
@@ -246,7 +254,7 @@ long File_Manager::File::get_num_pages_left_to_allocate() const {
 }
 
 void File_Manager::File::register_new_range(Address_Range range) {
-	printf("new range for file: %d    (%d - %d)  in total: %d\n", file_id, range.min, range.max, range.get_size());
+	printf("new range for file: %d    (%d - %d)  in total: %d\n", id, range.min, range.max, range.get_size());
 	assert(logical_addresses_to_be_written_in_current_range.size() == 0);
 	if (num_pages_written > 0) {
 		ranges_comprising_file.push_back(current_range_being_written);

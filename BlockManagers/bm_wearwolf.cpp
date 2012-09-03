@@ -4,7 +4,7 @@
 using namespace ssd;
 
 Block_manager_parallel_wearwolf::Block_manager_parallel_wearwolf(Ssd& ssd, FtlParent& ftl)
-	: Block_manager_parent(ssd, ftl, 2),
+	: Block_manager_parent(ssd, ftl, 1),
 	  page_hotness_measurer()
 {
 	wcrh_pointer = find_free_unused_block(0, 0, 0);
@@ -25,14 +25,17 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 	page_hotness_measurer.register_event(event);
 
 	// Increment block pointer
-	uint package_id = event.get_address().package;
-	uint die_id = event.get_address().die;
 	Address block_address = Address(event.get_address().get_linear_address(), BLOCK);
 
-	if (block_address.compare(wcrh_pointer) == BLOCK) {
+	if (block_address.compare(wcrh_pointer) == BLOCK && has_free_pages(wcrh_pointer)) {
 		wcrh_pointer.page = wcrh_pointer.page + 1;
-	} else if (block_address.compare(wcrc_pointer) == BLOCK) {
+		if (wcrh_pointer.page > BLOCK_SIZE) {
+			event.print();
+		}
+		assert(wcrh_pointer.page <= BLOCK_SIZE);
+	} else if (block_address.compare(wcrc_pointer) == BLOCK && has_free_pages(wcrc_pointer)) {
 		wcrc_pointer.page = wcrc_pointer.page + 1;
+		assert(wcrc_pointer.page <= BLOCK_SIZE);
 	}
 
 	if (!has_free_pages(wcrh_pointer)) {
@@ -104,6 +107,10 @@ Address Block_manager_parallel_wearwolf::write(Event const& write) {
 		return result;
 	}
 
+	if (write.get_id() == 17790 && write.get_bus_wait_time() > 934) {
+		write.print();
+	}
+
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
 	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(write.get_logical_address());
 
@@ -125,6 +132,10 @@ Address Block_manager_parallel_wearwolf::write(Event const& write) {
 	if ((write.is_garbage_collection_op()) ||
 			(!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0)) {
 
+		if (PRINT_LEVEL > 1) {
+			printf("Trying to migrate a write %s page, but could not find a relevant pointer.\n", w_hotness == WRITE_COLD ? "cold" : "hot");
+		}
+
 		if (wcrh_pointer.page < BLOCK_SIZE) {
 			result = wcrh_pointer;
 		} else if (wcrc_pointer.page < BLOCK_SIZE) {
@@ -133,9 +144,7 @@ Address Block_manager_parallel_wearwolf::write(Event const& write) {
 			result = get_free_block_pointer_with_shortest_IO_queue();
 		}
 
-		if (PRINT_LEVEL > 1) {
-			printf("Trying to migrate a write %s page, but could not find a relevant pointer.\n", w_hotness == WRITE_COLD ? "cold" : "hot");
-		}
+
 	}
 	return result;
 }
