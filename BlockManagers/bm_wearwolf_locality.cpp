@@ -21,12 +21,14 @@ Block_manager_parallel_wearwolf_locality::~Block_manager_parallel_wearwolf_local
 }
 
 void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event const& write) {
+
 	if (!write.is_original_application_io()) {
 		return;
 	}
 	if (PRINT_LEVEL > 1) {
 		printf("arrival: %d  in time: %f\n", write.get_logical_address(), write.get_current_time());
 	}
+
 	ulong lb = write.get_logical_address();
 	int tag = write.get_tag();
 	if (tag != -1 && tag_map.count(tag) == 0) {
@@ -43,10 +45,12 @@ void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event cons
 	// checks if should allocate pointers for the pattern
 	if (swt.num_times_pattern_has_repeated == 0 && swt.counter == THRESHOLD) {
 		if (PRINT_LEVEL > 1) {
-			printf("SEQUENTIAL PATTERN IDENTIFIED!  KEY: %d \n", detector->get_sequential_write_id(lb));
+			printf("SEQUENTIAL PATTERN IDENTIFIED!  KEY: %d \n", swt.key);
 		}
-		long key = detector->get_sequential_write_id(lb);
-		set_pointers_for_sequential_write(key, write.get_current_time());
+		set_pointers_for_sequential_write(swt.key, write.get_current_time());
+	}
+	if (swt.num_times_pattern_has_repeated > 0 || swt.counter >= THRESHOLD) {
+		arrived_writes_to_sequential_key_mapping[write.get_id()] = swt.key;
 	}
 }
 
@@ -59,9 +63,14 @@ Address Block_manager_parallel_wearwolf_locality::write(Event const& event) {
 	}
 
 	detector->remove_old_sequential_writes_metadata(event.get_current_time());
-	long key = detector->get_sequential_write_id(event.get_logical_address());
-	if (seq_write_key_to_pointers_mapping.count(key) == 1 && seq_write_key_to_pointers_mapping[key].num_pointers > 0) {
-		return perform_sequential_write(event, key);
+	//long key = detector->get_sequential_write_id(event.get_logical_address());
+
+	if (arrived_writes_to_sequential_key_mapping.count(event.get_id()) == 1) {
+		int key = arrived_writes_to_sequential_key_mapping[event.get_id()];
+		assert(seq_write_key_to_pointers_mapping.count(key) == 1);
+		if (seq_write_key_to_pointers_mapping[key].num_pointers > 0) {
+			return perform_sequential_write(event, key);
+		}
 	}
 	return Block_manager_parallel_wearwolf::write(event);
 }
@@ -107,6 +116,7 @@ Address Block_manager_parallel_wearwolf_locality::perform_sequential_write_round
 
 // TODO: for the ONE and LUN degrees, try to do read-balancing
 void Block_manager_parallel_wearwolf_locality::set_pointers_for_sequential_write(long key, double time) {
+	assert(seq_write_key_to_pointers_mapping.count(key) == 0);
 	if (parallel_degree == ONE) {
 		seq_write_key_to_pointers_mapping[key].pointers = vector<vector<Address> >(1, vector<Address>(1));
 		Address free_block = find_free_unused_block(time);
@@ -157,15 +167,14 @@ void Block_manager_parallel_wearwolf_locality::set_pointers_for_tagged_sequentia
 }
 
 void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event const& event, enum status status) {
-	long lb = event.get_logical_address();
 	long key;
-
-
 
 	if (event.get_tag() != -1) {
 		key = tag_map[event.get_tag()].key;
-	} else {
-		key = detector->get_sequential_write_id(lb);
+	} else if (arrived_writes_to_sequential_key_mapping.count(event.get_id()) == 1) {
+		key = arrived_writes_to_sequential_key_mapping[event.get_id()];
+		arrived_writes_to_sequential_key_mapping.erase(event.get_id());
+		//key = detector->get_sequential_write_id(lb);
 	}
 	//int b = seq_write_key_to_pointers_mapping[key].num_pointers;
 	if (seq_write_key_to_pointers_mapping.count(key) == 1 && seq_write_key_to_pointers_mapping[key].num_pointers > 0) {
@@ -187,7 +196,6 @@ void Block_manager_parallel_wearwolf_locality::register_write_outcome(Event cons
 			i = event.get_address().package;
 			j = event.get_address().die;
 		}
-
 
 		if (strat == ROUND_ROBIN) {
 			swp.cursor++;
@@ -248,10 +256,11 @@ void Block_manager_parallel_wearwolf_locality::sequential_event_metadata_removed
 		return;
 	}
 	sequential_writes_pointers& a = seq_write_key_to_pointers_mapping[key];
+	printf("Returning key %d: \n", key );
 	for (uint i = 0; i < a.pointers.size(); i++) {
 		for (uint j = 0; j < a.pointers[i].size(); j++) {
 			Address& pointer = a.pointers[i][j];
-			//pointer.print(); printf("\n");
+			printf("  "); pointer.print(); printf("\n");
 			Block_manager_parent::return_unfilled_block(pointer);
 		}
 	}
@@ -260,7 +269,6 @@ void Block_manager_parallel_wearwolf_locality::sequential_event_metadata_removed
 
 void Block_manager_parallel_wearwolf_locality::register_erase_outcome(Event const& event, enum status status) {
 	Block_manager_parallel_wearwolf::register_erase_outcome(event, status);
-
 	int i, j;
 	if (parallel_degree == ONE) {
 		i = j = 0;

@@ -117,24 +117,20 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	}
 	trim(event);
 
-	if (event.get_id() == 17789) {
-		int f = 0;
-		f++;
-	}
-
 	Address ba = Address(event.get_address().get_linear_address(), BLOCK);
 	if (ba.compare(free_block_pointers[ba.package][ba.die]) == BLOCK) {
 		Address pointer = free_block_pointers[ba.package][ba.die];
 		pointer.page = pointer.page + 1;
 		free_block_pointers[ba.package][ba.die] = pointer;
+		if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
+			printf("hot pointer ");
+			free_block_pointers[ba.package][ba.die].print();
+			printf("  is out of space.\n ");
+			Address free_pointer = find_free_unused_block(ba.package, ba.die, event.get_current_time());
+			free_block_pointers[ba.package][ba.die] = free_pointer;
+		}
 	}
-	if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
-		printf("hot pointer ");
-		free_block_pointers[ba.package][ba.die].print();
-		printf("  is out of space.\n ");
-		Address free_pointer = find_free_unused_block(ba.package, ba.die, event.get_current_time());
-		free_block_pointers[ba.package][ba.die] = free_pointer;
-	}
+
 }
 
 void Block_manager_parent::trim(Event const& event) {
@@ -369,6 +365,13 @@ struct block_valid_pages_comparator_wearwolf {
 // schedules a garbage collection operation to occur at a given time, and optionally for a given channel, LUN or age class
 // the block to be reclaimed is chosen when the gc operation is initialised
 void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, int klass) {
+
+	if ( klass >= num_age_classes || package_id >= SSD_SIZE || die_id >= PACKAGE_SIZE) {
+		int i = 0;
+		i++;
+	}
+	//assert(package_id < SSD_SIZE && package_id < PACKAGE_SIZE && klass < num_age_classes);
+
 	Address address;
 	address.package = package_id;
 	address.die = die_id;
@@ -386,7 +389,7 @@ void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, 
 	gc->set_age_class(klass);
 	if (PRINT_LEVEL > 0) {
 		//StateTracer::print();
-		printf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
+		//printf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
 	}
 	IOScheduler::instance()->schedule_event(gc);
 }
@@ -404,6 +407,7 @@ vector<long> Block_manager_parent::get_relevant_gc_candidates(int package_id, in
 			for (; age_class < num_classes; age_class++) {
 				set<long>::iterator iter = gc_candidates[package][die][age_class].begin();
 				for (; iter != gc_candidates[package][die][age_class].end(); ++iter) {
+					long g = *iter;
 					candidates.push_back(*iter);
 				}
 			}
@@ -480,11 +484,6 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 	assert(victim->get_state() != PARTIALLY_FREE);
 
 	num_available_pages_for_new_writes -= victim->get_pages_valid();
-
-	if (gc_event->get_id() == 18213) {
-		int i = 0;
-		i++;
-	}
 
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	for (uint i = 0; i < BLOCK_SIZE; i++) {

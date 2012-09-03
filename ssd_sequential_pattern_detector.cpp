@@ -46,16 +46,16 @@ sequential_writes_tracking* Sequential_Pattern_Detector::init_pattern(int key, d
 		printf("init_pattern: %d \n", key);
 	}
 	sequential_writes_key_lookup[key + 1] = key;
-	sequential_writes_tracking* swt = new sequential_writes_tracking(time);
+	sequential_writes_tracking* swt = new sequential_writes_tracking(time, key);
 	sequential_writes_identification_and_data[key] = swt;
 	return swt;
 }
 
 sequential_writes_tracking* Sequential_Pattern_Detector::process_next_write(int lb, double time) {
-	logical_address key = sequential_writes_key_lookup[lb];
+	int key = sequential_writes_key_lookup[lb];
 	sequential_writes_tracking* swm = sequential_writes_identification_and_data[key];
 	swm->counter++;
-	swm->last_LBA_timestamp = time;
+	swm->last_arrival_timestamp = time;
 	sequential_writes_key_lookup.erase(lb);
 	sequential_writes_key_lookup[lb + 1] = key;
 	return swm;
@@ -67,84 +67,19 @@ sequential_writes_tracking * Sequential_Pattern_Detector::restart_pattern(int ke
 		return swm;
 	}
 	swm->num_times_pattern_has_repeated++;
-	assert(sequential_writes_key_lookup.count(key + swm->counter) == 1);
 	sequential_writes_key_lookup.erase(key + swm->counter);
-	sequential_writes_key_lookup[key] = key + 1;
-	swm->counter = 0;
-	swm->last_LBA_timestamp = time;
+	sequential_writes_key_lookup[key + 1] = key;
+	swm->counter = 1;
+	swm->last_arrival_timestamp = time;
 	if (PRINT_LEVEL > 0) {
 		printf("SEQUENTIAL PATTERN RESTARTED!  key: %d\n", key);
 	}
 	return swm;
 }
 
-int Sequential_Pattern_Detector::get_current_offset(logical_address lb) {
-	if (sequential_writes_key_lookup.count(lb) == 0) {
-		return -1;
-	} else {
-		logical_address key = sequential_writes_key_lookup[lb];
-		sequential_writes_tracking& swm = *sequential_writes_identification_and_data[key];
-		return swm.counter;
-	}
-}
-
-int Sequential_Pattern_Detector::get_num_times_pattern_has_repeated(logical_address lb) {
-	if (sequential_writes_key_lookup.count(lb) == 0) {
-		return -1;
-	} else {
-		logical_address key = sequential_writes_key_lookup[lb];
-		sequential_writes_tracking& swm = *sequential_writes_identification_and_data[key];
-		return swm.num_times_pattern_has_repeated;
-	}
-}
-
-double Sequential_Pattern_Detector::get_arrival_time_of_last_io_in_pattern(logical_address lb) {
-	if (sequential_writes_key_lookup.count(lb) == 0) {
-		return -1;
-	} else {
-		logical_address key = sequential_writes_key_lookup[lb];
-		sequential_writes_tracking& swm = *sequential_writes_identification_and_data[key];
-		return swm.last_LBA_timestamp;
-	}
-}
-
-// takes an LBA and, if this LBA belongs to a previusly detected sequential pattern, return the key of the pattern
-// the key is the first LBA in the pattern
-int Sequential_Pattern_Detector::get_sequential_write_id(logical_address lb) {
-
-	// if order of execution of events matches order of arrival, we should be able to find the id easily
-	if (sequential_writes_key_lookup.count(lb) == 1) {
-		logical_address key = sequential_writes_key_lookup[lb];
-		return key;
-	}
-
-	// otherwise, if the order of execution of muffled, we can find it through a range search
-	map<logical_address, sequential_writes_tracking*>::iterator iter = sequential_writes_identification_and_data.begin();
-	while(iter != sequential_writes_identification_and_data.end())
-	{
-		long key = (*iter).first;
-		sequential_writes_tracking* swt = (*iter).second;
-		if (key <= lb && lb <= key + swt->counter - 1) {
-			return key;
-		}
-		iter++;
-	}
-	return -1;
-}
-
 void Sequential_Pattern_Detector::set_listener(Sequential_Pattern_Detector_Listener * new_listener) {
 	listener = new_listener;
 }
-
-/*void Sequential_Pattern_Detector::remove(logical_address lb) {
-	if (sequential_writes_key_lookup.count(lb) == 1) {
-		logical_address key = sequential_writes_key_lookup[lb];
-		delete sequential_writes_identification_and_data[key];
-		sequential_writes_identification_and_data.erase(key);
-		sequential_writes_key_lookup.erase(lb);
-		sequential_writes_key_lookup.erase(lb + 1);
-	}
-}*/
 
 // TODO: invoke this method from somewhere
 void Sequential_Pattern_Detector::remove_old_sequential_writes_metadata(double time) {
@@ -152,7 +87,7 @@ void Sequential_Pattern_Detector::remove_old_sequential_writes_metadata(double t
 	while(iter != sequential_writes_identification_and_data.end())
 	{
 		logical_address key = (*iter).first;
-		if ((*iter).second->last_LBA_timestamp + 400 < time) {
+		if ((*iter).second->last_arrival_timestamp + 400 < time) {
 			if (PRINT_LEVEL > 1) {
 				printf("deleting seq write with key %d:\n", key);
 			}
@@ -169,11 +104,10 @@ void Sequential_Pattern_Detector::remove_old_sequential_writes_metadata(double t
 	}
 }
 
-sequential_writes_tracking::sequential_writes_tracking(double time)
+sequential_writes_tracking::sequential_writes_tracking(double time, long key)
 	: counter(1),
-	  last_LBA_timestamp(time),
-	  num_times_pattern_has_repeated(0)
+	  num_times_pattern_has_repeated(0),
+	  key(key),
+	  last_arrival_timestamp(time),
+	  init_timestamp(time)
 {}
-
-sequential_writes_tracking::~sequential_writes_tracking() {
-}
