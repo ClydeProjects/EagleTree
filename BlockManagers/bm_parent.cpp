@@ -131,9 +131,15 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
 		printf("hot pointer ");
 		free_block_pointers[ba.package][ba.die].print();
-		printf("  is out of space.\n ");
+		printf(" is out of space");
 		Address free_pointer = find_free_unused_block(ba.package, ba.die, event.get_current_time());
-		free_block_pointers[ba.package][ba.die] = free_pointer;
+		if (free_pointer.valid != NONE) {
+			free_block_pointers[ba.package][ba.die] = free_pointer;
+		} else { // If no free pointer could be found, schedule GC
+			schedule_gc(event.get_current_time(), ba.package, ba.die);
+		}
+		if (free_pointer.valid == NONE) printf(", and a new unused block could not be found.\n");
+		else printf(".\n");
 	}
 }
 
@@ -447,7 +453,10 @@ Address Block_manager_parent::reserve_page_on(uint package, uint die, double tim
 	Address free_block = free_block_pointers[package][die];
 	if (!has_free_pages(free_block)) { // If there is no free pages left, try to find another block
 		free_block = find_free_unused_block(package, die, time);
-		if (free_block.valid == NONE) return Address(0, NONE); // Another free block could not be found, return FAIL
+		if (free_block.valid == NONE) { // Another free block could not be found, schedule GC and return invalid address
+			schedule_gc(time, package, die);
+			return Address(0, NONE);
+		}
 		assert(free_block.package == package);
 		assert(free_block.die == die);
 		free_block_pointers[package][die] = free_block;
