@@ -207,6 +207,7 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
+		assert(event->get_event_type() == WRITE);
 		Address result = bm->write(*event);
 		double wait_time = bm->in_how_long_can_this_event_be_scheduled(result, event->get_current_time());
 		if (wait_time == 0) {
@@ -397,7 +398,11 @@ enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd.controller.issue(event);
 
 	if (PRINT_LEVEL > 0) {
-		event->print();
+		printf("->"); event->print();
+	}
+
+	if (event->get_id() == 191 || event->get_id() == 192) {
+		printf("--");
 	}
 
 	if (event->get_event_type() == COPY_BACK) {
@@ -466,6 +471,9 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		assert(false); // events should not fail at this point. Any failure indicates application error
 	}
 
+	printf("FINISHING ");
+	event->print();
+
 	VisualTracer::get_instance()->register_completed_event(*event);
 	if (event->get_event_type() == WRITE || event->get_event_type() == COPY_BACK) {
 		ftl.register_write_completion(*event, outcome);
@@ -522,13 +530,17 @@ void IOScheduler::init_event(Event* event) {
 	else if (type == GARBAGE_COLLECTION) {
 		vector<deque<Event*> > migrations = bm->migrate(event);
 		while (migrations.size() > 0) {
+			// Pick first migration from deque
 			deque<Event*> migration = migrations.back();
 			migrations.pop_back();
+			// Pick first event from migration
 			Event * first = migration.front();
 			migration.pop_front();
+			// first is     (GC) a write   or (CB) a copy_back
+			// migration is (GC) a read    or (CB) empty deque
 			dependencies[first->get_application_io_id()] = migration;
 			dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
-			dependency_code_to_type[first->get_application_io_id()] = /*WRITE*/first->get_event_type(); // Seems more generic to just use event type of whatever event is in from on deque
+			dependency_code_to_type[first->get_application_io_id()] = WRITE; //first->get_event_type(); // Seems more generic to just use event type of whatever event is in from on deque
 			init_event(first);
 		}
 		delete event;

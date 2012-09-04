@@ -132,10 +132,10 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 			free_block_pointers[ba.package][ba.die].print();
 			printf(" is out of space");
 			Address free_pointer = find_free_unused_block(ba.package, ba.die, event.get_current_time());
-			if (free_pointer.valid != NONE) {
+			if (has_free_pages(free_pointer)) {
 				free_block_pointers[ba.package][ba.die] = free_pointer;
 			} else { // If no free pointer could be found, schedule GC
-				schedule_gc(event.get_current_time(), ba.package, ba.die);
+				//schedule_gc(event.get_current_time(), ba.package, ba.die);
 			}
 			if (free_pointer.valid == NONE) printf(", and a new unused block could not be found.\n");
 			else printf(".\n");
@@ -399,7 +399,7 @@ void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, 
 	gc->set_age_class(klass);
 	if (PRINT_LEVEL > 0) {
 		//StateTracer::print();
-		//printf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
+		printf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
 	}
 	IOScheduler::instance()->schedule_event(gc);
 }
@@ -448,11 +448,11 @@ Block* Block_manager_parent::choose_gc_victim(vector<long> candidates) const {
 // Returns true if a copy back is allowed on a given logical address
 bool Block_manager_parent::copy_back_allowed_on(long logical_address) {
 	if (MAX_REPEATED_COPY_BACKS_ALLOWED <= 0 || MAX_ITEMS_IN_COPY_BACK_MAP <= 0) return false;
-	map<long, uint>::iterator copy_back_count = page_copy_back_count.find(logical_address);
-	bool address_in_map = (copy_back_count != page_copy_back_count.end());
+	//map<long, uint>::iterator copy_back_count = page_copy_back_count.find(logical_address);
+	bool address_in_map = page_copy_back_count.count(logical_address) == 1; //(copy_back_count != page_copy_back_count.end());
 	// If address is not in map and map is full, or if page has already been copy backed as many times as allowed, copy back is not allowed
 	if ((!address_in_map && page_copy_back_count.size() >= MAX_ITEMS_IN_COPY_BACK_MAP) ||
-		( address_in_map && copy_back_count->second >= MAX_REPEATED_COPY_BACKS_ALLOWED)) return false;
+		( address_in_map && page_copy_back_count[logical_address] >= MAX_REPEATED_COPY_BACKS_ALLOWED)) return false;
 	else return true;
 }
 
@@ -463,7 +463,7 @@ Address Block_manager_parent::reserve_page_on(uint package, uint die, double tim
 	if (!has_free_pages(free_block)) { // If there is no free pages left, try to find another block
 		free_block = find_free_unused_block(package, die, time);
 		if (free_block.valid == NONE) { // Another free block could not be found, schedule GC and return invalid address
-			schedule_gc(time, package, die);
+			//schedule_gc(time, package, die);
 			return Address(0, NONE);
 		}
 		assert(free_block.package == package);
@@ -471,7 +471,7 @@ Address Block_manager_parent::reserve_page_on(uint package, uint die, double tim
 		free_block_pointers[package][die] = free_block;
 	}
 	increment_pointer(free_block_pointers[package][die]); // Increment pointer so the returned page is not used again in the future (it is reserved)
-	assert(free_block.page < BLOCK_SIZE);
+	assert(has_free_pages(free_block));
 	return free_block;
 }
 
@@ -489,6 +489,9 @@ void Block_manager_parent::register_ECC_check_on(uint logical_address) {
 // An erase is issued in register_write_completion after the last
 // page from this block has been migrated
 vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
+
+	//StateTracer::print();
+
 	Address a = gc_event->get_address();
 
 	int die_id = a.valid >= DIE ? a.die : -1;
@@ -548,14 +551,17 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 			Address copy_back_target = copy_back_allowed_on(logical_address) ? reserve_page_on(addr.package, addr.die, gc_event->get_current_time()) : Address(0, NONE);
 
 			// If a copy back is allowed, and a target page could be reserved, do it. Otherwise, just do a traditional and more expensive READ - WRITE garbage collection
-			if (copy_back_target.valid != NONE) {
+			if (copy_back_target.valid == PAGE) {
 				Event* copy_back = new Event(COPY_BACK, logical_address, 1, gc_event->get_start_time());
 				copy_back->set_address(copy_back_target);
 				copy_back->set_replace_address(addr);
 				copy_back->set_garbage_collection_op(true);
+				printf("Initiating copy-back GC operation ");
+				copy_back->print();
 				migration.push_back(copy_back);
 				register_copy_back_operation_on(logical_address);
 				//printf("COPY_BACK MAP (Size: %d):\n", page_copy_back_count.size()); for (map<long, uint>::iterator it = page_copy_back_count.begin(); it != page_copy_back_count.end(); it++) printf(" lba %d\t: %d\n", it->first, it->second);
+				//copy_back->print();
 			} else {
 				Event* read = new Event(READ, logical_address, 1, gc_event->get_start_time());
 				read->set_address(addr);

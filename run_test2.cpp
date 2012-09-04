@@ -32,6 +32,9 @@ using namespace ssd;
 void experiement1() {
 	vector<Thread*> threads;
 	threads.push_back(new Asynchronous_Random_Thread(0, 199, 108, 1, WRITE, 10, 1));
+	threads.push_back(new Asynchronous_Random_Thread(200, 399, 108, 1, WRITE, 10, 1));
+	threads.push_back(new Asynchronous_Random_Thread(400, 599, 108, 1, WRITE, 10, 1));
+	threads.push_back(new Asynchronous_Random_Thread(600, 799, 108, 1, WRITE, 10, 1));
 	/*threads.push_back(new Asynchronous_Sequential_Thread(200, 399, 1, WRITE));
 	threads.push_back(new Asynchronous_Sequential_Thread(400, 599, 1, WRITE));
 	threads.push_back(new Asynchronous_Sequential_Thread(600, 799, 1, WRITE));*/
@@ -44,21 +47,49 @@ void experiement1() {
 
 void experiement2() {
 
-	Thread* t1 = new Asynchronous_Sequential_Thread(0, 50, 1, WRITE, 17);
-	Thread* t2 = new Asynchronous_Sequential_Thread(200, 250, 1, WRITE, 17);
-	Thread* t3 = new Asynchronous_Sequential_Thread(400, 450, 1, WRITE, 17);
-	Thread* t4 = new Asynchronous_Sequential_Thread(600, 650, 1, WRITE, 17);
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, 199, 1, WRITE, 17);
+	Thread* t2 = new Asynchronous_Sequential_Thread(200, 399, 1, WRITE, 17);
+	Thread* t3 = new Asynchronous_Sequential_Thread(400, 599, 1, WRITE, 17);
+	//Thread* t4 = new Asynchronous_Sequential_Thread(600, 799, 1, WRITE, 17);
 
-	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, 199, 1000, 1, WRITE, 100, 1));
-	//t2->add_follow_up_thread(new Asynchronous_Random_Thread(200, 399, 1000, 2, WRITE, 100, 2));
-	//t3->add_follow_up_thread(new Asynchronous_Random_Thread(400, 599, 1000, 3, WRITE, 100, 3));
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, 199, 1000, 1, WRITE, 30, 1));
+	t2->add_follow_up_thread(new Asynchronous_Random_Thread(200, 399, 1000, 2, WRITE, 30, 2));
+	t3->add_follow_up_thread(new Asynchronous_Random_Thread(400, 599, 1000, 3, WRITE, 30, 3));
 	//t4->add_follow_up_thread(new Asynchronous_Random_Thread(600, 799, 1000, 4, WRITE, 100, 4));
 
 	vector<Thread*> threads;
 	threads.push_back(t1);
 	threads.push_back(t2);
 	threads.push_back(t3);
-	threads.push_back(t4);
+	//threads.push_back(t4);
+
+	OperatingSystem* os = new OperatingSystem(threads);
+	os->run();
+
+	VisualTracer::get_instance()->print_horizontally_with_breaks();
+	StateTracer::print();
+	delete os;
+}
+
+void simple_experiement() {
+
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, 64, 1, WRITE, 1);
+	Thread* t2 = new Asynchronous_Sequential_Thread(65, 128, 1, WRITE, 1);
+	//Thread* t3 = new Asynchronous_Sequential_Thread(400, 599, 1, WRITE, 17);
+	//Thread* t4 = new Asynchronous_Sequential_Thread(600, 799, 1, WRITE, 17);
+
+	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, 64, 100, 1, WRITE, 30, 1));
+	t1->add_follow_up_thread(new Asynchronous_Sequential_Thread(0, 64, 1, WRITE, 1));
+
+	//t2->add_follow_up_thread(new Asynchronous_Random_Thread(200, 399, 1000, 2, WRITE, 30, 2));
+	//t3->add_follow_up_thread(new Asynchronous_Random_Thread(400, 599, 1000, 3, WRITE, 30, 3));
+	//t4->add_follow_up_thread(new Asynchronous_Random_Thread(600, 799, 1000, 4, WRITE, 100, 4));
+
+	vector<Thread*> threads;
+	threads.push_back(t1);
+	threads.push_back(t2);
+	//threads.push_back(t3);
+	//threads.push_back(t4);
 
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
@@ -133,7 +164,9 @@ int main()
 	//getchar();
 	printf("\n");
 
-	file_manager_experiment();
+//	file_manager_experiment();
+//	experiement2();
+	simple_experiement();
 
 	return 0;
 }

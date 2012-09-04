@@ -133,7 +133,7 @@ Address Block_manager_parallel_wearwolf::write(Event const& write) {
 			(!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0)) {
 
 		if (PRINT_LEVEL > 1) {
-			printf("Trying to migrate a write %s page, but could not find a relevant pointer.\n", w_hotness == WRITE_COLD ? "cold" : "hot");
+			//printf("Trying to migrate a write %s page, but could not find a relevant pointer.\n", w_hotness == WRITE_COLD ? "cold" : "hot");
 		}
 
 		if (wcrh_pointer.page < BLOCK_SIZE) {
