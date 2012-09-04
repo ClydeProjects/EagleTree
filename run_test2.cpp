@@ -79,7 +79,7 @@ void simple_experiement() {
 	//Thread* t4 = new Asynchronous_Sequential_Thread(600, 799, 1, WRITE, 17);
 
 	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, 64, 100, 1, WRITE, 30, 1));
-	t1->add_follow_up_thread(new Asynchronous_Sequential_Thread(0, 64, 1, WRITE, 1));
+	t1->add_follow_up_thread(new Asynchronous_Sequential_Thread(0, 64, 100, WRITE, 1));
 
 	//t2->add_follow_up_thread(new Asynchronous_Random_Thread(200, 399, 1000, 2, WRITE, 30, 2));
 	//t3->add_follow_up_thread(new Asynchronous_Random_Thread(400, 599, 1000, 3, WRITE, 30, 3));
