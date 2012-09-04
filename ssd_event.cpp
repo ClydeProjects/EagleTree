@@ -58,8 +58,26 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 		assert((long long int) logical_address <= (long long int) SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE);
 	else
 		assert((long long int) logical_address*VIRTUAL_PAGE_SIZE <= (long long int) SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE);
-
 }
+
+Event::Event(Event& event) :
+	start_time(event.start_time),
+	time_taken(event.time_taken),
+	bus_wait_time(event.bus_wait_time),
+	type(event.type),
+	logical_address(event.logical_address),
+	size(event.size),
+	payload(NULL),
+	//next(NULL),
+	noop(event.noop),
+	id(id_generator++),
+	application_io_id(event.application_io_id),
+	garbage_collection_op(event.garbage_collection_op),
+	mapping_op(event.mapping_op),
+	original_application_io(event.original_application_io),
+	age_class(event.age_class),
+	tag(event.tag)
+{}
 
 Event::Event() : type(NOT_VALID) {}
 

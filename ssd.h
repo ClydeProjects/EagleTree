@@ -413,6 +413,7 @@ class Event
 public:
 	Event(enum event_type type, ulong logical_address, uint size, double start_time);
 	Event();
+	Event(Event& event);
 	~Event() {}
 	ulong get_logical_address(void) const;
 	const Address &get_address(void) const;
