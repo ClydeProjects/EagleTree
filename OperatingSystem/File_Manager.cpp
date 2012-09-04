@@ -10,7 +10,7 @@
 
 using namespace ssd;
 
-#define ENABLE_TAGGING false
+#define ENABLE_TAGGING true
 
 File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, double time_breaks, double start_time, ulong randseed)
 	: Thread(start_time), min_LBA(min_LBA), max_LBA(max_LBA),
@@ -56,16 +56,19 @@ void File_Manager::handle_event_completion(Event*event) {
 	if (event->get_event_type() == TRIM)
 		return;
 	current_file->register_write_completion();
-	if (current_file->is_finished())
+	if (current_file->is_finished()) {
 		handle_file_completion(event->get_current_time());
-	else if (current_file->needs_new_range())
+		time = max(time, event->get_current_time());
+	}
+	else if (current_file->needs_new_range()) {
 		assign_new_range();
+		time = max(time, event->get_current_time());
+	}
 }
 
 void File_Manager::handle_file_completion(double current_time) {
 	current_file->finish(current_time);
 	files.push_back(current_file);
-	time = max(time, current_time);
 	if (num_files_to_write-- == 0) {
 		finished = true;
 		return;
