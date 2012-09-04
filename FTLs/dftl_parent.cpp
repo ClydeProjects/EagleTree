@@ -68,7 +68,8 @@ FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
 	addressPerPage(PAGE_SIZE / ( (ceil(addressSize / 8.0) * 2) )),
 	num_mapping_pages(ceil((double)(NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE) / addressPerPage)),
 	global_translation_directory( ),
-	totalCMTentries(CACHE_DFTL_LIMIT * addressPerPage)
+	totalCMTentries(CACHE_DFTL_LIMIT * addressPerPage),
+	num_pages_written(0)
 {
 	//addressPerPage = 0;
 	cmt = 0;
