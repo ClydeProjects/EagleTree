@@ -93,6 +93,10 @@ void File_Manager::write_next_file() {
 }
 
 void File_Manager::assign_new_range() {
+	if (current_file->id == 165) {
+		int i = 0;
+		i++;
+	}
 	Address_Range range = free_ranges.front();
 	free_ranges.pop_front();
 	long num_pages_left_to_write = current_file->get_num_pages_left_to_allocate();

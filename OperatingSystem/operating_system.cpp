@@ -28,7 +28,7 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 
 OperatingSystem::~OperatingSystem() {
 	for (uint i = 0; i < threads.size(); i++) {
-		threads[i]->print_thread_stats();
+		//threads[i]->print_thread_stats();
 		delete threads[i];
 		delete events[i];
 	}

@@ -65,14 +65,23 @@ Address Block_manager_parallel_wearwolf_locality::write(Event const& event) {
 	detector->remove_old_sequential_writes_metadata(event.get_current_time());
 	//long key = detector->get_sequential_write_id(event.get_logical_address());
 
-	if (arrived_writes_to_sequential_key_mapping.count(event.get_id()) == 1) {
-		int key = arrived_writes_to_sequential_key_mapping[event.get_id()];
-		assert(seq_write_key_to_pointers_mapping.count(key) == 1);
-		if (seq_write_key_to_pointers_mapping[key].num_pointers > 0) {
-			return perform_sequential_write(event, key);
-		}
+
+	if (arrived_writes_to_sequential_key_mapping.count(event.get_id()) == 0) {
+		return Block_manager_parallel_wearwolf::write(event);
 	}
-	return Block_manager_parallel_wearwolf::write(event);
+
+	int key = arrived_writes_to_sequential_key_mapping[event.get_id()];
+
+	if (seq_write_key_to_pointers_mapping.count(key) == 0) {
+		arrived_writes_to_sequential_key_mapping.erase(event.get_id());
+		return Block_manager_parallel_wearwolf::write(event);
+	}
+
+	if (seq_write_key_to_pointers_mapping[key].num_pointers == 0) {
+		return Block_manager_parallel_wearwolf::write(event);
+	}
+
+	return perform_sequential_write(event, key);
 }
 
 Address Block_manager_parallel_wearwolf_locality::perform_sequential_write(Event const& event, long key) {
@@ -256,11 +265,11 @@ void Block_manager_parallel_wearwolf_locality::sequential_event_metadata_removed
 		return;
 	}
 	sequential_writes_pointers& a = seq_write_key_to_pointers_mapping[key];
-	printf("Returning key %d: \n", key );
+	//printf("Returning key %d: \n", key );
 	for (uint i = 0; i < a.pointers.size(); i++) {
 		for (uint j = 0; j < a.pointers[i].size(); j++) {
 			Address& pointer = a.pointers[i][j];
-			printf("  "); pointer.print(); printf("\n");
+			//printf("  "); pointer.print(); printf("\n");
 			Block_manager_parent::return_unfilled_block(pointer);
 		}
 	}
