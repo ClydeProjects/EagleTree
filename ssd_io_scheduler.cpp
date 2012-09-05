@@ -158,7 +158,7 @@ void IOScheduler::execute_current_waiting_ios() {
 		}
 	}
 	handle_noop_events(noop_events);
-	handle_next_batch(copy_backs); // Copy backs should be prioritized first to avoid conflict
+	handle_next_batch(copy_backs); // Copy backs should be prioritized first to avoid conflict, since they have a reserved page waiting to be written
 	handle_next_batch(erases);
 	handle_next_batch(read_commands);
 	handle_next_batch(read_transfers);
@@ -228,6 +228,13 @@ bool IOScheduler::should_event_be_scheduled(Event* event) {
 	return LBA_currently_executing.count(la) == 1 && LBA_currently_executing[la] == event->get_application_io_id();
 }
 
+bool IOScheduler::remove_event_from_current_events(Event* event) {
+	vector<Event*>::iterator e = std::find(current_events.begin(), current_events.end(), event);
+	if (e == current_events.end()) return false;
+	current_events.erase(e);
+	return true;
+}
+
 void IOScheduler::remove_redundant_events(Event* new_event) {
 	uint la = new_event->get_logical_address();
 	if (LBA_currently_executing.count(la) == 0) {
@@ -249,7 +256,17 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	event_type new_op_code = dependency_code_to_type[dependency_code_of_new_event];
 	event_type scheduled_op_code = dependency_code_to_type[dependency_code_of_other_event];
 
-	if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
+	// if something is to be trimmed, and a copy back is sent, the copy back is unnecessary to perform;
+	// however, since the copy back destination address is already reserved, we need to use it.
+	if (scheduled_op_code == COPY_BACK) {
+		make_dependent(new_event, existing_event);
+	}
+	else if (new_op_code == COPY_BACK) {
+		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
+		make_dependent(existing_event, new_event);
+		remove_event_from_current_events(existing_event); // Remove old event from current_events; it's added again when independent event (the copy back) finishes
+	}
+	else if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
 		promote_to_gc(existing_event);
 		remove_current_operation(new_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
@@ -307,14 +324,6 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		remove_current_operation(new_event);
 		//new_event->set_noop(true);
 	}
-	// if something is to be trimmed, and a copy back is sent, the copy back is unnecessary to perform; however, since the copy back destination
-	// address is already reserved, we need to use it
-	else if (new_op_code == TRIM && scheduled_op_code == COPY_BACK) {
-		make_dependent(new_event, existing_event);
-	}
-	else if (new_op_code == COPY_BACK && scheduled_op_code == TRIM) {
-		make_dependent(existing_event, new_event);
-	}
 }
 
 Event* IOScheduler::find_scheduled_event(uint dependency_code) {
@@ -325,8 +334,6 @@ Event* IOScheduler::find_scheduled_event(uint dependency_code) {
 		}
 	}
 	//assert(false);
-	int i = 0;
-	i++;
 	return NULL;
 }
 
@@ -398,16 +405,7 @@ enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd.controller.issue(event);
 
 	if (PRINT_LEVEL > 0) {
-		printf("->"); event->print();
-	}
-
-	if (event->get_id() == 191 || event->get_id() == 192) {
-		printf("--");
-	}
-
-	if (event->get_event_type() == COPY_BACK) {
-		int i = 0;
-		i++;
+		event->print();
 	}
 
 	if (result == SUCCESS) {
@@ -425,6 +423,7 @@ enum status IOScheduler::execute_next(Event* event) {
 			uint lba = dependency_code_to_LBA[dependency_code];
 			if (event->get_event_type() != ERASE) {
 				if (LBA_currently_executing.count(lba) == 0) {
+					printf("Assertion failure LBA_currently_executing.count(lba) = %d, concerning ", LBA_currently_executing.count(lba));
 					event->print();
 				}
 				assert(LBA_currently_executing.count(lba) == 1);
@@ -470,10 +469,6 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	if (outcome == FAILURE) {
 		assert(false); // events should not fail at this point. Any failure indicates application error
 	}
-
-	printf("FINISHING ");
-	event->print();
-
 	VisualTracer::get_instance()->register_completed_event(*event);
 	if (event->get_event_type() == WRITE || event->get_event_type() == COPY_BACK) {
 		ftl.register_write_completion(*event, outcome);
@@ -540,13 +535,10 @@ void IOScheduler::init_event(Event* event) {
 			// migration is (GC) a read    or (CB) empty deque
 			dependencies[first->get_application_io_id()] = migration;
 			dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
-			dependency_code_to_type[first->get_application_io_id()] = WRITE; //first->get_event_type(); // Seems more generic to just use event type of whatever event is in from on deque
+			dependency_code_to_type[first->get_application_io_id()] = first->get_event_type(); // = WRITE for normal GC, COPY_BACK for copy backs
 			init_event(first);
 		}
 		delete event;
-	}
-	else if (type == COPY_BACK) {
-		current_events.push_back(event);
 	}
 	else if (type == ERASE) {
 		current_events.push_back(event);

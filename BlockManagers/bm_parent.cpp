@@ -128,13 +128,10 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	if (ba.compare(free_block_pointers[ba.package][ba.die]) == BLOCK && event.get_event_type() == WRITE) {
 		increment_pointer(free_block_pointers[ba.package][ba.die]);
 		if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
-			printf("hot pointer ");
-			free_block_pointers[ba.package][ba.die].print();
-			printf(" is out of space");
 			if (PRINT_LEVEL > 1) {
 				printf("hot pointer ");
 				free_block_pointers[ba.package][ba.die].print();
-				printf("  is out of space.\n ");
+				printf(" is out of space");
 			}
 			Address free_pointer = find_free_unused_block(ba.package, ba.die, event.get_current_time());
 			if (has_free_pages(free_pointer)) {
@@ -142,8 +139,10 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 			} else { // If no free pointer could be found, schedule GC
 				//schedule_gc(event.get_current_time(), ba.package, ba.die);
 			}
-			if (free_pointer.valid == NONE) printf(", and a new unused block could not be found.\n");
-			else printf(".\n");
+			if (PRINT_LEVEL > 1) {
+				if (free_pointer.valid == NONE) printf(", and a new unused block could not be found.\n");
+				else printf(".\n");
+			}
 		}
 	}
 }
@@ -542,6 +541,8 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	num_available_pages_for_new_writes -= victim->get_pages_valid();
 
+	deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
+
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
 		if (victim->getPages()[i].get_state() == VALID) {
@@ -561,12 +562,9 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 				copy_back->set_address(copy_back_target);
 				copy_back->set_replace_address(addr);
 				copy_back->set_garbage_collection_op(true);
-				printf("Initiating copy-back GC operation ");
-				copy_back->print();
-				migration.push_back(copy_back);
+				cb_migrations.push_back(copy_back);
 				register_copy_back_operation_on(logical_address);
 				//printf("COPY_BACK MAP (Size: %d):\n", page_copy_back_count.size()); for (map<long, uint>::iterator it = page_copy_back_count.begin(); it != page_copy_back_count.end(); it++) printf(" lba %d\t: %d\n", it->first, it->second);
-				//copy_back->print();
 			} else {
 				Event* read = new Event(READ, logical_address, 1, gc_event->get_start_time());
 				read->set_address(addr);
@@ -581,9 +579,11 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 				register_ECC_check_on(logical_address); // An ECC check happens in a normal read-write GC operation
 			}
-			migrations.push_back(migration);
+			if (migration.size() > 0) migrations.push_back(migration);
 		}
 	}
+	if (cb_migrations.size() > 0) migrations.push_back(cb_migrations);
+
 	return migrations;
 }
 

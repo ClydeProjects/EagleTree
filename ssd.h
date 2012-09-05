@@ -1118,6 +1118,7 @@ private:
 	void init_event(Event* event);
 	void handle_noop_events(vector<Event*>& events);
 
+	bool remove_event_from_current_events(Event* event);
 
 	vector<Event*> future_events;
 	vector<Event*> current_events;

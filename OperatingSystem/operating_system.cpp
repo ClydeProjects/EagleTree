@@ -124,7 +124,6 @@ void OperatingSystem::register_event_completion(Event* event) {
 	currently_executing_ios_counter--;
 	currently_executing_ios.erase(event->get_id());
 	delete event;
-	printf("OperatingSystem::register_event_completion: Killing event "); event->print();
 }
 
 double OperatingSystem::get_event_minimal_completion_time(Event const*const event) const {

@@ -198,7 +198,6 @@ void Ssd::register_event_completion(Event * event) {
 	if (os != NULL && event->is_original_application_io()) {
 		os->register_event_completion(event);
 	} else {
-		printf("ssd::register_event_completion: Killing event "); event->print();
 		delete event;
 	}
 }
