@@ -10,7 +10,7 @@
 
 using namespace ssd;
 
-#define ENABLE_TAGGING false
+#define ENABLE_TAGGING true
 
 File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, double time_breaks, double start_time, ulong randseed)
 	: Thread(start_time), min_LBA(min_LBA), max_LBA(max_LBA),

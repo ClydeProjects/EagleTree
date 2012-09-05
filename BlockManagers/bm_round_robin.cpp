@@ -47,7 +47,7 @@ void Block_manager_roundrobin::register_erase_outcome(Event const& event, enum s
 	check_if_should_trigger_more_GC(event.get_current_time());
 }
 
-Address Block_manager_roundrobin::write(Event const& write) { // const
+Address Block_manager_roundrobin::choose_best_address(Event const& write) { // const
 	Address result;
 	bool can_write = Block_manager_parent::can_write(write);
 	if (!can_write) {

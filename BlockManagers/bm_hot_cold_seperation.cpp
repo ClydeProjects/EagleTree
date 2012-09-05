@@ -61,62 +61,15 @@ void Block_manager_parallel_hot_cold_seperation::register_erase_outcome(Event co
 	check_if_should_trigger_more_GC(event.get_current_time());
 }
 
-// ensures the pointer has at least 1 free page, and that the die is not busy (waiting for a read)
-bool Block_manager_parallel_hot_cold_seperation::pointer_can_be_written_to(Address pointer) const {
-	bool has_space = pointer.page < BLOCK_SIZE;
-	bool non_busy = !ssd.getPackages()[pointer.package].getDies()[pointer.die].register_is_busy();
-	return has_space && non_busy;
-}
 
-
-bool Block_manager_parallel_hot_cold_seperation::at_least_one_available_write_hot_pointer() const  {
-	for (uint i = 0; i < SSD_SIZE; i++) {
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			if (pointer_can_be_written_to(free_block_pointers[i][j])) {
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-Address Block_manager_parallel_hot_cold_seperation::write(Event const& write) {
-	Address result;
-	bool can_write = Block_manager_parent::can_write(write);
-	if (!can_write) {
-		return result;
-	}
-
+Address Block_manager_parallel_hot_cold_seperation::choose_best_address(Event const& write) {
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
-	bool relevant_pointer_unavailable = false;
+	return w_hotness == WRITE_HOT ? get_free_block_pointer_with_shortest_IO_queue() : cold_pointer;
+}
 
-	if (w_hotness == WRITE_HOT) {
-		result = get_free_block_pointer_with_shortest_IO_queue();
-	} else if (w_hotness == WRITE_COLD) {
-		result = cold_pointer;
-	}
-	if (result.valid == PAGE && result.page < BLOCK_SIZE) {
-		return result;
-	}
-
-	if (!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0) {
-		schedule_gc(write.get_current_time());
-	}
-
-	if (write.is_garbage_collection_op() || how_many_gc_operations_are_scheduled() == 0) {
-
-		if (cold_pointer.page < BLOCK_SIZE) {
-			result = cold_pointer;
-		} else if (w_hotness == WRITE_COLD) {
-			result = get_free_block_pointer_with_shortest_IO_queue();
-		}
-
-		if (PRINT_LEVEL > 1) {
-			printf("Trying to migrate a write %s page, but could not find a relevant pointer.\n", w_hotness == WRITE_COLD ? "cold" : "hot");
-		}
-	}
-
-	return result;
+Address Block_manager_parallel_hot_cold_seperation::choose_any_address() {
+	Address a = Block_manager_parent::choose_any_address();
+	return has_free_pages(a) ? a : cold_pointer;
 }
 
 void Block_manager_parallel_hot_cold_seperation::register_read_outcome(Event const& event, enum status status){

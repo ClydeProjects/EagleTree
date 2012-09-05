@@ -53,6 +53,29 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
 
 Block_manager_parent::~Block_manager_parent(void){}
 
+
+Address Block_manager_parent::choose_address(Event const& write) {
+	if (!can_write(write)) {
+		return Address();
+	}
+	Address a = choose_best_address(write);
+	if (has_free_pages(a)) {
+		return a;
+	}
+	if (!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0) {
+		schedule_gc(write.get_current_time());
+	}
+	if (write.is_garbage_collection_op() || how_many_gc_operations_are_scheduled() == 0) {
+		return choose_any_address();
+	}
+	return Address();
+}
+
+Address Block_manager_parent::choose_any_address() {
+	return get_free_block_pointer_with_shortest_IO_queue();
+}
+
+
 void Block_manager_parent::register_erase_outcome(Event const& event, enum status status) {
 	Address a = event.get_address();
 	a.valid = PAGE;
