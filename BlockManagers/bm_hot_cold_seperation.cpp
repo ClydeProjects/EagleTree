@@ -103,8 +103,7 @@ Address Block_manager_parallel_hot_cold_seperation::write(Event const& write) {
 		schedule_gc(write.get_current_time());
 	}
 
-	if ((write.is_garbage_collection_op()) ||
-			(!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0)) {
+	if (write.is_garbage_collection_op() || how_many_gc_operations_are_scheduled() == 0) {
 
 		if (cold_pointer.page < BLOCK_SIZE) {
 			result = cold_pointer;

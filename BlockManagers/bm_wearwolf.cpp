@@ -130,8 +130,7 @@ Address Block_manager_parallel_wearwolf::write(Event const& write) {
 		schedule_gc(write.get_current_time());
 	}
 
-	if ((write.is_garbage_collection_op()) ||
-			(!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0)) {
+	if (write.is_garbage_collection_op() || how_many_gc_operations_are_scheduled() == 0) {
 
 		if (PRINT_LEVEL > 1) {
 			printf("Trying to migrate a write %s page, but could not find a relevant pointer.\n", w_hotness == WRITE_COLD ? "cold" : "hot");
@@ -144,8 +143,6 @@ Address Block_manager_parallel_wearwolf::write(Event const& write) {
 		} else if (w_hotness == WRITE_COLD) {
 			result = get_free_block_pointer_with_shortest_IO_queue();
 		}
-
-
 	}
 	return result;
 }

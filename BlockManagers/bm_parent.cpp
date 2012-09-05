@@ -75,6 +75,7 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 
 	num_free_pages += BLOCK_SIZE;
 	num_available_pages_for_new_writes += BLOCK_SIZE;
+	printf("num_available_pages_for_new_writes: %d \n", num_available_pages_for_new_writes);
 
 	Block_manager_parent::check_if_should_trigger_more_GC(event.get_current_time());
 	Wear_Level(event);
@@ -110,6 +111,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	if (!event.is_garbage_collection_op()) {
 		assert(num_available_pages_for_new_writes > 0);
 		num_available_pages_for_new_writes--;
+		printf("num_available_pages_for_new_writes: %d \n", num_available_pages_for_new_writes);
 	}
 	// if there are very few pages left, need to trigger emergency GC
 	if (num_free_pages <= BLOCK_SIZE && how_many_gc_operations_are_scheduled() == 0) {
@@ -192,7 +194,7 @@ void Block_manager_parent::trim(Event const& event) {
 }
 
 void Block_manager_parent::remove_as_gc_candidate(Address const& phys_address) {
-	for (uint i = 0; i < num_age_classes; i++) {
+	for (int i = 0; i < num_age_classes; i++) {
 		gc_candidates[phys_address.package][phys_address.die][i].erase(phys_address.get_linear_address());
 	}
 }
@@ -270,6 +272,7 @@ void Block_manager_parent::Wear_Level(Event const& event) {
 		Block* target = blocks_to_wl.front();
 		blocks_to_wl.pop();
 		num_available_pages_for_new_writes -= target->get_pages_valid();
+		printf("num_available_pages_for_new_writes: %d \n", num_available_pages_for_new_writes);
 		//migrate(target, event.get_start_time() + event.get_time_taken());
 	}
 }
@@ -390,7 +393,7 @@ void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, 
 	gc->set_address(address);
 	gc->set_age_class(klass);
 	if (PRINT_LEVEL > 0) {
-		StateTracer::print();
+		//StateTracer::print();
 		printf("scheduling gc in (%d %d %d)  -  ", package_id, die_id, klass); gc->print();
 	}
 	IOScheduler::instance()->schedule_event(gc);
@@ -470,7 +473,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 	blocks_being_garbage_collected[victim->get_physical_address()] = victim->get_pages_valid();
 	num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die]++;
 	if (PRINT_LEVEL > 1) {
-		printf("num gc operations in (%d %d) : %d", addr.package, addr.die, num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die]);
+		printf("num gc operations in (%d %d) : %d  ", addr.package, addr.die, num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die]);
 		printf("Triggering GC in %ld    time: %f  ", victim->get_physical_address(), gc_event->get_current_time()); addr.print(); printf(". Migrating %d \n", victim->get_pages_valid());
 		printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
 		for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
@@ -485,7 +488,9 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 	assert(victim->get_state() != FREE);
 	assert(victim->get_state() != PARTIALLY_FREE);
 
+
 	num_available_pages_for_new_writes -= victim->get_pages_valid();
+	printf("num_available_pages_for_new_writes: %d \n", num_available_pages_for_new_writes);
 
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	for (uint i = 0; i < BLOCK_SIZE; i++) {

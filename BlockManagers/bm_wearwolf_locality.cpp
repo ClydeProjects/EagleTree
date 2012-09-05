@@ -58,6 +58,15 @@ void Block_manager_parallel_wearwolf_locality::register_write_arrival(Event cons
 Address Block_manager_parallel_wearwolf_locality::write(Event const& event) {
 	int tag = event.get_tag();
 
+	if (event.get_id() == 53357 && event.get_bus_wait_time() > 105) {
+		printf(" ");
+	}
+
+	bool can_write = Block_manager_parent::can_write(event);
+	if (!can_write) {
+		return Address();
+	}
+
 	if (tag != -1 && tag_map.count(tag) == 1 && seq_write_key_to_pointers_mapping[tag_map[tag].key].num_pointers > 0) {
 		return perform_sequential_write(event, tag_map[tag].key);
 	}
