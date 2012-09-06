@@ -646,7 +646,12 @@ Address Block_manager_parent::find_free_unused_block_with_class(uint klass, doub
 void Block_manager_parent::return_unfilled_block(Address pba) {
 	if (has_free_pages(pba)) {
 		int age_class = sort_into_age_class(pba);
-		free_blocks[pba.package][pba.die][age_class].push_back(pba);
+		if (has_free_pages(free_block_pointers[pba.package][pba.die])) {
+			free_blocks[pba.package][pba.die][age_class].push_back(pba);
+		} else {
+			free_block_pointers[pba.package][pba.die] = pba;
+		}
+
 	}
 }
 
