@@ -36,11 +36,21 @@ OperatingSystem::~OperatingSystem() {
 }
 
 void OperatingSystem::run() {
+	const int idle_limit = 1000000;
+	int idle_time = 0;
 	do {
 		int thread_id = pick_event_with_shortest_start_time();
 		if (thread_id == -1 || (currently_executing_ios_counter > 0 && last_dispatched_event_minimal_finish_time < events[thread_id]->get_start_time())) {
+			if (idle_time >= idle_limit) {
+				fprintf(stderr, "Idle time limit reached\n");
+				printf("Running IOs:\n");
+				for (set<uint>::iterator it = currently_executing_ios.begin(); it != currently_executing_ios.end(); it++) {
+					printf("%d ", *it);
+				}
+				throw;
+			}
 			ssd->progress_since_os_is_idle();
-
+			idle_time++;
 			/*
 			printf("Idle. Events running (%d) (%d):", currently_executing_ios_counter, currently_pending_ios_counter);
 			for (set<uint>::iterator it = currently_executing_ios.begin(); it != currently_executing_ios.end(); it++) {
@@ -51,6 +61,7 @@ void OperatingSystem::run() {
 		}
 		else {
 			dispatch_event(thread_id);
+			idle_time = 0;
 		}
 	} while (currently_executing_ios_counter > 0 || currently_pending_ios_counter > 0);
 }
