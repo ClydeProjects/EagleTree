@@ -886,6 +886,8 @@ public:
 	virtual void trim(Event const& write);
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
 	vector<deque<Event*> > migrate(Event * gc_event);
+	bool Copy_backs_in_progress(Address const& address);
+
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	void increment_pointer(Address& pointer);
@@ -927,7 +929,6 @@ private:
 	Address reserve_page_on(uint package, uint die, double time);
 	void register_copy_back_operation_on(uint logical_address);
 	void register_ECC_check_on(uint logical_address);
-
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 	bool greedy_gc;
@@ -1143,6 +1144,7 @@ private:
 	void promote_to_gc(Event* event_to_promote);
 	void nullify_and_add_as_dependent(uint dependency_code_to_be_nullified, uint dependency_code_to_remain);
 	void make_dependent(Event* dependent_event, Event* independent_event);
+	void make_dependent(Event* dependent_event, uint independent_code);
 	double get_current_time() const;
 
 	struct io_scheduler_stats {

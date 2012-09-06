@@ -196,10 +196,10 @@ bool OS_LOCK = true;
 
 /* Defines the max number of copy back operations on a page before ECC check is performed.
  * Set to zero to disable copy back GC operations */
-uint MAX_REPEATED_COPY_BACKS_ALLOWED = 1;
+uint MAX_REPEATED_COPY_BACKS_ALLOWED = 1024;
 
 /* Defines the max number of page addresses in map keeping track of each pages copy back count */
-uint MAX_ITEMS_IN_COPY_BACK_MAP = 1;
+uint MAX_ITEMS_IN_COPY_BACK_MAP = 1024;
 
 void load_entry(char *name, double value, uint line_number) {
 	/* cheap implementation - go through all possibilities and match entry */

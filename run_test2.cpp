@@ -29,7 +29,7 @@
 using namespace ssd;
 
 // this experiement is to show
-void experiement1() {
+void experiment1() {
 	vector<Thread*> threads;
 	threads.push_back(new Asynchronous_Random_Thread(0, 199, 108, 1, WRITE, 10, 1));
 	threads.push_back(new Asynchronous_Random_Thread(200, 399, 108, 1, WRITE, 10, 1));
@@ -45,7 +45,7 @@ void experiement1() {
 	delete os;
 }
 
-void experiement2() {
+void experiment2() {
 
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, 199, 1, WRITE, 17);
 	Thread* t2 = new Asynchronous_Sequential_Thread(200, 399, 1, WRITE, 17);
@@ -71,17 +71,17 @@ void experiement2() {
 	delete os;
 }
 
-void simple_experiement() {
+void simple_experiment() {
 
-	Thread* t1 = new Asynchronous_Sequential_Thread(0, 64, 1, WRITE, 1);
-	Thread* t2 = new Asynchronous_Sequential_Thread(65, 128, 1, WRITE, 1);
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, 127, 1, WRITE, 1);
+	Thread* t2 = new Asynchronous_Sequential_Thread(128, 256, 1, WRITE, 1);
 	//Thread* t3 = new Asynchronous_Sequential_Thread(400, 599, 1, WRITE, 17);
 	//Thread* t4 = new Asynchronous_Sequential_Thread(600, 799, 1, WRITE, 17);
 
 	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, 64, 100, 1, WRITE, 30, 1));
-	t1->add_follow_up_thread(new Asynchronous_Sequential_Thread(0, 64, 100, WRITE, 1));
+	t1->add_follow_up_thread(new Asynchronous_Sequential_Thread(0, 256, 100, WRITE, 1));
 
-	//t2->add_follow_up_thread(new Asynchronous_Random_Thread(200, 399, 1000, 2, WRITE, 30, 2));
+	t2->add_follow_up_thread(new Asynchronous_Random_Thread(0, 256, 1000, 2, WRITE, 256, 1));
 	//t3->add_follow_up_thread(new Asynchronous_Random_Thread(400, 599, 1000, 3, WRITE, 30, 3));
 	//t4->add_follow_up_thread(new Asynchronous_Random_Thread(600, 799, 1000, 4, WRITE, 100, 4));
 
@@ -140,9 +140,10 @@ int main()
 	printf("\n");
 
 //	file_manager_experiment();
-//	experiement2();
-	simple_experiement();
-
+//	experiment2();
+//	simple_experiment();
+	file_manager_experiment();
+	//experiment1();
 	return 0;
 }
 

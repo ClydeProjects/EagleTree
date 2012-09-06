@@ -210,7 +210,9 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 		assert(event->get_event_type() == WRITE);
 		Address result = bm->write(*event);
 		double wait_time = bm->in_how_long_can_this_event_be_scheduled(result, event->get_current_time());
+		if (wait_time == 0 && bm->Copy_backs_in_progress(result)) wait_time = 1; // If copy backs are in progress, keep waiting until they are done
 		if (wait_time == 0) {
+			ftl.set_replace_address(*event); // 05-09-2012: Moved to here from init_event (else if (type == WRITE) { ...)
 			event->set_address(result);
 			execute_next(event);
 		}
@@ -249,17 +251,18 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	uint dependency_code_of_other_event = LBA_currently_executing[common_logical_address];
 	Event * existing_event = find_scheduled_event(dependency_code_of_other_event);
 
-	assert(existing_event != NULL);
 	//bool both_events_are_gc = new_event->is_garbage_collection_op() && existing_event->is_garbage_collection_op();
 	//assert(!both_events_are_gc);
 
 	event_type new_op_code = dependency_code_to_type[dependency_code_of_new_event];
 	event_type scheduled_op_code = dependency_code_to_type[dependency_code_of_other_event];
 
+	assert (existing_event != NULL || scheduled_op_code == COPY_BACK);
+
 	// if something is to be trimmed, and a copy back is sent, the copy back is unnecessary to perform;
 	// however, since the copy back destination address is already reserved, we need to use it.
 	if (scheduled_op_code == COPY_BACK) {
-		make_dependent(new_event, existing_event);
+		make_dependent(new_event, dependency_code_of_other_event);
 	}
 	else if (new_op_code == COPY_BACK) {
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
@@ -315,12 +318,12 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		//make_dependent(new_event, new_op_code, scheduled_op_code);
 	}
 	// if a read is scheduled when a trim is received, we must still execute the read. Then we can trim
-	else if (new_op_code == TRIM && scheduled_op_code == READ) {
+	else if (new_op_code == TRIM && (scheduled_op_code == READ || scheduled_op_code == READ_TRANSFER || scheduled_op_code == READ_COMMAND)) {
 		make_dependent(new_event, existing_event);
 		//make_dependent(new_event, dependency_code_of_new_event, dependency_code_of_other_event);
 	}
 	// if something is to be trimmed, and a read is sent, invalidate the read
-	else if (new_op_code == READ && scheduled_op_code == TRIM) {
+	else if ((new_op_code == READ || new_op_code == READ_TRANSFER || new_op_code == READ_COMMAND) && scheduled_op_code == TRIM) {
 		remove_current_operation(new_event);
 		//new_event->set_noop(true);
 	}
@@ -375,8 +378,11 @@ void IOScheduler::nullify_and_add_as_dependent(uint dependency_code_to_be_nullif
 }
 
 void IOScheduler::make_dependent(Event* dependent_event, Event* independent_event) {
+	make_dependent(dependent_event, independent_event->get_application_io_id());
+}
+
+void IOScheduler::make_dependent(Event* dependent_event, uint independent_code/*Event* independent_event_application_io*/) {
 	uint dependent_code = dependent_event->get_application_io_id();
-	uint independent_code = independent_event->get_application_io_id();
 	op_code_to_dependent_op_codes[independent_code].push(dependent_code);
 	dependencies[dependent_code].push_front(dependent_event);
 }
@@ -412,10 +418,16 @@ enum status IOScheduler::execute_next(Event* event) {
 		int dependency_code = event->get_application_io_id();
 		if (dependencies[dependency_code].size() > 0) {
 			Event* dependent = dependencies[dependency_code].front();
+			LBA_currently_executing.erase(event->get_logical_address());
+			//LBA_currently_executing[dependent->get_logical_address()] = dependent->get_application_io_id();
 			dependent->set_application_io_id(dependency_code);
 			dependent->set_start_time(event->get_current_time());
 			dependent->set_noop(event->get_noop());
 			dependencies[dependency_code].pop_front();
+			// The dependent event might have a different LBA and type - record this in bookkeeping maps
+			LBA_currently_executing[dependent->get_logical_address()] = dependent->get_application_io_id();
+			dependency_code_to_LBA[dependency_code] = dependent->get_logical_address();
+			dependency_code_to_type[dependency_code] = dependent->get_event_type();
 			init_event(dependent);
 		} else {
 			assert(dependencies.count(dependency_code) == 1);
@@ -423,7 +435,7 @@ enum status IOScheduler::execute_next(Event* event) {
 			uint lba = dependency_code_to_LBA[dependency_code];
 			if (event->get_event_type() != ERASE) {
 				if (LBA_currently_executing.count(lba) == 0) {
-					printf("Assertion failure LBA_currently_executing.count(lba) = %d, concerning ", LBA_currently_executing.count(lba));
+					printf("Assertion failure LBA_currently_executing.count(lba = %d) = %d, concerning ", lba, LBA_currently_executing.count(lba));
 					event->print();
 				}
 				assert(LBA_currently_executing.count(lba) == 1);
@@ -446,7 +458,7 @@ enum status IOScheduler::execute_next(Event* event) {
 			op_code_to_dependent_op_codes.erase(dependency_code);
 		}
 	} else {
-		printf("FAILED!!!! ");
+		fprintf(stderr, "execute_event: Event failed! ");
 		dependencies.erase(event->get_application_io_id()); // possible memory leak here, since events are not deleted
 	}
 
@@ -502,6 +514,9 @@ void IOScheduler::init_event(Event* event) {
 	if (type == TRIM || type == READ_COMMAND || type == READ_TRANSFER || type == WRITE || type == COPY_BACK) {
 		if (should_event_be_scheduled(event)) {
 			current_events.push_back(event);
+		} else {
+			printf("Event not scheduled: ");
+			event->print();
 		}
 	}
 
@@ -517,7 +532,7 @@ void IOScheduler::init_event(Event* event) {
 	}
 	else if (type == WRITE) {
 		bm->register_write_arrival(*event);
-		ftl.set_replace_address(*event);
+//		ftl.set_replace_address(*event);
 	}
 	else if (type == TRIM) {
 		ftl.set_replace_address(*event);
@@ -529,13 +544,27 @@ void IOScheduler::init_event(Event* event) {
 			deque<Event*> migration = migrations.back();
 			migrations.pop_back();
 			// Pick first event from migration
-			Event * first = migration.front();
-			migration.pop_front();
-			// first is     (GC) a write   or (CB) a copy_back
-			// migration is (GC) a read    or (CB) empty deque
-			dependencies[first->get_application_io_id()] = migration;
-			dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
-			dependency_code_to_type[first->get_application_io_id()] = first->get_event_type(); // = WRITE for normal GC, COPY_BACK for copy backs
+			Event* first = migration.front();
+
+			if (first->get_event_type() == COPY_BACK) {
+				// Make a chain of dependencies, to enforce an order of execution: first -> second -> third, etc.
+				for (deque<Event*>::iterator e = migration.begin(); e != migration.end(); e++) {
+					Event* current = *(e);
+					Event* next    = *(e+1);
+					bool last  = (e+1 == migration.end());
+					bool first = (e   == migration.begin());
+					dependency_code_to_LBA[current->get_application_io_id()] = current->get_logical_address();
+					dependency_code_to_type[current->get_application_io_id()] = current->get_event_type(); // = WRITE for normal GC, COPY_BACK for copy backs
+					if (first) dependencies[current->get_application_io_id()] = deque<Event*>();
+					remove_redundant_events(current);
+					if (!last) make_dependent(next, current);
+				}
+			} else {
+				migration.pop_front();
+				dependencies[first->get_application_io_id()] = migration;
+				dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
+				dependency_code_to_type[first->get_application_io_id()] = first->get_event_type(); // = WRITE for normal GC, COPY_BACK for copy backs
+			}
 			init_event(first);
 		}
 		delete event;

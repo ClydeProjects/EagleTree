@@ -354,6 +354,15 @@ bool Block_manager_parent::has_free_pages(Address const& address) const {
 	return address.valid == PAGE && address.page < BLOCK_SIZE;
 }
 
+bool Block_manager_parent::Copy_backs_in_progress(Address const& addr) {
+	if (addr.page > 0) {
+		Block& block = ssd.getPackages()[addr.package].getDies()[addr.die].getPlanes()[addr.plane].getBlocks()[addr.block];
+		Page const& page_before = block.getPages()[addr.page - 1];
+		return page_before.get_state() == EMPTY;
+	}
+	return false;
+}
+
 // gives time until both the channel and die are clear
 double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const {
 	if (die_address.valid == NONE) {
