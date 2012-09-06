@@ -4,7 +4,7 @@
 using namespace ssd;
 using namespace std;
 
-#define THRESHOLD 6 // the number of sequential writes before we recognize the pattern as sequential
+#define THRESHOLD 5 // the number of sequential writes before we recognize the pattern as sequential
 
 Wearwolf_Locality::Wearwolf_Locality(Ssd& ssd, FtlParent& ftl)
 	: Wearwolf(ssd, ftl),
@@ -56,6 +56,10 @@ void Wearwolf_Locality::register_write_arrival(Event const& write) {
 
 
 Address Wearwolf_Locality::choose_best_address(Event const& event) {
+	if (event.is_garbage_collection_op()) {
+		return Wearwolf::choose_best_address(event);
+	}
+
 	int tag = event.get_tag();
 
 	if (tag != -1 && tag_map.count(tag) == 1 && seq_write_key_to_pointers_mapping[tag_map[tag].key].num_pointers > 0) {
@@ -266,94 +270,6 @@ void Wearwolf_Locality::register_write_outcome(Event const& event, enum status s
 	}
 	Wearwolf::register_write_outcome(event, status);
 }
-
-
-
-// TODO must update this so that writes chosen from the choose_any method can be found too
-/*void Wearwolf_Locality::register_write_outcome(Event const& event, enum status status) {
-	long key;
-
-	if (event.get_tag() != -1) {
-		key = tag_map[event.get_tag()].key;
-	} else if (arrived_writes_to_sequential_key_mapping.count(event.get_id()) == 1) {
-		key = arrived_writes_to_sequential_key_mapping[event.get_id()];
-		arrived_writes_to_sequential_key_mapping.erase(event.get_id());
-		//key = detector->get_sequential_write_id(lb);
-	}
-	//int b = seq_write_key_to_pointers_mapping[key].num_pointers;
-	if (seq_write_key_to_pointers_mapping.count(key) == 1 && seq_write_key_to_pointers_mapping[key].num_pointers > 0) {
-		Block_manager_parent::register_write_outcome(event, status);
-		page_hotness_measurer.register_event(event);
-		sequential_writes_pointers& swp = seq_write_key_to_pointers_mapping[key];
-
-		int i, j;
-		if (event.get_tag() != -1) {
-			i = event.get_address().package;
-			j = event.get_address().die;
-		}
-		else if (parallel_degree == ONE) {
-			i = j = 0;
-		} else if (parallel_degree == CHANNEL) {
-			i = event.get_address().package;
-			j = 0;
-		} else if (parallel_degree == LUN) {
-			i = event.get_address().package;
-			j = event.get_address().die;
-		}
-
-		if (strat == ROUND_ROBIN) {
-			swp.cursor++;
-		}
-
-		Address selected_pointer = swp.pointers[i][j];
-		assert(selected_pointer.valid == PAGE);
-		selected_pointer.page++;
-		swp.pointers[i][j] = selected_pointer;
-		bool allocate_more_blocks = !has_free_pages(selected_pointer);
-
-		int tag = event.get_tag();
-		if (tag != -1) {
-			tag_map[tag].num_written++;
-			if (allocate_more_blocks && !tag_map[tag].need_more_space()) {
-				allocate_more_blocks = false;
-			}
-			if (tag_map[tag].is_finished()) {
-				int i = 0;
-				i++;
-				sequential_event_metadata_removed(tag_map[tag].key);
-				tag_map.erase(tag);
-			}
-		}
-
-		if (allocate_more_blocks) {
-			Address free_block;
-			if (parallel_degree == ONE) {
-				free_block = find_free_unused_block(event.get_current_time());
-				if (free_block.valid == NONE) {
-					schedule_gc(event.get_current_time());
-				}
-			} else if (parallel_degree == CHANNEL) {
-				free_block = find_free_unused_block(event.get_address().package, event.get_current_time());
-				if (free_block.valid == NONE) {
-					schedule_gc(event.get_current_time(), event.get_address().package);
-				}
-			} else if (parallel_degree == LUN) {
-				free_block = find_free_unused_block(event.get_address().package, event.get_address().die, event.get_current_time());
-				if (free_block.valid == NONE) {
-					schedule_gc(event.get_current_time(), event.get_address().package, event.get_address().die);
-				}
-			}
-			if (has_free_pages(free_block)) {
-				swp.pointers[i][j] = free_block;
-			} else {
-				swp.num_pointers--;
-			}
-		}
-
-	} else {
-		Wearwolf::register_write_outcome(event, status);
-	}
-}*/
 
 void Wearwolf_Locality::sequential_event_metadata_removed(long key) {
 	if (seq_write_key_to_pointers_mapping.count(key) == 0) {
