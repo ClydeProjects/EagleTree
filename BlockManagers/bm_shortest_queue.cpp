@@ -39,10 +39,5 @@ void Block_manager_parallel::register_erase_outcome(Event const& event, enum sta
 }
 
 Address Block_manager_parallel::choose_best_address(Event const& write) {
-	Address result;
-	bool can_write = Block_manager_parent::can_write(write);
-	if (!can_write) {
-		return result;
-	}
 	return get_free_block_pointer_with_shortest_IO_queue();
 }

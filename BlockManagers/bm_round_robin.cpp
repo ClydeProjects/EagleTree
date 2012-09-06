@@ -48,11 +48,6 @@ void Block_manager_roundrobin::register_erase_outcome(Event const& event, enum s
 }
 
 Address Block_manager_roundrobin::choose_best_address(Event const& write) { // const
-	Address result;
-	bool can_write = Block_manager_parent::can_write(write);
-	if (!can_write) {
-		return result;
-	}
 	return free_block_pointers[address_cursor.package][address_cursor.die];
 }
 
