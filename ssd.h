@@ -288,8 +288,8 @@ class Block_manager;
 class Block_manager_parent;
 class Block_manager_parallel;
 class Block_manager_parallel_hot_cold_seperation;
-class Block_manager_parallel_wearwolf;
-class Block_manager_parallel_wearwolf_locality;
+class Wearwolf;
+class Wearwolf_Locality;
 
 class Sequential_Pattern_Detector;
 class Page_Hotness_Measurer;
@@ -881,7 +881,7 @@ public:
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual Address write(Event const& write) = 0;
+	virtual Address choose_address(Event const& write);
 	virtual void register_write_arrival(Event const& write);
 	virtual void trim(Event const& write);
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
@@ -889,6 +889,9 @@ public:
 	bool Copy_backs_in_progress(Address const& address);
 
 protected:
+	virtual Address choose_best_address(Event const& write) = 0;
+	virtual Address choose_any_address();
+
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	void increment_pointer(Address& pointer);
 
@@ -951,7 +954,8 @@ public:
 	~Block_manager_parallel() {}
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
-	Address write(Event const& write);
+protected:
+	Address choose_best_address(Event const& write);
 };
 
 // A simple BM that assigns writes sequentially to dies in a round-robin fashion. No hot-cold separation or anything else intelligent
@@ -961,7 +965,8 @@ public:
 	~Block_manager_roundrobin();
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
-	Address write(Event const& write);
+protected:
+	Address choose_best_address(Event const& write);
 private:
 	void move_address_cursor();
 	Address address_cursor;
@@ -976,33 +981,30 @@ public:
 	void register_write_outcome(Event const& event, enum status status);
 	void register_read_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
-	Address write(Event const& write);
 protected:
+	Address choose_best_address(Event const& write);
+	virtual Address choose_any_address();
 	void check_if_should_trigger_more_GC(double start_time);
 private:
-	bool pointer_can_be_written_to(Address pointer) const;
-	bool at_least_one_available_write_hot_pointer() const;
 	void handle_cold_pointer_out_of_space(double start_time);
 	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
 	Address cold_pointer;
 };
 
 
-class Block_manager_parallel_wearwolf : public Block_manager_parent {
+class Wearwolf : public Block_manager_parent {
 public:
-	Block_manager_parallel_wearwolf(Ssd& ssd, FtlParent& ftl);
-	~Block_manager_parallel_wearwolf() {}
+	Wearwolf(Ssd& ssd, FtlParent& ftl);
+	~Wearwolf() {}
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
-	virtual Address write(Event const& write);
-
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
+	virtual Address choose_best_address(Event const& write);
+	virtual Address choose_any_address();
 	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
 private:
-	bool pointer_can_be_written_to(Address pointer) const;
-	bool at_least_one_available_write_hot_pointer() const;
 	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
 	void reset_any_filled_pointers(Event const& event);
 	Address wcrh_pointer;
@@ -1042,18 +1044,17 @@ private:
 	uint threshold;
 };
 
-class Block_manager_parallel_wearwolf_locality : public Block_manager_parallel_wearwolf, public Sequential_Pattern_Detector_Listener {
+class Wearwolf_Locality : public Wearwolf, public Sequential_Pattern_Detector_Listener {
 public:
-	Block_manager_parallel_wearwolf_locality(Ssd& ssd, FtlParent& ftl);
-	~Block_manager_parallel_wearwolf_locality();
+	Wearwolf_Locality(Ssd& ssd, FtlParent& ftl);
+	~Wearwolf_Locality();
 	void register_write_arrival(Event const& write);
-	Address write(Event const& write);
-
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
 	void sequential_event_metadata_removed(long key);
 protected:
-	//void check_if_should_trigger_more_GC(double start_time);
+	Address choose_best_address(Event const& write);
+	Address choose_any_address();
 private:
 	enum parallel_degree_for_sequential_files { ONE, LUN, CHANNEL };
 	parallel_degree_for_sequential_files parallel_degree;
@@ -1081,6 +1082,7 @@ private:
 	Address perform_sequential_write(Event const& event, long key);
 	Address perform_sequential_write_shortest_queue(sequential_writes_pointers& swp);
 	Address perform_sequential_write_round_robin(sequential_writes_pointers& swp);
+	void process_write_completion(Event const& event, long key, pair<long, long> index);
 
 	Sequential_Pattern_Detector* detector;
 

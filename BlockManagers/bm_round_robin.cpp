@@ -47,13 +47,7 @@ void Block_manager_roundrobin::register_erase_outcome(Event const& event, enum s
 	check_if_should_trigger_more_GC(event.get_current_time());
 }
 
-// TODO handle situation where the next LUN to write to does not have space
-Address Block_manager_roundrobin::write(Event const& write) { // const
-	Address result;
-	bool can_write = Block_manager_parent::can_write(write);
-	if (!can_write) {
-		return result;
-	}
+Address Block_manager_roundrobin::choose_best_address(Event const& write) { // const
 	return free_block_pointers[address_cursor.package][address_cursor.die];
 }
 

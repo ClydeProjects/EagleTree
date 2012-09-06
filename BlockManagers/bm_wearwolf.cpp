@@ -3,7 +3,7 @@
 
 using namespace ssd;
 
-Block_manager_parallel_wearwolf::Block_manager_parallel_wearwolf(Ssd& ssd, FtlParent& ftl)
+Wearwolf::Wearwolf(Ssd& ssd, FtlParent& ftl)
 	: Block_manager_parent(ssd, ftl, 1),
 	  page_hotness_measurer()
 {
@@ -17,7 +17,8 @@ Block_manager_parallel_wearwolf::Block_manager_parallel_wearwolf(Ssd& ssd, FtlPa
 	}
 }
 
-void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event, enum status status) {
+void Wearwolf::register_write_outcome(Event const& event, enum status status) {
+	assert(event.get_event_type() == WRITE || event.get_event_type() == COPY_BACK);
 	if (status == FAILURE) {
 		return;
 	}
@@ -29,9 +30,6 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 
 	if (block_address.compare(wcrh_pointer) == BLOCK && has_free_pages(wcrh_pointer)) {
 		wcrh_pointer.page = wcrh_pointer.page + 1;
-		if (wcrh_pointer.page > BLOCK_SIZE) {
-			event.print();
-		}
 		assert(wcrh_pointer.page <= BLOCK_SIZE);
 	} else if (block_address.compare(wcrc_pointer) == BLOCK && has_free_pages(wcrc_pointer)) {
 		wcrc_pointer.page = wcrc_pointer.page + 1;
@@ -46,7 +44,7 @@ void Block_manager_parallel_wearwolf::register_write_outcome(Event const& event,
 	}
 }
 
-void Block_manager_parallel_wearwolf::handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time) {
+void Wearwolf::handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time) {
 	Address addr = page_hotness_measurer.get_best_target_die_for_WC(rh);
 	Address& pointer = rh == READ_COLD ? wcrc_pointer : wcrh_pointer;
 	Address free_block = find_free_unused_block(addr.package, addr.die, start_time);
@@ -58,14 +56,14 @@ void Block_manager_parallel_wearwolf::handle_cold_pointer_out_of_space(enum read
 	}
 }
 
-void Block_manager_parallel_wearwolf::register_erase_outcome(Event const& event, enum status status) {
+void Wearwolf::register_erase_outcome(Event const& event, enum status status) {
 	Block_manager_parent::register_erase_outcome(event, status);
 	reset_any_filled_pointers(event);
 	check_if_should_trigger_more_GC(event.get_current_time());
 }
 
 // must really improve logic in this class. Currently, mistakes are too easy if much GC happens at same time
-void Block_manager_parallel_wearwolf::reset_any_filled_pointers(Event const& event) {
+void Wearwolf::reset_any_filled_pointers(Event const& event) {
 	uint package_id = event.get_address().package;
 	uint die_id = event.get_address().die;
 
@@ -81,81 +79,32 @@ void Block_manager_parallel_wearwolf::reset_any_filled_pointers(Event const& eve
 	}
 }
 
-// ensures the pointer has at least 1 free page, and that the die is not busy (waiting for a read)
-bool Block_manager_parallel_wearwolf::pointer_can_be_written_to(Address pointer) const {
-	bool has_space = pointer.page < BLOCK_SIZE;
-	bool non_busy = !ssd.getPackages()[pointer.package].getDies()[pointer.die].register_is_busy();
-	return has_space && non_busy;
-}
 
-
-bool Block_manager_parallel_wearwolf::at_least_one_available_write_hot_pointer() const  {
-	for (uint i = 0; i < SSD_SIZE; i++) {
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			if (pointer_can_be_written_to(free_block_pointers[i][j])) {
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-Address Block_manager_parallel_wearwolf::write(Event const& write) {
-	Address result;
-	bool can_write = Block_manager_parent::can_write(write);
-	if (!can_write) {
-		return result;
-	}
-
-	if (write.get_id() == 17790 && write.get_bus_wait_time() > 934) {
-		write.print();
-	}
-
+Address Wearwolf::choose_best_address(Event const& write) {
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
 	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(write.get_logical_address());
 
 	if (w_hotness == WRITE_HOT) {
-		result = get_free_block_pointer_with_shortest_IO_queue();
+		return get_free_block_pointer_with_shortest_IO_queue();
 	} else if (w_hotness == WRITE_COLD && r_hotness == READ_COLD) {
-		result = wcrc_pointer;
-	} else if (w_hotness == WRITE_COLD && r_hotness == READ_HOT) {
-		result = wcrh_pointer;
+		return wcrc_pointer;
+	} else /* if (w_hotness == WRITE_COLD && r_hotness == READ_HOT) */ {
+		return wcrh_pointer;
 	}
-	if (result.valid == PAGE && result.page < BLOCK_SIZE) {
-		return result;
-	}
-
-	if (!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0) {
-		schedule_gc(write.get_current_time());
-	}
-
-	if ((write.is_garbage_collection_op()) ||
-			(!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0)) {
-
-		if (PRINT_LEVEL > 1) {
-			//printf("Trying to migrate a write %s page, but could not find a relevant pointer.\n", w_hotness == WRITE_COLD ? "cold" : "hot");
-		}
-
-		if (wcrh_pointer.page < BLOCK_SIZE) {
-			result = wcrh_pointer;
-		} else if (wcrc_pointer.page < BLOCK_SIZE) {
-			result = wcrc_pointer;
-		} else if (w_hotness == WRITE_COLD) {
-			result = get_free_block_pointer_with_shortest_IO_queue();
-		}
-
-
-	}
-	return result;
 }
 
-void Block_manager_parallel_wearwolf::register_read_outcome(Event const& event, enum status status){
+Address Wearwolf::choose_any_address() {
+	Address a = get_free_block_pointer_with_shortest_IO_queue();
+	return has_free_pages(a) ? a : has_free_pages(wcrh_pointer) ? wcrh_pointer : wcrc_pointer;
+}
+
+void Wearwolf::register_read_outcome(Event const& event, enum status status){
 	if (status == SUCCESS && !event.is_garbage_collection_op()) {
 		page_hotness_measurer.register_event(event);
 	}
 }
 
-void Block_manager_parallel_wearwolf::check_if_should_trigger_more_GC(double start_time) {
+void Wearwolf::check_if_should_trigger_more_GC(double start_time) {
 	if (wcrh_pointer.page >= BLOCK_SIZE) {
 		handle_cold_pointer_out_of_space(READ_HOT, start_time);
 	}

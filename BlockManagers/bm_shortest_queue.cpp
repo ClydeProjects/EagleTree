@@ -38,11 +38,6 @@ void Block_manager_parallel::register_erase_outcome(Event const& event, enum sta
 	check_if_should_trigger_more_GC(event.get_current_time());
 }
 
-Address Block_manager_parallel::write(Event const& write) {
-	Address result;
-	bool can_write = Block_manager_parent::can_write(write);
-	if (!can_write) {
-		return result;
-	}
+Address Block_manager_parallel::choose_best_address(Event const& write) {
 	return get_free_block_pointer_with_shortest_IO_queue();
 }

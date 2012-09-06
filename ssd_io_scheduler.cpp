@@ -22,9 +22,9 @@ IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
 	} else if (BLOCK_MANAGER_ID == 1) {
 		bm = new Block_manager_parallel_hot_cold_seperation(ssd, ftl);
 	} else if (BLOCK_MANAGER_ID == 2) {
-		bm = new Block_manager_parallel_wearwolf(ssd, ftl);
+		bm = new Wearwolf(ssd, ftl);
 	} else if (BLOCK_MANAGER_ID == 3) {
-		bm = new Block_manager_parallel_wearwolf_locality(ssd, ftl);
+		bm = new Wearwolf_Locality(ssd, ftl);
 	} else if (BLOCK_MANAGER_ID == 4) {
 		bm = new Block_manager_roundrobin(ssd, ftl);
 	} else {
@@ -207,8 +207,12 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
-		assert(event->get_event_type() == WRITE);
-		Address result = bm->write(*event);
+//<<<<<<< HEAD
+//		assert(event->get_event_type() == WRITE);
+//		Address result = bm->write(*event);
+//=======
+		Address result = bm->choose_address(*event);
+//>>>>>>> a8b5fbf35afcae284afc26df2bca0be9381933f2
 		double wait_time = bm->in_how_long_can_this_event_be_scheduled(result, event->get_current_time());
 		if (wait_time == 0 && bm->Copy_backs_in_progress(result)) wait_time = 1; // If copy backs are in progress, keep waiting until they are done
 		if (wait_time == 0) {

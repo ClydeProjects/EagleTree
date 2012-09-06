@@ -102,7 +102,7 @@ void simple_experiment() {
 void file_manager_experiment() {
 	vector<Thread*> threads;
 	Thread* fm1 = new File_Manager(0, 399, 200, 100, 10, 1, 1);
-	Thread* fm2 = new File_Manager(400, 799, 200, 100, 10, 2, 2);
+	Thread* fm2 = new File_Manager(450, 799, 200, 100, 10, 2, 2);
 	threads.push_back(fm1);
 	threads.push_back(fm2);
 	OperatingSystem* os = new OperatingSystem(threads);
