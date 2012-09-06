@@ -10,7 +10,7 @@
 
 using namespace ssd;
 
-#define ENABLE_TAGGING true
+#define ENABLE_TAGGING false
 
 File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, double time_breaks, double start_time, ulong randseed)
 	: Thread(start_time), min_LBA(min_LBA), max_LBA(max_LBA),
@@ -83,7 +83,7 @@ void File_Manager::handle_file_completion(double current_time) {
 
 void File_Manager::write_next_file() {
 	assert(num_free_pages > 0); // deal with this problem later
-	double death_probability = double_generator();
+	double death_probability = double_generator() / 2;
 	uint size;
 	if (max_file_size > num_free_pages) {
 		size = num_free_pages;
@@ -96,10 +96,6 @@ void File_Manager::write_next_file() {
 }
 
 void File_Manager::assign_new_range() {
-	if (current_file->id == 165) {
-		int i = 0;
-		i++;
-	}
 	Address_Range range = free_ranges.front();
 	free_ranges.pop_front();
 	long num_pages_left_to_write = current_file->get_num_pages_left_to_allocate();
@@ -116,7 +112,7 @@ void File_Manager::randomly_delete_files() {
 	for (uint i = 0; i < files.size(); ) {
 		File* file = files[i];
 		double random_num = double_generator();
-		if (file->death_probability < random_num) {
+		if (file->death_probability > random_num) {
 			delete_file(file);
 			files.erase(files.begin() + i);
 		} else {
