@@ -879,6 +879,7 @@ public:
 	virtual void trim(Event const& write);
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
 	vector<deque<Event*> > migrate(Event * gc_event);
+	void register_trim_making_gc_redundant();
 protected:
 	virtual Address choose_best_address(Event const& write) = 0;
 	virtual Address choose_any_address();

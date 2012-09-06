@@ -98,7 +98,10 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 
 	num_free_pages += BLOCK_SIZE;
 	num_available_pages_for_new_writes += BLOCK_SIZE;
-	printf("num_available_pages_for_new_writes: %d \n", num_available_pages_for_new_writes);
+
+	if (blocks_being_garbage_collected.size() == 0) {
+		assert(num_free_pages == num_available_pages_for_new_writes);
+	}
 
 	Block_manager_parent::check_if_should_trigger_more_GC(event.get_current_time());
 	Wear_Level(event);
@@ -134,7 +137,6 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	if (!event.is_garbage_collection_op()) {
 		assert(num_available_pages_for_new_writes > 0);
 		num_available_pages_for_new_writes--;
-		printf("num_available_pages_for_new_writes: %d \n", num_available_pages_for_new_writes);
 	}
 	// if there are very few pages left, need to trigger emergency GC
 	if (num_free_pages <= BLOCK_SIZE && how_many_gc_operations_are_scheduled() == 0) {
@@ -295,7 +297,6 @@ void Block_manager_parent::Wear_Level(Event const& event) {
 		Block* target = blocks_to_wl.front();
 		blocks_to_wl.pop();
 		num_available_pages_for_new_writes -= target->get_pages_valid();
-		printf("num_available_pages_for_new_writes: %d \n", num_available_pages_for_new_writes);
 		//migrate(target, event.get_start_time() + event.get_time_taken());
 	}
 }
@@ -463,6 +464,13 @@ Block* Block_manager_parent::choose_gc_victim(vector<long> candidates) const {
 	return best_block;
 }
 
+void Block_manager_parent::register_trim_making_gc_redundant() {
+	if (PRINT_LEVEL > 1) {
+		printf("a trim made a gc event redundant\n");
+	}
+	num_available_pages_for_new_writes++;
+}
+
 // Reads and rewrites all valid pages of a block somewhere else
 // An erase is issued in register_write_completion after the last
 // page from this block has been migrated
@@ -513,7 +521,6 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 
 	num_available_pages_for_new_writes -= victim->get_pages_valid();
-	printf("num_available_pages_for_new_writes: %d \n", num_available_pages_for_new_writes);
 
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	for (uint i = 0; i < BLOCK_SIZE; i++) {

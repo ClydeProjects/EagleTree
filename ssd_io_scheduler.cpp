@@ -283,6 +283,9 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	// if a write is scheduled when a trim is received, we may as well cancel the write
 	else if (new_op_code == TRIM && scheduled_op_code == WRITE) {
 		remove_current_operation(existing_event);
+		if (existing_event->is_garbage_collection_op()) {
+			bm->register_trim_making_gc_redundant();
+		}
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 	}
 	// if a trim is scheduled, and a write arrives, may as well let the trim execute first
