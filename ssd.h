@@ -1067,6 +1067,7 @@ private:
 	Address perform_sequential_write(Event const& event, long key);
 	Address perform_sequential_write_shortest_queue(sequential_writes_pointers& swp);
 	Address perform_sequential_write_round_robin(sequential_writes_pointers& swp);
+	void process_write_completion(Event const& event, long key, pair<long, long> index);
 
 	Sequential_Pattern_Detector* detector;
 

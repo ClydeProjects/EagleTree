@@ -95,10 +95,7 @@ Address Wearwolf::choose_best_address(Event const& write) {
 
 Address Wearwolf::choose_any_address() {
 	Address a = get_free_block_pointer_with_shortest_IO_queue();
-	if (has_free_pages(a)) {
-		return a;
-	}
-	return has_free_pages(wcrh_pointer) ? wcrh_pointer : wcrc_pointer;
+	return has_free_pages(a) ? a : has_free_pages(wcrh_pointer) ? wcrh_pointer : wcrc_pointer;
 }
 
 void Wearwolf::register_read_outcome(Event const& event, enum status status){

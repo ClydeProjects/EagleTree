@@ -58,21 +58,11 @@ void Wearwolf_Locality::register_write_arrival(Event const& write) {
 Address Wearwolf_Locality::choose_best_address(Event const& event) {
 	int tag = event.get_tag();
 
-	if (event.get_id() == 53357 && event.get_bus_wait_time() > 105) {
-		printf(" ");
-	}
-
-	bool can_write = Block_manager_parent::can_write(event);
-	if (!can_write) {
-		return Address();
-	}
-
 	if (tag != -1 && tag_map.count(tag) == 1 && seq_write_key_to_pointers_mapping[tag_map[tag].key].num_pointers > 0) {
 		return perform_sequential_write(event, tag_map[tag].key);
 	}
 
 	detector->remove_old_sequential_writes_metadata(event.get_current_time());
-	//long key = detector->get_sequential_write_id(event.get_logical_address());
 
 	if (arrived_writes_to_sequential_key_mapping.count(event.get_id()) == 0) {
 		return Wearwolf::choose_best_address(event);
@@ -202,8 +192,85 @@ void Wearwolf_Locality::set_pointers_for_tagged_sequential_write(int tag, double
 	}
 }
 
-// TODO must update this so that writes chosen from the choose_any method can be found too
+// must handle situation in which a pointer was chosen for GC operation from choose_any_location
+void Wearwolf_Locality::process_write_completion(Event const& event, long key, pair<long, long> index) {
+	Block_manager_parent::register_write_outcome(event, SUCCESS);
+	page_hotness_measurer.register_event(event);
+
+	sequential_writes_pointers& swp = seq_write_key_to_pointers_mapping[key];
+
+	Address selected_pointer = swp.pointers[index.first][index.second];
+	assert(selected_pointer.valid == PAGE);
+	selected_pointer.page++;
+	swp.pointers[index.first][index.second] = selected_pointer;
+
+	if (strat == ROUND_ROBIN) {
+		swp.cursor++;
+	}
+
+	bool allocate_more_blocks = !has_free_pages(selected_pointer);
+
+	int tag = event.get_tag();
+	if (tag != UNDEFINED) {
+		tag_map[tag].num_written++;
+		if (allocate_more_blocks && !tag_map[tag].need_more_space()) {
+			allocate_more_blocks = false;
+		}
+		if (tag_map[tag].is_finished()) {
+			sequential_event_metadata_removed(tag_map[tag].key);
+			tag_map.erase(tag);
+		}
+	}
+
+	if (allocate_more_blocks) {
+		Address free_block;
+		if (parallel_degree == ONE) {
+			free_block = find_free_unused_block(event.get_current_time());
+			if (free_block.valid == NONE) {
+				schedule_gc(event.get_current_time());
+			}
+		} else if (parallel_degree == CHANNEL) {
+			free_block = find_free_unused_block(event.get_address().package, event.get_current_time());
+			if (free_block.valid == NONE) {
+				schedule_gc(event.get_current_time(), event.get_address().package);
+			}
+		} else if (parallel_degree == LUN) {
+			free_block = find_free_unused_block(event.get_address().package, event.get_address().die, event.get_current_time());
+			if (free_block.valid == NONE) {
+				schedule_gc(event.get_current_time(), event.get_address().package, event.get_address().die);
+			}
+		}
+		if (has_free_pages(free_block)) {
+			swp.pointers[index.first][index.second] = free_block;
+		} else {
+			swp.num_pointers--;
+		}
+	}
+
+}
+
 void Wearwolf_Locality::register_write_outcome(Event const& event, enum status status) {
+	map<long, sequential_writes_pointers >::iterator iter = seq_write_key_to_pointers_mapping.begin();
+	for (; iter != seq_write_key_to_pointers_mapping.end(); iter++) {
+		vector<vector<Address> >& pointers = (*iter).second.pointers;
+		for (uint i = 0; i < pointers.size(); i++) {
+			for (uint j = 0; j < pointers.size(); j++) {
+				if (event.get_address().compare(pointers[i][j]) >= BLOCK) {
+					long key = (*iter).first;
+					pair<long, long> index(i, j);
+					process_write_completion(event, key, index);
+					return;
+				}
+			}
+		}
+	}
+	Wearwolf::register_write_outcome(event, status);
+}
+
+
+
+// TODO must update this so that writes chosen from the choose_any method can be found too
+/*void Wearwolf_Locality::register_write_outcome(Event const& event, enum status status) {
 	long key;
 
 	if (event.get_tag() != -1) {
@@ -286,7 +353,7 @@ void Wearwolf_Locality::register_write_outcome(Event const& event, enum status s
 	} else {
 		Wearwolf::register_write_outcome(event, status);
 	}
-}
+}*/
 
 void Wearwolf_Locality::sequential_event_metadata_removed(long key) {
 	if (seq_write_key_to_pointers_mapping.count(key) == 0) {
@@ -317,9 +384,6 @@ void Wearwolf_Locality::register_erase_outcome(Event const& event, enum status s
 		j = event.get_address().die;
 	}
 
-	// need to figure out if a pointer is actually needed, only when there is a tag
-	// need to ensure I don't crash
-
 	map<long, sequential_writes_pointers >::iterator iter = seq_write_key_to_pointers_mapping.begin();
 	for (; iter != seq_write_key_to_pointers_mapping.end(); iter++) {
 		sequential_writes_pointers& swt = (*iter).second;
@@ -341,7 +405,6 @@ void Wearwolf_Locality::register_erase_outcome(Event const& event, enum status s
 		}
 
 	}
-	//check_if_should_trigger_more_GC(event.get_current_time());
 }
 
 Wearwolf_Locality::sequential_writes_pointers::sequential_writes_pointers()
@@ -350,35 +413,4 @@ Wearwolf_Locality::sequential_writes_pointers::sequential_writes_pointers()
 	  cursor(rand() % 100),
 	  tag(-1)
 {}
-
-/*void Block_manager_parallel_wearwolf_locality::check_if_should_trigger_more_GC(double start_time) {
-	map<long, vector<vector<Address> > >::iterator iter = seq_write_key_to_pointers_mapping.begin();
-
-	int a, b;
-	if (parallel_degree == ONE) {
-		a = b = 0;
-	} else if (parallel_degree == CHANNEL) {
-		a = PACKAGE_SIZE;
-		b = 0;
-	} else if (parallel_degree == LUN) {
-		a = PACKAGE_SIZE;
-		b = DIE_SIZE;
-	}
-
-	for (; iter != seq_write_key_to_pointers_mapping.end(); iter++) {
-		for (int i = 0; i < a; i++) {
-			for (int j = 0; j < b; j++) {
-				if ((*iter).second[i][j].page >= BLOCK_SIZE) {
-					if (parallel_degree == ONE) {
-						perform_gc(start_time);
-					} else if (parallel_degree == CHANNEL) {
-						find_free_unused_block(i, start_time);
-					} else if (parallel_degree == LUN) {
-						find_free_unused_block(i, j, start_time);
-					}
-				}
-			}
-		}
-	}
-}*/
 
