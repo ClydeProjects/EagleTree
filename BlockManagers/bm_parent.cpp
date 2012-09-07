@@ -98,7 +98,10 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 
 	num_free_pages += BLOCK_SIZE;
 	num_available_pages_for_new_writes += BLOCK_SIZE;
-	printf("num_available_pages_for_new_writes: %d \n", num_available_pages_for_new_writes);
+
+	if (blocks_being_garbage_collected.size() == 0) {
+		assert(num_free_pages == num_available_pages_for_new_writes);
+	}
 
 	Block_manager_parent::check_if_should_trigger_more_GC(event.get_current_time());
 	Wear_Level(event);
@@ -141,7 +144,6 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	if (!event.is_garbage_collection_op()) {
 		assert(num_available_pages_for_new_writes > 0);
 		num_available_pages_for_new_writes--;
-		printf("num_available_pages_for_new_writes: %d \n", num_available_pages_for_new_writes);
 	}
 	// if there are very few pages left, need to trigger emergency GC
 	if (num_free_pages <= BLOCK_SIZE && how_many_gc_operations_are_scheduled() == 0) {
@@ -307,7 +309,6 @@ void Block_manager_parent::Wear_Level(Event const& event) {
 		Block* target = blocks_to_wl.front();
 		blocks_to_wl.pop();
 		num_available_pages_for_new_writes -= target->get_pages_valid();
-		printf("num_available_pages_for_new_writes: %d \n", num_available_pages_for_new_writes);
 		//migrate(target, event.get_start_time() + event.get_time_taken());
 	}
 }
@@ -524,6 +525,13 @@ void Block_manager_parent::register_ECC_check_on(uint logical_address) {
 	page_copy_back_count.erase(logical_address);
 }
 
+void Block_manager_parent::register_trim_making_gc_redundant() {
+	if (PRINT_LEVEL > 1) {
+		printf("a trim made a gc event redundant\n");
+	}
+	num_available_pages_for_new_writes++;
+}
+
 // Reads and rewrites all valid pages of a block somewhere else
 // An erase is issued in register_write_completion after the last
 // page from this block has been migrated
@@ -576,7 +584,6 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 
 	num_available_pages_for_new_writes -= victim->get_pages_valid();
-	printf("num_available_pages_for_new_writes: %d \n", num_available_pages_for_new_writes);
 
 	deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
 
@@ -696,7 +703,12 @@ Address Block_manager_parent::find_free_unused_block_with_class(uint klass, doub
 void Block_manager_parent::return_unfilled_block(Address pba) {
 	if (has_free_pages(pba)) {
 		int age_class = sort_into_age_class(pba);
-		free_blocks[pba.package][pba.die][age_class].push_back(pba);
+		if (has_free_pages(free_block_pointers[pba.package][pba.die])) {
+			free_blocks[pba.package][pba.die][age_class].push_back(pba);
+		} else {
+			free_block_pointers[pba.package][pba.die] = pba;
+		}
+
 	}
 }
 

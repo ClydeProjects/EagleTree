@@ -888,6 +888,7 @@ public:
 	vector<deque<Event*> > migrate(Event * gc_event);
 	bool Copy_backs_in_progress(Address const& address);
 
+	void register_trim_making_gc_redundant();
 protected:
 	virtual Address choose_best_address(Event const& write) = 0;
 	virtual Address choose_any_address();
@@ -1544,6 +1545,9 @@ public:
 	void register_completed_event(Event const& event);
 	void print();
 	void print_csv();
+	string totals_csv_header();
+	string totals_csv_line();
+
 private:
 	static StatisticsGatherer *inst;
 	Ssd & ssd;

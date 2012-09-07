@@ -207,12 +207,7 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
-//<<<<<<< HEAD
-//		assert(event->get_event_type() == WRITE);
-//		Address result = bm->write(*event);
-//=======
 		Address result = bm->choose_address(*event);
-//>>>>>>> a8b5fbf35afcae284afc26df2bca0be9381933f2
 		double wait_time = bm->in_how_long_can_this_event_be_scheduled(result, event->get_current_time());
 		if (wait_time == 0 && bm->Copy_backs_in_progress(result)) wait_time = 1; // If copy backs are in progress, keep waiting until they are done
 		if (wait_time == 0) {
@@ -312,8 +307,10 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if a write is scheduled when a trim is received, we may as well cancel the write
 	else if (new_op_code == TRIM && scheduled_op_code == WRITE) {
-		//remove_current_operation(existing_event);
-		existing_event->set_noop(true);
+		remove_current_operation(existing_event);
+		if (existing_event->is_garbage_collection_op()) {
+			bm->register_trim_making_gc_redundant();
+		}
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 	}
 	// if a trim is scheduled, and a write arrives, may as well let the trim execute first
