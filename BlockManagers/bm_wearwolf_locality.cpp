@@ -61,7 +61,6 @@ Address Wearwolf_Locality::choose_best_address(Event const& event) {
 	}
 
 	int tag = event.get_tag();
-
 	if (tag != -1 && tag_map.count(tag) == 1 && seq_write_key_to_pointers_mapping[tag_map[tag].key].num_pointers > 0) {
 		return perform_sequential_write(event, tag_map[tag].key);
 	}
@@ -214,16 +213,8 @@ void Wearwolf_Locality::process_write_completion(Event const& event, long key, p
 
 	bool allocate_more_blocks = !has_free_pages(selected_pointer);
 
-	int tag = event.get_tag();
-	if (tag != UNDEFINED) {
-		tag_map[tag].num_written++;
-		if (allocate_more_blocks && !tag_map[tag].need_more_space()) {
-			allocate_more_blocks = false;
-		}
-		if (tag_map[tag].is_finished()) {
-			sequential_event_metadata_removed(tag_map[tag].key);
-			tag_map.erase(tag);
-		}
+	if (allocate_more_blocks && event.get_tag() != UNDEFINED && !tag_map[event.get_tag()].need_more_space()) {
+		allocate_more_blocks = false;
 	}
 
 	if (allocate_more_blocks) {
@@ -253,22 +244,58 @@ void Wearwolf_Locality::process_write_completion(Event const& event, long key, p
 
 }
 
-void Wearwolf_Locality::register_write_outcome(Event const& event, enum status status) {
-	map<long, sequential_writes_pointers >::iterator iter = seq_write_key_to_pointers_mapping.begin();
-	for (; iter != seq_write_key_to_pointers_mapping.end(); iter++) {
-		vector<vector<Address> >& pointers = (*iter).second.pointers;
-		for (uint i = 0; i < pointers.size(); i++) {
-			for (uint j = 0; j < pointers.size(); j++) {
-				if (event.get_address().compare(pointers[i][j]) >= BLOCK) {
-					long key = (*iter).first;
-					pair<long, long> index(i, j);
-					process_write_completion(event, key, index);
-					return;
+void Wearwolf_Locality::print_tags() {
+	map<long, sequential_writes_pointers> a;
+	map<long, tagged_sequential_write>::iterator iter = tag_map.begin();
+	for (; iter != tag_map.end(); iter++) {
+		tagged_sequential_write& f = (*iter).second;
+		sequential_writes_pointers& d = seq_write_key_to_pointers_mapping[f.key];
+		printf("  %d  %d  %d   %d   %d   %d  %d\n", (*iter).first, f.key, f.size, f.free_allocated_space, f.num_written, d.num_pointers, d.tag);
+		for (uint i = 0; i < d.pointers.size(); i++) {
+			for (uint j = 0; j < d.pointers[i].size(); j++) {
+				if (has_free_pages(d.pointers[i][j])) {
+					printf("    "); d.pointers[i][j].print(); printf("\n");
 				}
 			}
 		}
 	}
-	Wearwolf::register_write_outcome(event, status);
+}
+
+void Wearwolf_Locality::register_write_outcome(Event const& event, enum status status) {
+	int tag = event.get_tag();
+	if (tag != UNDEFINED) {
+		tag_map[tag].num_written++;
+	}
+
+	map<long, sequential_writes_pointers >::iterator iter = seq_write_key_to_pointers_mapping.begin();
+	bool found = false;
+	for (; iter != seq_write_key_to_pointers_mapping.end(); iter++) {
+		vector<vector<Address> >& pointers = (*iter).second.pointers;
+		for (uint i = 0; i < pointers.size(); i++) {
+			for (uint j = 0; j < pointers.size(); j++) {
+				if (has_free_pages(pointers[i][j]) && event.get_address().compare(pointers[i][j]) >= BLOCK) {
+
+					if (event.get_id() == 160537) {
+						StateTracer::print();
+					}
+
+					long key = (*iter).first;
+					pair<long, long> index(i, j);
+					process_write_completion(event, key, index);
+					found = true;
+				}
+			}
+		}
+	}
+
+	if (tag != UNDEFINED && tag_map[tag].is_finished()) {
+		sequential_event_metadata_removed(tag_map[tag].key);
+		tag_map.erase(tag);
+	}
+
+	if (!found) {
+		Wearwolf::register_write_outcome(event, status);
+	}
 }
 
 void Wearwolf_Locality::sequential_event_metadata_removed(long key) {
@@ -319,7 +346,6 @@ void Wearwolf_Locality::register_erase_outcome(Event const& event, enum status s
 				(*iter).second.num_pointers++;
 			}
 		}
-
 	}
 }
 
