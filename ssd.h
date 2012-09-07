@@ -1437,7 +1437,7 @@ public:
 	void event_arrive(Event* event);
 	void event_arrive(enum event_type type, ulong logical_address, uint size, double start_time);
 	void event_arrive(enum event_type type, ulong logical_address, uint size, double start_time, void *buffer);
-	void progress_since_os_is_idle();
+	void progress_since_os_is_waiting();
 	void register_event_completion(Event * event);
 	void *get_result_buffer();
 	friend class Controller;
@@ -1742,7 +1742,7 @@ public:
 	~OperatingSystem();
 	void run();
 	void register_event_completion(Event* event);
-
+	void set_num_writes_to_stop_after(long num_writes);
 private:
 	int pick_event_with_shortest_start_time();
 	void dispatch_event(int thread_id);
@@ -1763,6 +1763,8 @@ private:
 	int currently_executing_ios_counter;
 	int currently_pending_ios_counter;
 	double last_dispatched_event_minimal_finish_time;
+	long num_writes_to_stop_after;
+	long num_writes_completed;
 };
 
 /*class Block_manager

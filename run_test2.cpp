@@ -61,6 +61,7 @@ void file_manager_experiment() {
 	threads.push_back(fm1);
 	threads.push_back(fm2);
 	OperatingSystem* os = new OperatingSystem(threads);
+	os->set_num_writes_to_stop_after(20000);
 	os->run();
 	VisualTracer::get_instance()->print_horizontally_with_breaks();
 	StateTracer::print();

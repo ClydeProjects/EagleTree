@@ -14,7 +14,9 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	  currently_executing_ios_counter(0),
 	  currently_pending_ios_counter(0),
 	  last_dispatched_event_minimal_finish_time(1),
-	  threads(new_threads)
+	  threads(new_threads),
+	  num_writes_to_stop_after(UNDEFINED),
+	  num_writes_completed(0)
 {
 	assert(threads.size() > 0);
 	for (uint i = 0; i < threads.size(); i++) {
@@ -36,15 +38,22 @@ OperatingSystem::~OperatingSystem() {
 }
 
 void OperatingSystem::run() {
+	bool finished_experiment, still_more_work;
 	do {
+
 		int thread_id = pick_event_with_shortest_start_time();
-		if (thread_id == -1 || (currently_executing_ios_counter > 0 && last_dispatched_event_minimal_finish_time < events[thread_id]->get_start_time())) {
-			ssd->progress_since_os_is_idle();
+		if (thread_id == UNDEFINED || (currently_executing_ios_counter > 0 && last_dispatched_event_minimal_finish_time < events[thread_id]->get_start_time())) {
+			ssd->progress_since_os_is_waiting();
 		}
 		else {
 			dispatch_event(thread_id);
 		}
-	} while (currently_executing_ios_counter > 0 || currently_pending_ios_counter > 0);
+
+		finished_experiment = num_writes_to_stop_after != UNDEFINED && num_writes_to_stop_after <= num_writes_completed;
+
+		still_more_work = currently_executing_ios_counter > 0 || currently_pending_ios_counter;
+
+	} while (!finished_experiment && still_more_work);
 }
 
 int OperatingSystem::pick_event_with_shortest_start_time() {
@@ -93,6 +102,10 @@ void OperatingSystem::register_event_completion(Event* event) {
 	Thread* thread = threads[thread_id];
 	thread->register_event_completion(event);
 
+	if (event->get_event_type() == WRITE) {
+		num_writes_completed++;
+	}
+
 	if (thread->is_finished() && thread->get_follow_up_threads().size() > 0) {
 		printf("Switching to new follow up thread\n");
 		vector<Thread*> follow_up_threads = thread->get_follow_up_threads();
@@ -114,6 +127,10 @@ void OperatingSystem::register_event_completion(Event* event) {
 	}
 	currently_executing_ios_counter--;
 	delete event;
+}
+
+void OperatingSystem::set_num_writes_to_stop_after(long num_writes) {
+	num_writes_to_stop_after = num_writes;
 }
 
 double OperatingSystem::get_event_minimal_completion_time(Event const*const event) const {
