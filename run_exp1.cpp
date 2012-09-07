@@ -72,7 +72,7 @@ void overprovisioning_experiment() {
 		int highest_lba = (int) ((double) num_pages * used_space / 100);
 		printf("Experiment with max %d pct used space: Writing to no LBA higher than %d (out of %d total available)\n", used_space, highest_lba, num_pages);
 		Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, 10);
-		t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, 100, 1, WRITE, 30, 1));
+		t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, 1000, 1, WRITE, 30, 1));
 
 		vector<Thread*> threads;
 		threads.push_back(t1);
