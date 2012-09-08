@@ -4,19 +4,19 @@
 using namespace ssd;
 using namespace std;
 
-#define THRESHOLD 5 // the number of sequential writes before we recognize the pattern as sequential
+#define THRESHOLD 4 // the number of sequential writes before we recognize the pattern as sequential
 
 Wearwolf_Locality::Wearwolf_Locality(Ssd& ssd, FtlParent& ftl)
 	: Wearwolf(ssd, ftl),
-	  parallel_degree(LUN),
+	  parallel_degree(ONE),
 	  seq_write_key_to_pointers_mapping(),
 	  detector(new Sequential_Pattern_Detector(THRESHOLD)),
-	  strat(ROUND_ROBIN)
+	  strat(SHOREST_QUEUE)
 {
 	detector->set_listener(this);
 }
 
-Wearwolf_Locality::~Wearwolf_Locality(void) {
+Wearwolf_Locality::~Wearwolf_Locality() {
 	delete detector;
 }
 
@@ -56,12 +56,14 @@ void Wearwolf_Locality::register_write_arrival(Event const& write) {
 
 
 Address Wearwolf_Locality::choose_best_address(Event const& event) {
+
+
 	if (event.is_garbage_collection_op()) {
 		return Wearwolf::choose_best_address(event);
 	}
 
 	int tag = event.get_tag();
-	if (tag != -1 && tag_map.count(tag) == 1 && seq_write_key_to_pointers_mapping[tag_map[tag].key].num_pointers > 0) {
+	if (tag != UNDEFINED && tag_map.count(tag) == 1 && seq_write_key_to_pointers_mapping[tag_map[tag].key].num_pointers > 0) {
 		return perform_sequential_write(event, tag_map[tag].key);
 	}
 
@@ -119,7 +121,7 @@ Address Wearwolf_Locality::perform_sequential_write(Event const& event, long key
 		}
 	}
 	if (!has_free_pages(to_return)) {
-		schedule_gc(event.get_current_time(), -1, -1, -1);  // TODO only trigger GC if tagged need more space
+		//schedule_gc(event.get_current_time(), -1, -1, -1);  // TODO only trigger GC if tagged need more space
 		to_return = Wearwolf::choose_best_address(event);
 	}
 	return to_return;
@@ -129,6 +131,7 @@ Address Wearwolf_Locality::perform_sequential_write_shortest_queue(sequential_wr
 	pair<bool, pair<uint, uint> > best_die_id = get_free_block_pointer_with_shortest_IO_queue(swp.pointers);
 	bool can_write = best_die_id.first;
 	if (can_write) {
+		Address chosen = swp.pointers[best_die_id.second.first][best_die_id.second.second];
 		return swp.pointers[best_die_id.second.first][best_die_id.second.second];
 	}
 	return Address();
@@ -190,6 +193,8 @@ void Wearwolf_Locality::set_pointers_for_tagged_sequential_write(int tag, double
 		if (has_free_pages(free_block)) {
 			tag_map[tag].free_allocated_space += BLOCK_SIZE - free_block.page;
 			seq_write_key_to_pointers_mapping[key].num_pointers++;
+			assert(package == free_block.package);
+			assert(die == free_block.die);
 			pointers[package][die] = free_block;
 		}
 	}
@@ -219,20 +224,22 @@ void Wearwolf_Locality::process_write_completion(Event const& event, long key, p
 
 	if (allocate_more_blocks) {
 		Address free_block;
-		if (parallel_degree == ONE) {
-			free_block = find_free_unused_block(event.get_current_time());
-			if (free_block.valid == NONE) {
-				schedule_gc(event.get_current_time());
-			}
-		} else if (parallel_degree == CHANNEL) {
-			free_block = find_free_unused_block(event.get_address().package, event.get_current_time());
-			if (free_block.valid == NONE) {
-				schedule_gc(event.get_current_time(), event.get_address().package);
-			}
-		} else if (parallel_degree == LUN) {
+		if (parallel_degree == LUN || event.get_tag() != UNDEFINED) {
 			free_block = find_free_unused_block(event.get_address().package, event.get_address().die, event.get_current_time());
 			if (free_block.valid == NONE) {
-				schedule_gc(event.get_current_time(), event.get_address().package, event.get_address().die);
+				//schedule_gc(event.get_current_time(), event.get_address().package, event.get_address().die);
+			}
+		}
+		else if (parallel_degree == CHANNEL) {
+			free_block = find_free_unused_block(event.get_address().package, event.get_current_time());
+			if (free_block.valid == NONE) {
+				//schedule_gc(event.get_current_time(), event.get_address().package);
+			}
+		}
+		else if (parallel_degree == ONE) {
+			free_block = find_free_unused_block(event.get_current_time());
+			if (free_block.valid == NONE) {
+				//schedule_gc(event.get_current_time());
 			}
 		}
 		if (has_free_pages(free_block)) {
@@ -241,7 +248,6 @@ void Wearwolf_Locality::process_write_completion(Event const& event, long key, p
 			swp.num_pointers--;
 		}
 	}
-
 }
 
 void Wearwolf_Locality::print_tags() {
@@ -335,15 +341,19 @@ void Wearwolf_Locality::register_erase_outcome(Event const& event, enum status s
 		}
 		Address& pointer = swt.pointers[i][j];
 		if (!has_free_pages(pointer)) {
-			if (parallel_degree == ONE) {
-				(*iter).second.pointers[i][j] = find_free_unused_block(event.get_current_time());
-			} else if (parallel_degree == CHANNEL) {
-				(*iter).second.pointers[i][j] = find_free_unused_block(i, event.get_current_time());
-			} else if (parallel_degree == LUN) {
-				(*iter).second.pointers[i][j] = find_free_unused_block(i, j, event.get_current_time());
+			Address new_block;
+			if (parallel_degree == LUN || swt.tag != UNDEFINED) {
+				new_block = find_free_unused_block(i, j, event.get_current_time());
 			}
-			if (has_free_pages(pointer)) {
-				(*iter).second.num_pointers++;
+			else if (parallel_degree == CHANNEL) {
+				new_block = find_free_unused_block(i, event.get_current_time());
+			}
+			else if (parallel_degree == ONE) {
+				new_block = find_free_unused_block(event.get_current_time());
+			}
+			if (has_free_pages(new_block)) {
+				swt.num_pointers++;
+				swt.pointers[i][j] = new_block;
 			}
 		}
 	}
