@@ -205,11 +205,11 @@ void Event::set_mapping_op(bool value) {
 	mapping_op = value;
 }
 
-void Event::set_age_class(uint value) {
+void Event::set_age_class(int value) {
 	age_class = value;
 }
 
-uint Event::get_age_class() {
+int Event::get_age_class() const {
 	return age_class;
 }
 

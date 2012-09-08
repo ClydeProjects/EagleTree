@@ -281,7 +281,7 @@ class IOScheduler;
 class Block_manager;
 class Block_manager_parent;
 class Block_manager_parallel;
-class Block_manager_parallel_hot_cold_seperation;
+class Shortest_Queue_Hot_Cold_BM;
 class Wearwolf;
 class Wearwolf_Locality;
 
@@ -437,8 +437,8 @@ public:
 	void set_application_io_id(uint application_io_id);
 	void set_garbage_collection_op(bool value);
 	void set_mapping_op(bool value);
-	void set_age_class(uint value);
-	uint get_age_class();
+	void set_age_class(int value);
+	int get_age_class() const;
 	bool is_garbage_collection_op() const;
 	bool is_mapping_op() const;
 	void *get_payload(void) const;
@@ -960,10 +960,10 @@ private:
 };
 
 // A BM that assigns each write to the die with the shortest queue, as well as hot-cold seperation
-class Block_manager_parallel_hot_cold_seperation : public Block_manager_parent {
+class Shortest_Queue_Hot_Cold_BM : public Block_manager_parent {
 public:
-	Block_manager_parallel_hot_cold_seperation(Ssd& ssd, FtlParent& ftl);
-	~Block_manager_parallel_hot_cold_seperation();
+	Shortest_Queue_Hot_Cold_BM(Ssd& ssd, FtlParent& ftl);
+	~Shortest_Queue_Hot_Cold_BM();
 	void register_write_outcome(Event const& event, enum status status);
 	void register_read_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
@@ -1529,6 +1529,8 @@ public:
 	static StatisticsGatherer *get_instance();
 	static void init(Ssd * ssd);
 	void register_completed_event(Event const& event);
+	void register_scheduled_gc(Event const& gc);
+	void register_executed_gc(Event const& gc, Block const& victim);
 	void print();
 	void print_csv();
 private:
@@ -1548,6 +1550,18 @@ private:
 	vector<vector<uint> > num_gc_writes_per_LUN;
 
 	vector<vector<uint> > num_erases_per_LUN;
+
+	// garbage collection stats
+	long num_gc_executed;
+	double num_migrations;
+	long num_gc_scheduled;
+
+	long num_gc_targeting_package_die_class;
+	long num_gc_targeting_package_die;
+	long num_gc_targeting_package_class;
+	long num_gc_targeting_package;
+	long num_gc_targeting_class;
+	long num_gc_targeting_anything;
 };
 
 class Thread

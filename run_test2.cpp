@@ -56,12 +56,14 @@ void experiement2() {
 
 void file_manager_experiment() {
 	vector<Thread*> threads;
-	Thread* fm1 = new File_Manager(0, 449, 200, 100, 10, 1, 1);
-	Thread* fm2 = new File_Manager(450, 899, 200, 100, 10, 2, 2);
+	long logical_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * 0.8;
+	long max_file_size = logical_space_size / 10;
+	Thread* fm1 = new File_Manager(0, logical_space_size / 2, 100, max_file_size, 10, 1, 1);
+	Thread* fm2 = new File_Manager((logical_space_size / 2) + 1, logical_space_size, 100, max_file_size, 10, 2, 2);
 	threads.push_back(fm1);
 	threads.push_back(fm2);
 	OperatingSystem* os = new OperatingSystem(threads);
-	os->set_num_writes_to_stop_after(20000);
+	//os->set_num_writes_to_stop_after(5000);
 	os->run();
 	VisualTracer::get_instance()->print_horizontally_with_breaks();
 	StateTracer::print();

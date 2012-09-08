@@ -144,8 +144,8 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	}
 	trim(event);
 
-	Address ba = Address(event.get_address().get_linear_address(), BLOCK);
-	if (ba.compare(free_block_pointers[ba.package][ba.die]) == BLOCK) {
+	Address ba = event.get_address();
+	if (ba.compare(free_block_pointers[ba.package][ba.die]) >= BLOCK) {
 		Address pointer = free_block_pointers[ba.package][ba.die];
 		pointer.page = pointer.page + 1;
 		free_block_pointers[ba.package][ba.die] = pointer;
@@ -394,13 +394,6 @@ struct block_valid_pages_comparator_wearwolf {
 // schedules a garbage collection operation to occur at a given time, and optionally for a given channel, LUN or age class
 // the block to be reclaimed is chosen when the gc operation is initialised
 void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, int klass) {
-
-	if ( klass >= num_age_classes || package_id >= SSD_SIZE || die_id >= PACKAGE_SIZE) {
-		int i = 0;
-		i++;
-	}
-	//assert(package_id < SSD_SIZE && package_id < PACKAGE_SIZE && klass < num_age_classes);
-
 	Address address;
 	address.package = package_id;
 	address.die = die_id;
@@ -485,6 +478,8 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	vector<deque<Event*> > migrations;
 
+	StatisticsGatherer::get_instance()->register_scheduled_gc(*gc_event);
+
 	if (victim == NULL) {
 		return migrations;
 	}
@@ -521,6 +516,8 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 
 	num_available_pages_for_new_writes -= victim->get_pages_valid();
+
+	StatisticsGatherer::get_instance()->register_executed_gc(*gc_event, *victim);
 
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
@@ -629,18 +626,16 @@ Address Block_manager_parent::find_free_unused_block_with_class(uint klass, doub
 	assert(klass < num_age_classes);
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			Address a = free_blocks[i][j][klass].back();
-			if (has_free_pages(a)) {
+			uint num_free_blocks_left = free_blocks[i][j][klass].size();
+			if (num_free_blocks_left > 0) {
+				Address block = free_blocks[i][j][klass].back();
 				free_blocks[i][j][klass].pop_back();
-				if (greedy_gc && free_blocks[i][j][klass].size() < 2) {
-					//perform_gc(i, j, klass, time);
-					schedule_gc(time, i, j, klass);
-				}
-				return a;
+				assert(has_free_pages(block));
+				return block;
 			}
 		}
 	}
-	return Address(0, NONE);
+	return Address();
 }
 
 void Block_manager_parent::return_unfilled_block(Address pba) {

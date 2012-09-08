@@ -18,22 +18,13 @@ Wearwolf::Wearwolf(Ssd& ssd, FtlParent& ftl)
 }
 
 void Wearwolf::register_write_outcome(Event const& event, enum status status) {
-	assert(event.get_event_type() == WRITE);
-	if (status == FAILURE) {
-		return;
-	}
 	Block_manager_parent::register_write_outcome(event, status);
 	page_hotness_measurer.register_event(event);
 
-	// Increment block pointer
-	Address block_address = Address(event.get_address().get_linear_address(), BLOCK);
-
-	if (block_address.compare(wcrh_pointer) == BLOCK && has_free_pages(wcrh_pointer)) {
+	if (event.get_address().compare(wcrh_pointer) >= BLOCK) {
 		wcrh_pointer.page = wcrh_pointer.page + 1;
-		assert(wcrh_pointer.page <= BLOCK_SIZE);
-	} else if (block_address.compare(wcrc_pointer) == BLOCK && has_free_pages(wcrc_pointer)) {
+	} else if (event.get_address().compare(wcrc_pointer) >= BLOCK) {
 		wcrc_pointer.page = wcrc_pointer.page + 1;
-		assert(wcrc_pointer.page <= BLOCK_SIZE);
 	}
 
 	if (!has_free_pages(wcrh_pointer)) {
@@ -47,9 +38,9 @@ void Wearwolf::register_write_outcome(Event const& event, enum status status) {
 void Wearwolf::handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time) {
 	Address addr = page_hotness_measurer.get_best_target_die_for_WC(rh);
 	Address& pointer = rh == READ_COLD ? wcrc_pointer : wcrh_pointer;
-	Address free_block = find_free_unused_block(addr.package, addr.die, start_time);
-	if (free_block.valid != NONE) {
-		pointer = free_block;
+	Address block = find_free_unused_block(addr.package, addr.die, start_time);
+	if (has_free_pages(block)) {
+		pointer = block;
 	} else {
 		//perform_gc(addr.package, addr.die, 1, start_time);
 		schedule_gc(start_time, addr.package, addr.die, 0);
@@ -105,10 +96,10 @@ void Wearwolf::register_read_outcome(Event const& event, enum status status){
 }
 
 void Wearwolf::check_if_should_trigger_more_GC(double start_time) {
-	if (wcrh_pointer.page >= BLOCK_SIZE) {
+	if (!has_free_pages(wcrh_pointer)) {
 		handle_cold_pointer_out_of_space(READ_HOT, start_time);
 	}
-	if (wcrc_pointer.page >= BLOCK_SIZE) {
+	if (!has_free_pages(wcrc_pointer)) {
 		handle_cold_pointer_out_of_space(READ_COLD, start_time);
 	}
 }

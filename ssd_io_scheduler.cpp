@@ -20,7 +20,7 @@ IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
 	if (BLOCK_MANAGER_ID == 0) {
 		bm = new Block_manager_parallel(ssd, ftl);
 	} else if (BLOCK_MANAGER_ID == 1) {
-		bm = new Block_manager_parallel_hot_cold_seperation(ssd, ftl);
+		bm = new Shortest_Queue_Hot_Cold_BM(ssd, ftl);
 	} else if (BLOCK_MANAGER_ID == 2) {
 		bm = new Wearwolf(ssd, ftl);
 	} else if (BLOCK_MANAGER_ID == 3) {
@@ -246,11 +246,13 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		promote_to_gc(existing_event);
 		remove_current_operation(new_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
+		stats.num_write_cancellations++;
 	}
 	else if (existing_event->is_garbage_collection_op() && new_op_code == WRITE) {
 		promote_to_gc(new_event);
 		remove_current_operation(existing_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
+		stats.num_write_cancellations++;
 	}
 	// if two writes are scheduled, the one before is irrelevant and may as well be cancelled
 	else if (new_op_code == WRITE && scheduled_op_code == WRITE) {

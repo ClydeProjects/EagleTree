@@ -3,84 +3,71 @@
 
 using namespace ssd;
 
-Block_manager_parallel_hot_cold_seperation::Block_manager_parallel_hot_cold_seperation(Ssd& ssd, FtlParent& ftl)
-	: Block_manager_parent(ssd, ftl, 2),
-	  page_hotness_measurer()
-{
-	cold_pointer = find_free_unused_block(0, 0, 0);
-}
+Shortest_Queue_Hot_Cold_BM::Shortest_Queue_Hot_Cold_BM(Ssd& ssd, FtlParent& ftl)
+	: Block_manager_parent(ssd, ftl, 1),
+	  page_hotness_measurer(),
+	  cold_pointer(find_free_unused_block(0))
+{}
 
-Block_manager_parallel_hot_cold_seperation::~Block_manager_parallel_hot_cold_seperation(void) {}
+Shortest_Queue_Hot_Cold_BM::~Shortest_Queue_Hot_Cold_BM() {}
 
-void Block_manager_parallel_hot_cold_seperation::register_write_outcome(Event const& event, enum status status) {
-	assert(event.get_event_type() == WRITE);
-	if (status == FAILURE) {
-		return;
-	}
+void Shortest_Queue_Hot_Cold_BM::register_write_outcome(Event const& event, enum status status) {
 	Block_manager_parent::register_write_outcome(event, status);
 	page_hotness_measurer.register_event(event);
 
-	// Increment block pointer
-	Address block_address = Address(event.get_address().get_linear_address(), BLOCK);
-	if (block_address.compare(cold_pointer) == BLOCK) {
+	if (event.get_address().compare(cold_pointer) >= BLOCK) {
 		cold_pointer.page = cold_pointer.page + 1;
 	}
 
-	if (has_free_pages(cold_pointer)) {
+	if (!has_free_pages(cold_pointer)) {
 		handle_cold_pointer_out_of_space(event.get_current_time());
 	}
 }
 
-void Block_manager_parallel_hot_cold_seperation::handle_cold_pointer_out_of_space(double start_time) {
-	Address free_block = find_free_unused_block_with_class(1, start_time);
-	if (free_block.valid != NONE) {
-		cold_pointer = free_block;
-	} else {
-		schedule_gc(start_time, -1, -1, 1);
+void Shortest_Queue_Hot_Cold_BM::handle_cold_pointer_out_of_space(double start_time) {
+	//Address block = find_free_unused_block_with_class(1, start_time);
+	//cold_pointer = has_free_pages(block) ? block : find_free_unused_block(start_time);
+	cold_pointer = find_free_unused_block(start_time);
+	if (!has_free_pages(cold_pointer)) {
+		schedule_gc(start_time, -1, -1, 0);
 	}
 }
 
-void Block_manager_parallel_hot_cold_seperation::register_erase_outcome(Event const& event, enum status status) {
-	assert(event.get_event_type() == ERASE);
-	if (status == FAILURE) {
-		return;
-	}
+void Shortest_Queue_Hot_Cold_BM::register_erase_outcome(Event const& event, enum status status) {
 	Block_manager_parent::register_erase_outcome(event, status);
-	uint package_id = event.get_address().package;
-	uint die_id = event.get_address().die;
+	Address addr = event.get_address();
 
 	// TODO: Need better logic for this assignment. Easiest to remember some state.
 	// when we trigger GC for a cold pointer, remember which block was chosen.
-	if (free_block_pointers[package_id][die_id].page >= BLOCK_SIZE) {
-		free_block_pointers[package_id][die_id] = find_free_unused_block(package_id, die_id);
+	if (!has_free_pages(free_block_pointers[addr.package][addr.die])) {
+		free_block_pointers[addr.package][addr.die] = find_free_unused_block(addr.package, addr.die, event.get_current_time());
 	}
-	else if (cold_pointer.page >= BLOCK_SIZE) {
-		cold_pointer = find_free_unused_block(package_id, die_id);
+	else if (!has_free_pages(cold_pointer)) {
+		cold_pointer = find_free_unused_block(addr.package, addr.die, event.get_current_time());
 	}
 
 	check_if_should_trigger_more_GC(event.get_current_time());
 }
 
 
-Address Block_manager_parallel_hot_cold_seperation::choose_best_address(Event const& write) {
+Address Shortest_Queue_Hot_Cold_BM::choose_best_address(Event const& write) {
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
 	return w_hotness == WRITE_HOT ? get_free_block_pointer_with_shortest_IO_queue() : cold_pointer;
 }
 
-Address Block_manager_parallel_hot_cold_seperation::choose_any_address() {
-	Address a = Block_manager_parent::choose_any_address();
+Address Shortest_Queue_Hot_Cold_BM::choose_any_address() {
+	Address a = get_free_block_pointer_with_shortest_IO_queue();
 	return has_free_pages(a) ? a : cold_pointer;
 }
 
-void Block_manager_parallel_hot_cold_seperation::register_read_outcome(Event const& event, enum status status){
+void Shortest_Queue_Hot_Cold_BM::register_read_outcome(Event const& event, enum status status){
 	if (status == SUCCESS && !event.is_garbage_collection_op()) {
 		page_hotness_measurer.register_event(event);
 	}
 }
 
-void Block_manager_parallel_hot_cold_seperation::check_if_should_trigger_more_GC(double start_time) {
-	Block_manager_parent::check_if_should_trigger_more_GC(start_time);
-	if (cold_pointer.page >= BLOCK_SIZE) {
+void Shortest_Queue_Hot_Cold_BM::check_if_should_trigger_more_GC(double start_time) {
+	if (!has_free_pages(cold_pointer)) {
 		handle_cold_pointer_out_of_space(start_time);
 	}
 }
