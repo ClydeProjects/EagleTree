@@ -55,12 +55,12 @@ void experiement2() {
 }
 
 void file_manager_experiment() {
-	BLOCK_MANAGER_ID = 1;
+	BLOCK_MANAGER_ID = 0;
 	vector<Thread*> threads;
 	long logical_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * 0.8;
 	long max_file_size = logical_space_size / 10;
-	Thread* fm1 = new File_Manager(0, logical_space_size / 2, 10, max_file_size, 10, 1, 1);
-	Thread* fm2 = new File_Manager((logical_space_size / 2) + 1, logical_space_size, 10, max_file_size, 10, 2, 2);
+	Thread* fm1 = new File_Manager(0, logical_space_size / 2, 50, max_file_size, 10, 1, 1);
+	Thread* fm2 = new File_Manager((logical_space_size / 2) + 1, logical_space_size, 50, max_file_size, 10, 2, 2);
 	threads.push_back(fm1);
 	threads.push_back(fm2);
 	OperatingSystem* os = new OperatingSystem(threads);

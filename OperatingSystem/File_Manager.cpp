@@ -197,9 +197,9 @@ void File_Manager::print_thread_stats() {
 		printf("file %d: ", f->id);
 		printf("\t%d ", f->size);
 		printf("\t%f ", f->death_probability);
-		printf("\t%f ", f->time_created);
-		printf("\t%f ", f->time_finished_writing);
-		printf("\t%f ", f->time_deleted);
+		printf("\t%d ", (long)f->time_created);
+		printf("\t%d ", (long)f->time_finished_writing);
+		printf("\t%d ", (long)f->time_deleted);
 		printf("\n");
 	}
 	printf("\n");
