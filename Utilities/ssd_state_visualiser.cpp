@@ -5,7 +5,7 @@
  *      Author: niv
  */
 
-#include "ssd.h"
+#include "../ssd.h"
 using namespace ssd;
 
 Ssd *StateTracer::ssd = NULL;

@@ -178,7 +178,7 @@ extern bool GREEDY_GC;
 /*
  * Controls the level of detail of output
  */
-extern const int PRINT_LEVEL;
+extern int PRINT_LEVEL;
 
 /*
  * tells the Operating System class to either lock or not lock LBAs after dispatching IOs to them
@@ -1662,6 +1662,24 @@ private:
 	int time_breaks;
 };
 
+class Reliable_Random_Int_Generator {
+public:
+	Reliable_Random_Int_Generator(int seed, int num_numbers_needed);
+	int next();
+private:
+	MTRand_int32 random_number_generator;
+	deque<int> numbers;
+};
+
+class Reliable_Random_Double_Generator {
+public:
+	Reliable_Random_Double_Generator(int seed, int num_numbers_needed);
+	double next();
+private:
+	MTRand_open random_number_generator;
+	deque<double> numbers;
+};
+
 // assuming the relation is made of contigouse pages
 // RAM_available is the number of pages that fit into RAM
 class External_Sort : public Thread
@@ -1752,8 +1770,12 @@ private:
 	File* current_file;
 	long min_LBA, max_LBA;
 	int num_files_to_write;
-	MTRand_int32 random_number_generator;
-	MTRand_open double_generator;
+
+	Reliable_Random_Int_Generator random_number_generator;
+	Reliable_Random_Double_Generator double_generator;
+
+	//MTRand_int32 random_number_generator;
+	//MTRand_open double_generator;
 	double time_breaks;
 	set<long> addresses_to_trim;
 	const long max_file_size;
