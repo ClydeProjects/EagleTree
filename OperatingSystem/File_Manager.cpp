@@ -86,8 +86,8 @@ void File_Manager::handle_file_completion(double current_time) {
 	do {
 		randomly_delete_files(current_time);
 	} while (num_free_pages == 0);
-	//StateTracer::print();
-	//StatisticsGatherer::get_instance()->print();
+	StateTracer::print();
+	StatisticsGatherer::get_instance()->print();
 	write_next_file(current_time);
 }
 
@@ -95,7 +95,7 @@ void File_Manager::write_next_file(double current_time) {
 	assert(num_free_pages > 0); // deal with this problem later
 	//double death_probability = double_generator() / 2;
 	double death_probability = double_generator.next() / 2;
-	uint size = abs(random_number_generator.next()) % max_file_size;
+	uint size = 1 + abs(random_number_generator.next()) % max_file_size;
 	if (size > num_free_pages) {
 		size = num_free_pages;
 	}
