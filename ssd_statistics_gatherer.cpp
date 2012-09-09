@@ -28,7 +28,10 @@ StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
 	  num_gc_targeting_package_class(0),
 	  num_gc_targeting_package(0),
 	  num_gc_targeting_class(0),
-	  num_gc_targeting_anything(0)
+	  num_gc_targeting_anything(0),
+	  num_gc_cancelled_no_candidate(0),
+	  num_gc_cancelled_not_enough_free_space(0),
+	  num_gc_cancelled_gc_already_happening(0)
 {}
 
 StatisticsGatherer::~StatisticsGatherer() {}
@@ -187,6 +190,10 @@ void StatisticsGatherer::print() {
 	printf("gc targeting package: %d \n", num_gc_targeting_package);
 	printf("gc targeting class: %d \n", num_gc_targeting_class);
 	printf("gc targeting anything: %d \n", num_gc_targeting_anything);
+	printf("\n");
+	printf("num_gc_cancelled_no_candidate: %d \n", num_gc_cancelled_no_candidate);
+	printf("num_gc_cancelled_not_enough_free_space: %d \n", num_gc_cancelled_not_enough_free_space);
+	printf("num_gc_cancelled_gc_already_happening: %d \n", num_gc_cancelled_gc_already_happening);
 }
 
 void StatisticsGatherer::print_csv() {

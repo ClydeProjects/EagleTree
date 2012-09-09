@@ -1533,6 +1533,11 @@ public:
 	void register_executed_gc(Event const& gc, Block const& victim);
 	void print();
 	void print_csv();
+
+	long num_gc_cancelled_no_candidate;
+	long num_gc_cancelled_not_enough_free_space;
+	long num_gc_cancelled_gc_already_happening;
+
 private:
 	static StatisticsGatherer *inst;
 	Ssd & ssd;
@@ -1562,6 +1567,8 @@ private:
 	long num_gc_targeting_package;
 	long num_gc_targeting_class;
 	long num_gc_targeting_anything;
+
+
 };
 
 class Thread
@@ -1582,7 +1589,7 @@ public:
 	void set_time(double current_time) {
 		time = current_time;
 	}
-	void print_thread_stats();
+	virtual void print_thread_stats();
 	void add_follow_up_thread(Thread* thread) {
 		threads_to_start_when_this_thread_finishes.push_back(thread);
 	}
@@ -1683,8 +1690,10 @@ class File_Manager : public Thread
 {
 public:
 	File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, double time_breaks = 10, double start_time = 1, ulong randseed = 0);
+	~File_Manager();
 	Event* issue_next_io();
 	void handle_event_completion(Event* event);
+	virtual void print_thread_stats();
 private:
 
 	struct Address_Range {
@@ -1704,7 +1713,7 @@ private:
 
 	struct File {
 		const double death_probability;
-		double time_finished;
+		double time_created, time_finished_writing, time_deleted;
 		static int file_id_generator;
 		const uint size;
 		int id;
@@ -1714,7 +1723,7 @@ private:
 		set<long> logical_addresses_to_be_written_in_current_range;
 		uint num_pages_allocated_so_far;
 
-		File(uint size, double death_probability);
+		File(uint size, double death_probability, double time_created);
 
 		long get_num_pages_left_to_allocate() const;
 		bool needs_new_range() const;
@@ -1727,18 +1736,19 @@ private:
 	};
 
 	void schedule_to_trim_file(File* file);
-	void write_next_file();
+	void write_next_file(double time);
 	void assign_new_range();
-	void randomly_delete_files();
+	void randomly_delete_files(double current_time);
 	Event* issue_trim();
 	Event* issue_write();
 	void reclaim_file_space(File* file);
-	void delete_file(File* victim);
+	void delete_file(File* victim, double current_time);
 	void handle_file_completion(double current_time);
 
 	long num_free_pages;
 	deque<Address_Range> free_ranges;
-	vector<File*> files;
+	vector<File*> live_files;
+	vector<File*> files_history;
 	File* current_file;
 	long min_LBA, max_LBA;
 	int num_files_to_write;

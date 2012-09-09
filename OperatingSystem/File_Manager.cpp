@@ -15,14 +15,20 @@ using namespace ssd;
 File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, double time_breaks, double start_time, ulong randseed)
 	: Thread(start_time), min_LBA(min_LBA), max_LBA(max_LBA),
 	  num_files_to_write(num_files_to_write), time_breaks(time_breaks),
-	  max_file_size(max_file_size)
+	  max_file_size(max_file_size),
+	  num_free_pages(max_LBA - min_LBA + 1)
 {
 	random_number_generator.seed(randseed);
 	double_generator.seed(randseed * 17);
 	Address_Range free_range(min_LBA, max_LBA);
 	free_ranges.push_front(free_range);
-	num_free_pages = max_LBA - min_LBA + 1;
-	write_next_file();
+	write_next_file(0);
+}
+
+File_Manager::~File_Manager() {
+	for (uint i = 0; i < files_history.size(); i++) {
+		delete files_history[i];
+	}
 }
 
 Event* File_Manager::issue_next_io() {
@@ -68,22 +74,24 @@ void File_Manager::handle_event_completion(Event*event) {
 
 void File_Manager::handle_file_completion(double current_time) {
 	current_file->finish(current_time);
-	files.push_back(current_file);
+	live_files.push_back(current_file);
+	files_history.push_back(current_file);
+
 	if (num_files_to_write-- == 0) {
 		finished = true;
 		return;
 	}
 	do {
-		randomly_delete_files();
-	} while (free_ranges.size() == 0);
-	StateTracer::print();
-	StatisticsGatherer::get_instance()->print();
-	write_next_file();
+		randomly_delete_files(current_time);
+	} while (num_free_pages == 0);
+	//StateTracer::print();
+	//StatisticsGatherer::get_instance()->print();
+	write_next_file(current_time);
 }
 
-void File_Manager::write_next_file() {
+void File_Manager::write_next_file(double current_time) {
 	assert(num_free_pages > 0); // deal with this problem later
-	double death_probability = double_generator() / 2;
+	double death_probability = double_generator() / 3;
 	uint size;
 	if (max_file_size > num_free_pages) {
 		size = num_free_pages;
@@ -91,7 +99,7 @@ void File_Manager::write_next_file() {
 		size = 1 + random_number_generator() % max_file_size; // max file size
 	}
 	num_free_pages -= size;
-	current_file = new File(size, death_probability);
+	current_file = new File(size, death_probability, current_time);
 	assign_new_range();
 }
 
@@ -108,25 +116,25 @@ void File_Manager::assign_new_range() {
 	}
 }
 
-void File_Manager::randomly_delete_files() {
-	for (uint i = 0; i < files.size(); ) {
-		File* file = files[i];
+void File_Manager::randomly_delete_files(double current_time) {
+	for (uint i = 0; i < live_files.size(); ) {
+		File* file = live_files[i];
 		double random_num = double_generator();
 		if (file->death_probability > random_num) {
-			delete_file(file);
-			files.erase(files.begin() + i);
+			delete_file(file, current_time);
+			live_files.erase(live_files.begin() + i);
 		} else {
 			i++;
 		}
 	}
 }
 
-void File_Manager::delete_file(File* victim) {
+void File_Manager::delete_file(File* victim, double current_time) {
 	printf("deleting file  %d\n", victim->id);
 	num_free_pages += victim->size;
 	schedule_to_trim_file(victim);
 	reclaim_file_space(victim);
-	delete victim;
+	victim->time_deleted = current_time;
 }
 
 // merges the
@@ -183,6 +191,20 @@ void File_Manager::reclaim_file_space(File* file) {
 	free_ranges = new_list;
 }
 
+void File_Manager::print_thread_stats() {
+	for (uint i = 0; i < files_history.size(); i++) {
+		File* f = files_history[i];
+		printf("file %d: ", f->id);
+		printf("\t%d ", f->size);
+		printf("\t%f ", f->death_probability);
+		printf("\t%f ", f->time_created);
+		printf("\t%f ", f->time_finished_writing);
+		printf("\t%f ", f->time_deleted);
+		printf("\n");
+	}
+	printf("\n");
+}
+
 // ----------------- Address_Range ---------------------------
 
 File_Manager::Address_Range::Address_Range(long min, long max)
@@ -214,8 +236,9 @@ void File_Manager::Address_Range::merge(Address_Range other) {
 
 int File_Manager::File::file_id_generator = 0;
 
-File_Manager::File::File(uint size, double death_probability)
-	: death_probability(death_probability), size(size), id(file_id_generator++),
+File_Manager::File::File(uint size, double death_probability, double creation_time)
+	: death_probability(death_probability), time_created(creation_time), time_finished_writing(0),
+	  time_deleted(0), size(size), id(file_id_generator++),
 	  num_pages_written(0), current_range_being_written(-1, -1), num_pages_allocated_so_far(0)
 {
 	printf("creating file: %d  %d   %f\n", id, size, death_probability);
@@ -224,7 +247,7 @@ File_Manager::File::File(uint size, double death_probability)
 }
 
 void File_Manager::File::finish(double time) {
-	time_finished = time;
+	time_finished_writing = time;
 	ranges_comprising_file.push_back(current_range_being_written);
 	printf("finished with file  %d\n", id);
 }

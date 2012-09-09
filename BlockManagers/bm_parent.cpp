@@ -481,10 +481,12 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 	StatisticsGatherer::get_instance()->register_scheduled_gc(*gc_event);
 
 	if (victim == NULL) {
+		StatisticsGatherer::get_instance()->num_gc_cancelled_no_candidate++;
 		return migrations;
 	}
 
 	if (num_available_pages_for_new_writes < victim->get_pages_valid()) {
+		StatisticsGatherer::get_instance()->num_gc_cancelled_not_enough_free_space++;
 		return migrations;
 	}
 
@@ -492,6 +494,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	uint max_num_gc_per_LUN = GREEDY_GC ? 2 : 1;
 	if (num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die] >= max_num_gc_per_LUN) {
+		StatisticsGatherer::get_instance()->num_gc_cancelled_gc_already_happening++;
 		return migrations;
 	}
 
@@ -508,12 +511,8 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 		printf("\n");
 	}
 
-
-	// if there is not enough free space to migrate the block into, cancel the GC operation
-
 	assert(victim->get_state() != FREE);
 	assert(victim->get_state() != PARTIALLY_FREE);
-
 
 	num_available_pages_for_new_writes -= victim->get_pages_valid();
 

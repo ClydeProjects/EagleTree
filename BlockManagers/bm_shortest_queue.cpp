@@ -26,12 +26,9 @@ void Block_manager_parallel::register_erase_outcome(Event const& event, enum sta
 	Block_manager_parent::register_erase_outcome(event, status);
 	Address a = event.get_address();
 
-	// if there is no free pointer for this block, set it to this one.
 	if (!has_free_pages(free_block_pointers[a.package][a.die])) {
 		free_block_pointers[a.package][a.die] = find_free_unused_block(a.package, a.die, event.get_current_time());
 	}
-
-	check_if_should_trigger_more_GC(event.get_current_time());
 }
 
 Address Block_manager_parallel::choose_best_address(Event const& write) {

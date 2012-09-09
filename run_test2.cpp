@@ -55,18 +55,21 @@ void experiement2() {
 }
 
 void file_manager_experiment() {
+	BLOCK_MANAGER_ID = 1;
 	vector<Thread*> threads;
 	long logical_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * 0.8;
 	long max_file_size = logical_space_size / 10;
-	Thread* fm1 = new File_Manager(0, logical_space_size / 2, 100, max_file_size, 10, 1, 1);
-	Thread* fm2 = new File_Manager((logical_space_size / 2) + 1, logical_space_size, 100, max_file_size, 10, 2, 2);
+	Thread* fm1 = new File_Manager(0, logical_space_size / 2, 10, max_file_size, 10, 1, 1);
+	Thread* fm2 = new File_Manager((logical_space_size / 2) + 1, logical_space_size, 10, max_file_size, 10, 2, 2);
 	threads.push_back(fm1);
 	threads.push_back(fm2);
 	OperatingSystem* os = new OperatingSystem(threads);
 	//os->set_num_writes_to_stop_after(5000);
 	os->run();
-	VisualTracer::get_instance()->print_horizontally_with_breaks();
-	StateTracer::print();
+	fm1->print_thread_stats();
+	fm2->print_thread_stats();
+	//VisualTracer::get_instance()->print_horizontally_with_breaks();
+	//StateTracer::print();
 	delete os;
 }
 
@@ -85,7 +88,7 @@ void DBWorkload() {
 	//thread_dependencies[4].push(new External_Sort(400, 599, 40, 600, 799));
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
-	VisualTracer::get_instance()->print_horizontally_with_breaks();
+	//VisualTracer::get_instance()->print_horizontally_with_breaks();
 	delete os;
 }
 
