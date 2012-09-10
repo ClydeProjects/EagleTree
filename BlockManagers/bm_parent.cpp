@@ -151,17 +151,9 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	}
 	trim(event);
 
-//<<<<<<< HEAD
-	Address ba = Address(event.get_address().get_linear_address(), BLOCK);
+	Address ba = event.get_address();
 	if (ba.compare(free_block_pointers[ba.package][ba.die]) >= BLOCK && event.get_event_type() == WRITE) {
 		increment_pointer(free_block_pointers[ba.package][ba.die]);
-//=======
-//	Address ba = event.get_address();
-//	if (ba.compare(free_block_pointers[ba.package][ba.die]) >= BLOCK) {
-//		Address pointer = free_block_pointers[ba.package][ba.die];
-//		pointer.page = pointer.page + 1;
-//		free_block_pointers[ba.package][ba.die] = pointer;
-//>>>>>>> 49654b74d94409e0b34e1e5484f8fe9883764c5e
 		if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
 			if (PRINT_LEVEL > 1) {
 				printf("hot pointer ");
