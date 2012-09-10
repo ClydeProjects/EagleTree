@@ -151,9 +151,17 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	}
 	trim(event);
 
+//<<<<<<< HEAD
 	Address ba = Address(event.get_address().get_linear_address(), BLOCK);
-	if (ba.compare(free_block_pointers[ba.package][ba.die]) == BLOCK && event.get_event_type() == WRITE) {
+	if (ba.compare(free_block_pointers[ba.package][ba.die]) >= BLOCK && event.get_event_type() == WRITE) {
 		increment_pointer(free_block_pointers[ba.package][ba.die]);
+//=======
+//	Address ba = event.get_address();
+//	if (ba.compare(free_block_pointers[ba.package][ba.die]) >= BLOCK) {
+//		Address pointer = free_block_pointers[ba.package][ba.die];
+//		pointer.page = pointer.page + 1;
+//		free_block_pointers[ba.package][ba.die] = pointer;
+//>>>>>>> 49654b74d94409e0b34e1e5484f8fe9883764c5e
 		if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
 			if (PRINT_LEVEL > 1) {
 				printf("hot pointer ");
@@ -415,13 +423,6 @@ struct block_valid_pages_comparator_wearwolf {
 // schedules a garbage collection operation to occur at a given time, and optionally for a given channel, LUN or age class
 // the block to be reclaimed is chosen when the gc operation is initialised
 void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, int klass) {
-
-	if ( klass >= num_age_classes || package_id >= SSD_SIZE || die_id >= PACKAGE_SIZE) {
-		int i = 0;
-		i++;
-	}
-	//assert(package_id < SSD_SIZE && package_id < PACKAGE_SIZE && klass < num_age_classes);
-
 	Address address;
 	address.package = package_id;
 	address.die = die_id;
@@ -549,11 +550,15 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	vector<deque<Event*> > migrations;
 
+	StatisticsGatherer::get_instance()->register_scheduled_gc(*gc_event);
+
 	if (victim == NULL) {
+		StatisticsGatherer::get_instance()->num_gc_cancelled_no_candidate++;
 		return migrations;
 	}
 
 	if (num_available_pages_for_new_writes < victim->get_pages_valid()) {
+		StatisticsGatherer::get_instance()->num_gc_cancelled_not_enough_free_space++;
 		return migrations;
 	}
 
@@ -561,6 +566,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	uint max_num_gc_per_LUN = GREEDY_GC ? 2 : 1;
 	if (num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die] >= max_num_gc_per_LUN) {
+		StatisticsGatherer::get_instance()->num_gc_cancelled_gc_already_happening++;
 		return migrations;
 	}
 
@@ -577,15 +583,13 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 		printf("\n");
 	}
 
-	// if there is not enough free space to migrate the block into, cancel the GC operation
-
 	assert(victim->get_state() != FREE);
 	assert(victim->get_state() != PARTIALLY_FREE);
-
 
 	num_available_pages_for_new_writes -= victim->get_pages_valid();
 
 	deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
+	StatisticsGatherer::get_instance()->register_executed_gc(*gc_event, *victim);
 
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
@@ -686,18 +690,16 @@ Address Block_manager_parent::find_free_unused_block_with_class(uint klass, doub
 	assert(klass < num_age_classes);
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			Address a = free_blocks[i][j][klass].back();
-			if (has_free_pages(a)) {
+			uint num_free_blocks_left = free_blocks[i][j][klass].size();
+			if (num_free_blocks_left > 0) {
+				Address block = free_blocks[i][j][klass].back();
 				free_blocks[i][j][klass].pop_back();
-				if (greedy_gc && free_blocks[i][j][klass].size() < 2) {
-					//perform_gc(i, j, klass, time);
-					schedule_gc(time, i, j, klass);
-				}
-				return a;
+				assert(has_free_pages(block));
+				return block;
 			}
 		}
 	}
-	return Address(0, NONE);
+	return Address();
 }
 
 void Block_manager_parent::return_unfilled_block(Address pba) {

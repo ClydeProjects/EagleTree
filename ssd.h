@@ -178,7 +178,7 @@ extern bool GREEDY_GC;
 /*
  * Controls the level of detail of output
  */
-extern const int PRINT_LEVEL;
+extern int PRINT_LEVEL;
 
 /*
  * tells the Operating System class to either lock or not lock LBAs after dispatching IOs to them
@@ -287,7 +287,7 @@ class IOScheduler;
 class Block_manager;
 class Block_manager_parent;
 class Block_manager_parallel;
-class Block_manager_parallel_hot_cold_seperation;
+class Shortest_Queue_Hot_Cold_BM;
 class Wearwolf;
 class Wearwolf_Locality;
 
@@ -444,8 +444,8 @@ public:
 	void set_application_io_id(uint application_io_id);
 	void set_garbage_collection_op(bool value);
 	void set_mapping_op(bool value);
-	void set_age_class(uint value);
-	uint get_age_class();
+	void set_age_class(int value);
+	int get_age_class() const;
 	bool is_garbage_collection_op() const;
 	bool is_mapping_op() const;
 	void *get_payload(void) const;
@@ -975,10 +975,10 @@ private:
 };
 
 // A BM that assigns each write to the die with the shortest queue, as well as hot-cold seperation
-class Block_manager_parallel_hot_cold_seperation : public Block_manager_parent {
+class Shortest_Queue_Hot_Cold_BM : public Block_manager_parent {
 public:
-	Block_manager_parallel_hot_cold_seperation(Ssd& ssd, FtlParent& ftl);
-	~Block_manager_parallel_hot_cold_seperation();
+	Shortest_Queue_Hot_Cold_BM(Ssd& ssd, FtlParent& ftl);
+	~Shortest_Queue_Hot_Cold_BM();
 	void register_write_outcome(Event const& event, enum status status);
 	void register_read_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
@@ -1546,10 +1546,16 @@ public:
 	static StatisticsGatherer *get_instance();
 	static void init(Ssd * ssd);
 	void register_completed_event(Event const& event);
+	void register_scheduled_gc(Event const& gc);
+	void register_executed_gc(Event const& gc, Block const& victim);
 	void print();
 	void print_csv();
 	string totals_csv_header();
 	string totals_csv_line();
+
+	long num_gc_cancelled_no_candidate;
+	long num_gc_cancelled_not_enough_free_space;
+	long num_gc_cancelled_gc_already_happening;
 
 private:
 	static StatisticsGatherer *inst;
@@ -1570,6 +1576,20 @@ private:
 	vector<vector<uint> > num_copy_backs_per_LUN;
 
 	vector<vector<uint> > num_erases_per_LUN;
+
+	// garbage collection stats
+	long num_gc_executed;
+	double num_migrations;
+	long num_gc_scheduled;
+
+	long num_gc_targeting_package_die_class;
+	long num_gc_targeting_package_die;
+	long num_gc_targeting_package_class;
+	long num_gc_targeting_package;
+	long num_gc_targeting_class;
+	long num_gc_targeting_anything;
+
+
 };
 
 class Thread
@@ -1590,7 +1610,7 @@ public:
 	void set_time(double current_time) {
 		time = current_time;
 	}
-	void print_thread_stats();
+	virtual void print_thread_stats();
 	void add_follow_up_thread(Thread* thread) {
 		threads_to_start_when_this_thread_finishes.push_back(thread);
 	}
@@ -1663,6 +1683,24 @@ private:
 	int time_breaks;
 };
 
+class Reliable_Random_Int_Generator {
+public:
+	Reliable_Random_Int_Generator(int seed, int num_numbers_needed);
+	int next();
+private:
+	MTRand_int32 random_number_generator;
+	deque<int> numbers;
+};
+
+class Reliable_Random_Double_Generator {
+public:
+	Reliable_Random_Double_Generator(int seed, int num_numbers_needed);
+	double next();
+private:
+	MTRand_open random_number_generator;
+	deque<double> numbers;
+};
+
 // assuming the relation is made of contigouse pages
 // RAM_available is the number of pages that fit into RAM
 class External_Sort : public Thread
@@ -1683,6 +1721,25 @@ private:
 	bool can_start_next_read;
 };
 
+class Throughput_Moderator {
+public:
+	Throughput_Moderator();
+	double register_event_completion(Event const& event);
+private:
+	int window_size;
+	int counter;
+	vector<double> window_measurments;
+	double differential;
+	double diff_sum;
+	int breaks_counter;
+	double average_wait_time;
+	double last_average_wait_time;
+};
+
+class Throughput_Measurer {
+
+};
+
 // This is a file manager that writes one file at a time sequentially
 // files might be fragmented across logical space
 // files have a random size determined by the file manager
@@ -1691,8 +1748,10 @@ class File_Manager : public Thread
 {
 public:
 	File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, double time_breaks = 10, double start_time = 1, ulong randseed = 0);
+	~File_Manager();
 	Event* issue_next_io();
 	void handle_event_completion(Event* event);
+	virtual void print_thread_stats();
 private:
 
 	struct Address_Range {
@@ -1712,7 +1771,7 @@ private:
 
 	struct File {
 		const double death_probability;
-		double time_finished;
+		double time_created, time_finished_writing, time_deleted;
 		static int file_id_generator;
 		const uint size;
 		int id;
@@ -1722,7 +1781,7 @@ private:
 		set<long> logical_addresses_to_be_written_in_current_range;
 		uint num_pages_allocated_so_far;
 
-		File(uint size, double death_probability);
+		File(uint size, double death_probability, double time_created);
 
 		long get_num_pages_left_to_allocate() const;
 		bool needs_new_range() const;
@@ -1735,26 +1794,32 @@ private:
 	};
 
 	void schedule_to_trim_file(File* file);
-	void write_next_file();
+	void write_next_file(double time);
 	void assign_new_range();
-	void randomly_delete_files();
+	void randomly_delete_files(double current_time);
 	Event* issue_trim();
 	Event* issue_write();
 	void reclaim_file_space(File* file);
-	void delete_file(File* victim);
+	void delete_file(File* victim, double current_time);
 	void handle_file_completion(double current_time);
 
 	long num_free_pages;
 	deque<Address_Range> free_ranges;
-	vector<File*> files;
+	vector<File*> live_files;
+	vector<File*> files_history;
 	File* current_file;
 	long min_LBA, max_LBA;
 	int num_files_to_write;
-	MTRand_int32 random_number_generator;
-	MTRand_open double_generator;
+
+	Reliable_Random_Int_Generator random_number_generator;
+	Reliable_Random_Double_Generator double_generator;
+
+	//MTRand_int32 random_number_generator;
+	//MTRand_open double_generator;
 	double time_breaks;
 	set<long> addresses_to_trim;
 	const long max_file_size;
+	Throughput_Moderator throughout_moderator;
 };
 
 class OperatingSystem

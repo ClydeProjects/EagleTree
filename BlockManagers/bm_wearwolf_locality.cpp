@@ -132,7 +132,6 @@ Address Wearwolf_Locality::perform_sequential_write_shortest_queue(sequential_wr
 	bool can_write = best_die_id.first;
 	if (can_write) {
 		Address chosen = swp.pointers[best_die_id.second.first][best_die_id.second.second];
-		assert(chosen.package == best_die_id.second.first && chosen.die == best_die_id.second.second);
 		return swp.pointers[best_die_id.second.first][best_die_id.second.second];
 	}
 	return Address();
@@ -343,15 +342,19 @@ void Wearwolf_Locality::register_erase_outcome(Event const& event, enum status s
 		}
 		Address& pointer = swt.pointers[i][j];
 		if (!has_free_pages(pointer)) {
-			if (parallel_degree == ONE) {
-				(*iter).second.pointers[i][j] = find_free_unused_block(event.get_current_time());
-			} else if (parallel_degree == CHANNEL) {
-				(*iter).second.pointers[i][j] = find_free_unused_block(i, event.get_current_time());
-			} else if (parallel_degree == LUN) {
-				(*iter).second.pointers[i][j] = find_free_unused_block(i, j, event.get_current_time());
+			Address new_block;
+			if (parallel_degree == LUN || swt.tag != UNDEFINED) {
+				new_block = find_free_unused_block(i, j, event.get_current_time());
 			}
-			if (has_free_pages(pointer)) {
-				(*iter).second.num_pointers++;
+			else if (parallel_degree == CHANNEL) {
+				new_block = find_free_unused_block(i, event.get_current_time());
+			}
+			else if (parallel_degree == ONE) {
+				new_block = find_free_unused_block(event.get_current_time());
+			}
+			if (has_free_pages(new_block)) {
+				swt.num_pointers++;
+				swt.pointers[i][j] = new_block;
 			}
 		}
 	}

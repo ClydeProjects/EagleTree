@@ -82,8 +82,7 @@ void overprovisioning_experiment() {
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->run();
 
-		csv_file << used_space << ", ";
-		csv_file << StatisticsGatherer::get_instance()->totals_csv_line();
+		csv_file << used_space << ", " << StatisticsGatherer::get_instance()->totals_csv_line();
 
 		delete os;
 	}

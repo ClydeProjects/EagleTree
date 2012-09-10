@@ -230,7 +230,7 @@ public:
          inserted_element_count_ = f.inserted_element_count_;
          random_seed_ = f.random_seed_;
          desired_false_positive_probability_ = f.desired_false_positive_probability_;
-         delete[] bit_table_;
+         //if(*bit_table_ != '\0') /* if statement added by MKS */ delete[] bit_table_;
          bit_table_ = new cell_type[static_cast<std::size_t>(raw_table_size_)];
          std::copy(f.bit_table_,f.bit_table_ + raw_table_size_,bit_table_);
          salt_ = f.salt_;

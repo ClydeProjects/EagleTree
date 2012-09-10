@@ -5,7 +5,7 @@
  *      Author: niv
  */
 
-#include "ssd.h"
+#include "../ssd.h"
 using namespace ssd;
 #include <stdio.h>
 #include <sstream>
@@ -21,7 +21,19 @@ StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
 	  num_gc_reads_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_gc_writes_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_copy_backs_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
-	  num_erases_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0))
+	  num_erases_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
+	  num_gc_executed(0),
+	  num_migrations(0),
+	  num_gc_scheduled(0),
+	  num_gc_targeting_package_die_class(0),
+	  num_gc_targeting_package_die(0),
+	  num_gc_targeting_package_class(0),
+	  num_gc_targeting_package(0),
+	  num_gc_targeting_class(0),
+	  num_gc_targeting_anything(0),
+	  num_gc_cancelled_no_candidate(0),
+	  num_gc_cancelled_not_enough_free_space(0),
+	  num_gc_cancelled_gc_already_happening(0)
 {}
 
 StatisticsGatherer::~StatisticsGatherer() {}
@@ -59,6 +71,44 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	} else if (event.get_event_type() == COPY_BACK) {
 		num_copy_backs_per_LUN[a.package][a.die]++;
 	}
+}
+
+void StatisticsGatherer::register_scheduled_gc(Event const& gc) {
+	num_gc_scheduled++;
+
+	int age_class = gc.get_age_class();
+	Address addr = gc.get_address();
+
+	if (age_class == UNDEFINED) {
+		int i = 0;
+		i++;
+	}
+
+	if (addr.valid == DIE && age_class != UNDEFINED) {
+		num_gc_targeting_package_die_class++;
+	}
+	else if (addr.valid == PACKAGE && age_class != UNDEFINED) {
+		num_gc_targeting_package_class++;
+	}
+	else if (addr.valid == NONE && age_class != UNDEFINED) {
+		num_gc_targeting_class++;
+	}
+	else if (addr.valid == DIE) {
+		num_gc_targeting_package_die++;
+	}
+	else if (addr.valid == PACKAGE) {
+		num_gc_targeting_package++;
+	}
+	else {
+		num_gc_targeting_anything++;
+	}
+}
+
+void StatisticsGatherer::register_executed_gc(Event const& gc, Block const& victim) {
+	num_gc_executed++;
+	num_migrations += victim.get_pages_valid();
+
+
 }
 
 void StatisticsGatherer::print() {
@@ -138,7 +188,21 @@ void StatisticsGatherer::print() {
 	printf("%d\t\t", total_erases);
 	printf("%f\t\t", avg_overall_write_wait_time);
 	printf("%f\t\t", avg_overall_read_wait_time);
+	printf("\n\n");
+	printf("num scheduled gc: %d \n", num_gc_scheduled);
+	printf("num executed gc: %d \n", num_gc_executed);
+	printf("num migrations per gc: %f \n", (double)num_migrations / num_gc_executed);
 	printf("\n");
+	printf("gc targeting package die class: %d \n", num_gc_targeting_package_die_class);
+	printf("gc targeting package die: %d \n", num_gc_targeting_package_die);
+	printf("gc targeting package class: %d \n", num_gc_targeting_package_class);
+	printf("gc targeting package: %d \n", num_gc_targeting_package);
+	printf("gc targeting class: %d \n", num_gc_targeting_class);
+	printf("gc targeting anything: %d \n", num_gc_targeting_anything);
+	printf("\n");
+	printf("num_gc_cancelled_no_candidate: %d \n", num_gc_cancelled_no_candidate);
+	printf("num_gc_cancelled_not_enough_free_space: %d \n", num_gc_cancelled_not_enough_free_space);
+	printf("num_gc_cancelled_gc_already_happening: %d \n", num_gc_cancelled_gc_already_happening);
 }
 
 string StatisticsGatherer::totals_csv_header() {
