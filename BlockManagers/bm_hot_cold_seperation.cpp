@@ -17,10 +17,10 @@ void Shortest_Queue_Hot_Cold_BM::register_write_outcome(Event const& event, enum
 
 	if (event.get_address().compare(cold_pointer) >= BLOCK) {
 		cold_pointer.page = cold_pointer.page + 1;
-	}
-
-	if (!has_free_pages(cold_pointer)) {
-		handle_cold_pointer_out_of_space(event.get_current_time());
+		printf("cold write:   "); event.print();
+		if (!has_free_pages(cold_pointer)) {
+			handle_cold_pointer_out_of_space(event.get_current_time());
+		}
 	}
 }
 
@@ -29,7 +29,7 @@ void Shortest_Queue_Hot_Cold_BM::handle_cold_pointer_out_of_space(double start_t
 	//cold_pointer = has_free_pages(block) ? block : find_free_unused_block(start_time);
 	cold_pointer = find_free_unused_block(start_time);
 	if (!has_free_pages(cold_pointer)) {
-		schedule_gc(start_time, -1, -1, 0);
+		//schedule_gc(start_time);
 	}
 }
 
@@ -52,6 +52,7 @@ void Shortest_Queue_Hot_Cold_BM::register_erase_outcome(Event const& event, enum
 
 Address Shortest_Queue_Hot_Cold_BM::choose_best_address(Event const& write) {
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
+	//w_hotness = WRITE_HOT;
 	return w_hotness == WRITE_HOT ? get_free_block_pointer_with_shortest_IO_queue() : cold_pointer;
 }
 

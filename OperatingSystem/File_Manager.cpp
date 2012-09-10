@@ -63,6 +63,7 @@ Event* File_Manager::issue_write() {
 void File_Manager::handle_event_completion(Event*event) {
 	if (event->get_event_type() == TRIM)
 		return;
+	//time_breaks += throughout_moderator.register_event_completion(*event);
 	current_file->register_write_completion();
 	if (current_file->is_finished()) {
 		handle_file_completion(event->get_current_time());

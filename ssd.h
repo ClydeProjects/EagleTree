@@ -1700,6 +1700,25 @@ private:
 	bool can_start_next_read;
 };
 
+class Throughput_Moderator {
+public:
+	Throughput_Moderator();
+	double register_event_completion(Event const& event);
+private:
+	int window_size;
+	int counter;
+	vector<double> window_measurments;
+	double differential;
+	double diff_sum;
+	int breaks_counter;
+	double average_wait_time;
+	double last_average_wait_time;
+};
+
+class Throughput_Measurer {
+
+};
+
 // This is a file manager that writes one file at a time sequentially
 // files might be fragmented across logical space
 // files have a random size determined by the file manager
@@ -1779,6 +1798,7 @@ private:
 	double time_breaks;
 	set<long> addresses_to_trim;
 	const long max_file_size;
+	Throughput_Moderator throughout_moderator;
 };
 
 class OperatingSystem
