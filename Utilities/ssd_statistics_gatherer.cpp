@@ -40,12 +40,13 @@ StatisticsGatherer::~StatisticsGatherer() {}
 
 void StatisticsGatherer::init(Ssd * ssd)
 {
-	StatisticsGatherer::inst = new StatisticsGatherer(*ssd);
+	if (inst != NULL) delete inst;
+	inst = new StatisticsGatherer(*ssd);
 }
 
 StatisticsGatherer *StatisticsGatherer::get_instance()
 {
-	return StatisticsGatherer::inst;
+	return inst;
 }
 
 void StatisticsGatherer::register_completed_event(Event const& event) {
@@ -215,8 +216,8 @@ string StatisticsGatherer::totals_csv_header() {
 	ss << q << "GC reads" << qc;
 	ss << q << "copy backs" << qc;
 	ss << q << "erases" << qc;
-	ss << q << "avg write wait" << qc;
-	ss << q << "avg read wait" << q;
+	ss << q << "avg write wait (µs)" << qc;
+	ss << q << "avg read wait (µs)" << q;
 	ss << "\n";
 	return ss.str();
 }

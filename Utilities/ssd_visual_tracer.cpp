@@ -18,12 +18,13 @@ VisualTracer::~VisualTracer() {}
 
 void VisualTracer::init()
 {
-	VisualTracer::inst = new VisualTracer();
+	if (inst != NULL) delete inst;
+	inst = new VisualTracer();
 }
 
 VisualTracer *VisualTracer::get_instance()
 {
-	return VisualTracer::inst;
+	return inst;
 }
 
 vector<char> get_int_as_char_vector(int num) {

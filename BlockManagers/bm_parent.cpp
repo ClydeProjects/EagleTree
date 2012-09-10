@@ -66,7 +66,10 @@ Address Block_manager_parent::choose_address(Event const& write) {
 		schedule_gc(write.get_current_time());
 	}
 	if (write.is_garbage_collection_op() || how_many_gc_operations_are_scheduled() == 0) {
-		return choose_any_address();
+		a = choose_any_address();
+		if (has_free_pages(a)) {
+			return a;
+		}
 	}
 	return Address();
 }
@@ -391,12 +394,13 @@ bool Block_manager_parent::Copy_backs_in_progress(Address const& addr) {
 }
 
 // gives time until both the channel and die are clear
-double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const {
-	if (die_address.valid == NONE) {
+double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& address, double time_taken) const {
+	if (address.valid == NONE) {
 		return 1;
 	}
-	uint package_id = die_address.package;
-	uint die_id = die_address.die;
+
+	uint package_id = address.package;
+	uint die_id = address.die;
 	double channel_finish_time = ssd.bus.get_channel(package_id).get_currently_executing_operation_finish_time();
 	double die_finish_time = ssd.getPackages()[package_id].getDies()[die_id].get_currently_executing_io_finish_time();
 	double max = std::max(channel_finish_time, die_finish_time);

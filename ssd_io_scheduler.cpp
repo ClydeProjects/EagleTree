@@ -40,13 +40,17 @@ IOScheduler *IOScheduler::inst = NULL;
 
 void IOScheduler::instance_initialize(Ssd& ssd, FtlParent& ftl)
 {
-	IOScheduler::inst = new IOScheduler(ssd, ftl);
+	if (inst != NULL) {
+		delete inst;
+	}
+	inst = new IOScheduler(ssd, ftl);
 }
 
 IOScheduler *IOScheduler::instance()
 {
 	return IOScheduler::inst;
 }
+
 
 bool bus_wait_time_comparator (const Event* i, const Event* j) {
 	return i->get_bus_wait_time() < j->get_bus_wait_time();
@@ -207,12 +211,14 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
+
 		Address result = bm->choose_address(*event);
 		double wait_time = bm->in_how_long_can_this_event_be_scheduled(result, event->get_current_time());
 		if (wait_time == 0 && bm->Copy_backs_in_progress(result)) wait_time = 1; // If copy backs are in progress, keep waiting until they are done
 		if (wait_time == 0) {
-			ftl.set_replace_address(*event); // 05-09-2012: Moved to here from init_event (else if (type == WRITE) { ...)
 			event->set_address(result);
+			ftl.set_replace_address(*event); // 05-09-2012: Moved to here from init_event (else if (type == WRITE) { ...)
+			assert(result.page < BLOCK_SIZE);
 			execute_next(event);
 		}
 		else {
@@ -271,6 +277,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	else if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
 		promote_to_gc(existing_event);
 		remove_current_operation(new_event);
+		current_events.push_back(new_event); // Make sure the old GC READ is run, even though it is now a NOOP command
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 		stats.num_write_cancellations++;
 	}
@@ -509,6 +516,8 @@ void IOScheduler::print_stats() {
 	printf("num_write_cancellations %d\n", stats.num_write_cancellations);
 	printf("\n");
 }
+
+
 
 void IOScheduler::init_event(Event* event) {
 	uint dep_code = event->get_application_io_id();

@@ -56,6 +56,7 @@ void StateTracer::print() {
 				printf("\n");
 			}
 		}
+		printf("\n");
 	}
 	printf("\n");
 	printf("num valid pages: %d\n", num_valid_pages);
