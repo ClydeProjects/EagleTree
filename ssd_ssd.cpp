@@ -146,7 +146,7 @@ void Ssd::event_arrive(Event* event) {
 	//printf("submitted: %d\n",  event->get_id());
 	// Print error and terminate if start time of event is less than IO submission time
 	// assert(event->get_start_time() >= last_io_submission_time);
-	if (event->get_start_time() < last_io_submission_time + 0.00001) {
+	if (event->get_start_time() + 0.00001 < last_io_submission_time) {
 		fprintf(stderr, "Error: Start time of event (%f) less than last IO submission time (%f).\n", event->get_start_time(), last_io_submission_time);
 		fprintf(stderr, "Triggering event: ");
 		event->print(stderr);
@@ -184,7 +184,7 @@ void Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, d
 	event_arrive(event);
 }
 
-void Ssd::progress_since_os_is_idle() {
+void Ssd::progress_since_os_is_waiting() {
 	IOScheduler::instance()->execute_soonest_events();
 }
 
