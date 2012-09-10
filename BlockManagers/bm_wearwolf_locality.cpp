@@ -243,6 +243,7 @@ void Wearwolf_Locality::process_write_completion(Event const& event, long key, p
 			}
 		}
 		if (has_free_pages(free_block)) {
+			assert(index.first == free_block.package && index.second == free_block.die);
 			swp.pointers[index.first][index.second] = free_block;
 		} else {
 			swp.num_pointers--;
