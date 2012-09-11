@@ -42,13 +42,21 @@
 // Feedback about the C++ port should be sent to Jasper Bedaux,
 // see http://www.bedaux.net/mtrand/ for e-mail address and info.
 
+// MKS: Change note: The static fields have been made dynamic to make each instance encapsulated and independent of other instances.
+//      The motivation for this change is to make sure each separate object using random numbers behaves in a deterministic way,
+//      unaffected by whatever else is running. The bit of extra memory used is a non-issue in the context of the SSD simulator.
+//      Note that this means that new objects should ALWAYS be seeded in the constructor (as opposed to what the mtreadme.txt file says).
+
 #ifndef MTRAND_H
 #define MTRAND_H
+
+#include <iostream>
 
 class MTRand_int32 { // Mersenne Twister random number generator
 public:
 // default constructor: uses default seed only if this is the first instance
-  MTRand_int32() { if (!init) seed(5489UL); init = true; }
+/* MKS: Uncommented empty constructor since seeding is required for each object instantiation as a result of the removal of static fields */
+  MTRand_int32() { std::cout << "You should always provide a seed to the constructor, since the static fields have been made dynamic.\n"; throw; if (!init) seed(5489UL); init = true; }
 // constructor with 32 bit int as seed
   MTRand_int32(unsigned long s) { seed(s); init = true; }
 // constructor with array of size 32 bit ints as seed
@@ -65,9 +73,10 @@ protected: // used by derived classes, otherwise not accessible; use the ()-oper
 private:
   static const int n = 624, m = 397; // compile time constants
 // the variables below are static (no duplicates can exist)
-  static unsigned long state[n]; // state vector array
-  static int p; // position in state array
-  static bool init; // true if init function is called
+  // MKS: Following three lines uncommented because the static fields are made dynamic
+  /*static*/ unsigned long state[n]; // state vector array
+  /*static*/ int p; // position in state array
+  /*static*/ bool init; // true if init function is called
 // private functions used to generate the pseudo random numbers
   unsigned long twiddle(unsigned long, unsigned long); // used by gen_state()
   void gen_state(); // generate new state

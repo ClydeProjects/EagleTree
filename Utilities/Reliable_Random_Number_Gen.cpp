@@ -4,7 +4,7 @@
  *  Created on: Sep 9, 2012
  *      Author: niv
  */
-
+/*
 #include "../ssd.h"
 #include "../MTRand/mtrand.h"
 using namespace ssd;
@@ -43,3 +43,4 @@ double Reliable_Random_Double_Generator::next() {
 	return num;
 }
 
+*/

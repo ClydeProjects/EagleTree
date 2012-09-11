@@ -5,9 +5,12 @@
 // reside in header file because of the risk of multiple declarations
 
 // initialization of static private members
+// MKS: Following three lines uncommented because the static fields have been made dynamic
+/*
 unsigned long MTRand_int32::state[n] = {0x0UL};
 int MTRand_int32::p = 0;
 bool MTRand_int32::init = false;
+*/
 
 void MTRand_int32::gen_state() { // generate new state vector
   for (int i = 0; i < (n - m); ++i)
