@@ -20,6 +20,7 @@ StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
 	  num_writes_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_gc_reads_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_gc_writes_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
+	  num_gc_scheduled_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_copy_backs_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_erases_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_gc_executed(0),
@@ -87,6 +88,7 @@ void StatisticsGatherer::register_scheduled_gc(Event const& gc) {
 
 	if (addr.valid == DIE && age_class != UNDEFINED) {
 		num_gc_targeting_package_die_class++;
+		num_gc_scheduled_per_LUN[addr.package][addr.die]++;
 	}
 	else if (addr.valid == PACKAGE && age_class != UNDEFINED) {
 		num_gc_targeting_package_class++;
@@ -96,6 +98,7 @@ void StatisticsGatherer::register_scheduled_gc(Event const& gc) {
 	}
 	else if (addr.valid == DIE) {
 		num_gc_targeting_package_die++;
+		num_gc_scheduled_per_LUN[addr.package][addr.die]++;
 	}
 	else if (addr.valid == PACKAGE) {
 		num_gc_targeting_package++;
@@ -118,6 +121,7 @@ void StatisticsGatherer::print() {
 	printf("num reads\t");
 	printf("GC writes\t");
 	printf("GC reads\t");
+	printf("GC scheduled\t"); // <--
 	printf("copy backs\t");
 	printf("erases\t\t");
 	printf("avg write wait\t");
@@ -131,6 +135,7 @@ void StatisticsGatherer::print() {
 	uint total_reads = 0;
 	uint total_gc_writes = 0;
 	uint total_gc_reads = 0;
+	uint total_gc_scheduled = 0;
 	uint total_copy_backs = 0;
 	uint total_erases = 0;
 	double avg_overall_write_wait_time = 0;
@@ -142,6 +147,7 @@ void StatisticsGatherer::print() {
 			total_reads += num_reads_per_LUN[i][j];
 			total_gc_writes += num_gc_writes_per_LUN[i][j];
 			total_gc_reads += num_gc_reads_per_LUN[i][j];
+			total_gc_scheduled += num_gc_scheduled_per_LUN[i][j];
 			total_copy_backs += num_copy_backs_per_LUN[i][j];
 			total_erases += num_erases_per_LUN[i][j];
 
@@ -168,6 +174,7 @@ void StatisticsGatherer::print() {
 
 			printf("%d\t\t", num_gc_writes_per_LUN[i][j]);
 			printf("%d\t\t", num_gc_reads_per_LUN[i][j]);
+			printf("%d\t\t", num_gc_scheduled_per_LUN[i][j]);
 			printf("%d\t\t", num_copy_backs_per_LUN[i][j]);
 			printf("%d\t\t", num_erases_per_LUN[i][j]);
 
@@ -185,6 +192,7 @@ void StatisticsGatherer::print() {
 	printf("%d\t\t", total_reads);
 	printf("%d\t\t", total_gc_writes);
 	printf("%d\t\t", total_gc_reads);
+	printf("%d\t\t", total_gc_scheduled);
 	printf("%d\t\t", total_copy_backs);
 	printf("%d\t\t", total_erases);
 	printf("%f\t\t", avg_overall_write_wait_time);
@@ -214,6 +222,7 @@ string StatisticsGatherer::totals_csv_header() {
 	ss << q << "num reads" << qc;
 	ss << q << "GC write" << qc;
 	ss << q << "GC reads" << qc;
+	ss << q << "GC scheduled" << qc;
 	ss << q << "copy backs" << qc;
 	ss << q << "erases" << qc;
 	ss << q << "avg write wait (µs)" << qc;
@@ -227,6 +236,7 @@ string StatisticsGatherer::totals_csv_line() {
 	uint total_reads = 0;
 	uint total_gc_writes = 0;
 	uint total_gc_reads = 0;
+	uint total_gc_scheduled = 0;
 	uint total_copy_backs = 0;
 	uint total_erases = 0;
 	double avg_overall_write_wait_time = 0;
@@ -238,6 +248,7 @@ string StatisticsGatherer::totals_csv_line() {
 			total_reads += num_reads_per_LUN[i][j];
 			total_gc_writes += num_gc_writes_per_LUN[i][j];
 			total_gc_reads += num_gc_reads_per_LUN[i][j];
+			total_gc_scheduled += num_gc_scheduled_per_LUN[i][j];
 			total_copy_backs += num_copy_backs_per_LUN[i][j];
 			total_erases += num_erases_per_LUN[i][j];
 
@@ -265,6 +276,7 @@ string StatisticsGatherer::totals_csv_line() {
 	ss << total_reads << ", ";
 	ss << total_gc_writes << ", ";
 	ss << total_gc_reads << ", ";
+	ss << total_gc_scheduled << ", ";
 	ss << total_copy_backs << ", ";
 	ss << total_erases << ", ";
 	ss << avg_overall_write_wait_time << ", ";
@@ -281,6 +293,7 @@ void StatisticsGatherer::print_csv() {
 	printf("num reads,");
 	printf("GC writes,");
 	printf("GC reads,");
+	printf("GC scheduled,");
 	printf("copy backs,");
 	printf("erases,");
 	printf("write wait,");
@@ -307,6 +320,7 @@ void StatisticsGatherer::print_csv() {
 
 			printf("%d,", num_gc_writes_per_LUN[i][j]);
 			printf("%d,", num_gc_reads_per_LUN[i][j]);
+			printf("%d,", num_gc_scheduled_per_LUN[i][j]);
 			printf("%d,", num_copy_backs_per_LUN[i][j]);
 			printf("%d,", num_erases_per_LUN[i][j]);
 
