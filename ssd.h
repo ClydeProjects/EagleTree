@@ -1577,6 +1577,8 @@ private:
 
 	vector<vector<uint> > num_erases_per_LUN;
 
+	vector<vector<uint> > num_gc_scheduled_per_LUN;
+
 	// garbage collection stats
 	long num_gc_executed;
 	double num_migrations;
@@ -1683,6 +1685,7 @@ private:
 	int time_breaks;
 };
 
+/*
 class Reliable_Random_Int_Generator {
 public:
 	Reliable_Random_Int_Generator(int seed, int num_numbers_needed);
@@ -1700,6 +1703,7 @@ private:
 	MTRand_open random_number_generator;
 	deque<double> numbers;
 };
+*/
 
 // assuming the relation is made of contigouse pages
 // RAM_available is the number of pages that fit into RAM
@@ -1811,11 +1815,11 @@ private:
 	long min_LBA, max_LBA;
 	int num_files_to_write;
 
-	Reliable_Random_Int_Generator random_number_generator;
-	Reliable_Random_Double_Generator double_generator;
+	//Reliable_Random_Int_Generator random_number_generator;
+	//Reliable_Random_Double_Generator double_generator;
 
-	//MTRand_int32 random_number_generator;
-	//MTRand_open double_generator;
+	MTRand_int32 random_number_generator;
+	MTRand_open double_generator;
 	double time_breaks;
 	set<long> addresses_to_trim;
 	const long max_file_size;

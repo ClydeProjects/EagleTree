@@ -17,11 +17,9 @@ File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, 
 	  num_files_to_write(num_files_to_write), time_breaks(time_breaks),
 	  max_file_size(max_file_size),
 	  num_free_pages(max_LBA - min_LBA + 1),
-	  double_generator(randseed * 13, 100000),
-	  random_number_generator(randseed, num_files_to_write + 1)
+	  double_generator(randseed * 13),
+	  random_number_generator(randseed)
 {
-	//random_number_generator.seed(randseed);
-	//double_generator.seed(randseed * 17);
 	Address_Range free_range(min_LBA, max_LBA);
 	free_ranges.push_front(free_range);
 	write_next_file(0);
@@ -95,8 +93,8 @@ void File_Manager::handle_file_completion(double current_time) {
 void File_Manager::write_next_file(double current_time) {
 	assert(num_free_pages > 0); // deal with this problem later
 	//double death_probability = double_generator() / 2;
-	double death_probability = double_generator.next() / 2;
-	uint size = 1 + abs(random_number_generator.next()) % max_file_size;
+	double death_probability = double_generator() / 2;
+	uint size = 1 + random_number_generator() % max_file_size;
 	if (size > num_free_pages) {
 		size = num_free_pages;
 	}
@@ -121,7 +119,7 @@ void File_Manager::assign_new_range() {
 void File_Manager::randomly_delete_files(double current_time) {
 	for (uint i = 0; i < live_files.size(); ) {
 		File* file = live_files[i];
-		double random_num = double_generator.next();
+		double random_num = double_generator();
 		if (file->death_probability > random_num) {
 			delete_file(file, current_time);
 			live_files.erase(live_files.begin() + i);

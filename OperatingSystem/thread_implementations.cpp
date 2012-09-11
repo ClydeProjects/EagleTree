@@ -116,10 +116,9 @@ Synchronous_Random_Thread::Synchronous_Random_Thread(long min_LBA, long max_LBA,
 	  max_LBA(max_LBA),
 	  ready_to_issue_next_write(true),
 	  number_of_times_to_repeat(num_ios_to_issue),
-	  type(type)
-{
-	random_number_generator.seed(randseed);
-}
+	  type(type),
+	  random_number_generator(randseed)
+{}
 
 Event* Synchronous_Random_Thread::issue_next_io() {
 	if (ready_to_issue_next_write && 0 < number_of_times_to_repeat--) {
@@ -145,10 +144,9 @@ Asynchronous_Random_Thread::Asynchronous_Random_Thread(long min_LBA, long max_LB
 	  max_LBA(max_LBA),
 	  number_of_times_to_repeat(num_ios_to_issue),
 	  type(type),
-	  time_breaks(time_breaks)
-{
-	random_number_generator.seed(randseed);
-}
+	  time_breaks(time_breaks),
+	  random_number_generator(randseed)
+{}
 
 Event* Asynchronous_Random_Thread::issue_next_io() {
 	Event* event;

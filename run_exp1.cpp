@@ -62,7 +62,7 @@ void DrawGraph(int sizeX, int sizeY, string outputFile, string dataFilename, str
 }
 
 void overprovisioning_experiment() {
-    const int num_random_writes = 10000;
+    const int num_random_writes = 100000;
 
     string measurement_name = "Used space (%)";
 	string csv_filename = "overprovisioning_experiment.csv";
@@ -72,13 +72,13 @@ void overprovisioning_experiment() {
 
 	int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
 
-	for (int used_space = 5; used_space <= 90; used_space += 5) {
+	for (int used_space = 80; used_space <= 80; used_space += 5) {
 		int highest_lba = (int) ((double) num_pages * used_space / 100);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		printf("Experiment with max %d pct used space: Writing to no LBA higher than %d (out of %d total available)\n", used_space, highest_lba, num_pages);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, 10);
-		t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_random_writes, 1, WRITE, 111, 1));
+		t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_random_writes, time(NULL), WRITE, 111, 1));
 
 		vector<Thread*> threads;
 		threads.push_back(t1);
@@ -87,6 +87,8 @@ void overprovisioning_experiment() {
 		os->run();
 
 		csv_file << used_space << ", " << StatisticsGatherer::get_instance()->totals_csv_line();
+
+		StateTracer::print();
 
 		delete os;
 	}

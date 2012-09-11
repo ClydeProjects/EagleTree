@@ -469,6 +469,8 @@ vector<long> Block_manager_parent::get_relevant_gc_candidates(int package_id, in
 Block* Block_manager_parent::choose_gc_victim(vector<long> candidates) const {
 	uint min_valid_pages = BLOCK_SIZE;
 	Block* best_block = NULL;
+
+	// Old solution
 	for (uint i = 0; i < candidates.size(); i++) {
 		long physical_address = candidates[i];
 		Address a = Address(physical_address, BLOCK);
@@ -479,6 +481,24 @@ Block* Block_manager_parent::choose_gc_victim(vector<long> candidates) const {
 			assert(min_valid_pages < BLOCK_SIZE);
 		}
 	}
+
+// New solution introducing random tie-breaking, giving no improvement whatsoever.
+/*
+    MTRand_int32 random_number_generator(time(NULL));
+    while (candidates.size() > 0) {
+		int i = random_number_generator() % candidates.size();
+		long physical_address = candidates[i];
+		candidates.erase(candidates.begin() + i);
+
+		Address a = Address(physical_address, BLOCK);
+		Block* block = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
+		if (block->get_pages_valid() < min_valid_pages && block->get_state() == ACTIVE) {
+			min_valid_pages = block->get_pages_valid();
+			best_block = block;
+			assert(min_valid_pages < BLOCK_SIZE);
+		}
+	}
+*/
 	return best_block;
 }
 
