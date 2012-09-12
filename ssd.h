@@ -1572,12 +1572,14 @@ private:
 
 	vector<vector<uint> > num_gc_reads_per_LUN;
 	vector<vector<uint> > num_gc_writes_per_LUN;
-
+	vector<vector<double> > sum_gc_wait_time_per_LUN;
 	vector<vector<uint> > num_copy_backs_per_LUN;
 
 	vector<vector<uint> > num_erases_per_LUN;
 
 	vector<vector<uint> > num_gc_scheduled_per_LUN;
+
+
 
 	// garbage collection stats
 	long num_gc_executed;

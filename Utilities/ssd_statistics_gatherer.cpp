@@ -13,7 +13,10 @@ using namespace ssd;
 StatisticsGatherer *StatisticsGatherer::inst = NULL;
 
 StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
-	: ssd(ssd),
+	:  num_gc_cancelled_no_candidate(0),
+	   num_gc_cancelled_not_enough_free_space(0),
+	   num_gc_cancelled_gc_already_happening(0),
+	   ssd(ssd),
 	  sum_bus_wait_time_for_reads_per_LUN(SSD_SIZE, vector<double>(PACKAGE_SIZE, 0)),
 	  num_reads_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  sum_bus_wait_time_for_writes_per_LUN(SSD_SIZE, vector<double>(PACKAGE_SIZE, 0)),
@@ -21,6 +24,7 @@ StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
 	  num_gc_reads_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_gc_writes_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_gc_scheduled_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
+	  sum_gc_wait_time_per_LUN(SSD_SIZE, vector<double>(PACKAGE_SIZE, 0)),
 	  num_copy_backs_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_erases_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_gc_executed(0),
@@ -31,10 +35,8 @@ StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
 	  num_gc_targeting_package_class(0),
 	  num_gc_targeting_package(0),
 	  num_gc_targeting_class(0),
-	  num_gc_targeting_anything(0),
-	  num_gc_cancelled_no_candidate(0),
-	  num_gc_cancelled_not_enough_free_space(0),
-	  num_gc_cancelled_gc_already_happening(0)
+	  num_gc_targeting_anything(0)
+
 {}
 
 StatisticsGatherer::~StatisticsGatherer() {}
@@ -58,6 +60,8 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 			num_writes_per_LUN[a.package][a.die]++;
 		} else if (event.is_garbage_collection_op()) {
 			num_gc_writes_per_LUN[a.package][a.die]++;
+			Address replace_add = event.get_replace_address();
+			sum_gc_wait_time_per_LUN[replace_add.package][replace_add.die] += event.get_bus_wait_time();
 		}
 	} else if (event.get_event_type() == READ_COMMAND || event.get_event_type() == READ_TRANSFER) {
 		sum_bus_wait_time_for_reads_per_LUN[a.package][a.die] += event.get_bus_wait_time();
@@ -122,6 +126,7 @@ void StatisticsGatherer::print() {
 	printf("GC writes\t");
 	printf("GC reads\t");
 	printf("GC scheduled\t"); // <--
+	printf("GC wait\t\t");
 	printf("copy backs\t");
 	printf("erases\t\t");
 	printf("avg write wait\t");
@@ -159,6 +164,8 @@ void StatisticsGatherer::print() {
 
 			avg_overall_read_wait_time += average_read_wait_time;
 
+			double average_gc_wait_per_LUN = sum_gc_wait_time_per_LUN[i][j] / num_gc_writes_per_LUN[i][j];
+
 			if (num_writes_per_LUN[i][j] == 0) {
 				average_write_wait_time = 0;
 			}
@@ -175,7 +182,10 @@ void StatisticsGatherer::print() {
 			printf("%d\t\t", num_gc_writes_per_LUN[i][j]);
 			printf("%d\t\t", num_gc_reads_per_LUN[i][j]);
 			printf("%d\t\t", num_gc_scheduled_per_LUN[i][j]);
+			printf("%f\t\t", average_gc_wait_per_LUN);
 			printf("%d\t\t", num_copy_backs_per_LUN[i][j]);
+
+
 			printf("%d\t\t", num_erases_per_LUN[i][j]);
 
 			printf("%f\t", average_write_wait_time);
