@@ -7,6 +7,7 @@
 
 #include "ssd.h"
 #include <limits>
+#include <algorithm> // random_shuffle
 
 using namespace ssd;
 
@@ -196,6 +197,7 @@ double IOScheduler::get_current_time() const {
 // in light of these new events, see if any other existing pending events are now redundant
 void IOScheduler::update_current_events() {
 	double current_time = get_current_time();
+	random_shuffle(future_events.begin(), future_events.end()); // Process events with same timestamp in random order to prevent imbalances
 	for (uint i = 0; i < future_events.size(); i++) {
 		Event* e = future_events[i];
 	    if (e->get_current_time() < current_time + 1) {
