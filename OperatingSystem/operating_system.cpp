@@ -136,6 +136,9 @@ void OperatingSystem::register_event_completion(Event* event) {
 	}
 	currently_executing_ios_counter--;
 	currently_executing_ios.erase(event->get_id());
+
+	time_of_last_event_completed = max(time_of_last_event_completed, event->get_current_time());
+
 	delete event;
 }
 
@@ -173,3 +176,8 @@ bool OperatingSystem::is_LBA_locked(ulong lba) {
 		return read_LBA_to_thread_id.count(lba) > 0 || write_LBA_to_thread_id.count(lba) > 0 || trim_LBA_to_thread_id.count(lba) > 0;
 	}
 }
+
+double OperatingSystem::get_total_runtime() const {
+	return time_of_last_event_completed;
+}
+

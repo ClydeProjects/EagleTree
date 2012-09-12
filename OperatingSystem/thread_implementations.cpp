@@ -62,7 +62,7 @@ void Synchronous_Sequential_Thread::handle_event_completion(Event* event) {
 		//StateTracer::print();
 		if (--number_of_times_to_repeat == 0) {
 			finished = true;
-			StateTracer::print();
+			StateVisualiser::print_page_status();
 		}
 	}
 }
@@ -138,7 +138,7 @@ void Synchronous_Random_Thread::handle_event_completion(Event* event) {
 
 // =================  Asynchronous_Random_Writer  =============================
 
-Asynchronous_Random_Thread::Asynchronous_Random_Thread(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed, event_type type, int time_breaks, double start_time)
+Asynchronous_Random_Thread::Asynchronous_Random_Thread(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed, event_type type, double time_breaks, double start_time)
 	: Thread(start_time),
 	  min_LBA(min_LBA),
 	  max_LBA(max_LBA),

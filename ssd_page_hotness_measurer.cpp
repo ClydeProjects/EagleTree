@@ -235,7 +235,7 @@ void BloomFilter_Page_Hotness_Measurer::print_die_stats() const {
 			package_die_stats[package][die].print();
 		}
 	}
-	StateTracer::print(); // DEBUG
+	StateVisualiser::print_page_status(); // DEBUG
 }
 
 // Looks at all dies having less than the average number of WC pages:

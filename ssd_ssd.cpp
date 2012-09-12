@@ -113,7 +113,7 @@ Ssd::Ssd(uint ssd_size):
 
 	IOScheduler::instance_initialize(*this, controller.get_ftl());
 	VisualTracer::init();
-	StateTracer::init(this);
+	StateVisualiser::init(this);
 	StatisticsGatherer::init(this);
 
 	return;

@@ -1532,10 +1532,11 @@ private:
 	vector<vector<vector<char> > > trace;
 };
 
-class StateTracer
+class StateVisualiser
 {
 public:
-	static void print();
+	static void print_page_status();
+	static void print_block_ages();
 	static Ssd * ssd;
 	static void init(Ssd * ssd);
 };
@@ -1676,7 +1677,7 @@ private:
 class Asynchronous_Random_Thread : public Thread
 {
 public:
-	Asynchronous_Random_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed = 0, event_type type = WRITE,  int time_breaks = 5, double start_time = 1);
+	Asynchronous_Random_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed = 0, event_type type = WRITE,  double time_breaks = 5, double start_time = 1);
 	Event* issue_next_io();
 	void handle_event_completion(Event* event);
 private:
@@ -1684,7 +1685,7 @@ private:
 	int number_of_times_to_repeat;
 	MTRand_int32 random_number_generator;
 	event_type type;
-	int time_breaks;
+	double time_breaks;
 };
 
 /*
@@ -1836,6 +1837,7 @@ public:
 	void run();
 	void register_event_completion(Event* event);
 	void set_num_writes_to_stop_after(long num_writes);
+	double get_total_runtime() const;
 private:
 	int pick_event_with_shortest_start_time();
 	void dispatch_event(int thread_id);
@@ -1860,6 +1862,8 @@ private:
 	set<uint> currently_executing_ios;
 	long num_writes_to_stop_after;
 	long num_writes_completed;
+
+	double time_of_last_event_completed;
 };
 
 /*class Block_manager

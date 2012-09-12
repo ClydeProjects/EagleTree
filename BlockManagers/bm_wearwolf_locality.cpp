@@ -282,7 +282,7 @@ void Wearwolf_Locality::register_write_outcome(Event const& event, enum status s
 				if (has_free_pages(pointers[i][j]) && event.get_address().compare(pointers[i][j]) >= BLOCK) {
 
 					if (event.get_id() == 160537) {
-						StateTracer::print();
+						StateVisualiser::print_page_status();
 					}
 
 					long key = (*iter).first;

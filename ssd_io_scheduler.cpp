@@ -529,8 +529,10 @@ void IOScheduler::init_event(Event* event) {
 		if (should_event_be_scheduled(event)) {
 			current_events.push_back(event);
 		} else {
-			printf("Event not scheduled: ");
-			event->print();
+			if (PRINT_LEVEL >= 1) {
+				printf("Event not scheduled: ");
+				event->print();
+			}
 		}
 	}
 
