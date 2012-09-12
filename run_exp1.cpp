@@ -49,7 +49,7 @@ void DrawGraph(int sizeX, int sizeY, string outputFile, string dataFilename, str
     "   " << xAxisConf << endl <<
     "   yaxis min 0" << endl <<
     "   data   \"" << dataFilename << "\"" << endl <<
-    "   " << command << endl <<
+    command << endl <<
     "end graph" << endl;
     gleScript.close();
 
@@ -62,36 +62,75 @@ void DrawGraph(int sizeX, int sizeY, string outputFile, string dataFilename, str
 }
 
 void overprovisioning_experiment() {
-    const int num_random_writes = 100000;
+	const int graph_data_types[] = {9};
+	string markers[] = {"circle", "square", "triangle", "diamond", "cross", "plus", "star", "star2", "star3", "star4", "flower"};
+	const int num_random_writes = 10000;
 
     string measurement_name = "Used space (%)";
 	string csv_filename = "overprovisioning_experiment.csv";
     std::ofstream csv_file;
     csv_file.open(csv_filename.c_str());
-    csv_file << "\"" << measurement_name << "\"," << StatisticsGatherer::get_instance()->totals_csv_header();
+    csv_file << "\"" << measurement_name << "\", " << StatisticsGatherer::get_instance()->totals_csv_header() << ", \"Throughput (IOs/µs)\"" << "\n";
 
-	int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
+    int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
 
-	for (int used_space = 80; used_space <= 80; used_space += 5) {
+	double time_breaks, total_runtime, average_time_per_write;
+	int total_writes_issued;
+	for (int used_space = 5; used_space <= 90; used_space += 5) {
 		int highest_lba = (int) ((double) num_pages * used_space / 100);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		printf("Experiment with max %d pct used space: Writing to no LBA higher than %d (out of %d total available)\n", used_space, highest_lba, num_pages);
 		printf("----------------------------------------------------------------------------------------------------------\n");
-		Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, 10);
-		t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_random_writes, time(NULL), WRITE, 111, 1));
 
-		vector<Thread*> threads;
-		threads.push_back(t1);
+		time_breaks = 1.0;
 
-		OperatingSystem* os = new OperatingSystem(threads);
-		os->run();
+		{
+			Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, time_breaks, 0);
+			t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_random_writes, time(NULL), WRITE, time_breaks, 0));
 
-		csv_file << used_space << ", " << StatisticsGatherer::get_instance()->totals_csv_line();
+			vector<Thread*> threads;
+			threads.push_back(t1);
 
-		StateTracer::print();
+			OperatingSystem* os = new OperatingSystem(threads);
+			os->run();
 
-		delete os;
+			total_runtime          = os->get_total_runtime();
+			delete os;
+		}
+
+		total_writes_issued       = highest_lba + num_random_writes;
+		average_time_per_write = total_runtime / (double) total_writes_issued;
+		time_breaks = average_time_per_write;
+		printf("Total writes: %d   Total runtime: %f   Avg.time/write: %f\n", total_writes_issued, total_runtime, average_time_per_write);
+
+
+		{
+			Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, time_breaks, 0);
+			t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_random_writes, time(NULL), WRITE, time_breaks, 0));
+
+			vector<Thread*> threads;
+			threads.push_back(t1);
+
+			OperatingSystem* os = new OperatingSystem(threads);
+			os->run();
+
+			double throughput = (double) total_writes_issued / total_runtime;
+			time_breaks = average_time_per_write;
+
+			csv_file << used_space << ", " << StatisticsGatherer::get_instance()->totals_csv_line() << ", " << throughput << "\n";
+
+			StateVisualiser::print_page_status();
+			StateVisualiser::print_block_ages();
+
+			delete os;
+		}
+
 	}
+
+	stringstream command;
+	for (uint i = 0; i < sizeof(graph_data_types)/sizeof(int); i++) {
+		command << "   " << "d" << graph_data_types[i] << " line marker " << markers[i] << "\n";
+    }
 
 	stringstream graph_name;
     graph_name << "Overprovisioning experiment (";
@@ -101,7 +140,7 @@ void overprovisioning_experiment() {
     DrawGraph(
     	16, 10, "overprovisioning_experiment", csv_filename, graph_name.str(),
     	measurement_name, "units", "",
-    	"d3 line marker cross\nd6 line marker circle\nd7 line marker triangle"
+    	command.str()//"d3 line marker cross\nd6 line marker circle\nd7 line marker triangle"
     );
 
 }
