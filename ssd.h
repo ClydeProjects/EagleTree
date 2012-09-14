@@ -1553,6 +1553,8 @@ public:
 	void print_csv();
 	string totals_csv_header();
 	string totals_csv_line();
+	string age_histogram_csv();
+	string wait_time_histogram_csv();
 
 	long num_gc_cancelled_no_candidate;
 	long num_gc_cancelled_not_enough_free_space;
@@ -1564,6 +1566,7 @@ private:
 	StatisticsGatherer(Ssd & ssd);
 	~StatisticsGatherer();
 	double compute_average_age(uint package_id, uint die_id);
+	string histogram_csv(map<double, uint> histogram);
 
 	vector<vector<double> > sum_bus_wait_time_for_reads_per_LUN;
 	vector<vector<uint> > num_reads_per_LUN;
@@ -1581,6 +1584,9 @@ private:
 	vector<vector<uint> > num_gc_scheduled_per_LUN;
 
 
+	static const double wait_time_histogram_steps = 250;
+	static const double age_histogram_steps = 1;
+	map<double, uint> wait_time_histogram;
 
 	// garbage collection stats
 	long num_gc_executed;

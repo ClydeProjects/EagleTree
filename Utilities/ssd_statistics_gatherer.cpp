@@ -77,6 +77,7 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	} else if (event.get_event_type() == COPY_BACK) {
 		num_copy_backs_per_LUN[a.package][a.die]++;
 	}
+	wait_time_histogram[floor(event.get_bus_wait_time() / wait_time_histogram_steps)*wait_time_histogram_steps]++;
 }
 
 void StatisticsGatherer::register_scheduled_gc(Event const& gc) {
@@ -306,6 +307,35 @@ string StatisticsGatherer::totals_csv_line() {
 	ss << avg_overall_read_wait_time;
 //	ss << "\n";
 	return ss.str();
+}
+
+string StatisticsGatherer::histogram_csv(map<double, uint> histogram) {
+	stringstream ss;
+	ss << "\"Interval\", \"Frequency\"" << "\n";
+	for (map<double,uint>::iterator it = histogram.begin(); it != histogram.end(); ++it) {
+		ss << it->first << " " << it->second << "\n";
+	}
+	return ss.str();
+}
+
+string StatisticsGatherer::age_histogram_csv() {
+	map<double, uint> age_histogram;
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			for (uint k = 0; k < DIE_SIZE; k++) {
+				for (uint t = 0; t < PLANE_SIZE; t++) {
+					Block const& block = ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
+					uint age = BLOCK_ERASES - block.get_erases_remaining();
+					age_histogram[floor((double) age / age_histogram_steps)*age_histogram_steps]++;
+				}
+			}
+		}
+	}
+	return histogram_csv(age_histogram);
+}
+
+string StatisticsGatherer::wait_time_histogram_csv() {
+	return histogram_csv(wait_time_histogram);
 }
 
 void StatisticsGatherer::print_csv() {
