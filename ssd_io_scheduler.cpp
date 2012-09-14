@@ -93,10 +93,12 @@ void IOScheduler::schedule_event(Event* event) {
 
 void IOScheduler::finish_all_events_until_this_time(double time) {
 	update_current_events();
+
 	while ( get_current_time() < time && current_events.size() > 0 ) {
 		execute_current_waiting_ios();
 		update_current_events();
 	}
+
 }
 
 
@@ -169,6 +171,8 @@ void IOScheduler::execute_current_waiting_ios() {
 	handle_next_batch(read_transfers);
 	handle_writes(gc_writes);
 	handle_writes(writes);
+
+	// Queue length track here?
 }
 
 double get_soonest_event_time(vector<Event*> events) {
@@ -196,6 +200,7 @@ double IOScheduler::get_current_time() const {
 // goes through all the events that has just been submitted (i.e. bus_wait_time = 0)
 // in light of these new events, see if any other existing pending events are now redundant
 void IOScheduler::update_current_events() {
+	StatisticsGatherer::get_instance()->register_events_queue_length(current_events.size(), get_current_time());
 	double current_time = get_current_time();
 	random_shuffle(future_events.begin(), future_events.end()); // Process events with same timestamp in random order to prevent imbalances
 	for (uint i = 0; i < future_events.size(); i++) {

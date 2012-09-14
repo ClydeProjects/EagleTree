@@ -1549,12 +1549,15 @@ public:
 	void register_completed_event(Event const& event);
 	void register_scheduled_gc(Event const& gc);
 	void register_executed_gc(Event const& gc, Block const& victim);
+	void register_events_queue_length(uint queue_size, double time);
 	void print();
 	void print_csv();
 	string totals_csv_header();
 	string totals_csv_line();
 	string age_histogram_csv();
 	string wait_time_histogram_csv();
+	string queue_length_csv();
+	uint max_age();
 
 	long num_gc_cancelled_no_candidate;
 	long num_gc_cancelled_not_enough_free_space;
@@ -1583,7 +1586,8 @@ private:
 
 	vector<vector<uint> > num_gc_scheduled_per_LUN;
 
-
+	static const uint queue_length_tracker_resolution = 1000; // microseconds
+	vector<uint> queue_length_tracker;
 	static const double wait_time_histogram_steps = 250;
 	static const double age_histogram_steps = 1;
 	map<double, uint> wait_time_histogram;

@@ -30,6 +30,8 @@
 
 using namespace ssd;
 
+static uint max_age = 0;
+
 void DrawGraph(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command) {
     // Write tempoary file containing GLE script
     string scriptFilename = outputFile + ".gle"; // Name of tempoary script file
@@ -74,10 +76,12 @@ void DrawGraphWithHistograms(int sizeX, int sizeY, string outputFile, string dat
 	endl <<
 	"pad = 2" << endl <<
 	endl <<
+	"age_max = " << max_age << endl <<
+	endl <<
 	"size std_sx+pad std_sy+(std_sy*hist_graphs/2)+pad" << endl <<
 	"set font texcmr" << endl <<
 	endl <<
-	"sub hist xp yp data$ title$ yaxis$" << endl <<
+	"sub hist xp yp data$ title$ yaxis$ xaxistitle$ xmax" << endl <<
 	"   amove xp*(std_sx/2)+pad yp*(std_sy/2)+pad" << endl <<
 	"   begin graph" << endl <<
 	"      fullsize" << endl <<
@@ -85,7 +89,27 @@ void DrawGraphWithHistograms(int sizeX, int sizeY, string outputFile, string dat
 	"      data  data$" << endl <<
 	"      title title$" << endl <<
 	"      yaxis \\expr{yaxis$}" << endl <<
+	"!      xaxis dticks 1" << endl <<
+	"      if xmax<>-1 then" << endl <<
+	"         xaxis max xmax" << endl <<
+	"      end if" << endl <<
+	"      xtitle xaxistitle$" << endl <<
+	"      ytitle \"Frequency\"" << endl <<
 	"      d1 line steps" << endl <<
+	"   end graph" << endl <<
+	"end sub" << endl <<
+	endl <<
+	"sub plot xp yp data$ title$ yaxis$ xaxistitle$ yaxistitle$" << endl <<
+	"   amove xp*(std_sx/2)+pad yp*(std_sy/2)+pad" << endl <<
+	"   begin graph" << endl <<
+	"      fullsize" << endl <<
+	"      size 16-pad 5-pad" << endl <<
+	"      data  data$" << endl <<
+	"      title title$" << endl <<
+	"      yaxis \\expr{yaxis$}" << endl <<
+	"      xtitle xaxistitle$" << endl <<
+	"      ytitle yaxistitle$" << endl <<
+	"      d1 line" << endl <<
 	"   end graph" << endl <<
 	"end sub" << endl <<
 	endl <<
@@ -126,16 +150,20 @@ void overprovisioning_experiment() {
 	string markers[] = {"circle", "square", "triangle", "diamond", "cross", "plus", "star", "star2", "star3", "star4", "flower"};
 
 	// Experiment parameters ---------------------
-	const int graph_data_types[]	= {9,10};
-	int histogram_points[]			= {40,60,90};
-    int space_min 					= 5;
-	int space_max 					= 90;
-	int space_inc 					= 5;
-	const int num_random_IOs 	= 100000;
+	const int graph_data_types[]			= {9,10};
+	const int histogram_points[]			= {5,15,40,60,90};
+	const int space_min						= 5;
+    const int space_max						= 15;
+	const int space_inc						= 5;
+	const int num_random_IOs				= 10000;
+	const long int cpu_instructions_per_sec		= 161254 * 1000000; // Sandra DhryStone benchmark result for Core i7 980X @ 4.4 GHz (IPS)
+	const long int cpu_instructions_used_per_io	= 2000;
 	// -------------------------------------------
+    const long int    IOs_per_microsecond		= (int) ((double) cpu_instructions_per_sec / cpu_instructions_used_per_io / 1000000);
+	const long double IO_submission_rate			= 1.0 / IOs_per_microsecond;
     vector<string> histogram_commands;
 
-    PRINT_LEVEL = 1;
+    PRINT_LEVEL = 0;
 
 	string measurement_name = "Used space (%)";
 	string csv_filename = "overprovisioning_experiment.csv";
@@ -158,7 +186,7 @@ void overprovisioning_experiment() {
 		{
 			Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, time_breaks, 0);
 			t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_random_IOs, 1, WRITE, time_breaks, 0));
-			t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_random_IOs, 2, READ, time_breaks, 0));
+			//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_random_IOs, 2, READ, time_breaks, 0));
 
 			vector<Thread*> threads;
 			threads.push_back(t1);
@@ -194,8 +222,12 @@ void overprovisioning_experiment() {
 			if (count (histogram_points, histogram_points+sizeof(histogram_points)/sizeof(int), used_space) == 1) {
 				stringstream hist_filename;
 				stringstream age_filename;
+				stringstream queue_filename;
+
 				hist_filename << "hist-" << used_space << ".csv";
 				age_filename << "age-" << used_space << ".csv";
+				queue_filename << "queue-" << used_space << ".csv";
+
 				std::ofstream hist_file;
 				hist_file.open(hist_filename.str().c_str());
 				hist_file << StatisticsGatherer::get_instance()->wait_time_histogram_csv();
@@ -205,15 +237,24 @@ void overprovisioning_experiment() {
 				age_file.open(age_filename.str().c_str());
 				age_file << StatisticsGatherer::get_instance()->age_histogram_csv();
 				age_file.close();
+			    max_age = max(StatisticsGatherer::get_instance()->max_age(), max_age);
 
-			    stringstream hist_command;
-			    hist_command << "hist 0 " << histogram_commands.size() << " \"" << hist_filename.str() << "\" \"Wait time histogram (" << used_space << "% used space)\" \"log min 1\"";
+				std::ofstream queue_file;
+				queue_file.open(queue_filename.str().c_str());
+				queue_file << StatisticsGatherer::get_instance()->queue_length_csv();
+				queue_file.close();
+
+				stringstream hist_command;
+			    hist_command << "hist 0 " << histogram_commands.size() << " \"" << hist_filename.str() << "\" \"Wait time histogram (" << used_space << "% used space)\" \"log min 1\" \"Event wait time (µs)\" -1";
 			    histogram_commands.push_back(hist_command.str());
 
 			    stringstream age_command;
-			    age_command << "hist 0 " << histogram_commands.size() << " \"" << age_filename.str() << "\" \"Block age histogram (" << used_space << "% used space)\" \"on\"";
+			    age_command << "hist 0 " << histogram_commands.size() << " \"" << age_filename.str() << "\" \"Block age histogram (" << used_space << "% used space)\" \"on\" \"Block age\" age_max";
 			    histogram_commands.push_back(age_command.str());
 
+			    stringstream queue_command;
+			    queue_command << "plot 0 " << histogram_commands.size() << " \"" << queue_filename.str() << "\" \"Queue length history (" << used_space << "% used space)\" \"on\" \"Timeline (µs progressed)\" \"Items in event queue\"";
+			    histogram_commands.push_back(queue_command.str());
 			}
 
 			StateVisualiser::print_page_status();

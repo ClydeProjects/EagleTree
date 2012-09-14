@@ -120,6 +120,21 @@ void StatisticsGatherer::register_executed_gc(Event const& gc, Block const& vict
 
 }
 
+void StatisticsGatherer::register_events_queue_length(uint queue_size, double time) {
+	if (time == 0) return;
+	uint current_window = floor(time / queue_length_tracker_resolution);
+	while (current_window > 0 && queue_length_tracker.size() < current_window) {
+		queue_length_tracker.push_back(queue_length_tracker.back());
+//		printf("-> COPIED LAST (vs=%d, window=%d)", queue_length_tracker.size(), current_window);
+	}
+	if (queue_length_tracker.size() == current_window) {
+		queue_length_tracker.push_back(queue_size);
+//		printf("Q: %f\t: %d\t (%d)", time, queue_size, queue_length_tracker.size() * queue_length_tracker_resolution);
+//		printf("-> SAMPLED");
+//		printf("\n");
+	}
+}
+
 void StatisticsGatherer::print() {
 	printf("\n\t");
 	printf("num writes\t");
@@ -313,9 +328,26 @@ string StatisticsGatherer::histogram_csv(map<double, uint> histogram) {
 	stringstream ss;
 	ss << "\"Interval\", \"Frequency\"" << "\n";
 	for (map<double,uint>::iterator it = histogram.begin(); it != histogram.end(); ++it) {
-		ss << it->first << " " << it->second << "\n";
+		ss << it->first << ", " << it->second << "\n";
 	}
 	return ss.str();
+}
+
+uint StatisticsGatherer::max_age() {
+	uint max_age = 0;
+	map<double, uint> age_histogram;
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			for (uint k = 0; k < DIE_SIZE; k++) {
+				for (uint t = 0; t < PLANE_SIZE; t++) {
+					Block const& block = ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
+					uint age = BLOCK_ERASES - block.get_erases_remaining();
+					max_age = max(age, max_age);
+				}
+			}
+		}
+	}
+	return max_age;
 }
 
 string StatisticsGatherer::age_histogram_csv() {
@@ -336,6 +368,15 @@ string StatisticsGatherer::age_histogram_csv() {
 
 string StatisticsGatherer::wait_time_histogram_csv() {
 	return histogram_csv(wait_time_histogram);
+}
+
+string StatisticsGatherer::queue_length_csv() {
+	stringstream ss;
+	ss << "\"Time (µs)\", \"Queued events\"" << "\n";
+	for (uint window = 0; window < queue_length_tracker.size(); window++) {
+		ss << window*queue_length_tracker_resolution << ", " << queue_length_tracker[window] << "\n";
+	}
+	return ss.str();
 }
 
 void StatisticsGatherer::print_csv() {
