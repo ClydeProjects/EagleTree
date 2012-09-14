@@ -41,7 +41,7 @@ void experiment1() {
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
 	VisualTracer::get_instance()->print_horizontally_with_breaks();
-	StateTracer::print();
+	StateVisualiser::print_page_status();
 	delete os;
 }
 
@@ -67,7 +67,7 @@ void experiment2() {
 	os->run();
 
 	VisualTracer::get_instance()->print_horizontally_with_breaks();
-	StateTracer::print();
+	StateVisualiser::print_page_status();
 	delete os;
 }
 
@@ -95,7 +95,7 @@ void simple_experiment() {
 	os->run();
 
 	VisualTracer::get_instance()->print_horizontally_with_breaks();
-	StateTracer::print();
+	StateVisualiser::print_page_status();
 	delete os;
 }
 
@@ -116,7 +116,7 @@ void file_manager_experiment() {
 	fm1->print_thread_stats();
 	fm2->print_thread_stats();
 	VisualTracer::get_instance()->print_horizontally_with_breaks();
-	StateTracer::print();
+	StateVisualiser::print_page_status();
 	delete os;
 }
 
