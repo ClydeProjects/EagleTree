@@ -38,7 +38,7 @@ OperatingSystem::~OperatingSystem() {
 }
 
 void OperatingSystem::run() {
-	const int idle_limit = 1000000;
+	const int idle_limit = 600000000; // 10 minutes
 	int idle_time = 0;
 	bool finished_experiment, still_more_work;
 	do {
@@ -80,6 +80,10 @@ int OperatingSystem::pick_event_with_shortest_start_time() {
 
 void OperatingSystem::dispatch_event(int thread_id) {
 	Event* event = events[thread_id];
+
+	printf("dispatching event: "); event->print();
+
+	//if (event->get_start_time() > )
 
 	currently_executing_ios_counter++;
 	currently_executing_ios.insert(event->get_id());
