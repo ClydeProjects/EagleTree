@@ -37,7 +37,7 @@ CXX = /usr/bin/g++
 CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
 ELF1 = run_trace
-ELF2 = run_test2
+ELF2 = run_exp1
 HDR = ssd.h 
 VPATH = FTLs MTRand BlockManagers OperatingSystem Utilities
 #SRC = ssd_address.cpp ssd_block.cpp ssd_bus.cpp ssd_channel.cpp ssd_config.cpp ssd_controller.cpp ssd_die.cpp ssd_event.cpp ssd_ftl.cpp ssd_gc.cpp ssd_package.cpp ssd_page.cpp ssd_plane.cpp ssd_quicksort.cpp ssd_ram.cpp ssd_ssd.cpp ssd_wl.cpp
@@ -65,11 +65,11 @@ test: $(HDR) $(OBJ)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 test2: $(HDR) $(OBJ)
-	#$(CXX) $(CXXFLAGS) -I/home/niv/install/boost_1_47_0 -L/home/niv/install/boost_1_47_0/libs -o $(ELF2) run_test2.cpp $(OBJ)
-	$(CXX) $(CXXFLAGS) -o $(ELF2) run_test2.cpp $(OBJ)
+	#$(CXX) $(CXXFLAGS) -I/home/niv/install/boost_1_47_0 -L/home/niv/install/boost_1_47_0/libs -o $(ELF2) run_exp1.cpp $(OBJ)
+	$(CXX) $(CXXFLAGS) -o $(ELF2) run_exp1.cpp $(OBJ)
 	-chmod $(PERMS) $(OBJ)
 	-chmod $(EPERMS) $(ELF2)
-#script -c "$(CXX) $(CXXFLAGS) -o $(ELF2) run_test2.cpp $(OBJ)" $(LOG)
+#script -c "$(CXX) $(CXXFLAGS) -o $(ELF2) run_exp1.cpp $(OBJ)" $(LOG)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 trace: $(HDR) $(OBJ)
