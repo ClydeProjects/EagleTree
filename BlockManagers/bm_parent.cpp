@@ -56,6 +56,7 @@ Block_manager_parent::~Block_manager_parent(void){}
 
 Address Block_manager_parent::choose_address(Event const& write) {
 	if (!can_write(write)) {
+		//StateVisualiser::print_page_status();
 		return Address();
 	}
 	Address a = choose_best_address(write);

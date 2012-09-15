@@ -1127,6 +1127,8 @@ private:
 
 	bool remove_event_from_current_events(Event* event);
 
+	void manage_operation_completion(Event* event);
+
 	vector<Event*> future_events;
 	vector<Event*> current_events;
 	map<uint, deque<Event*> > dependencies;
