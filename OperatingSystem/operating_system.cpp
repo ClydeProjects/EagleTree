@@ -132,10 +132,11 @@ void OperatingSystem::dispatch_event(os_event event) {
 int OperatingSystem::release_lock(Event* event_just_finished) {
 	long lba = event_just_finished->get_logical_address();
 	int thread_id = lba_locks[lba];
-	lba_locks.erase(lba);
+
 	if (locked_events.count(lba) == 1) {
 		os_event released_event = locked_events[lba].front();
 		locked_events[lba].pop();
+		lba_locks[lba] = released_event.thread_id;
 		double os_wait_time = event_just_finished->get_current_time() - released_event.pending_event->get_current_time();
 		released_event.pending_event->incr_os_wait_time(os_wait_time);
 		released_event.pending_event->incr_time_taken(os_wait_time);
@@ -146,6 +147,8 @@ int OperatingSystem::release_lock(Event* event_just_finished) {
 		}
 		num_locked_events--;
 		printf("num_locked_events:\t%d\n", num_locked_events);
+	} else {
+		lba_locks.erase(lba);
 	}
 	return thread_id;
 }

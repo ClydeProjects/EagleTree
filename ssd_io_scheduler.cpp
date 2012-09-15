@@ -264,6 +264,12 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	event_type new_op_code = dependency_code_to_type[dependency_code_of_new_event];
 	event_type scheduled_op_code = dependency_code_to_type[dependency_code_of_other_event];
 
+	if (existing_event == NULL) {
+		new_event->print();
+		int i = 0;
+		i++;
+	}
+
 	assert (existing_event != NULL || scheduled_op_code == COPY_BACK);
 
 	// if something is to be trimmed, and a copy back is sent, the copy back is unnecessary to perform;
@@ -312,9 +318,13 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if there are two reads to the same address, there is no point reading the same page twice.
 	else if (new_op_code == READ && scheduled_op_code == READ) {
-		assert(false);
+		//new_event->print();
+		//existing_event->print();
+		//assert(false);
 		make_dependent(new_event, existing_event);
-		new_event->set_noop(true);
+		if (!new_event->is_garbage_collection_op()) {
+			new_event->set_noop(true);
+		}
 	}
 	// if a write is scheduled when a trim is received, we may as well cancel the write
 	else if (new_op_code == TRIM && scheduled_op_code == WRITE) {
@@ -426,6 +436,16 @@ enum status IOScheduler::execute_next(Event* event) {
 		event->print();
 	}
 
+	if (event->get_id() == 3103) {
+		int i = 0;
+		i++;
+	}
+
+	if (event->get_id() == 4222) {
+			int i = 0;
+			i++;
+		}
+
 	if (result == SUCCESS) {
 		int dependency_code = event->get_application_io_id();
 		if (dependencies[dependency_code].size() > 0) {
@@ -465,7 +485,8 @@ enum status IOScheduler::execute_next(Event* event) {
 					dependant_event->print();
 				}
 				dependencies[dependent_code].pop_front();
-				future_events.push_back(dependant_event);
+				init_event(dependant_event);
+				//future_events.push_back(dependant_event);
 			}
 			op_code_to_dependent_op_codes.erase(dependency_code);
 		}
@@ -524,6 +545,11 @@ void IOScheduler::print_stats() {
 void IOScheduler::init_event(Event* event) {
 	uint dep_code = event->get_application_io_id();
 	event_type type = event->get_event_type();
+
+	if (event->get_id() ==  3157 ) {
+		int i = 0;
+		i++;
+	}
 
 	if (type == TRIM || type == READ_COMMAND || type == READ_TRANSFER || type == WRITE || type == COPY_BACK) {
 		if (should_event_be_scheduled(event)) {
