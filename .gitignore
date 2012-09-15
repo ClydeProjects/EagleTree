@@ -3,10 +3,12 @@
 /RAID
 /Page
 /Correctness
+/.settings
 .project
 .cproject
 *.o
 *.d
 *.mk
 *~
-
+*.csv
+*.prefs

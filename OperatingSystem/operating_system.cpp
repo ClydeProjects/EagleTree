@@ -10,20 +10,18 @@ using namespace ssd;
 
 OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	: ssd(new Ssd()),
-	  events(threads.size()),
+	  events(0),
 	  currently_executing_ios_counter(0),
 	  currently_pending_ios_counter(0),
+	  num_locked_events(0),
 	  last_dispatched_event_minimal_finish_time(1),
 	  threads(new_threads),
 	  num_writes_to_stop_after(UNDEFINED),
 	  num_writes_completed(0)
 {
 	assert(threads.size() > 0);
-	for (uint i = 0; i < threads.size(); i++) {
-		events[i] = threads[i]->run();
-		if (events[i]->get_event_type() != NOT_VALID) {
-			currently_pending_ios_counter++;
-		}
+	for (uint thread_id = 0; thread_id < threads.size(); thread_id++) {
+		get_next_event(thread_id);
 	}
 	ssd->set_operating_system(this);
 }
@@ -32,18 +30,28 @@ OperatingSystem::~OperatingSystem() {
 	for (uint i = 0; i < threads.size(); i++) {
 		//threads[i]->print_thread_stats();
 		delete threads[i];
-		delete events[i];
+		//delete events[i];
 	}
 	delete ssd;
 }
+
+// create a method that gets thread_id. Runs thread,
+// if locked, puts in queue, and calls run again until there is an unlocked event.
+// this is problematic, if all lbas are locked.
+// May create a locked event structure, consisting of an event pointer and thread id.
+// have a map from locked lba to queue of pending events awaiting the lock.
+// invariant: if there are x events executing, there cannot be more than x locked lbas.
+// when lock is released, submit event.
 
 void OperatingSystem::run() {
 	const int idle_limit = 600000000; // 10 minutes
 	int idle_time = 0;
 	bool finished_experiment, still_more_work;
 	do {
-		int thread_id = pick_event_with_shortest_start_time();
-		if (thread_id == UNDEFINED || (currently_executing_ios_counter > 0 && last_dispatched_event_minimal_finish_time < events[thread_id]->get_start_time())) {
+		os_event event = pick_unlocked_event_with_shortest_start_time();
+
+		if (event.pending_event == NULL) {
+
 			if (idle_time >= idle_limit) {
 				fprintf(stderr, "Idle time limit reached\n");
 				printf("Running IOs:\n");
@@ -52,11 +60,12 @@ void OperatingSystem::run() {
 				}
 				throw;
 			}
+
 			ssd->progress_since_os_is_waiting();
 			idle_time++;
 		}
 		else {
-			dispatch_event(thread_id);
+			dispatch_event(event);
 			idle_time = 0;
 		}
 		finished_experiment = num_writes_to_stop_after != UNDEFINED && num_writes_to_stop_after <= num_writes_completed;
@@ -64,54 +73,85 @@ void OperatingSystem::run() {
 	} while (!finished_experiment && still_more_work);
 }
 
-int OperatingSystem::pick_event_with_shortest_start_time() {
-	double soonest_time = numeric_limits<double>::max();
-	int thread_id = -1;
+void OperatingSystem::get_next_event(int thread_id) {
+	Event* event = threads[thread_id]->run();
+	while (event != NULL && is_LBA_locked(event->get_logical_address())) {
+		os_event le = os_event(thread_id, event);
+		assert(event->get_event_type() != NOT_VALID);
+		currently_pending_ios_counter++;
+		printf("locking:\t"); event->print();
+		locked_events[event->get_logical_address()].push(le);
+		event = threads[thread_id]->run();
+		num_locked_events++;
+		printf("num_locked_events:\t%d\n", num_locked_events);
+	}
+	if (event != NULL) {
+		os_event le = os_event(thread_id, event);
+		events.push_back(le);
+		lba_locks[event->get_logical_address()] = thread_id;
+	}
+}
 
+
+
+os_event OperatingSystem::pick_unlocked_event_with_shortest_start_time() {
+	double soonest_time = numeric_limits<double>::max();
+	int chosen = UNDEFINED;
 	for (uint i = 0; i < events.size(); i++) {
-		Event* e = events[i];
-		if (e != NULL && e->get_start_time() < soonest_time && !is_LBA_locked(e->get_logical_address()) ) {
-			soonest_time = events[i]->get_start_time();
-			thread_id = i;
+		Event* e = events[i].pending_event;
+		bool can_schedule = currently_executing_ios_counter == 0 || last_dispatched_event_minimal_finish_time >= e->get_start_time();
+		//assert(!is_LBA_locked(e->get_logical_address()));
+		if (can_schedule && e->get_current_time() < soonest_time) {
+			soonest_time = e->get_current_time();
+			chosen = i;
 		}
+	}
+
+	os_event chosen_event;
+	if (chosen != UNDEFINED) {
+		chosen_event = events[chosen];
+		events.erase(events.begin() + chosen);
+	}
+
+	return chosen_event;
+}
+
+void OperatingSystem::dispatch_event(os_event event) {
+	Event* ssd_event = event.pending_event;
+	printf("dispatching event: "); ssd_event->print();
+	currently_executing_ios_counter++;
+	currently_executing_ios.insert(ssd_event->get_id());
+	currently_pending_ios_counter--;
+	double min_completion_time = get_event_minimal_completion_time(ssd_event);
+	last_dispatched_event_minimal_finish_time = max(last_dispatched_event_minimal_finish_time, min_completion_time);
+	assert(ssd_event->get_event_type() != NOT_VALID);
+	ssd->event_arrive(ssd_event);
+	get_next_event(event.thread_id);
+}
+
+int OperatingSystem::release_lock(Event* event_just_finished) {
+	long lba = event_just_finished->get_logical_address();
+	int thread_id = lba_locks[lba];
+	lba_locks.erase(lba);
+	if (locked_events.count(lba) == 1) {
+		os_event released_event = locked_events[lba].front();
+		locked_events[lba].pop();
+		double os_wait_time = event_just_finished->get_current_time() - released_event.pending_event->get_current_time();
+		released_event.pending_event->incr_os_wait_time(os_wait_time);
+		released_event.pending_event->incr_time_taken(os_wait_time);
+		events.push_back(released_event);
+		printf("releasing lock on:  "); released_event.pending_event->print();
+		if (locked_events[lba].size() == 0) {
+			locked_events.erase(lba);
+		}
+		num_locked_events--;
+		printf("num_locked_events:\t%d\n", num_locked_events);
 	}
 	return thread_id;
 }
 
-void OperatingSystem::dispatch_event(int thread_id) {
-	Event* event = events[thread_id];
-
-	printf("dispatching event: "); event->print();
-
-	//if (event->get_start_time() > )
-
-	currently_executing_ios_counter++;
-	currently_executing_ios.insert(event->get_id());
-	currently_pending_ios_counter--;
-
-	double min_completion_time = get_event_minimal_completion_time(event);
-	last_dispatched_event_minimal_finish_time = max(last_dispatched_event_minimal_finish_time, min_completion_time);
-
-	map<long, queue<uint> >& map = get_relevant_LBA_to_thread_map(event->get_event_type());
-	map[event->get_logical_address()].push(thread_id);
-
-	ssd->event_arrive(event);
-	events[thread_id] = threads[thread_id]->run();
-	if (events[thread_id] != NULL && event->get_event_type() != NOT_VALID) {
-		currently_pending_ios_counter++;
-	}
-}
-
 void OperatingSystem::register_event_completion(Event* event) {
-
-	ulong la = event->get_logical_address();
-	map<long, queue<uint> >& map = get_relevant_LBA_to_thread_map(event->get_event_type());
-	uint thread_id = map[la].front();
-	map[la].pop();
-	if (map[la].size() == 0) {
-		map.erase(la);
-	}
-
+	int thread_id = release_lock(event);
 	Thread* thread = threads[thread_id];
 	thread->register_event_completion(event);
 
@@ -124,23 +164,17 @@ void OperatingSystem::register_event_completion(Event* event) {
 		vector<Thread*> follow_up_threads = thread->get_follow_up_threads();
 		threads[thread_id] = follow_up_threads[0];
 		threads[thread_id]->set_time(event->get_current_time());
+		get_next_event(thread_id);
 		for (uint i = 1; i < follow_up_threads.size(); i++) {
 			follow_up_threads[i]->set_time(event->get_current_time());
 			threads.push_back(follow_up_threads[i]);
-			events.push_back(follow_up_threads[i]->run());
+			get_next_event(threads.size() - 1);
 		}
 		delete thread;
 	}
 
-	if (events[thread_id] == NULL) {
-		events[thread_id] = threads[thread_id]->run();
-		if (events[thread_id] != NULL && events[thread_id]->get_event_type() != NOT_VALID) {
-			currently_pending_ios_counter++;
-		}
-	}
 	currently_executing_ios_counter--;
 	currently_executing_ios.erase(event->get_id());
-
 	time_of_last_event_completed = max(time_of_last_event_completed, event->get_current_time());
 
 	delete event;
@@ -161,23 +195,11 @@ double OperatingSystem::get_event_minimal_completion_time(Event const*const even
 	return result;
 }
 
-map<long, queue<uint> >& OperatingSystem::get_relevant_LBA_to_thread_map(event_type type) {
-	if (type == READ || type == READ_TRANSFER) {
-		return read_LBA_to_thread_id;
-	}
-	else if (type == WRITE) {
-		return write_LBA_to_thread_id;
-	}
-	else {
-		return trim_LBA_to_thread_id;
-	}
-}
-
 bool OperatingSystem::is_LBA_locked(ulong lba) {
 	if (!OS_LOCK) {
 		return false;
 	} else {
-		return read_LBA_to_thread_id.count(lba) > 0 || write_LBA_to_thread_id.count(lba) > 0 || trim_LBA_to_thread_id.count(lba) > 0;
+		return lba_locks.count(lba) == 1;
 	}
 }
 

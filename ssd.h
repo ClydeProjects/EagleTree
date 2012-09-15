@@ -427,8 +427,10 @@ public:
 	void set_original_application_io(bool);
 	double get_time_taken(void) const;
 	double get_current_time(void) const;
+	double get_ssd_submission_time() const;
 	uint get_application_io_id(void) const;
 	double get_bus_wait_time(void) const;
+	double get_os_wait_time(void) const;
 	bool get_noop(void) const;
 	uint get_id(void) const;
 	int get_tag() const;
@@ -450,6 +452,7 @@ public:
 	bool is_mapping_op() const;
 	void *get_payload(void) const;
 	double incr_bus_wait_time(double time);
+	double incr_os_wait_time(double time);
 	double incr_time_taken(double time_incr);
 	double get_best_case_finish_time();
 	void print(FILE *stream = stdout) const;
@@ -457,6 +460,7 @@ private:
 	double start_time;
 	double time_taken;
 	double bus_wait_time;
+	double os_wait_time;
 	enum event_type type;
 
 	ulong logical_address;
@@ -1835,6 +1839,13 @@ private:
 	Throughput_Moderator throughout_moderator;
 };
 
+struct os_event {
+	int thread_id;
+	Event* pending_event;
+	os_event(int thread_id, Event* event) : thread_id(thread_id), pending_event(event) {}
+	os_event() : thread_id(UNDEFINED), pending_event(NULL) {}
+};
+
 class OperatingSystem
 {
 public:
@@ -1845,24 +1856,26 @@ public:
 	void set_num_writes_to_stop_after(long num_writes);
 	double get_total_runtime() const;
 private:
-	int pick_event_with_shortest_start_time();
-	void dispatch_event(int thread_id);
+
+	void dispatch_event(os_event event);
 	double get_event_minimal_completion_time(Event const*const event) const;
 	bool is_LBA_locked(ulong lba);
+	void get_next_event(int thread_id);
+	int release_lock(Event* event_just_finished);
 	Ssd * ssd;
 	vector<Thread*> threads;
-	vector<Event*> events;
+
 
 	//map<long, uint> LBA_to_thread_id_map;
 
-	map<long, queue<uint> > write_LBA_to_thread_id;
-	map<long, queue<uint> > read_LBA_to_thread_id;
-	map<long, queue<uint> > trim_LBA_to_thread_id;
-
-	map<long, queue<uint> >& get_relevant_LBA_to_thread_map(event_type);
+	os_event pick_unlocked_event_with_shortest_start_time();
+	vector<os_event> events;
+	map<long, queue<os_event> > locked_events;
+	map<long, int> lba_locks;
 
 	int currently_executing_ios_counter;
 	int currently_pending_ios_counter;
+	int num_locked_events;
 	double last_dispatched_event_minimal_finish_time;
 
 	set<uint> currently_executing_ios;
@@ -1870,6 +1883,7 @@ private:
 	long num_writes_completed;
 
 	double time_of_last_event_completed;
+
 };
 
 /*class Block_manager
