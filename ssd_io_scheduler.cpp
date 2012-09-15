@@ -264,7 +264,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	event_type new_op_code = dependency_code_to_type[dependency_code_of_new_event];
 	event_type scheduled_op_code = dependency_code_to_type[dependency_code_of_other_event];
 
-	assert (existing_event != NULL || scheduled_op_code == COPY_BACK);
+	//assert (existing_event != NULL || scheduled_op_code == COPY_BACK);
 
 	// if something is to be trimmed, and a copy back is sent, the copy back is unnecessary to perform;
 	// however, since the copy back destination address is already reserved, we need to use it.
@@ -273,7 +273,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	else if (new_op_code == COPY_BACK) {
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
-		make_dependent(existing_event, new_event);
+		make_dependent(existing_event, dependency_code_of_other_event);
 		remove_event_from_current_events(existing_event); // Remove old event from current_events; it's added again when independent event (the copy back) finishes
 	}
 	else if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
@@ -283,7 +283,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 		stats.num_write_cancellations++;
 	}
-	else if (existing_event->is_garbage_collection_op() && new_op_code == WRITE) {
+	else if (existing_event != NULL && existing_event->is_garbage_collection_op() && new_op_code == WRITE) {
 		promote_to_gc(new_event);
 		remove_current_operation(existing_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
@@ -303,8 +303,8 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if there is a write, but before a read was scheduled, we should read first before making the write
 	else if (new_op_code == WRITE && scheduled_op_code == READ) {
-		assert(false);
-		//make_dependent(new_event, dependency_code_of_new_event, dependency_code_of_other_event);
+		//assert(false);
+		make_dependent(new_event, dependency_code_of_other_event);
 	}
 	// if there is a read, and a write is scheduled, then the contents of the write must be buffered, so the read can wait
 	else if (new_op_code == READ && scheduled_op_code == WRITE) {
@@ -312,8 +312,8 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if there are two reads to the same address, there is no point reading the same page twice.
 	else if (new_op_code == READ && scheduled_op_code == READ) {
-		assert(false);
-		make_dependent(new_event, existing_event);
+		//assert(false);
+		make_dependent(new_event, dependency_code_of_other_event);
 		new_event->set_noop(true);
 	}
 	// if a write is scheduled when a trim is received, we may as well cancel the write
@@ -331,7 +331,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if a read is scheduled when a trim is received, we must still execute the read. Then we can trim
 	else if (new_op_code == TRIM && (scheduled_op_code == READ || scheduled_op_code == READ_TRANSFER || scheduled_op_code == READ_COMMAND)) {
-		make_dependent(new_event, existing_event);
+		make_dependent(new_event, dependency_code_of_other_event);
 		//make_dependent(new_event, dependency_code_of_new_event, dependency_code_of_other_event);
 	}
 	// if something is to be trimmed, and a read is sent, invalidate the read
@@ -383,14 +383,6 @@ void IOScheduler::promote_to_gc(Event* event_to_promote) {
 	for (uint i = 0; i < dependents.size(); i++){
 		dependents[i]->set_garbage_collection_op(true);
 	}
-}
-
-void IOScheduler::nullify_and_add_as_dependent(uint dependency_code_to_be_nullified, uint dependency_code_to_remain) {
-
-}
-
-void IOScheduler::make_dependent(Event* dependent_event, Event* independent_event) {
-	make_dependent(dependent_event, independent_event->get_application_io_id());
 }
 
 void IOScheduler::make_dependent(Event* dependent_event, uint independent_code/*Event* independent_event_application_io*/) {
@@ -573,7 +565,7 @@ void IOScheduler::init_event(Event* event) {
 					dependency_code_to_type[current->get_application_io_id()] = current->get_event_type(); // = WRITE for normal GC, COPY_BACK for copy backs
 					if (first) dependencies[current->get_application_io_id()] = deque<Event*>();
 					remove_redundant_events(current);
-					if (!last) make_dependent(next, current);
+					if (!last) make_dependent(next, current->get_application_io_id());
 				}
 			} else {
 				migration.pop_front();

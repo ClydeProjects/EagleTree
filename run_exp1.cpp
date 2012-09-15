@@ -131,7 +131,7 @@ void overprovisioning_experiment() {
     int space_min 					= 5;
 	int space_max 					= 90;
 	int space_inc 					= 5;
-	const int num_random_IOs 	= 100000;
+	const int num_random_IOs 	= 10000;
 	// -------------------------------------------
     vector<string> histogram_commands;
 

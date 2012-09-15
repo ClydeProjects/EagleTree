@@ -192,7 +192,7 @@ bool GREEDY_GC = false;
  */
 int PRINT_LEVEL = 0;
 
-bool OS_LOCK = true;
+bool OS_LOCK = false;
 
 /* Defines the max number of copy back operations on a page before ECC check is performed.
  * Set to zero to disable copy back GC operations */

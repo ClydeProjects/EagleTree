@@ -1148,8 +1148,6 @@ private:
 	Event* find_scheduled_event(uint dependency_code);
 	void remove_current_operation(Event* event);
 	void promote_to_gc(Event* event_to_promote);
-	void nullify_and_add_as_dependent(uint dependency_code_to_be_nullified, uint dependency_code_to_remain);
-	void make_dependent(Event* dependent_event, Event* independent_event);
 	void make_dependent(Event* dependent_event, uint independent_code);
 	double get_current_time() const;
 
