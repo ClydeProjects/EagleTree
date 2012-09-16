@@ -1726,6 +1726,11 @@ private:
 };
 */
 
+class Random_Order_Iterator {
+public:
+	static vector<int> get_iterator(int needed_length);
+};
+
 // assuming the relation is made of contigouse pages
 // RAM_available is the number of pages that fit into RAM
 class External_Sort : public Thread
@@ -1746,7 +1751,7 @@ private:
 	bool can_start_next_read;
 };
 
-class Throughput_Moderator {
+/*class Throughput_Moderator {
 public:
 	Throughput_Moderator();
 	double register_event_completion(Event const& event);
@@ -1759,11 +1764,8 @@ private:
 	int breaks_counter;
 	double average_wait_time;
 	double last_average_wait_time;
-};
+};*/
 
-class Throughput_Measurer {
-
-};
 
 // This is a file manager that writes one file at a time sequentially
 // files might be fragmented across logical space
@@ -1844,7 +1846,7 @@ private:
 	double time_breaks;
 	set<long> addresses_to_trim;
 	const long max_file_size;
-	Throughput_Moderator throughout_moderator;
+	//Throughput_Moderator throughout_moderator;
 };
 
 class OperatingSystem
