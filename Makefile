@@ -57,14 +57,15 @@ ssd: $(HDR) $(SRC)
 # All Target
 all: test2
 
-test: $(HDR) $(OBJ)
-	$(CXX) $(CXXFLAGS) -o $(ELF0) run_test.cpp $(OBJ)
+test2: $(HDR) $(OBJ)
+	#$(CXX) $(CXXFLAGS) -I/home/niv/install/boost_1_47_0 -L/home/niv/install/boost_1_47_0/libs -o $(ELF2) run_test2.cpp $(OBJ)
+	$(CXX) $(CXXFLAGS) -o $(ELF2) run_test2.cpp $(OBJ)
 	-chmod $(PERMS) $(OBJ)
-	-chmod $(EPERMS) $(ELF0)
-#script -c "$(CXX) $(CXXFLAGS) -o $(ELF0) run_test.cpp $(OBJ)" $(LOG)
+	-chmod $(EPERMS) $(ELF2)
+#script -c "$(CXX) $(CXXFLAGS) -o $(ELF2) run_test2.cpp $(OBJ)" $(LOG)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
-test2: $(HDR) $(OBJ)
+exp1: $(HDR) $(OBJ)
 	#$(CXX) $(CXXFLAGS) -I/home/niv/install/boost_1_47_0 -L/home/niv/install/boost_1_47_0/libs -o $(ELF2) run_exp1.cpp $(OBJ)
 	$(CXX) $(CXXFLAGS) -o $(ELF2) run_exp1.cpp $(OBJ)
 	-chmod $(PERMS) $(OBJ)

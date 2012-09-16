@@ -183,7 +183,7 @@ uint RAID_NUMBER_OF_PHYSICAL_SSDS = 0;
  */
 int BLOCK_MANAGER_ID = 0;
 
-bool GREEDY_GC = false;
+bool GREEDY_GC = true;
 
 /* Output level of detail:
  * 0 -> Nothing
