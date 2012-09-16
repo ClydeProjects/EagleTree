@@ -151,8 +151,6 @@ void StatisticsGatherer::print() {
 	printf("num reads\t");
 	printf("GC writes\t");
 	printf("GC reads\t");
-	printf("GC scheduled\t"); // <--
-	printf("GC wait \t\t");
 	printf("copy backs\t");
 	printf("erases\t\t");
 	printf("avg write wait\t");
@@ -191,10 +189,6 @@ void StatisticsGatherer::print() {
 
 			avg_overall_read_wait_time += average_read_wait_time;
 
-			double average_gc_wait_per_LUN = sum_gc_wait_time_per_LUN[i][j] / num_gc_writes_per_LUN_destination[i][j];
-
-			avg_overall_gc_wait_time += average_gc_wait_per_LUN;
-
 			if (num_writes_per_LUN[i][j] == 0) {
 				average_write_wait_time = 0;
 			}
@@ -210,8 +204,6 @@ void StatisticsGatherer::print() {
 
 			printf("%d\t\t", num_gc_writes_per_LUN_origin[i][j]);
 			printf("%d\t\t", num_gc_reads_per_LUN[i][j]);
-			printf("%d\t\t", num_gc_scheduled_per_LUN[i][j]);
-			printf("%f\t\t", average_gc_wait_per_LUN);
 			printf("%d\t\t", num_copy_backs_per_LUN[i][j]);
 
 
@@ -226,14 +218,11 @@ void StatisticsGatherer::print() {
 	}
 	avg_overall_write_wait_time /= SSD_SIZE * PACKAGE_SIZE;
 	avg_overall_read_wait_time /= SSD_SIZE * PACKAGE_SIZE;
-	avg_overall_gc_wait_time /= SSD_SIZE * PACKAGE_SIZE;
 	printf("\nTotals:\t");
 	printf("%d\t\t", total_writes);
 	printf("%d\t\t", total_reads);
 	printf("%d\t\t", total_gc_writes);
 	printf("%d\t\t", total_gc_reads);
-	printf("%d\t\t", total_gc_scheduled);
-	printf("%f\t\t", avg_overall_gc_wait_time);
 	printf("%d\t\t", total_copy_backs);
 	printf("%d\t\t", total_erases);
 	printf("%f\t\t", avg_overall_write_wait_time);

@@ -174,6 +174,8 @@ extern void *global_buffer;
  */
 extern int BLOCK_MANAGER_ID;
 extern bool GREEDY_GC;
+extern int WEARWOLF_LOCALITY_THRESHOLD;
+extern bool ENABLE_TAGGING;
 
 /*
  * Controls the level of detail of output

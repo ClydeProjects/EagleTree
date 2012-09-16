@@ -4,13 +4,11 @@
 using namespace ssd;
 using namespace std;
 
-#define THRESHOLD 4 // the number of sequential writes before we recognize the pattern as sequential
-
 Wearwolf_Locality::Wearwolf_Locality(Ssd& ssd, FtlParent& ftl)
 	: Wearwolf(ssd, ftl),
-	  parallel_degree(ONE),
+	  parallel_degree(LUN),
 	  seq_write_key_to_pointers_mapping(),
-	  detector(new Sequential_Pattern_Detector(THRESHOLD)),
+	  detector(new Sequential_Pattern_Detector(WEARWOLF_LOCALITY_THRESHOLD)),
 	  strat(SHOREST_QUEUE)
 {
 	detector->set_listener(this);
@@ -43,13 +41,13 @@ void Wearwolf_Locality::register_write_arrival(Event const& write) {
 
 	sequential_writes_tracking const& swt = detector->register_event(lb, write.get_current_time());
 	// checks if should allocate pointers for the pattern
-	if (swt.num_times_pattern_has_repeated == 0 && swt.counter == THRESHOLD) {
+	if (swt.num_times_pattern_has_repeated == 0 && swt.counter == WEARWOLF_LOCALITY_THRESHOLD) {
 		if (PRINT_LEVEL > 1) {
 			printf("SEQUENTIAL PATTERN IDENTIFIED!  KEY: %d \n", swt.key);
 		}
 		set_pointers_for_sequential_write(swt.key, write.get_current_time());
 	}
-	if (swt.num_times_pattern_has_repeated > 0 || swt.counter >= THRESHOLD) {
+	if (swt.num_times_pattern_has_repeated > 0 || swt.counter >= WEARWOLF_LOCALITY_THRESHOLD) {
 		arrived_writes_to_sequential_key_mapping[write.get_id()] = swt.key;
 	}
 }

@@ -100,22 +100,17 @@ void simple_experiment() {
 }
 
 void file_manager_experiment() {
-	BLOCK_MANAGER_ID = 3;
-	PRINT_LEVEL = 2;
 	vector<Thread*> threads;
 	long logical_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * 0.8;
 	long max_file_size = logical_space_size / 10;
-	long num_files = 10;
+	long num_files = 100;
 	Thread* fm1 = new File_Manager(0, logical_space_size / 2, num_files, max_file_size, 10, 1, 1);
 	Thread* fm2 = new File_Manager((logical_space_size / 2) + 1, logical_space_size, num_files, max_file_size, 10, 2, 2);
 	threads.push_back(fm1);
-	//threads.push_back(fm2);
+	threads.push_back(fm2);
 	OperatingSystem* os = new OperatingSystem(threads);
-	//os->set_num_writes_to_stop_after(5000);
 	os->run();
-	fm1->print_thread_stats();
-	fm2->print_thread_stats();
-	VisualTracer::get_instance()->print_horizontally_with_breaks();
+	//VisualTracer::get_instance()->print_horizontally_with_breaks();
 	StateVisualiser::print_page_status();
 	delete os;
 }
@@ -123,16 +118,19 @@ void file_manager_experiment() {
 int main()
 {
 	load_config();
-	//print_config(NULL);
-	printf("Press ENTER to continue...");
-	//getchar();
-	printf("\n");
+	BLOCK_MANAGER_ID = 3;
+	PRINT_LEVEL = 0;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = false;
 
-//	file_manager_experiment();
-//	experiment2();
-//	simple_experiment();
-	file_manager_experiment();
-	//experiment1();
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+
+	for (int i = 2; i < 10; i++) {
+		WEARWOLF_LOCALITY_THRESHOLD = i;
+		file_manager_experiment();
+	}
+
+
 	return 0;
 }
 

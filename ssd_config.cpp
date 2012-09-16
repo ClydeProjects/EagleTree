@@ -193,6 +193,8 @@ bool GREEDY_GC = true;
 int PRINT_LEVEL = 0;
 
 bool OS_LOCK = false;
+int WEARWOLF_LOCALITY_THRESHOLD = 10;
+bool ENABLE_TAGGING = false;
 
 /* Defines the max number of copy back operations on a page before ECC check is performed.
  * Set to zero to disable copy back GC operations */
