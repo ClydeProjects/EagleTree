@@ -346,8 +346,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if a trim is scheduled, and a write arrives, may as well let the trim execute first
 	else if (new_op_code == WRITE && scheduled_op_code == TRIM) {
-		assert(false);
-		//make_dependent(new_event, new_op_code, scheduled_op_code);
+		make_dependent(new_event, dependency_code_of_other_event);
 	}
 	// if a read is scheduled when a trim is received, we must still execute the read. Then we can trim
 	else if (new_op_code == TRIM && (scheduled_op_code == READ || scheduled_op_code == READ_TRANSFER || scheduled_op_code == READ_COMMAND)) {

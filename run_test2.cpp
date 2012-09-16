@@ -99,36 +99,53 @@ void simple_experiment() {
 	delete os;
 }
 
+// problem: some of the pointers for the 6 block managers end up in the same LUNs. This is stupid.
+// solution: have a method in bm_parent that returns a free block from the LUN with the shortest queue.
+
 void file_manager_experiment() {
 	vector<Thread*> threads;
 	long logical_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * 0.8;
-	long max_file_size = logical_space_size / 10;
-	long num_files = 100;
-	Thread* fm1 = new File_Manager(0, logical_space_size / 2, num_files, max_file_size, 10, 1, 1);
-	Thread* fm2 = new File_Manager((logical_space_size / 2) + 1, logical_space_size, num_files, max_file_size, 10, 2, 2);
+	long max_file_size = logical_space_size / 40;
+	long num_files = 10;
+	long log_space_per_thread = logical_space_size / 6;
+	Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, 40, 1, 1);
+	Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, 40, 2, 2);
+	Thread* fm3 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, num_files, max_file_size, 40, 3, 3);
+	Thread* fm4 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, num_files, max_file_size, 40, 4, 4);
+	Thread* fm5 = new File_Manager(log_space_per_thread * 4 + 1, log_space_per_thread * 5, num_files, max_file_size, 40, 5, 5);
+	Thread* fm6 = new File_Manager(log_space_per_thread * 5 + 1, log_space_per_thread * 6, num_files, max_file_size, 40, 6, 6);
 	threads.push_back(fm1);
 	threads.push_back(fm2);
+	threads.push_back(fm3);
+	threads.push_back(fm4);
+	threads.push_back(fm5);
+	threads.push_back(fm6);
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
-	//VisualTracer::get_instance()->print_horizontally_with_breaks();
+	VisualTracer::get_instance()->print_horizontally_with_breaks();
+	//StatisticsGatherer::get_instance()->print();
 	StateVisualiser::print_page_status();
 	delete os;
+}
+
+
+void changing_threshold() {
+	for (int i = 2; i < 10; i++) {
+		WEARWOLF_LOCALITY_THRESHOLD = i;
+		file_manager_experiment();
+	}
 }
 
 int main()
 {
 	load_config();
 	BLOCK_MANAGER_ID = 3;
-	PRINT_LEVEL = 0;
+	PRINT_LEVEL = 1;
 	GREEDY_GC = false;
 	ENABLE_TAGGING = false;
-
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 
-	for (int i = 2; i < 10; i++) {
-		WEARWOLF_LOCALITY_THRESHOLD = i;
-		file_manager_experiment();
-	}
+	file_manager_experiment();
 
 
 	return 0;

@@ -50,7 +50,7 @@ void VisualTracer::register_completed_event(Event const& event) {
 	if (type == WRITE) {
 		write(add.package, add.die, 't', 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY);
 		vector<vector<char> > symbols;
-		vector<char> logical_address = get_int_as_char_vector(event.get_id());
+		vector<char> logical_address = get_int_as_char_vector(event.get_logical_address());
 		symbols.push_back(logical_address);
 		if (event.is_garbage_collection_op()) {
 			vector<char> gc_symbol(2);
