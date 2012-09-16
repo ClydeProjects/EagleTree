@@ -128,6 +128,7 @@ Ssd::~Ssd(void)
 
 	//StateTracer::print();
 	StatisticsGatherer::get_instance()->print();
+	StatisticsGatherer::get_instance()->print_gc_info();
 	IOScheduler::instance()->print_stats();
 	/* explicitly call destructors and use free
 	 * since we used malloc and placement new */

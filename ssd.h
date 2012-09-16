@@ -1550,6 +1550,7 @@ public:
 	void register_scheduled_gc(Event const& gc);
 	void register_executed_gc(Event const& gc, Block const& victim);
 	void print();
+	void print_gc_info();
 	void print_csv();
 	string totals_csv_header();
 	string totals_csv_line();
@@ -1575,7 +1576,8 @@ private:
 	vector<vector<uint> > num_writes_per_LUN;
 
 	vector<vector<uint> > num_gc_reads_per_LUN;
-	vector<vector<uint> > num_gc_writes_per_LUN;
+	vector<vector<uint> > num_gc_writes_per_LUN_origin;
+	vector<vector<uint> > num_gc_writes_per_LUN_destination;
 	vector<vector<double> > sum_gc_wait_time_per_LUN;
 	vector<vector<uint> > num_copy_backs_per_LUN;
 
@@ -1583,6 +1585,8 @@ private:
 
 	vector<vector<uint> > num_gc_scheduled_per_LUN;
 
+	vector<vector<uint> > num_executed_gc_ops;
+	vector<vector<uint> > num_live_pages_in_gc_exec;
 
 	static const double wait_time_histogram_steps = 250;
 	static const double age_histogram_steps = 1;
