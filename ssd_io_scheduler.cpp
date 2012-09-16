@@ -124,8 +124,9 @@ vector<Event*> IOScheduler::collect_soonest_events() {
 
 // tries to execute all current events. Some events may be put back in the queue if they cannot be executed.
 void IOScheduler::execute_current_waiting_ios() {
-	printf("current_events   %d\n", current_events.size());
+	//printf("current_events   %d\n", current_events.size());
 	vector<Event*> events = collect_soonest_events();
+	//random_shuffle(future_events.begin(), future_events.end());
 	vector<Event*> read_commands;
 	vector<Event*> read_transfers;
 	vector<Event*> gc_writes;
@@ -209,7 +210,7 @@ void IOScheduler::update_current_events() {
 	if (current_events.size() == 100) {
 		//VisualTracer::get_instance()->print_horizontally_with_breaks();
 	}
-	assert(current_events.size() < 500);
+	assert(current_events.size() < 10000);
 }
 
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
@@ -438,7 +439,7 @@ enum status IOScheduler::execute_next(Event* event) {
 	if (PRINT_LEVEL > 0) {
 		event->print();
 	}
-
+	handle_finished_event(event, result);
 	if (result == SUCCESS) {
 		int dependency_code = event->get_application_io_id();
 		if (dependencies[dependency_code].size() > 0) {
@@ -475,7 +476,7 @@ enum status IOScheduler::execute_next(Event* event) {
 		dependencies.erase(event->get_application_io_id()); // possible memory leak here, since events are not deleted
 	}
 
-	handle_finished_event(event, result);
+
 	return result;
 }
 
@@ -489,9 +490,6 @@ void IOScheduler::manage_operation_completion(Event* event) {
 		uint dependent_code = op_code_to_dependent_op_codes[dependency_code].front();
 		op_code_to_dependent_op_codes[dependency_code].pop();
 		Event* dependant_event = dependencies[dependent_code].front();
-		if (dependant_event->get_event_type() == TRIM) {
-			dependant_event->print();
-		}
 		dependencies[dependent_code].pop_front();
 		init_event(dependant_event);
 		//future_events.push_back(dependant_event);
