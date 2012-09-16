@@ -22,8 +22,11 @@ StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
 	  sum_bus_wait_time_for_writes_per_LUN(SSD_SIZE, vector<double>(PACKAGE_SIZE, 0)),
 	  num_writes_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_gc_reads_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
-	  num_gc_writes_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
+	  num_gc_writes_per_LUN_origin(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
+	  num_gc_writes_per_LUN_destination(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_gc_scheduled_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
+	  num_executed_gc_ops(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
+	  num_live_pages_in_gc_exec(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  sum_gc_wait_time_per_LUN(SSD_SIZE, vector<double>(PACKAGE_SIZE, 0)),
 	  num_copy_backs_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_erases_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
@@ -38,6 +41,9 @@ StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
 	  num_gc_targeting_anything(0)
 
 {}
+
+vector<vector<double> > num_valid_pages_per_gc_op;
+	vector<vector<int> > num_executed_gc_ops;
 
 StatisticsGatherer::~StatisticsGatherer() {}
 
@@ -59,9 +65,11 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 		if (event.is_original_application_io()) {
 			num_writes_per_LUN[a.package][a.die]++;
 		} else if (event.is_garbage_collection_op()) {
-			num_gc_writes_per_LUN[a.package][a.die]++;
 			Address replace_add = event.get_replace_address();
-			sum_gc_wait_time_per_LUN[replace_add.package][replace_add.die] += event.get_bus_wait_time();
+			num_gc_writes_per_LUN_origin[replace_add.package][replace_add.die]++;
+			num_gc_writes_per_LUN_destination[a.package][a.die]++;
+
+			sum_gc_wait_time_per_LUN[a.package][a.die] += event.get_bus_wait_time();
 		}
 	} else if (event.get_event_type() == READ_COMMAND || event.get_event_type() == READ_TRANSFER) {
 		sum_bus_wait_time_for_reads_per_LUN[a.package][a.die] += event.get_bus_wait_time();
@@ -116,8 +124,10 @@ void StatisticsGatherer::register_scheduled_gc(Event const& gc) {
 void StatisticsGatherer::register_executed_gc(Event const& gc, Block const& victim) {
 	num_gc_executed++;
 	num_migrations += victim.get_pages_valid();
-
-
+	Address a = Address(victim.get_physical_address(), BLOCK);
+	//num_valid_pages_per_gc_op[gc.get_address().package][gc.get_address().die] += victim.get_pages_valid();
+	num_executed_gc_ops[a.package][a.die] += 1;
+	num_live_pages_in_gc_exec[a.package][a.die] += victim.get_pages_valid();
 }
 
 void StatisticsGatherer::register_events_queue_length(uint queue_size, double time) {
@@ -167,7 +177,7 @@ void StatisticsGatherer::print() {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			total_writes += num_writes_per_LUN[i][j];
 			total_reads += num_reads_per_LUN[i][j];
-			total_gc_writes += num_gc_writes_per_LUN[i][j];
+			total_gc_writes += num_gc_writes_per_LUN_origin[i][j];
 			total_gc_reads += num_gc_reads_per_LUN[i][j];
 			total_gc_scheduled += num_gc_scheduled_per_LUN[i][j];
 			total_copy_backs += num_copy_backs_per_LUN[i][j];
@@ -181,7 +191,7 @@ void StatisticsGatherer::print() {
 
 			avg_overall_read_wait_time += average_read_wait_time;
 
-			double average_gc_wait_per_LUN = sum_gc_wait_time_per_LUN[i][j] / num_gc_writes_per_LUN[i][j];
+			double average_gc_wait_per_LUN = sum_gc_wait_time_per_LUN[i][j] / num_gc_writes_per_LUN_destination[i][j];
 
 			avg_overall_gc_wait_time += average_gc_wait_per_LUN;
 
@@ -198,7 +208,7 @@ void StatisticsGatherer::print() {
 			printf("%d\t\t", num_writes_per_LUN[i][j]);
 			printf("%d\t\t", num_reads_per_LUN[i][j]);
 
-			printf("%d\t\t", num_gc_writes_per_LUN[i][j]);
+			printf("%d\t\t", num_gc_writes_per_LUN_origin[i][j]);
 			printf("%d\t\t", num_gc_reads_per_LUN[i][j]);
 			printf("%d\t\t", num_gc_scheduled_per_LUN[i][j]);
 			printf("%f\t\t", average_gc_wait_per_LUN);
@@ -229,6 +239,78 @@ void StatisticsGatherer::print() {
 	printf("%f\t\t", avg_overall_write_wait_time);
 	printf("%f\t\t", avg_overall_read_wait_time);
 	printf("\n\n");
+}
+
+void StatisticsGatherer::print_gc_info() {
+	printf("\n\t");
+	printf("GC writes from\t");
+	printf("GC writes to\t");
+	printf("GC reads\t");
+	printf("GC scheduled\t");
+	printf("GC exec\t\t");
+	printf("GC wait \t\t");
+	printf("copy backs\t");
+	printf("erases\t\t");
+	//printf("age\t");
+
+	printf("\n");
+
+	uint total_gc_writes_origin = 0;
+	uint total_gc_writes_destination = 0;
+	uint total_gc_reads = 0;
+	uint total_gc_scheduled = 0;
+	uint total_gc_exec = 0;
+	uint total_copy_backs = 0;
+	uint total_erases = 0;
+	double avg_overall_gc_wait_time = 0;
+
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			total_gc_writes_origin += num_gc_writes_per_LUN_origin[i][j];
+			total_gc_writes_destination += num_gc_writes_per_LUN_destination[i][j];
+			total_gc_reads += num_gc_reads_per_LUN[i][j];
+			total_gc_scheduled += num_gc_scheduled_per_LUN[i][j];
+			total_gc_exec += num_executed_gc_ops[i][j];
+			total_copy_backs += num_copy_backs_per_LUN[i][j];
+			total_erases += num_erases_per_LUN[i][j];
+
+			double average_gc_wait_per_LUN = sum_gc_wait_time_per_LUN[i][j] / num_gc_writes_per_LUN_destination[i][j];
+
+			double average_migrations_per_gc = (double) num_live_pages_in_gc_exec[i][j] / num_executed_gc_ops[i][j];
+
+			avg_overall_gc_wait_time += average_gc_wait_per_LUN;
+
+			double avg_age = compute_average_age(i, j);
+
+			printf("C%d D%d\t", i, j);
+
+			printf("%d\t\t", num_gc_writes_per_LUN_origin[i][j]);
+			printf("%d\t\t", num_gc_writes_per_LUN_destination[i][j]);
+			printf("%d\t\t", num_gc_reads_per_LUN[i][j]);
+			printf("%d\t\t", num_gc_scheduled_per_LUN[i][j]);
+			printf("%d\t\t", num_executed_gc_ops[i][j]);
+			printf("%f\t\t", average_gc_wait_per_LUN);
+			printf("%d\t\t", num_copy_backs_per_LUN[i][j]);
+			printf("%d\t\t", num_erases_per_LUN[i][j]);
+			printf("%f\t\t", average_migrations_per_gc);
+			//printf("%f\t", average_write_wait_time);
+			//printf("%f\t", average_read_wait_time);
+
+			//printf("%f\t", avg_age);
+			printf("\n");
+		}
+	}
+	avg_overall_gc_wait_time /= SSD_SIZE * PACKAGE_SIZE;
+	printf("\nTotals:\t");
+	printf("%d\t\t", total_gc_writes_origin);
+	printf("%d\t\t", total_gc_writes_destination);
+	printf("%d\t\t", total_gc_reads);
+	printf("%d\t\t", total_gc_scheduled);
+	printf("%d\t\t", total_gc_exec);
+	printf("%f\t\t", avg_overall_gc_wait_time);
+	printf("%d\t\t", total_copy_backs);
+	printf("%d\t\t", total_erases);
+	printf("\n\n");
 	printf("num scheduled gc: %d \n", num_gc_scheduled);
 	printf("num executed gc: %d \n", num_gc_executed);
 	printf("num migrations per gc: %f \n", (double)num_migrations / num_gc_executed);
@@ -244,6 +326,8 @@ void StatisticsGatherer::print() {
 	printf("num_gc_cancelled_not_enough_free_space: %d \n", num_gc_cancelled_not_enough_free_space);
 	printf("num_gc_cancelled_gc_already_happening: %d \n", num_gc_cancelled_gc_already_happening);
 }
+
+
 
 string StatisticsGatherer::totals_csv_header() {
 	stringstream ss;
@@ -279,7 +363,7 @@ string StatisticsGatherer::totals_csv_line() {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			total_writes += num_writes_per_LUN[i][j];
 			total_reads += num_reads_per_LUN[i][j];
-			total_gc_writes += num_gc_writes_per_LUN[i][j];
+			total_gc_writes += num_gc_writes_per_LUN_origin[i][j];
 			total_gc_reads += num_gc_reads_per_LUN[i][j];
 			total_gc_scheduled += num_gc_scheduled_per_LUN[i][j];
 			total_copy_backs += num_copy_backs_per_LUN[i][j];
@@ -293,7 +377,7 @@ string StatisticsGatherer::totals_csv_line() {
 
 			avg_overall_read_wait_time += average_read_wait_time;
 
-			double average_gc_wait_per_LUN = sum_gc_wait_time_per_LUN[i][j] / num_gc_writes_per_LUN[i][j];
+			double average_gc_wait_per_LUN = sum_gc_wait_time_per_LUN[i][j] / num_gc_writes_per_LUN_origin[i][j];
 
 			avg_overall_gc_wait_time += average_gc_wait_per_LUN;
 
@@ -412,7 +496,7 @@ void StatisticsGatherer::print_csv() {
 			printf("%d,", num_writes_per_LUN[i][j]);
 			printf("%d,", num_reads_per_LUN[i][j]);
 
-			printf("%d,", num_gc_writes_per_LUN[i][j]);
+			printf("%d,", num_gc_writes_per_LUN_origin[i][j]);
 			printf("%d,", num_gc_reads_per_LUN[i][j]);
 			printf("%d,", num_gc_scheduled_per_LUN[i][j]);
 			printf("%d,", num_copy_backs_per_LUN[i][j]);

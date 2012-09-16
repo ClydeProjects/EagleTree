@@ -1127,6 +1127,8 @@ private:
 
 	bool remove_event_from_current_events(Event* event);
 
+	void manage_operation_completion(Event* event);
+
 	vector<Event*> future_events;
 	vector<Event*> current_events;
 	map<uint, deque<Event*> > dependencies;
@@ -1148,8 +1150,6 @@ private:
 	Event* find_scheduled_event(uint dependency_code);
 	void remove_current_operation(Event* event);
 	void promote_to_gc(Event* event_to_promote);
-	void nullify_and_add_as_dependent(uint dependency_code_to_be_nullified, uint dependency_code_to_remain);
-	void make_dependent(Event* dependent_event, Event* independent_event);
 	void make_dependent(Event* dependent_event, uint independent_code);
 	double get_current_time() const;
 
@@ -1551,6 +1551,7 @@ public:
 	void register_executed_gc(Event const& gc, Block const& victim);
 	void register_events_queue_length(uint queue_size, double time);
 	void print();
+	void print_gc_info();
 	void print_csv();
 	string totals_csv_header();
 	string totals_csv_line();
@@ -1578,7 +1579,8 @@ private:
 	vector<vector<uint> > num_writes_per_LUN;
 
 	vector<vector<uint> > num_gc_reads_per_LUN;
-	vector<vector<uint> > num_gc_writes_per_LUN;
+	vector<vector<uint> > num_gc_writes_per_LUN_origin;
+	vector<vector<uint> > num_gc_writes_per_LUN_destination;
 	vector<vector<double> > sum_gc_wait_time_per_LUN;
 	vector<vector<uint> > num_copy_backs_per_LUN;
 
@@ -1588,6 +1590,10 @@ private:
 
 	static const uint queue_length_tracker_resolution = 1000; // microseconds
 	vector<uint> queue_length_tracker;
+
+	vector<vector<uint> > num_executed_gc_ops;
+	vector<vector<uint> > num_live_pages_in_gc_exec;
+
 	static const double wait_time_histogram_steps = 250;
 	static const double age_histogram_steps = 1;
 	map<double, uint> wait_time_histogram;
