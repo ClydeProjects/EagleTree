@@ -336,6 +336,27 @@ string StatisticsGatherer::totals_csv_header() {
 	return ss.str();
 }
 
+
+uint StatisticsGatherer::total_reads() {
+	uint total_reads = 0;
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			total_reads += num_reads_per_LUN[i][j];
+		}
+	}
+	return total_reads;
+}
+
+uint StatisticsGatherer::total_writes() {
+	uint total_writes = 0;
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			total_writes += num_writes_per_LUN[i][j];
+		}
+	}
+	return total_writes;
+}
+
 string StatisticsGatherer::totals_csv_line() {
 	uint total_writes = 0;
 	uint total_reads = 0;

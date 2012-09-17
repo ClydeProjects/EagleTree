@@ -28,7 +28,7 @@ using namespace ssd;
 
 FtlParent::FtlParent(Controller &controller) : controller(controller)
 {
-	printf("Number of addressable blocks: %u\n", NUMBER_OF_ADDRESSABLE_BLOCKS);
+	if (PRINT_LEVEL >= 1) printf("Number of addressable blocks: %u\n", NUMBER_OF_ADDRESSABLE_BLOCKS);
 }
 
 

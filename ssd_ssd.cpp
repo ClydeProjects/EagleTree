@@ -127,7 +127,7 @@ Ssd::~Ssd(void)
 	}
 
 	//StateTracer::print();
-	StatisticsGatherer::get_instance()->print();
+	if (PRINT_LEVEL >= 1) StatisticsGatherer::get_instance()->print();
 	//StatisticsGatherer::get_instance()->print_gc_info();
 	//IOScheduler::instance()->print_stats();
 	/* explicitly call destructors and use free

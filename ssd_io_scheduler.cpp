@@ -212,10 +212,9 @@ void IOScheduler::update_current_events() {
 	    	future_events.erase(future_events.begin() + i--);
 	    }
 	}
-	if (current_events.size() == 100) {
-		//VisualTracer::get_instance()->print_horizontally_with_breaks();
+	if (current_events.size() >= 500) {
+		throw "Events queue maximum size exceeded";
 	}
-	assert(current_events.size() < 10000);
 }
 
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
