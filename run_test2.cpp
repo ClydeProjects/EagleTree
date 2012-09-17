@@ -106,7 +106,7 @@ void file_manager_experiment() {
 	vector<Thread*> threads;
 	long logical_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * 0.8;
 	long max_file_size = logical_space_size / 40;
-	long num_files = 10;
+	long num_files = 100;
 	long log_space_per_thread = logical_space_size / 6;
 	Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, 40, 1, 1);
 	Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, 40, 2, 2);
@@ -140,9 +140,9 @@ int main()
 {
 	load_config();
 	BLOCK_MANAGER_ID = 3;
-	PRINT_LEVEL = 1;
+	PRINT_LEVEL = 0;
 	GREEDY_GC = false;
-	ENABLE_TAGGING = false;
+	ENABLE_TAGGING = true;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 
 	file_manager_experiment();
