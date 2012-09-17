@@ -86,15 +86,15 @@ extern const uint BUS_TABLE_SIZE;
 
 /* Ssd class:
  * 	number of Packages per Ssd (size) */
-extern const uint SSD_SIZE;
+extern uint SSD_SIZE;
 
 /* Package class:
  * 	number of Dies per Package (size) */
-extern const uint PACKAGE_SIZE;
+extern uint PACKAGE_SIZE;
 
 /* Die class:
  * 	number of Planes per Die (size) */
-extern const uint DIE_SIZE;
+extern uint DIE_SIZE;
 
 /* Plane class:
  * 	number of Blocks per Plane (size)
@@ -102,7 +102,7 @@ extern const uint DIE_SIZE;
  * 	delay for writing to plane register
  * 	delay for merging is based on read, write, reg_read, reg_write 
  * 		and does not need to be explicitly defined */
-extern const uint PLANE_SIZE;
+extern uint PLANE_SIZE;
 extern const double PLANE_REG_READ_DELAY;
 extern const double PLANE_REG_WRITE_DELAY;
 
@@ -174,6 +174,8 @@ extern void *global_buffer;
  */
 extern int BLOCK_MANAGER_ID;
 extern bool GREEDY_GC;
+extern int WEARWOLF_LOCALITY_THRESHOLD;
+extern bool ENABLE_TAGGING;
 
 /*
  * Controls the level of detail of output
@@ -1097,8 +1099,8 @@ private:
 	map<long, tagged_sequential_write> tag_map; // maps from tags of sequential writes to the size of the sequential write
 	map<long, long> arrived_writes_to_sequential_key_mapping;
 
-
 	void print_tags(); // to be removed
+	MTRand_int32 random_number_generator;
 };
 
 class IOScheduler {
@@ -1131,6 +1133,8 @@ private:
 
 	bool remove_event_from_current_events(Event* event);
 
+	void manage_operation_completion(Event* event);
+
 	vector<Event*> future_events;
 	vector<Event*> current_events;
 	map<uint, deque<Event*> > dependencies;
@@ -1152,8 +1156,6 @@ private:
 	Event* find_scheduled_event(uint dependency_code);
 	void remove_current_operation(Event* event);
 	void promote_to_gc(Event* event_to_promote);
-	void nullify_and_add_as_dependent(uint dependency_code_to_be_nullified, uint dependency_code_to_remain);
-	void make_dependent(Event* dependent_event, Event* independent_event);
 	void make_dependent(Event* dependent_event, uint independent_code);
 	double get_current_time() const;
 
@@ -1553,12 +1555,18 @@ public:
 	void register_completed_event(Event const& event);
 	void register_scheduled_gc(Event const& gc);
 	void register_executed_gc(Event const& gc, Block const& victim);
+	void register_events_queue_length(uint queue_size, double time);
 	void print();
+	void print_gc_info();
 	void print_csv();
 	string totals_csv_header();
 	string totals_csv_line();
 	string age_histogram_csv();
 	string wait_time_histogram_csv();
+	string queue_length_csv();
+	uint max_age();
+	uint total_reads();
+	uint total_writes();
 
 	long num_gc_cancelled_no_candidate;
 	long num_gc_cancelled_not_enough_free_space;
@@ -1579,7 +1587,8 @@ private:
 	vector<vector<uint> > num_writes_per_LUN;
 
 	vector<vector<uint> > num_gc_reads_per_LUN;
-	vector<vector<uint> > num_gc_writes_per_LUN;
+	vector<vector<uint> > num_gc_writes_per_LUN_origin;
+	vector<vector<uint> > num_gc_writes_per_LUN_destination;
 	vector<vector<double> > sum_gc_wait_time_per_LUN;
 	vector<vector<uint> > num_copy_backs_per_LUN;
 
@@ -1587,6 +1596,11 @@ private:
 
 	vector<vector<uint> > num_gc_scheduled_per_LUN;
 
+	static const uint queue_length_tracker_resolution = 1000; // microseconds
+	vector<uint> queue_length_tracker;
+
+	vector<vector<uint> > num_executed_gc_ops;
+	vector<vector<uint> > num_live_pages_in_gc_exec;
 
 	static const double wait_time_histogram_steps = 250;
 	static const double age_histogram_steps = 1;
@@ -1718,6 +1732,11 @@ private:
 };
 */
 
+class Random_Order_Iterator {
+public:
+	static vector<int> get_iterator(int needed_length);
+};
+
 // assuming the relation is made of contigouse pages
 // RAM_available is the number of pages that fit into RAM
 class External_Sort : public Thread
@@ -1738,7 +1757,7 @@ private:
 	bool can_start_next_read;
 };
 
-class Throughput_Moderator {
+/*class Throughput_Moderator {
 public:
 	Throughput_Moderator();
 	double register_event_completion(Event const& event);
@@ -1751,11 +1770,8 @@ private:
 	int breaks_counter;
 	double average_wait_time;
 	double last_average_wait_time;
-};
+};*/
 
-class Throughput_Measurer {
-
-};
 
 // This is a file manager that writes one file at a time sequentially
 // files might be fragmented across logical space
@@ -1811,6 +1827,7 @@ private:
 	};
 
 	void schedule_to_trim_file(File* file);
+	double generate_death_probability();
 	void write_next_file(double time);
 	void assign_new_range();
 	void randomly_delete_files(double current_time);
@@ -1836,7 +1853,7 @@ private:
 	double time_breaks;
 	set<long> addresses_to_trim;
 	const long max_file_size;
-	Throughput_Moderator throughout_moderator;
+	//Throughput_Moderator throughout_moderator;
 };
 
 struct os_event {

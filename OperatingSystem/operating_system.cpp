@@ -44,7 +44,7 @@ OperatingSystem::~OperatingSystem() {
 // when lock is released, submit event.
 
 void OperatingSystem::run() {
-	const int idle_limit = 600000000; // 10 minutes
+	const int idle_limit = 1000000; // 10 minutes
 	int idle_time = 0;
 	bool finished_experiment, still_more_work;
 	do {
@@ -53,7 +53,7 @@ void OperatingSystem::run() {
 		if (event.pending_event == NULL) {
 
 			if (idle_time >= idle_limit) {
-				fprintf(stderr, "Idle time limit reached\n");
+				printf("Idle time limit reached\n");
 				printf("Running IOs:\n");
 				for (set<uint>::iterator it = currently_executing_ios.begin(); it != currently_executing_ios.end(); it++) {
 					printf("%d ", *it);
@@ -69,8 +69,10 @@ void OperatingSystem::run() {
 			idle_time = 0;
 		}
 		finished_experiment = num_writes_to_stop_after != UNDEFINED && num_writes_to_stop_after <= num_writes_completed;
-		still_more_work = currently_executing_ios_counter > 0 || currently_pending_ios_counter;
-	} while (!finished_experiment && still_more_work);
+		still_more_work = currently_executing_ios_counter > 0 || currently_pending_ios_counter > 0;
+		//printf("num_writes   %d\n", num_writes_completed);
+	} while (/*!finished_experiment &&*/ still_more_work);
+	printf(" ");
 }
 
 void OperatingSystem::get_next_event(int thread_id) {
@@ -78,7 +80,7 @@ void OperatingSystem::get_next_event(int thread_id) {
 	while (event != NULL && is_LBA_locked(event->get_logical_address())) {
 		os_event le = os_event(thread_id, event);
 		assert(event->get_event_type() != NOT_VALID);
-		currently_pending_ios_counter++;
+		//currently_pending_ios_counter++;
 		printf("locking:\t"); event->print();
 		locked_events[event->get_logical_address()].push(le);
 		event = threads[thread_id]->run();
@@ -89,6 +91,7 @@ void OperatingSystem::get_next_event(int thread_id) {
 		os_event le = os_event(thread_id, event);
 		events.push_back(le);
 		lba_locks[event->get_logical_address()] = thread_id;
+		currently_pending_ios_counter++;
 	}
 }
 
@@ -97,6 +100,7 @@ void OperatingSystem::get_next_event(int thread_id) {
 os_event OperatingSystem::pick_unlocked_event_with_shortest_start_time() {
 	double soonest_time = numeric_limits<double>::max();
 	int chosen = UNDEFINED;
+	int num_pending_events_confirmation = 0;
 	for (uint i = 0; i < events.size(); i++) {
 		Event* e = events[i].pending_event;
 		bool can_schedule = currently_executing_ios_counter == 0 || last_dispatched_event_minimal_finish_time >= e->get_start_time();
@@ -105,7 +109,14 @@ os_event OperatingSystem::pick_unlocked_event_with_shortest_start_time() {
 			soonest_time = e->get_current_time();
 			chosen = i;
 		}
+		if (e != NULL && e->get_event_type() != NOT_VALID) {
+			num_pending_events_confirmation++;
+		}
 	}
+	if (num_pending_events_confirmation != currently_pending_ios_counter) {
+		assert(false);
+	}
+
 
 	os_event chosen_event;
 	if (chosen != UNDEFINED) {
@@ -118,7 +129,7 @@ os_event OperatingSystem::pick_unlocked_event_with_shortest_start_time() {
 
 void OperatingSystem::dispatch_event(os_event event) {
 	Event* ssd_event = event.pending_event;
-	printf("dispatching event: "); ssd_event->print();
+	//printf("dispatching event: "); ssd_event->print();
 	currently_executing_ios_counter++;
 	currently_executing_ios.insert(ssd_event->get_id());
 	currently_pending_ios_counter--;
@@ -146,6 +157,7 @@ int OperatingSystem::release_lock(Event* event_just_finished) {
 			locked_events.erase(lba);
 		}
 		num_locked_events--;
+		currently_pending_ios_counter++;
 		printf("num_locked_events:\t%d\n", num_locked_events);
 	} else {
 		lba_locks.erase(lba);
@@ -163,7 +175,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	}
 
 	if (thread->is_finished() && thread->get_follow_up_threads().size() > 0) {
-		printf("Switching to new follow up thread\n");
+		if (PRINT_LEVEL >= 1) printf("Switching to new follow up thread\n");
 		vector<Thread*> follow_up_threads = thread->get_follow_up_threads();
 		threads[thread_id] = follow_up_threads[0];
 		threads[thread_id]->set_time(event->get_current_time());
@@ -178,6 +190,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 
 	currently_executing_ios_counter--;
 	currently_executing_ios.erase(event->get_id());
+
 	time_of_last_event_completed = max(time_of_last_event_completed, event->get_current_time());
 
 	delete event;

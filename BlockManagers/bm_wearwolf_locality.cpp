@@ -4,14 +4,13 @@
 using namespace ssd;
 using namespace std;
 
-#define THRESHOLD 4 // the number of sequential writes before we recognize the pattern as sequential
-
 Wearwolf_Locality::Wearwolf_Locality(Ssd& ssd, FtlParent& ftl)
 	: Wearwolf(ssd, ftl),
-	  parallel_degree(ONE),
+	  parallel_degree(LUN),
 	  seq_write_key_to_pointers_mapping(),
-	  detector(new Sequential_Pattern_Detector(THRESHOLD)),
-	  strat(SHOREST_QUEUE)
+	  detector(new Sequential_Pattern_Detector(WEARWOLF_LOCALITY_THRESHOLD)),
+	  strat(ROUND_ROBIN),
+	  random_number_generator(1111)
 {
 	detector->set_listener(this);
 }
@@ -20,43 +19,42 @@ Wearwolf_Locality::~Wearwolf_Locality() {
 	delete detector;
 }
 
-void Wearwolf_Locality::register_write_arrival(Event const& write) {
-
-	if (!write.is_original_application_io()) {
+void Wearwolf_Locality::register_write_arrival(Event const& event) {
+	if (!event.is_original_application_io()) {
 		return;
 	}
 	if (PRINT_LEVEL > 1) {
-		printf("arrival: %d  in time: %f\n", write.get_logical_address(), write.get_current_time());
+		printf("arrival: %d  in time: %f\n", event.get_logical_address(), event.get_current_time());
 	}
 
-	ulong lb = write.get_logical_address();
-	int tag = write.get_tag();
+	ulong lb = event.get_logical_address();
+	int tag = event.get_tag();
 	if (tag != -1 && tag_map.count(tag) == 0) {
-		tagged_sequential_write tsw(lb, write.get_size());
+		tagged_sequential_write tsw(lb, event.get_size());
 		tag_map[tag] = tsw;
-		set_pointers_for_tagged_sequential_write(tag, write.get_current_time());
+		printf("TAG SEEN FOR FIRST TIME!  KEY: %d   TAG: %d  SIZE: %d  \n", lb, tag, event.get_size());
+		set_pointers_for_tagged_sequential_write(tag, event.get_current_time());
 		return;
 	}
 	else if (tag != -1 && tag_map.count(tag) == 1) {
 		return;
 	}
 
-	sequential_writes_tracking const& swt = detector->register_event(lb, write.get_current_time());
+	sequential_writes_tracking const& swt = detector->register_event(lb, event.get_current_time());
 	// checks if should allocate pointers for the pattern
-	if (swt.num_times_pattern_has_repeated == 0 && swt.counter == THRESHOLD) {
+	if (swt.num_times_pattern_has_repeated == 0 && swt.counter == WEARWOLF_LOCALITY_THRESHOLD) {
 		if (PRINT_LEVEL > 1) {
 			printf("SEQUENTIAL PATTERN IDENTIFIED!  KEY: %d \n", swt.key);
 		}
-		set_pointers_for_sequential_write(swt.key, write.get_current_time());
+		set_pointers_for_sequential_write(swt.key, event.get_current_time());
 	}
-	if (swt.num_times_pattern_has_repeated > 0 || swt.counter >= THRESHOLD) {
-		arrived_writes_to_sequential_key_mapping[write.get_id()] = swt.key;
+	if (swt.num_times_pattern_has_repeated > 0 || swt.counter >= WEARWOLF_LOCALITY_THRESHOLD) {
+		arrived_writes_to_sequential_key_mapping[event.get_id()] = swt.key;
 	}
 }
 
 
 Address Wearwolf_Locality::choose_best_address(Event const& event) {
-
 
 	if (event.is_garbage_collection_op()) {
 		return Wearwolf::choose_best_address(event);
@@ -67,7 +65,7 @@ Address Wearwolf_Locality::choose_best_address(Event const& event) {
 		return perform_sequential_write(event, tag_map[tag].key);
 	}
 
-	detector->remove_old_sequential_writes_metadata(event.get_current_time());
+	detector->remove_old_sequential_writes_metadata(event.get_start_time());
 
 	if (arrived_writes_to_sequential_key_mapping.count(event.get_id()) == 0) {
 		return Wearwolf::choose_best_address(event);
@@ -186,9 +184,11 @@ void Wearwolf_Locality::set_pointers_for_tagged_sequential_write(int tag, double
 	int key = tag_map[tag].key;
 	seq_write_key_to_pointers_mapping[key].tag = tag;
 	vector<vector<Address> >& pointers = seq_write_key_to_pointers_mapping[key].pointers = vector<vector<Address> >(SSD_SIZE, vector<Address>(PACKAGE_SIZE));
-	for (int i = 0; i < num_blocks_to_allocate_now; i++) {
-		uint package = i % SSD_SIZE;
-		uint die = (i / SSD_SIZE) % PACKAGE_SIZE;
+	int random_offset = random_number_generator();
+	for (int i = 0 ; i < num_blocks_to_allocate_now; i++) {
+		int random_index = random_offset + i;
+		uint package = random_index % SSD_SIZE;
+		uint die = (random_index / SSD_SIZE) % PACKAGE_SIZE;
 		Address free_block = find_free_unused_block(package, die, time);
 		if (has_free_pages(free_block)) {
 			tag_map[tag].free_allocated_space += BLOCK_SIZE - free_block.page;
