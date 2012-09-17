@@ -174,12 +174,15 @@ void OperatingSystem::register_event_completion(Event* event) {
 		num_writes_completed++;
 	}
 
-	if (thread->is_finished() && thread->get_follow_up_threads().size() > 0) {
+	if (!thread->is_finished()) {
+		get_next_event(thread_id);
+	}
+	else if (thread->is_finished() && thread->get_follow_up_threads().size() > 0) {
 		if (PRINT_LEVEL >= 1) printf("Switching to new follow up thread\n");
 		vector<Thread*> follow_up_threads = thread->get_follow_up_threads();
 		threads[thread_id] = follow_up_threads[0];
 		threads[thread_id]->set_time(event->get_current_time());
-		get_next_event(thread_id);
+
 		for (uint i = 1; i < follow_up_threads.size(); i++) {
 			follow_up_threads[i]->set_time(event->get_current_time());
 			threads.push_back(follow_up_threads[i]);
@@ -187,6 +190,8 @@ void OperatingSystem::register_event_completion(Event* event) {
 		}
 		delete thread;
 	}
+
+
 
 	currently_executing_ios_counter--;
 	currently_executing_ios.erase(event->get_id());

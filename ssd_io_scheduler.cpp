@@ -213,6 +213,7 @@ void IOScheduler::update_current_events() {
 	    }
 	}
 	if (current_events.size() >= 500) {
+		StateVisualiser::print_page_status();
 		throw "Events queue maximum size exceeded";
 	}
 }
