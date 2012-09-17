@@ -558,6 +558,11 @@ void IOScheduler::init_event(Event* event) {
 		return;
 	}
 
+	if (event->get_application_io_id() == 359184) {
+		int i = 0;
+		i++;
+	}
+
 	if (type == TRIM || type == READ_COMMAND || type == READ_TRANSFER || type == WRITE || type == COPY_BACK) {
 		if (should_event_be_scheduled(event)) {
 			current_events.push_back(event);

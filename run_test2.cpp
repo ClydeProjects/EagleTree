@@ -148,7 +148,7 @@ int main()
 {
 	load_config();
 	BLOCK_MANAGER_ID = 0;
-	PRINT_LEVEL = 1;
+	PRINT_LEVEL = 0;
 	GREEDY_GC = false;
 	ENABLE_TAGGING = false;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
