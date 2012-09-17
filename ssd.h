@@ -1821,6 +1821,7 @@ private:
 	};
 
 	void schedule_to_trim_file(File* file);
+	double generate_death_probability();
 	void write_next_file(double time);
 	void assign_new_range();
 	void randomly_delete_files(double current_time);

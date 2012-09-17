@@ -6,7 +6,7 @@ using namespace std;
 
 Wearwolf_Locality::Wearwolf_Locality(Ssd& ssd, FtlParent& ftl)
 	: Wearwolf(ssd, ftl),
-	  parallel_degree(ONE),
+	  parallel_degree(LUN),
 	  seq_write_key_to_pointers_mapping(),
 	  detector(new Sequential_Pattern_Detector(WEARWOLF_LOCALITY_THRESHOLD)),
 	  strat(ROUND_ROBIN),
