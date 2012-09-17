@@ -42,7 +42,7 @@ static double calibration_precision = 0.01;       // microseconds
 static double calibration_starting_point = 100.0; // microseconds
 
 
-double CPUTimeUser() {
+double CPU_time_user() {
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
     struct timeval time = ru.ru_utime;
@@ -52,7 +52,7 @@ double CPUTimeUser() {
     return result;
 }
 
-double CPUTimeSystem() {
+double CPU_time_system() {
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
     struct timeval time = ru.ru_stime;
@@ -62,7 +62,7 @@ double CPUTimeSystem() {
     return result;
 }
 
-double WallClockTime() {
+double wall_clock_time() {
     struct timeval time;
     gettimeofday(&time, NULL);
 
@@ -71,7 +71,7 @@ double WallClockTime() {
     return result;
 }
 
-string PrettyTime(double time) {
+string pretty_time(double time) {
 	stringstream time_text;
 	double t = time;
 	uint hours = (uint) floor(time / 3600.0);
@@ -98,7 +98,7 @@ string PrettyTime(double time) {
 	return time_text.str();
 }
 
-void DrawGraph(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command) {
+void draw_graph(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command) {
     // Write tempoary file containing GLE script
     string scriptFilename = outputFile + ".gle"; // Name of tempoary script file
     std::ofstream gleScript;
@@ -129,7 +129,7 @@ void DrawGraph(int sizeX, int sizeY, string outputFile, string dataFilename, str
 //    remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
-void DrawGraphWithHistograms(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command, vector<string> histogram_commands) {
+void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command, vector<string> histogram_commands) {
     // Write tempoary file containing GLE script
     string scriptFilename = outputFile + ".gle"; // Name of tempoary script file
     std::ofstream gleScript;
@@ -208,9 +208,9 @@ void DrawGraphWithHistograms(int sizeX, int sizeY, string outputFile, string dat
 }
 
 vector<Thread*> random_IO_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
-	Thread* t1 = new Asynchronous_Sequential_Thread(0, 0/*highest_lba-1*/, 1, WRITE, IO_submission_rate, 1);
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1));
-	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_random_IOs, 2, READ, IO_submission_rate, 0));
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 2, READ, IO_submission_rate, 0));
 
 	vector<Thread*> threads;
 	threads.push_back(t1);
@@ -220,11 +220,11 @@ vector<Thread*> random_IO_experiment(int highest_lba, int num_IOs, double IO_sub
 double calibrate_IO_submission_rate(int highest_lba, int num_IOs, vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate)) {
 	double max_rate = calibration_starting_point;
 	double min_rate = 0;
-	double rate = max_rate;
+	double rate = min_rate + (max_rate - min_rate) / 2;
 	bool success;
 	printf("Calibrating...\n");
 	do {
-		//printf("Optimal submission rate in range %f - %f\n", min_rate, max_rate);
+		printf("Optimal submission rate in range %f - %f\n", min_rate, max_rate);
 		success = true;
 		{
 			vector<Thread*> threads = experiment(highest_lba, num_IOs, rate);
@@ -248,15 +248,18 @@ double calibrate_IO_submission_rate(int highest_lba, int num_IOs, vector<Thread*
 void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate)) {
 	string markers[] = {"circle", "square", "triangle", "diamond", "cross", "plus", "star", "star2", "star3", "star4", "flower"};
 
-	// Experiment parameters ---------------------
+	// Experiment parameters ----------------------------------------------
     string file_folder								= "./Results/";
-	const int graph_data_types[]					= {9,10};
-	const int histogram_points[]					= {90,95,10,20,40,60};
-	const int space_min								= 10;
-    const int space_max								= 25;
+	const int graph_data_types[]					= {9,10};     // Draw these values on main graph (numbers correspond to each type of StatisticsGatherer output)
+	const int details_graphs_for_used_space[]		= {50,70,90}; // Draw age and wait time histograms plus queue length history for chosen used_space values
+	const int space_min								= 5;
+    const int space_max								= 90;
 	const int space_inc								= 5;
-	const int num_random_IOs						= 1000;
+	const int num_IOs								= 100000;
     PRINT_LEVEL										= 0;
+	stringstream graph_name;
+    graph_name << "Overprovisioning experiment (" << num_IOs << " random writes + " << num_IOs << " random reads)";
+    // --------------------------------------------------------------------
 
 	// -- unused for now, calibrating throughput instead --
 	const long long cpu_instructions_per_sec		= 21000 * 1000000ll; // Benchmark by Mathias (3.5GHz i7 3970K)
@@ -276,7 +279,7 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
 
-    double start_time = WallClockTime();
+    double start_time = wall_clock_time();
 
 	for (int used_space = space_min; used_space <= space_max; used_space += space_inc) {
 		int highest_lba = (int) ((double) num_pages * used_space / 100);
@@ -284,10 +287,10 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 		printf("Experiment with max %d pct used space: Writing to no LBA higher than %d (out of %d total available)\n", used_space, highest_lba, num_pages);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
-		IO_submission_rate = calibrate_IO_submission_rate(highest_lba, num_random_IOs, experiment);
+		IO_submission_rate = calibrate_IO_submission_rate(highest_lba, num_IOs, experiment);
 
 		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
-		vector<Thread*> threads = experiment(highest_lba, num_random_IOs, IO_submission_rate);
+		vector<Thread*> threads = experiment(highest_lba, num_IOs, IO_submission_rate);
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->run();
 
@@ -295,7 +298,7 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 		long double throughput = (double) total_IOs_issued / os->get_total_runtime() * 1000; // IOs/sec
 		csv_file << used_space << ", " << StatisticsGatherer::get_instance()->totals_csv_line() << ", " << throughput << "\n";
 
-		if (count (histogram_points, histogram_points+sizeof(histogram_points)/sizeof(int), used_space) >= 1) {
+		if (count (details_graphs_for_used_space, details_graphs_for_used_space+sizeof(details_graphs_for_used_space)/sizeof(int), used_space) >= 1) {
 			stringstream hist_filename;
 			stringstream age_filename;
 			stringstream queue_filename;
@@ -341,21 +344,19 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 		delete os;
 	}
 
-	double end_time = WallClockTime();
+	double end_time = wall_clock_time();
 
 	double time_elapsed = end_time - start_time;
 
-	printf("Experiment completed in %s.\n", PrettyTime(time_elapsed).c_str());
+	printf("Experiment completed in %s.\n", pretty_time(time_elapsed).c_str());
 
 	stringstream command;
 	for (uint i = 0; i < sizeof(graph_data_types)/sizeof(int); i++) {
 		command << "   " << "d" << graph_data_types[i] << " line marker " << markers[i] << "\n";
     }
 
-	stringstream graph_name;
-    graph_name << "Overprovisioning experiment (" << num_random_IOs << " random writes + " << num_random_IOs << " random reads)";
 	csv_file.close();
-	DrawGraphWithHistograms(
+	draw_graph_with_histograms(
     	16, 10, "overprovisioning_experiment", csv_filename, graph_name.str(),
     	measurement_name, "units", "",
     	command.str(),
