@@ -269,16 +269,16 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	uint dependency_code_of_other_event = LBA_currently_executing[common_logical_address];
 	Event * existing_event = find_scheduled_event(dependency_code_of_other_event);
 
-	if (new_event->get_id() == 508 || (existing_event != NULL && existing_event->get_id() == 508)) {
-		new_event->print();
-		existing_event->print();
-	}
-
 	//bool both_events_are_gc = new_event->is_garbage_collection_op() && existing_event->is_garbage_collection_op();
 	//assert(!both_events_are_gc);
 
 	event_type new_op_code = dependency_code_to_type[dependency_code_of_new_event];
 	event_type scheduled_op_code = dependency_code_to_type[dependency_code_of_other_event];
+
+	if (existing_event == NULL) {
+		int i = 0;
+		i++;
+	}
 
 	//assert (existing_event != NULL || scheduled_op_code == COPY_BACK);
 
@@ -439,6 +439,11 @@ void IOScheduler::handle_next_batch(vector<Event*>& events) {
 
 enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd.controller.issue(event);
+
+	if (event->get_id() == 370973) {
+		int i = 0;
+		i++;
+	}
 
 	if (PRINT_LEVEL > 0) {
 		event->print();
