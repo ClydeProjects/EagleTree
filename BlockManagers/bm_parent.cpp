@@ -56,6 +56,7 @@ Block_manager_parent::~Block_manager_parent(void){}
 
 Address Block_manager_parent::choose_address(Event const& write) {
 	if (!can_write(write)) {
+		//StateVisualiser::print_page_status();
 		return Address();
 	}
 	Address a = choose_best_address(write);
@@ -274,6 +275,8 @@ void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
 	}
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+	//for (int i = SSD_SIZE - 1; i >= 0; i--) {
+	//	for (int j = PACKAGE_SIZE - 1; j >= 0; j--) {
 			if (!has_free_pages(free_block_pointers[i][j])) {
 				schedule_gc(start_time, i, j, 0);
 			}
@@ -334,10 +337,12 @@ pair<bool, pair<uint, uint> > Block_manager_parent::get_free_block_pointer_with_
 	bool can_write = false;
 	bool at_least_one_address = false;
 	double shortest_time = std::numeric_limits<double>::max( );
-	for (uint i = 0; i < dies.size(); i++) {
+	//for (uint i = 0; i < dies.size(); i++) {
+	for (int i = dies.size() - 1; i >= 0; i--) {
 		double earliest_die_finish_time = std::numeric_limits<double>::max();
 		uint die_with_earliest_finish_time = 0;
 		for (uint j = 0; j < dies[i].size(); j++) {
+		//for (int j = dies[i].size() - 1; j >= 0; j--) {
 			Address pointer = dies[i][j];
 			at_least_one_address = at_least_one_address ? at_least_one_address : pointer.valid == PAGE;
 			bool die_has_free_pages = has_free_pages(pointer);
@@ -580,7 +585,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	Address addr = Address(victim->get_physical_address(), BLOCK);
 
-	uint max_num_gc_per_LUN = GREEDY_GC ? 2 : 1;
+	uint max_num_gc_per_LUN = 1; //GREEDY_GC ? 2 : 1;
 	if (num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die] >= max_num_gc_per_LUN) {
 		StatisticsGatherer::get_instance()->num_gc_cancelled_gc_already_happening++;
 		return migrations;
@@ -653,8 +658,11 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 // finds and returns a free block from anywhere in the SSD. Returns Address(0, NONE) is there is no such block
 Address Block_manager_parent::find_free_unused_block(double time) {
-	for (uint i = 0; i < SSD_SIZE; i++) {
-		Address address = find_free_unused_block(i, time);
+	vector<int> order = Random_Order_Iterator::get_iterator(SSD_SIZE);
+	while (order.size() > 0) {
+		int index = order.back();
+		order.pop_back();
+		Address address = find_free_unused_block(index, time);
 		if (address.valid != NONE) {
 			return address;
 		}
@@ -664,8 +672,11 @@ Address Block_manager_parent::find_free_unused_block(double time) {
 
 Address Block_manager_parent::find_free_unused_block(uint package_id, double time) {
 	assert(package_id < SSD_SIZE);
-	for (uint i = 0; i < PACKAGE_SIZE; i++) {
-		Address address = find_free_unused_block(package_id, i, time);
+	vector<int> order = Random_Order_Iterator::get_iterator(PACKAGE_SIZE);
+	while (order.size() > 0) {
+		int index = order.back();
+		order.pop_back();
+		Address address = find_free_unused_block(package_id, index, time);
 		if (address.valid != NONE) {
 			return address;
 		}
@@ -676,8 +687,11 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, double tim
 // finds and returns a free block from a particular die in the SSD
 Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_id, double time) {
 	assert(package_id < SSD_SIZE && die_id < PACKAGE_SIZE);
-	for (uint i = 0; i < free_blocks[package_id][die_id].size(); i++) {
-		Address address = find_free_unused_block(package_id, die_id, i, time);
+	vector<int> order = Random_Order_Iterator::get_iterator(num_age_classes);
+	while (order.size() > 0) {
+		int index = order.back();
+		order.pop_back();
+		Address address = find_free_unused_block(package_id, die_id, index, time);
 		if (address.valid != NONE) {
 			return address;
 		}

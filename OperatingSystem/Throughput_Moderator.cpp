@@ -8,7 +8,7 @@
 #include "../ssd.h"
 using namespace ssd;
 
-Throughput_Moderator::Throughput_Moderator()
+/*Throughput_Moderator::Throughput_Moderator()
 	: window_size(100),
 	  counter(0),
 	  window_measurments(window_size, 0),
@@ -58,3 +58,4 @@ double Throughput_Moderator::register_event_completion(Event const& event) {
 
 	return differential;
 }
+*/

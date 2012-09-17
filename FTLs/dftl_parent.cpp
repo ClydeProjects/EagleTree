@@ -73,9 +73,10 @@ FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
 {
 	//addressPerPage = 0;
 	cmt = 0;
-	printf("Total required bits for representation: Address size: %i Total per page: %i \n", addressSize, addressPerPage);
-	printf("Number of elements in Cached Mapping Table (CMT): %i\n", totalCMTentries);
-
+	if (PRINT_LEVEL > 0) {
+		printf("Total required bits for representation: Address size: %i Total per page: %i \n", addressSize, addressPerPage);
+		printf("Number of elements in Cached Mapping Table (CMT): %i\n", totalCMTentries);
+	}
 	// Initialise block mapping table.
 	uint ssdSize = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
 

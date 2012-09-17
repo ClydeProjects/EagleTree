@@ -20,7 +20,6 @@ Sequential_Pattern_Detector::Sequential_Pattern_Detector(uint threshold)
   threshold(threshold) {}
 
 Sequential_Pattern_Detector::~Sequential_Pattern_Detector() {
-	delete listener;
 }
 
 sequential_writes_tracking const& Sequential_Pattern_Detector::register_event(logical_address lb, double time) {

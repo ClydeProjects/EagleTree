@@ -160,6 +160,7 @@ void overprovisioning_experiment() {
 	const int num_random_IOs				= 100000;
 	const long int cpu_instructions_per_sec		= 161254 * 1000000; // Sandra DhryStone benchmark result for Core i7 980X @ 4.4 GHz (IPS)
 	const long int cpu_instructions_used_per_io	= 2000;
+
 	// -------------------------------------------
     const long int    IOs_per_microsecond		= (int) ((double) cpu_instructions_per_sec / cpu_instructions_used_per_io / 1000000);
 	const long double IO_submission_rate			= 1.0 / IOs_per_microsecond;
@@ -183,7 +184,7 @@ void overprovisioning_experiment() {
 		printf("Experiment with max %d pct used space: Writing to no LBA higher than %d (out of %d total available)\n", used_space, highest_lba, num_pages);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
-		time_breaks = 5.0;
+		time_breaks = 10.0;
 
 		{
 			Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, time_breaks, 0);
@@ -208,7 +209,8 @@ void overprovisioning_experiment() {
 
 		{
 			Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, time_breaks, 0);
-			t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_random_IOs, time(NULL), WRITE, time_breaks, 0));
+			t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_random_IOs, 1, WRITE, time_breaks, 0));
+			t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_random_IOs, 2, READ, time_breaks, 0));
 
 			vector<Thread*> threads;
 			threads.push_back(t1);

@@ -163,11 +163,6 @@ Event* Asynchronous_Random_Thread::issue_next_io() {
 
 	//printf("creating event:  " ); event->print();
 
-	if (event->get_event_type() == READ && event->get_logical_address() == 361) {
-		int i = 0;
-		i++;
-	}
-
 	return event;
 }
 
