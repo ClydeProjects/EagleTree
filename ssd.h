@@ -1095,8 +1095,8 @@ private:
 	map<long, tagged_sequential_write> tag_map; // maps from tags of sequential writes to the size of the sequential write
 	map<long, long> arrived_writes_to_sequential_key_mapping;
 
-
 	void print_tags(); // to be removed
+	MTRand_int32 random_number_generator;
 };
 
 class IOScheduler {
