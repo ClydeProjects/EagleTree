@@ -86,6 +86,7 @@ void DrawGraphWithHistograms(int sizeX, int sizeY, string outputFile, string dat
 	"   begin graph" << endl <<
 	"      fullsize" << endl <<
 	"      size 16-pad 5-pad" << endl <<
+	"      key off" << endl <<
 	"      data  data$" << endl <<
 	"      title title$" << endl <<
 	"      yaxis \\expr{yaxis$}" << endl <<
@@ -104,6 +105,7 @@ void DrawGraphWithHistograms(int sizeX, int sizeY, string outputFile, string dat
 	"   begin graph" << endl <<
 	"      fullsize" << endl <<
 	"      size 16-pad 5-pad" << endl <<
+	"      key off" << endl <<
 	"      data  data$" << endl <<
 	"      title title$" << endl <<
 	"      yaxis \\expr{yaxis$}" << endl <<
@@ -151,11 +153,11 @@ void overprovisioning_experiment() {
 
 	// Experiment parameters ---------------------
 	const int graph_data_types[]			= {9,10};
-	const int histogram_points[]			= {5,15,40,60,90};
+	const int histogram_points[]			= {40,60,90};
 	const int space_min						= 5;
-    const int space_max						= 15;
+    const int space_max						= 95;
 	const int space_inc						= 5;
-	const int num_random_IOs				= 10000;
+	const int num_random_IOs				= 100000;
 	const long int cpu_instructions_per_sec		= 161254 * 1000000; // Sandra DhryStone benchmark result for Core i7 980X @ 4.4 GHz (IPS)
 	const long int cpu_instructions_used_per_io	= 2000;
 	// -------------------------------------------
