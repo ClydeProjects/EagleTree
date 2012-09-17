@@ -494,6 +494,10 @@ void IOScheduler::manage_operation_completion(Event* event) {
 		uint dependent_code = op_code_to_dependent_op_codes[dependency_code].front();
 		op_code_to_dependent_op_codes[dependency_code].pop();
 		Event* dependant_event = dependencies[dependent_code].front();
+
+		double diff = event->get_current_time() - dependant_event->get_current_time();
+		dependant_event->incr_bus_wait_time(diff);
+		dependant_event->incr_time_taken(diff);
 		dependencies[dependent_code].pop_front();
 		init_event(dependant_event);
 		//future_events.push_back(dependant_event);

@@ -106,7 +106,7 @@ void file_manager_experiment() {
 	long max_file_size = log_space_per_thread / 4;
 
 	Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, 100, 1, 1);
-	Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, 100, 2, 2);
+	Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, 120, 2, 2);
 	//Thread* t1 = new Asynchronous_Random_Thread(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 108, 1, WRITE, 10, 1);
 
 
@@ -142,7 +142,7 @@ int main()
 {
 	load_config();
 	BLOCK_MANAGER_ID = 0;
-	PRINT_LEVEL = 1;
+	PRINT_LEVEL = 0;
 	GREEDY_GC = true;
 	ENABLE_TAGGING = false;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
