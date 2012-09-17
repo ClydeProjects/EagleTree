@@ -1561,6 +1561,8 @@ public:
 	string wait_time_histogram_csv();
 	string queue_length_csv();
 	uint max_age();
+	uint total_reads();
+	uint total_writes();
 
 	long num_gc_cancelled_no_candidate;
 	long num_gc_cancelled_not_enough_free_space;

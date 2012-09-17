@@ -45,8 +45,10 @@ FtlImpl_Dftl::FtlImpl_Dftl(Controller &controller):
 	over_provisioning_percentage(0.2)
 {
 	uint ssdSize = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
-	printf("Total size to map: %uKB\n", ssdSize * PAGE_SIZE / 1024);
-	printf("Using DFTL.\n");
+	if (PRINT_LEVEL >= 1) {
+		printf("Total size to map: %uKB\n", ssdSize * PAGE_SIZE / 1024);
+		printf("Using DFTL.\n");
+	}
 	return;
 }
 

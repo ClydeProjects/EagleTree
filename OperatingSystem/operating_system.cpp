@@ -126,7 +126,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	}
 
 	if (thread->is_finished() && thread->get_follow_up_threads().size() > 0) {
-		printf("Switching to new follow up thread\n");
+		if (PRINT_LEVEL >= 1) printf("Switching to new follow up thread\n");
 		vector<Thread*> follow_up_threads = thread->get_follow_up_threads();
 		threads[thread_id] = follow_up_threads[0];
 		threads[thread_id]->set_time(event->get_current_time());
