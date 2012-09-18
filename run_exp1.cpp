@@ -367,6 +367,62 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
     );
 }
 
+vector<Thread*> basic_sequential_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
+	long log_space_per_thread = highest_lba / 2;
+	long max_file_size = log_space_per_thread / 4;
+	long num_files = 100;
+
+	Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1);
+	Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 2, 2);
+
+	vector<Thread*> threads;
+	threads.push_back(fm1);
+	threads.push_back(fm2);
+	return threads;
+}
+
+vector<Thread*> sequential_tagging(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = true;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	LOCALITY_PARALLEL_DEGREE = 0;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*> sequential_shortest_queues(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 0;
+	GREEDY_GC = true;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*> sequential_detection_LUN(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = false;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	LOCALITY_PARALLEL_DEGREE = 2;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*> sequential_detection_CHANNEL(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = false;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	LOCALITY_PARALLEL_DEGREE = 1;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*> sequential_detection_BLOCK(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = false;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	LOCALITY_PARALLEL_DEGREE = 0;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
 int main()
 {
 	load_config();
@@ -376,7 +432,13 @@ int main()
 	PACKAGE_SIZE = 2;
 	PLANE_SIZE = 4;
 
-	overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp1/");
+	//overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp1/");
+
+	overprovisioning_experiment(sequential_tagging, "/home/mkja/git/EagleTree/Exp2/");
+	overprovisioning_experiment(sequential_shortest_queues, "/home/mkja/git/EagleTree/Exp3/");
+	overprovisioning_experiment(sequential_detection_LUN, "/home/mkja/git/EagleTree/Exp4/");
+	overprovisioning_experiment(sequential_detection_CHANNEL, "/home/mkja/git/EagleTree/Exp5/");
+	overprovisioning_experiment(sequential_detection_BLOCK, "/home/mkja/git/EagleTree/Exp6/");
 
 //	PACKAGE_SIZE = 16;
 

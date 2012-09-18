@@ -110,7 +110,7 @@ extern const double PLANE_REG_WRITE_DELAY;
  * 	number of Pages per Block (size)
  * 	number of erases in lifetime of block
  * 	delay for erasing block */
-extern const uint BLOCK_SIZE;
+extern uint BLOCK_SIZE;
 extern const uint BLOCK_ERASES;
 extern const double BLOCK_ERASE_DELAY;
 
