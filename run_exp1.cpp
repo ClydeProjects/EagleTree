@@ -288,7 +288,7 @@ Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, i
     chdir(data_folder.c_str());
 
     string throughput_column_name = "Throughput (IOs/s)";
-	string measurement_name = "Used space (%)";
+	string measurement_name       = "Used space (%)";
     std::ofstream csv_file;
     csv_file.open(stats_filename.c_str());
     csv_file << "\"" << measurement_name << "\", " << StatisticsGatherer::get_instance()->totals_csv_header() << ", \"" << throughput_column_name <<"\"" << "\n";
@@ -412,12 +412,14 @@ void graph(string title, string filename, int column, vector<Exp> experiments, i
 //    "   xticks off" << endl <<
 //    "   " << xAxisConf << endl <<
     "   yaxis min 0" << endl;
+
     for (int i = 0; i < experiments.size(); i++) {
     	Exp e = experiments[i];
         gleScript <<
        	"   data   \"" << e.data_folder << stats_filename << "\"" << " d"<<i+1<<"=c1,c" << column-1 << endl <<
         "   d"<<i+1<<" line marker " << markers[i] << " key " << "\"" << e.name << "\"" << endl;
     }
+
     gleScript <<
     "end graph" << endl;
     gleScript.close();
@@ -448,7 +450,8 @@ int main()
 
 	exp.push_back(overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp2/", "Second experiment"));
 
-	graph("Testgraphtitle","testgraph.eps", 11, exp, 20, 15);
+	chdir("/home/mkja/git/EagleTree/Graphs");
+	graph("Testgraphtitle","testgraph.eps", 11, exp, 16, 8);
 
 	//	PACKAGE_SIZE = 16;
 
