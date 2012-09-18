@@ -181,7 +181,7 @@ uint RAID_NUMBER_OF_PHYSICAL_SSDS = 0;
  * 3 -> Wearwolf with Locality
  * 4 -> Round Robin
  */
-int BLOCK_MANAGER_ID = 0;
+int BLOCK_MANAGER_ID = 2;
 
 bool GREEDY_GC = true;
 
@@ -311,8 +311,6 @@ void load_config(void) {
 					line_number);
 	}
 	fclose(config_file);
-
-	NUMBER_OF_ADDRESSABLE_BLOCKS = (SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE) / VIRTUAL_PAGE_SIZE;
 
 	return;
 }

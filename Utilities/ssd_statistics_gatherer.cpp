@@ -409,12 +409,13 @@ string StatisticsGatherer::totals_csv_line() {
 	ss << total_gc_writes << ", ";
 	ss << total_gc_reads << ", ";
 	ss << total_gc_scheduled << ", ";
-	ss << avg_overall_write_wait_time << ", ";
+	ss << avg_overall_gc_wait_time << ", ";
 	ss << total_copy_backs << ", ";
 	ss << total_erases << ", ";
 	ss << avg_overall_write_wait_time << ", ";
 	ss << avg_overall_read_wait_time;
-//	ss << "\n";
+
+	//	ss << "\n";
 	return ss.str();
 }
 

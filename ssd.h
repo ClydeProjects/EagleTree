@@ -158,7 +158,10 @@ extern const uint VIRTUAL_BLOCK_SIZE;
 /* Virtual page size (as a multiple of the physical page size) */
 extern const uint VIRTUAL_PAGE_SIZE;
 
-extern const uint NUMBER_OF_ADDRESSABLE_BLOCKS;
+// extern const uint NUMBER_OF_ADDRESSABLE_BLOCKS;
+static inline uint NUMBER_OF_ADDRESSABLE_BLOCKS() {
+	return (SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE) / VIRTUAL_PAGE_SIZE;
+}
 
 /* RAISSDs: Number of physical SSDs */
 extern const uint RAID_NUMBER_OF_PHYSICAL_SSDS;
