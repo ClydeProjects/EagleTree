@@ -104,8 +104,8 @@ void simple_experiment() {
 
 void file_manager_experiment() {
 	vector<Thread*> threads;
-	long logical_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE * 0.9;
-
+	long logical_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
+	MAX_SSD_QUEUE_SIZE = 250;
 	long num_files = 100;
 	long log_space_per_thread = logical_space_size / 2;
 
@@ -114,9 +114,6 @@ void file_manager_experiment() {
 	Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, 100, 1, 1);
 	Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, 100, 2, 2);
 	//Thread* t1 = new Asynchronous_Random_Thread(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 108, 1, WRITE, 10, 1);
-
-
-
 	//Thread* fm3 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, num_files, max_file_size, 40, 3, 3);
 	//Thread* fm4 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, num_files, max_file_size, 40, 4, 4);
 	//Thread* fm5 = new File_Manager(log_space_per_thread * 4 + 1, log_space_per_thread * 5, num_files, max_file_size, 40, 5, 5);
