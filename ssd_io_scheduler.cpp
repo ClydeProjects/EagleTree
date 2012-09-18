@@ -126,6 +126,7 @@ vector<Event*> IOScheduler::collect_soonest_events() {
 
 // tries to execute all current events. Some events may be put back in the queue if they cannot be executed.
 void IOScheduler::execute_current_waiting_ios() {
+	//printf("queue size:  %d\n", current_events.size());
 	//printf("current_events   %d\n", current_events.size());
 	vector<Event*> events = collect_soonest_events();
 	//random_shuffle(future_events.begin(), future_events.end());
@@ -136,6 +137,13 @@ void IOScheduler::execute_current_waiting_ios() {
 	vector<Event*> erases;
 	vector<Event*> copy_backs;
 	vector<Event*> noop_events;
+
+	if (read_commands.size() + writes.size() >= 500) {
+		//StateVisualiser::print_page_status();
+		//printf("queue size:  %d\n", current_events.size());
+		throw "Events queue maximum size exceeded";
+	}
+
 	while (events.size() > 0) {
 		Event * event = events.back();
 
@@ -211,10 +219,6 @@ void IOScheduler::update_current_events() {
 	    	init_event(e);
 	    	future_events.erase(future_events.begin() + i--);
 	    }
-	}
-	if (current_events.size() >= 500) {
-		StateVisualiser::print_page_status();
-		throw "Events queue maximum size exceeded";
 	}
 }
 
