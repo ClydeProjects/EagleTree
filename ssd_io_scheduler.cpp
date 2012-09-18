@@ -138,7 +138,7 @@ void IOScheduler::execute_current_waiting_ios() {
 	vector<Event*> copy_backs;
 	vector<Event*> noop_events;
 
-	if (read_commands.size() + writes.size() >= 500) {
+	if (read_commands.size() + writes.size() >= MAX_SSD_QUEUE_SIZE) {
 		//StateVisualiser::print_page_status();
 		//printf("queue size:  %d\n", current_events.size());
 		throw "Events queue maximum size exceeded";

@@ -194,6 +194,12 @@ extern const uint MAX_REPEATED_COPY_BACKS_ALLOWED;
 /* Defines the max number of page addresses in map keeping track of each pages copy back count */
 extern const uint MAX_ITEMS_IN_COPY_BACK_MAP;
 
+/* Defines the maximal length of the SSD queue  */
+extern uint MAX_SSD_QUEUE_SIZE;
+
+/* Defines the maximal number of locks that can be held by the OS  */
+extern uint MAX_OS_NUM_LOCKS;
+
 /* Enumerations to clarify status integers in simulation
  * Do not use typedefs on enums for reader clarity */
 
