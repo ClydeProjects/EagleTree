@@ -272,6 +272,10 @@ void load_entry(char *name, double value, uint line_number) {
 	return;
 }
 
+static inline uint NUMBER_OF_ADDRESSABLE_BLOCKS_() {
+	return (SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE) / VIRTUAL_PAGE_SIZE;
+}
+
 void load_config(void) {
 	const char * const config_name = "ssd.conf";
 	FILE *config_file = NULL;

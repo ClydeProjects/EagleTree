@@ -86,15 +86,15 @@ extern const uint BUS_TABLE_SIZE;
 
 /* Ssd class:
  * 	number of Packages per Ssd (size) */
-extern const uint SSD_SIZE;
+extern uint SSD_SIZE;
 
 /* Package class:
  * 	number of Dies per Package (size) */
-extern const uint PACKAGE_SIZE;
+extern uint PACKAGE_SIZE;
 
 /* Die class:
  * 	number of Planes per Die (size) */
-extern const uint DIE_SIZE;
+extern uint DIE_SIZE;
 
 /* Plane class:
  * 	number of Blocks per Plane (size)
@@ -102,7 +102,7 @@ extern const uint DIE_SIZE;
  * 	delay for writing to plane register
  * 	delay for merging is based on read, write, reg_read, reg_write 
  * 		and does not need to be explicitly defined */
-extern const uint PLANE_SIZE;
+extern uint PLANE_SIZE;
 extern const double PLANE_REG_READ_DELAY;
 extern const double PLANE_REG_WRITE_DELAY;
 
