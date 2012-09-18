@@ -433,14 +433,14 @@ int main()
 	PLANE_SIZE = 4;
 	//BLOCK_SIZE = 8;
 
-	//overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp1/");
+	overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp1/");
 
-	overprovisioning_experiment(sequential_tagging, "/home/mkja/git/EagleTree/Exp2/");
+	/*overprovisioning_experiment(sequential_tagging, "/home/mkja/git/EagleTree/Exp2/");
 	overprovisioning_experiment(sequential_shortest_queues, "/home/mkja/git/EagleTree/Exp3/");
 	overprovisioning_experiment(sequential_detection_LUN, "/home/mkja/git/EagleTree/Exp4/");
 	overprovisioning_experiment(sequential_detection_CHANNEL, "/home/mkja/git/EagleTree/Exp5/");
 	overprovisioning_experiment(sequential_detection_BLOCK, "/home/mkja/git/EagleTree/Exp6/");
-
+*/
 //	PACKAGE_SIZE = 16;
 
 //	overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp2/");
