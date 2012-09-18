@@ -302,7 +302,13 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 		stats.num_write_cancellations++;
 	}
-	else if (existing_event != NULL && existing_event->is_garbage_collection_op() && new_op_code == WRITE) {
+	else if (existing_event != NULL && existing_event->is_garbage_collection_op() && (new_op_code == WRITE || new_op_code == TRIM)) {
+		if (new_op_code == TRIM) {
+			new_event->print();
+			existing_event->print();
+			bm->register_trim_making_gc_redundant();
+		}
+
 		promote_to_gc(new_event);
 		remove_current_operation(existing_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;

@@ -179,7 +179,6 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 }
 
 void Block_manager_parent::trim(Event const& event) {
-
 	Address ra = event.get_replace_address();
 
 	if (ra.valid == NONE) {
@@ -227,7 +226,7 @@ void Block_manager_parent::trim(Event const& event) {
 		issue_erase(ra, event.get_current_time());
 
 	}
-	else if (blocks_being_garbage_collected.count(phys_addr) == 1 && blocks_being_garbage_collected[block.get_physical_address()] == 0) {
+	else if (blocks_being_garbage_collected.count(phys_addr) == 1 && blocks_being_garbage_collected[phys_addr] == 0) {
 		assert(block.get_state() == INACTIVE);
 		blocks_being_garbage_collected[phys_addr]--;
 		issue_erase(ra, event.get_current_time());
