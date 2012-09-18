@@ -209,6 +209,9 @@ uint MAX_SSD_QUEUE_SIZE = 500;
 /* Defines the maximal number of locks that can be held by the OS  */
 uint MAX_OS_NUM_LOCKS = 500;
 
+/* Defines how the sequential writes detection algorithm spreads a sequential write  */
+uint LOCALITY_PARALLEL_DEGREE = 0;
+
 void load_entry(char *name, double value, uint line_number) {
 	/* cheap implementation - go through all possibilities and match entry */
 	if (!strcmp(name, "RAM_READ_DELAY"))
