@@ -38,7 +38,7 @@ static uint max_age = 0;
 static const double M = 1000000.0; // One million
 static const double K = 1000.0;    // One thousand
 
-static double calibration_precision = 0.01;       // microseconds
+static double calibration_precision = 0.1;        // microseconds
 static double calibration_starting_point = 100.0; // microseconds
 
 
@@ -209,8 +209,14 @@ void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string 
 
 vector<Thread*> random_IO_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1));
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 2, READ, IO_submission_rate, 0));
+	t1->add_follow_up_thread(new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1));
+
+
+	//Thread* t1 = new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1);
+	//Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
+	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1));
+
+	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 2, READ, IO_submission_rate, 0));
 
 	vector<Thread*> threads;
 	threads.push_back(t1);
@@ -220,43 +226,38 @@ vector<Thread*> random_IO_experiment(int highest_lba, int num_IOs, double IO_sub
 double calibrate_IO_submission_rate(int highest_lba, int num_IOs, vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate)) {
 	double max_rate = calibration_starting_point;
 	double min_rate = 0;
-	double rate = min_rate + (max_rate - min_rate) / 2;
+	double current_rate;
 	bool success;
 	printf("Calibrating...\n");
 	do {
-		printf("Optimal submission rate in range %f - %f\n", min_rate, max_rate);
+		current_rate = min_rate + ((max_rate - min_rate) / 2);
+		printf("Optimal submission rate in range %f - %f. Trying %f.\n", min_rate, max_rate, current_rate);
 		success = true;
 		{
-			vector<Thread*> threads = experiment(highest_lba, num_IOs, rate);
+			vector<Thread*> threads = experiment(highest_lba, num_IOs, current_rate);
 			OperatingSystem* os = new OperatingSystem(threads);
-			try { os->run(); }
+			try        { os->run(); }
 			catch(...) { success = false; }
 			delete os;
 		}
-		if (success) {
-			max_rate = rate;
-			rate -= ((max_rate - min_rate) / 2);
-		} else if (!success) {
-			min_rate = rate;
-			rate += ((max_rate - min_rate) / 2);
-		}
+		if      ( success) max_rate = current_rate;
+		else if (!success) min_rate = current_rate;
 	} while ((max_rate - min_rate) > calibration_precision);
 
 	return max_rate;
 }
 
-void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate)) {
+void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate), string data_folder) {
 	string markers[] = {"circle", "square", "triangle", "diamond", "cross", "plus", "star", "star2", "star3", "star4", "flower"};
 
 	// Experiment parameters ----------------------------------------------
-    string file_folder								= "./Results/";
-	const int graph_data_types[]					= {9,10};     // Draw these values on main graph (numbers correspond to each type of StatisticsGatherer output)
+	const int graph_data_types[]					= {11};     // Draw these values on main graph (numbers correspond to each type of StatisticsGatherer output)
 	const int details_graphs_for_used_space[]		= {50,70,90}; // Draw age and wait time histograms plus queue length history for chosen used_space values
-	const int space_min								= 5;
-    const int space_max								= 90;
+	const int space_min								= 10;
+    const int space_max								= 10;
 	const int space_inc								= 5;
 	const int num_IOs								= 100000;
-    PRINT_LEVEL										= 0;
+    PRINT_LEVEL										= 1;
 	stringstream graph_name;
     graph_name << "Overprovisioning experiment (" << num_IOs << " random writes + " << num_IOs << " random reads)";
     // --------------------------------------------------------------------
@@ -269,7 +270,7 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 	double IO_submission_rate	= 12.0 / IOs_per_microsecond;
     vector<string> histogram_commands;
 
-    chdir(file_folder.c_str());
+    chdir(data_folder.c_str());
 
 	string measurement_name = "Used space (%)";
 	string csv_filename = "overprovisioning_experiment.csv";
@@ -277,7 +278,7 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
     csv_file.open(csv_filename.c_str());
     csv_file << "\"" << measurement_name << "\", " << StatisticsGatherer::get_instance()->totals_csv_header() << ", \"Throughput (IOs/s)\"" << "\n";
 
-    const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
+    const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 
     double start_time = wall_clock_time();
 
@@ -287,7 +288,8 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 		printf("Experiment with max %d pct used space: Writing to no LBA higher than %d (out of %d total available)\n", used_space, highest_lba, num_pages);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
-		IO_submission_rate = calibrate_IO_submission_rate(highest_lba, num_IOs, experiment);
+
+		IO_submission_rate = 10;//calibrate_IO_submission_rate(highest_lba, num_IOs, experiment);
 
 		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
 		vector<Thread*> threads = experiment(highest_lba, num_IOs, IO_submission_rate);
@@ -334,6 +336,7 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 			stringstream queue_command;
 			queue_command << "plot 0 " << histogram_commands.size() << " \"" << queue_filename.str() << "\" \"Queue length history (" << used_space << "% used space)\" \"on\" \"Timeline (µs progressed)\" \"Items in event queue\"";
 			histogram_commands.push_back(queue_command.str());
+
 		}
 
 		if (PRINT_LEVEL >= 1) {
@@ -358,11 +361,10 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 	csv_file.close();
 	draw_graph_with_histograms(
     	16, 10, "overprovisioning_experiment", csv_filename, graph_name.str(),
-    	measurement_name, "units", "",
+    	measurement_name, "", "",
     	command.str(),
     	histogram_commands
     );
-
 }
 
 int main()
@@ -370,7 +372,15 @@ int main()
 	load_config();
 	print_config(NULL);
 
-	overprovisioning_experiment(random_IO_experiment);
+	SSD_SIZE = 4;
+	PACKAGE_SIZE = 2;
+	PLANE_SIZE = 4;
+
+	overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp1/");
+
+//	PACKAGE_SIZE = 16;
+
+//	overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp2/");
 
 	return 0;
 }

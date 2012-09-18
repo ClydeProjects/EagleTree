@@ -39,6 +39,7 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	start_time(start_time),
 	time_taken(0.0),
 	bus_wait_time(0.0),
+	os_wait_time(0.0),
 	type(type),
 	logical_address(logical_address),
 	size(size),
@@ -155,8 +156,16 @@ double Event::get_current_time(void) const {
 	return start_time + time_taken;
 }
 
+double Event::get_ssd_submission_time() const {
+	return start_time + os_wait_time;
+}
+
 uint Event::get_application_io_id(void) const {
 	return application_io_id;
+}
+
+double Event::get_os_wait_time(void) const {
+	return os_wait_time;
 }
 
 double Event::get_bus_wait_time(void) const
@@ -256,6 +265,13 @@ double Event::incr_time_taken(double time_incr)
   	if(time_incr > 0.0)
 		time_taken += time_incr;
 	return time_taken;
+}
+
+double Event::incr_os_wait_time(double time_incr)
+{
+  	if(time_incr > 0.0)
+		os_wait_time += time_incr;
+	return os_wait_time;
 }
 
 void Event::print(FILE *stream) const

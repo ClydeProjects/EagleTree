@@ -44,7 +44,7 @@ FtlImpl_Dftl::FtlImpl_Dftl(Controller &controller):
 	FtlImpl_DftlParent(controller),
 	over_provisioning_percentage(0.2)
 {
-	uint ssdSize = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
+	uint ssdSize = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 	if (PRINT_LEVEL >= 1) {
 		printf("Total size to map: %uKB\n", ssdSize * PAGE_SIZE / 1024);
 		printf("Using DFTL.\n");
@@ -72,7 +72,7 @@ void FtlImpl_Dftl::read(Event *event)
 void FtlImpl_Dftl::write(Event *event)
 {
 	current_dependent_events.clear();
-	int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
+	int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 	assert(event->get_logical_address() < num_pages - num_mapping_pages);
 
 	resolve_mapping(event, true);

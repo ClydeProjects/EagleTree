@@ -181,7 +181,7 @@ uint RAID_NUMBER_OF_PHYSICAL_SSDS = 0;
  * 3 -> Wearwolf with Locality
  * 4 -> Round Robin
  */
-int BLOCK_MANAGER_ID = 0;
+int BLOCK_MANAGER_ID = 2;
 
 bool GREEDY_GC = true;
 
@@ -192,7 +192,7 @@ bool GREEDY_GC = true;
  */
 int PRINT_LEVEL = 0;
 
-bool OS_LOCK = false;
+bool OS_LOCK = true;
 int WEARWOLF_LOCALITY_THRESHOLD = 10;
 bool ENABLE_TAGGING = false;
 
@@ -202,6 +202,12 @@ uint MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 
 /* Defines the max number of page addresses in map keeping track of each pages copy back count */
 uint MAX_ITEMS_IN_COPY_BACK_MAP = 1024;
+
+/* Defines the maximal length of the SSD queue  */
+uint MAX_SSD_QUEUE_SIZE = 500;
+
+/* Defines the maximal number of locks that can be held by the OS  */
+uint MAX_OS_NUM_LOCKS = 500;
 
 void load_entry(char *name, double value, uint line_number) {
 	/* cheap implementation - go through all possibilities and match entry */
@@ -305,8 +311,6 @@ void load_config(void) {
 					line_number);
 	}
 	fclose(config_file);
-
-	NUMBER_OF_ADDRESSABLE_BLOCKS = (SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE) / VIRTUAL_PAGE_SIZE;
 
 	return;
 }
