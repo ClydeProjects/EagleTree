@@ -72,7 +72,6 @@ void OperatingSystem::run() {
 		still_more_work = currently_executing_ios_counter > 0 || currently_pending_ios_counter > 0;
 		//printf("num_writes   %d\n", num_writes_completed);
 	} while (/*!finished_experiment &&*/ still_more_work);
-	printf(" ");
 }
 
 void OperatingSystem::get_next_event(int thread_id) {
@@ -132,7 +131,9 @@ os_event OperatingSystem::pick_unlocked_event_with_shortest_start_time() {
 
 void OperatingSystem::dispatch_event(os_event event) {
 	Event* ssd_event = event.pending_event;
-	//printf("dispatching event: "); ssd_event->print();
+	if (PRINT_LEVEL > 1) {
+		printf("dispatching event: "); ssd_event->print();
+	}
 	currently_executing_ios_counter++;
 	currently_executing_ios.insert(ssd_event->get_id());
 	currently_pending_ios_counter--;
@@ -155,13 +156,15 @@ int OperatingSystem::release_lock(Event* event_just_finished) {
 		released_event.pending_event->incr_os_wait_time(os_wait_time);
 		released_event.pending_event->incr_time_taken(os_wait_time);
 		events.push_back(released_event);
-		printf("releasing lock on:  "); released_event.pending_event->print();
 		if (locked_events[lba].size() == 0) {
 			locked_events.erase(lba);
 		}
 		num_locked_events--;
 		currently_pending_ios_counter++;
-		printf("num_locked_events:\t%d\n", num_locked_events);
+		if (PRINT_LEVEL > 1) {
+			printf("releasing lock on:  "); released_event.pending_event->print();
+			printf("num_locked_events:\t%d\n", num_locked_events);
+		}
 	} else {
 		lba_locks.erase(lba);
 	}
