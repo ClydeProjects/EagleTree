@@ -80,7 +80,6 @@ void IOScheduler::schedule_events_queue(deque<Event*> events) {
 		dependency.push(operation_code);
 		op_code_to_dependent_op_codes[first->get_id()] = dependency;
 	}
-
 	future_events.push_back(first);
 }
 
@@ -146,7 +145,6 @@ void IOScheduler::execute_current_waiting_ios() {
 
 	while (events.size() > 0) {
 		Event * event = events.back();
-
 		events.pop_back();
 		event_type type = event->get_event_type();
 		if (event->get_noop()) {
@@ -228,7 +226,6 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
-
 		Address result = bm->choose_address(*event);
 		double wait_time = bm->in_how_long_can_this_event_be_scheduled(result, event->get_current_time());
 		if (wait_time == 0 && bm->Copy_backs_in_progress(result)) wait_time = 1; // If copy backs are in progress, keep waiting until they are done
@@ -284,7 +281,6 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	//assert (existing_event != NULL || scheduled_op_code == COPY_BACK);
 
-
 	// if something is to be trimmed, and a copy back is sent, the copy back is unnecessary to perform;
 	// however, since the copy back destination address is already reserved, we need to use it.
 	if (scheduled_op_code == COPY_BACK) {
@@ -292,7 +288,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	else if (new_op_code == COPY_BACK) {
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
-		make_dependent(existing_event, dependency_code_of_other_event);
+		make_dependent(existing_event, dependency_code_of_new_event);
 		remove_event_from_current_events(existing_event); // Remove old event from current_events; it's added again when independent event (the copy back) finishes
 	}
 	else if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
