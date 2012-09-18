@@ -66,6 +66,10 @@ void OperatingSystem::run() {
 		}
 		else {
 			dispatch_event(event);
+			if (event.get_id() == 141 || event.get_id() == 148 || event.get_id() == 150) {
+				printf(" ");
+				event.print();
+			}
 			idle_time = 0;
 		}
 		finished_experiment = num_writes_to_stop_after != UNDEFINED && num_writes_to_stop_after <= num_writes_completed;
@@ -80,11 +84,13 @@ void OperatingSystem::get_next_event(int thread_id) {
 		os_event le = os_event(thread_id, event);
 		assert(event->get_event_type() != NOT_VALID);
 		//currently_pending_ios_counter++;
-		printf("locking:\t"); event->print();
+		if (PRINT_LEVEL > 1) {
+			printf("locking:\t"); event->print();
+		}
 		locked_events[event->get_logical_address()].push(le);
 		event = threads[thread_id]->run();
 		num_locked_events++;
-		printf("num_locked_events:\t%d\n", num_locked_events);
+		if (PRINT_LEVEL > 1) printf("num_locked_events:\t%d\n", num_locked_events);
 		if (num_locked_events >= MAX_OS_NUM_LOCKS) {
 			throw "The number of locks held by the system exceeded the permissible number";
 		}

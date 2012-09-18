@@ -253,11 +253,11 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 	// Experiment parameters ----------------------------------------------
 	const int graph_data_types[]					= {11};     // Draw these values on main graph (numbers correspond to each type of StatisticsGatherer output)
 	const int details_graphs_for_used_space[]		= {50,70,90}; // Draw age and wait time histograms plus queue length history for chosen used_space values
-	const int space_min								= 10;
-    const int space_max								= 10;
+	const int space_min								= 30;
+    const int space_max								= 30;
 	const int space_inc								= 5;
 	const int num_IOs								= 100;
-    PRINT_LEVEL										= 0;
+    PRINT_LEVEL										= 1;
 	stringstream graph_name;
     graph_name << "Overprovisioning experiment (" << num_IOs << " random writes + " << num_IOs << " random reads)";
     // --------------------------------------------------------------------
@@ -375,6 +375,7 @@ int main()
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	PLANE_SIZE = 4;
+	BLOCK_SIZE = 8;
 
 	overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp1/");
 
