@@ -39,7 +39,7 @@ static const double M = 1000000.0; // One million
 static const double K = 1000.0;    // One thousand
 
 static double calibration_precision = 0.1;        // microseconds
-static double calibration_starting_point = 100.0; // microseconds
+static double calibration_starting_point = 100000.0; // microseconds
 
 
 double CPU_time_user() {
@@ -208,13 +208,13 @@ void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string 
 }
 
 vector<Thread*> random_IO_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
-	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
-	t1->add_follow_up_thread(new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1));
+	//Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
+	//t1->add_follow_up_thread(new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1));
 
 
 	//Thread* t1 = new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1);
-	//Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
-	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1));
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1));
 
 	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 2, READ, IO_submission_rate, 0));
 
@@ -253,10 +253,10 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 	// Experiment parameters ----------------------------------------------
 	const int graph_data_types[]					= {11};     // Draw these values on main graph (numbers correspond to each type of StatisticsGatherer output)
 	const int details_graphs_for_used_space[]		= {50,70,90}; // Draw age and wait time histograms plus queue length history for chosen used_space values
-	const int space_min								= 10;
-    const int space_max								= 10;
+	const int space_min								= 90;
+    const int space_max								= 90;
 	const int space_inc								= 5;
-	const int num_IOs								= 100000;
+	const int num_IOs								= 100;
     PRINT_LEVEL										= 1;
 	stringstream graph_name;
     graph_name << "Overprovisioning experiment (" << num_IOs << " random writes + " << num_IOs << " random reads)";
@@ -431,6 +431,7 @@ int main()
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	PLANE_SIZE = 4;
+	//BLOCK_SIZE = 8;
 
 	//overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp1/");
 
