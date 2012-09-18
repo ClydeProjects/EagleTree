@@ -71,7 +71,7 @@ void OperatingSystem::run() {
 		finished_experiment = num_writes_to_stop_after != UNDEFINED && num_writes_to_stop_after <= num_writes_completed;
 		still_more_work = currently_executing_ios_counter > 0 || currently_pending_ios_counter > 0;
 		//printf("num_writes   %d\n", num_writes_completed);
-	} while (/*!finished_experiment &&*/ still_more_work);
+	} while (!finished_experiment && still_more_work);
 }
 
 void OperatingSystem::get_next_event(int thread_id) {

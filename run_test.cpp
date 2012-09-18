@@ -24,85 +24,87 @@
 
 #include "ssd.h"
 
-#define SIZE 130
-
 using namespace ssd;
+
+vector<Thread*> basic_sequential_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
+	long log_space_per_thread = highest_lba / 2;
+	long max_file_size = log_space_per_thread / 4;
+	long num_files = 100;
+
+	Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1);
+
+	vector<Thread*> threads;
+	threads.push_back(fm1);
+	return threads;
+}
+
+vector<Thread*>  sequential_writes_greedy_gc(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
+	GREEDY_GC = true;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	LOCALITY_PARALLEL_DEGREE = 1;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*>  sequential_writes_lazy_gc(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
+	GREEDY_GC = false;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	LOCALITY_PARALLEL_DEGREE = 1;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*>  random_writes_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
+	vector<Thread*> threads;
+	threads.push_back(t1);
+	return threads;
+}
+
+
+vector<Thread*>  random_writes_greedy_gc(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 0;
+	GREEDY_GC = true;
+	return random_writes_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*>  random_writes_lazy_gc(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 0;
+	GREEDY_GC = false;
+	return random_writes_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
 
 int main()
 {
+	/*
+	 * sequential_writes_lazy_gc
+	 * random_writes_experiment
+	 * random_writes_greedy_gc
+	 * random_writes_lazy_gc
+	 */
 	load_config();
-	print_config(NULL);
-   //printf("Press ENTER to continue...");
-   //getchar();
-   printf("\n");
+	SSD_SIZE = 4;
+	PACKAGE_SIZE = 2;
+	DIE_SIZE = 1;
+	PLANE_SIZE = 32;
+	BLOCK_SIZE = 32;
+	PRINT_LEVEL = 2;
 
-	Ssd *ssd = new Ssd();
+	long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
 
-	double result;
+		/*sequential_tagging
+		 * sequential_shortest_queues
+			sequential_detection_LUN
+			sequential_detection_CHANNEL
+			sequential_detection_BLOCK*/
 
-//	// Test one write to some blocks.
-//	for (int i = 0; i < SIZE; i++)
-//	{
-//		/* event_arrive(event_type, logical_address, size, start_time) */
-//		result = ssd -> event_arrive(WRITE, i*100000, 1, (double) 1+(250*i));
-//
-//		printf("Write time: %.20lf\n", result);
-////		result = ssd -> event_arrive(WRITE, i+10240, 1, (double) 1);
-////
-//	}
-//	for (int i = 0; i < SIZE; i++)
-//	{
-//		/* event_arrive(event_type, logical_address, size, start_time) */
-//		result = ssd -> event_arrive(READ, i*100000, 1, (double) 1+(500*i));
-//		printf("Read time : %.20lf\n", result);
-////		result = ssd -> event_arrive(READ, i, 1, (double) 1);
-////		printf("Read time : %.20lf\n", result);
-//	}
+	vector<Thread*> threads = random_writes_lazy_gc(logical_address_space_size, 100000, 200);
+	OperatingSystem* os = new OperatingSystem(threads);
+	os->set_num_writes_to_stop_after(10000);
+	os->run();
+	StatisticsGatherer::get_instance()->print();
+	delete os;
 
-//	// Test writes and read to same block.
-//	for (int i = 0; i < SIZE; i++)
-//	{
-//		result = ssd -> event_arrive(WRITE, i%64, 1, (double) 1+(250*i));
-//
-//		printf("Write time: %.20lf\n", result);
-//	}
-//	for (int i = 0; i < SIZE; i++)
-//	{
-//		result = ssd -> event_arrive(READ, i%64, 1, (double) 1+(500*i));
-//		printf("Read time : %.20lf\n", result);
-//	}
-
-	// Test random writes to a block
-	result = ssd -> event_arrive(WRITE, 5, 1, (double) 0.0);
-	printf("Write time: %.20lf\n", result);
-	result = ssd -> event_arrive(WRITE, 4, 1, (double) 300.0);
-	printf("Write time: %.20lf\n", result);
-	result = ssd -> event_arrive(WRITE, 3, 1, (double) 600.0);
-	printf("Write time: %.20lf\n", result);
-	result = ssd -> event_arrive(WRITE, 2, 1, (double) 900.0);
-	printf("Write time: %.20lf\n", result);
-	result = ssd -> event_arrive(WRITE, 1, 1, (double) 1200.0);
-	printf("Write time: %.20lf\n", result);
-	result = ssd -> event_arrive(WRITE, 0, 1, (double) 1500.0);
-	printf("Write time: %.20lf\n", result);
-
-	for (int i = 0; i < SIZE-6; i++)
-	{
-		/* event_arrive(event_type, logical_address, size, start_time) */
-		result = ssd -> event_arrive(WRITE, 6+i, 1, (double) 1800+(300*i));
-		printf("Write time: %.20lf\n", result);
-	}
-
-	// Force Merge
-	result = ssd -> event_arrive(WRITE, 10 , 1, (double) 0.0);
-	printf("Write time: %.20lf\n", result);
-//	for (int i = 0; i < SIZE; i++)
-//	{
-//		/* event_arrive(event_type, logical_address, size, start_time) */
-//		result = ssd -> event_arrive(READ, i%64, 1, (double) 1+(500*i));
-//		printf("Read time : %.20lf\n", result);
-//	}
-
-	delete ssd;
 	return 0;
 }
