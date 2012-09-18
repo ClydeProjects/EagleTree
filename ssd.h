@@ -1568,7 +1568,9 @@ public:
 	void print();
 	void print_gc_info();
 	void print_csv();
+
 	string totals_csv_header();
+	vector<string> totals_vector_header();
 	string totals_csv_line();
 	string age_histogram_csv();
 	string wait_time_histogram_csv();

@@ -322,20 +322,28 @@ string StatisticsGatherer::totals_csv_header() {
 	stringstream ss;
 	string q = "\"";
 	string qc = "\", ";
-	ss << q << "num writes" << qc;
-	ss << q << "num reads" << qc;
-	ss << q << "GC write" << qc;
-	ss << q << "GC reads" << qc;
-	ss << q << "GC scheduled" << qc;
-	ss << q << "GC wait" << qc;
-	ss << q << "copy backs" << qc;
-	ss << q << "erases" << qc;
-	ss << q << "avg write wait (µs)" << qc;
-	ss << q << "avg read wait (µs)" << q;
-//	ss << "\n";
+	vector<string> names = totals_vector_header();
+	for (int i = 0; i < names.size(); i++) {
+		ss << q << names[i] << q;
+		if (i != names.size()-1) ss << ", ";
+	}
 	return ss.str();
 }
 
+vector<string> StatisticsGatherer::totals_vector_header() {
+	vector<string> result;
+	result.push_back("num writes");
+	result.push_back("num reads");
+	result.push_back("GC write");
+	result.push_back("GC reads");
+	result.push_back("GC scheduled");
+	result.push_back("GC wait");
+	result.push_back("copy backs");
+	result.push_back("erases");
+	result.push_back("avg write wait (µs)");
+	result.push_back("avg read wait (µs)");
+	return result;
+}
 
 uint StatisticsGatherer::total_reads() {
 	uint total_reads = 0;

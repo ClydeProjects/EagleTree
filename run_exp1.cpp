@@ -35,12 +35,29 @@ using namespace ssd;
 
 static uint max_age = 0;
 
+static const string stats_filename = "stats.csv";
+
+static const string markers[] = {"circle", "square", "triangle", "diamond", "cross", "plus", "star", "star2", "star3", "star4", "flower"};
+
 static const double M = 1000000.0; // One million
 static const double K = 1000.0;    // One thousand
 
 static double calibration_precision = 0.1;        // microseconds
 static double calibration_starting_point = 100000.0; // microseconds
 
+class Exp {
+public:
+	Exp(string name_, string data_folder_, string x_axis_, vector<string> column_names_)
+	:	name(name_),
+	 	data_folder(data_folder_),
+	 	x_axis(x_axis_),
+	 	column_names(column_names_)
+	{}
+	string name;
+	string data_folder;
+	string x_axis;
+	vector<string> column_names;
+};
 
 double CPU_time_user() {
     struct rusage ru;
@@ -247,14 +264,12 @@ double calibrate_IO_submission_rate(int highest_lba, int num_IOs, vector<Thread*
 	return max_rate;
 }
 
-void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate), string data_folder) {
-	string markers[] = {"circle", "square", "triangle", "diamond", "cross", "plus", "star", "star2", "star3", "star4", "flower"};
-
+Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate), string data_folder, string name) {
 	// Experiment parameters ----------------------------------------------
-	const int graph_data_types[]					= {11};     // Draw these values on main graph (numbers correspond to each type of StatisticsGatherer output)
-	const int details_graphs_for_used_space[]		= {50,70,90}; // Draw age and wait time histograms plus queue length history for chosen used_space values
-	const int space_min								= 90;
-    const int space_max								= 90;
+//	const int graph_data_types[]					= {11};     // Draw these values on main graph (numbers correspond to each type of StatisticsGatherer output)
+//	const int details_graphs_for_used_space[]		= {50,70,90}; // Draw age and wait time histograms plus queue length history for chosen used_space values
+	const int space_min								= 5;
+    const int space_max								= 15;
 	const int space_inc								= 5;
 	const int num_IOs								= 100;
     PRINT_LEVEL										= 1;
@@ -272,11 +287,11 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 
     chdir(data_folder.c_str());
 
+    string throughput_column_name = "Throughput (IOs/s)";
 	string measurement_name = "Used space (%)";
-	string csv_filename = "overprovisioning_experiment.csv";
     std::ofstream csv_file;
-    csv_file.open(csv_filename.c_str());
-    csv_file << "\"" << measurement_name << "\", " << StatisticsGatherer::get_instance()->totals_csv_header() << ", \"Throughput (IOs/s)\"" << "\n";
+    csv_file.open(stats_filename.c_str());
+    csv_file << "\"" << measurement_name << "\", " << StatisticsGatherer::get_instance()->totals_csv_header() << ", \"" << throughput_column_name <<"\"" << "\n";
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 
@@ -300,44 +315,42 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 		long double throughput = (double) total_IOs_issued / os->get_total_runtime() * 1000; // IOs/sec
 		csv_file << used_space << ", " << StatisticsGatherer::get_instance()->totals_csv_line() << ", " << throughput << "\n";
 
-		if (count (details_graphs_for_used_space, details_graphs_for_used_space+sizeof(details_graphs_for_used_space)/sizeof(int), used_space) >= 1) {
-			stringstream hist_filename;
-			stringstream age_filename;
-			stringstream queue_filename;
+		//if (count (details_graphs_for_used_space, details_graphs_for_used_space+sizeof(details_graphs_for_used_space)/sizeof(int), used_space) >= 1) {
+		stringstream hist_filename;
+		stringstream age_filename;
+		stringstream queue_filename;
 
-			hist_filename << "hist-" << used_space << ".csv";
-			age_filename << "age-" << used_space << ".csv";
-			queue_filename << "queue-" << used_space << ".csv";
+		hist_filename << "hist-" << used_space << ".csv";
+		age_filename << "age-" << used_space << ".csv";
+		queue_filename << "queue-" << used_space << ".csv";
 
-			std::ofstream hist_file;
-			hist_file.open(hist_filename.str().c_str());
-			hist_file << StatisticsGatherer::get_instance()->wait_time_histogram_csv();
-			hist_file.close();
+		std::ofstream hist_file;
+		hist_file.open(hist_filename.str().c_str());
+		hist_file << StatisticsGatherer::get_instance()->wait_time_histogram_csv();
+		hist_file.close();
 
-			std::ofstream age_file;
-			age_file.open(age_filename.str().c_str());
-			age_file << StatisticsGatherer::get_instance()->age_histogram_csv();
-			age_file.close();
-			max_age = max(StatisticsGatherer::get_instance()->max_age(), max_age);
+		std::ofstream age_file;
+		age_file.open(age_filename.str().c_str());
+		age_file << StatisticsGatherer::get_instance()->age_histogram_csv();
+		age_file.close();
+		max_age = max(StatisticsGatherer::get_instance()->max_age(), max_age);
 
-			std::ofstream queue_file;
-			queue_file.open(queue_filename.str().c_str());
-			queue_file << StatisticsGatherer::get_instance()->queue_length_csv();
-			queue_file.close();
+		std::ofstream queue_file;
+		queue_file.open(queue_filename.str().c_str());
+		queue_file << StatisticsGatherer::get_instance()->queue_length_csv();
+		queue_file.close();
 
-			stringstream hist_command;
-			hist_command << "hist 0 " << histogram_commands.size() << " \"" << hist_filename.str() << "\" \"Wait time histogram (" << used_space << "% used space)\" \"log min 1\" \"Event wait time (µs)\" -1";
-			histogram_commands.push_back(hist_command.str());
+		stringstream hist_command;
+		hist_command << "hist 0 " << histogram_commands.size() << " \"" << hist_filename.str() << "\" \"Wait time histogram (" << used_space << "% used space)\" \"log min 1\" \"Event wait time (µs)\" -1";
+		histogram_commands.push_back(hist_command.str());
 
-			stringstream age_command;
-			age_command << "hist 0 " << histogram_commands.size() << " \"" << age_filename.str() << "\" \"Block age histogram (" << used_space << "% used space)\" \"on\" \"Block age\" age_max";
-			histogram_commands.push_back(age_command.str());
+		stringstream age_command;
+		age_command << "hist 0 " << histogram_commands.size() << " \"" << age_filename.str() << "\" \"Block age histogram (" << used_space << "% used space)\" \"on\" \"Block age\" age_max";
+		histogram_commands.push_back(age_command.str());
 
-			stringstream queue_command;
-			queue_command << "plot 0 " << histogram_commands.size() << " \"" << queue_filename.str() << "\" \"Queue length history (" << used_space << "% used space)\" \"on\" \"Timeline (µs progressed)\" \"Items in event queue\"";
-			histogram_commands.push_back(queue_command.str());
-
-		}
+		stringstream queue_command;
+		queue_command << "plot 0 " << histogram_commands.size() << " \"" << queue_filename.str() << "\" \"Queue length history (" << used_space << "% used space)\" \"on\" \"Timeline (µs progressed)\" \"Items in event queue\"";
+		histogram_commands.push_back(queue_command.str());
 
 		if (PRINT_LEVEL >= 1) {
 			StateVisualiser::print_page_status();
@@ -351,20 +364,70 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 
 	double time_elapsed = end_time - start_time;
 
+	csv_file.close();
+
 	printf("Experiment completed in %s.\n", pretty_time(time_elapsed).c_str());
 
+	/*
 	stringstream command;
+
 	for (uint i = 0; i < sizeof(graph_data_types)/sizeof(int); i++) {
 		command << "   " << "d" << graph_data_types[i] << " line marker " << markers[i] << "\n";
     }
 
-	csv_file.close();
-	draw_graph_with_histograms(
+    draw_graph_with_histograms(
     	16, 10, "overprovisioning_experiment", csv_filename, graph_name.str(),
     	measurement_name, "", "",
     	command.str(),
     	histogram_commands
     );
+    */
+
+	vector<string> original_column_names = StatisticsGatherer::get_instance()->totals_vector_header();
+
+	vector<string> column_names;
+	column_names.push_back(measurement_name);
+	for (uint i = 0; i < original_column_names.size(); i++) column_names.push_back(original_column_names[i]);
+//	column_names.insert(column_names.end(), original_column_names.begin(), original_column_names.end());
+	column_names.push_back(throughput_column_name);
+
+	return Exp(name, data_folder, "Free space (%)", column_names);
+}
+
+void graph(string title, string filename, int column, vector<Exp> experiments, int sizeX, int sizeY) {
+	// Write tempoary file containing GLE script
+    string scriptFilename = filename + "-temp.gle"; // Name of tempoary script file
+    std::ofstream gleScript;
+    gleScript.open(scriptFilename.c_str());
+    gleScript <<
+    "size " << sizeX << " " << sizeY << endl << // 12 8
+    "set font texcmr" << endl <<
+    "begin graph" << endl <<
+    "   " << "key pos tl offset -0.0 0 compact" << endl <<
+    "   scale auto" << endl <<
+//    "   nobox" << endl <<
+    "   title  \"" << title << "\"" << endl <<
+    "   xtitle \"" << experiments[0].x_axis << "\"" << endl <<
+    "   ytitle \"" << experiments[0].column_names[column] << "\"" << endl <<
+//    "   xticks off" << endl <<
+//    "   " << xAxisConf << endl <<
+    "   yaxis min 0" << endl;
+    for (int i = 0; i < experiments.size(); i++) {
+    	Exp e = experiments[i];
+        gleScript <<
+       	"   data   \"" << e.data_folder << stats_filename << "\"" << " d"<<i+1<<"=c1,c" << column-1 << endl <<
+        "   d"<<i+1<<" line marker " << markers[i] << " key " << "\"" << e.name << "\"" << endl;
+    }
+    gleScript <<
+    "end graph" << endl;
+    gleScript.close();
+
+    // Run gle to draw graph
+    string gleCommand = "gle \"" + scriptFilename + "\" \"" + filename + "\"";
+    cout << gleCommand << "\n";
+    system(gleCommand.c_str());
+
+//    remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
 int main()
@@ -372,14 +435,22 @@ int main()
 	load_config();
 	print_config(NULL);
 
+	vector<Exp> exp;
+
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	PLANE_SIZE = 4;
 	//BLOCK_SIZE = 8;
 
-	overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp1/");
+	exp.push_back(overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp1/", "First experiment"));
 
-//	PACKAGE_SIZE = 16;
+	PLANE_SIZE = 3;
+
+	exp.push_back(overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp2/", "Second experiment"));
+
+	graph("Testgraphtitle","testgraph.eps", 11, exp, 20, 15);
+
+	//	PACKAGE_SIZE = 16;
 
 //	overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp2/");
 
