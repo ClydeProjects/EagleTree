@@ -64,9 +64,9 @@ double FtlImpl_DftlParent::mpage_modified_ts_compare(const FtlImpl_DftlParent::M
 
 FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
 	FtlParent(controller),
-	addressSize(log(NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE)/log(2)),
+	addressSize(log(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE)/log(2)),
 	addressPerPage(PAGE_SIZE / ( (ceil(addressSize / 8.0) * 2) )),
-	num_mapping_pages(ceil((double)(NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE) / addressPerPage)),
+	num_mapping_pages(ceil((double)(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE) / addressPerPage)),
 	global_translation_directory( ),
 	totalCMTentries(CACHE_DFTL_LIMIT * addressPerPage),
 	num_pages_written(0)
@@ -78,7 +78,7 @@ FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
 		printf("Number of elements in Cached Mapping Table (CMT): %i\n", totalCMTentries);
 	}
 	// Initialise block mapping table.
-	uint ssdSize = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
+	uint ssdSize = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 
 	trans_map.reserve(ssdSize);
 	for (uint i=0;i<ssdSize;i++)
@@ -177,7 +177,7 @@ void FtlImpl_DftlParent::remove_from_cache(long lba) {
 void FtlImpl_DftlParent::update_mapping_on_flash(long lba, double time) {
 	int vpnBase = lba - lba % addressPerPage;
 	int num_cached_entries_in_mapping_page = 1;
-	int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
+	int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
  	int limit = addressPerPage < num_pages ? addressPerPage : num_pages;
 	for (int i = 0; i < limit; i++)
 	{
@@ -216,5 +216,5 @@ long FtlImpl_DftlParent::get_logical_address(uint physical_address) const {
 
 long FtlImpl_DftlParent::get_mapping_virtual_address(long event_lba) {
 	long virtual_mapping_page_number = event_lba / addressPerPage;
-	return NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE - 1 - event_lba / addressPerPage;
+	return NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE - 1 - event_lba / addressPerPage;
 }

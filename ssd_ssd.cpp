@@ -151,8 +151,8 @@ void Ssd::event_arrive(Event* event) {
 	//printf("submitted: %d\n",  event->get_id());
 	// Print error and terminate if start time of event is less than IO submission time
 	// assert(event->get_start_time() >= last_io_submission_time);
-	if (event->get_start_time() + 0.00001 < last_io_submission_time) {
-		fprintf(stderr, "Error: Start time of event (%f) less than last IO submission time (%f).\n", event->get_start_time(), last_io_submission_time);
+	if (event->get_ssd_submission_time() + 0.00001 < last_io_submission_time) {
+		fprintf(stderr, "Error: Start time of event (%f) less than last IO submission time (%f).\n", event->get_ssd_submission_time(), last_io_submission_time);
 		fprintf(stderr, "Triggering event: ");
 		event->print(stderr);
 		throw;
@@ -195,7 +195,7 @@ void Ssd::progress_since_os_is_waiting() {
 
 void Ssd::register_event_completion(Event * event) {
 	if (event->is_original_application_io() && !event->get_noop() && (event->get_event_type() == WRITE || event->get_event_type() == READ_COMMAND)) {
-		last_io_submission_time = max(last_io_submission_time, event->get_start_time());
+		last_io_submission_time = max(last_io_submission_time, event->get_ssd_submission_time());
 	}
 	if (event->get_event_type() == READ_COMMAND) {
 		return;

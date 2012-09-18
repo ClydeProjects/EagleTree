@@ -181,7 +181,7 @@ uint RAID_NUMBER_OF_PHYSICAL_SSDS = 0;
  * 3 -> Wearwolf with Locality
  * 4 -> Round Robin
  */
-int BLOCK_MANAGER_ID = 0;
+int BLOCK_MANAGER_ID = 2;
 
 bool GREEDY_GC = true;
 
@@ -192,7 +192,7 @@ bool GREEDY_GC = true;
  */
 int PRINT_LEVEL = 0;
 
-bool OS_LOCK = false;
+bool OS_LOCK = true;
 int WEARWOLF_LOCALITY_THRESHOLD = 10;
 bool ENABLE_TAGGING = false;
 
@@ -272,10 +272,6 @@ void load_entry(char *name, double value, uint line_number) {
 	return;
 }
 
-static inline uint NUMBER_OF_ADDRESSABLE_BLOCKS_() {
-	return (SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE) / VIRTUAL_PAGE_SIZE;
-}
-
 void load_config(void) {
 	const char * const config_name = "ssd.conf";
 	FILE *config_file = NULL;
@@ -309,8 +305,6 @@ void load_config(void) {
 					line_number);
 	}
 	fclose(config_file);
-
-	NUMBER_OF_ADDRESSABLE_BLOCKS = (SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE) / VIRTUAL_PAGE_SIZE;
 
 	return;
 }

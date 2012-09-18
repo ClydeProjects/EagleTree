@@ -6,10 +6,11 @@ using namespace std;
 
 Wearwolf_Locality::Wearwolf_Locality(Ssd& ssd, FtlParent& ftl)
 	: Wearwolf(ssd, ftl),
-	  parallel_degree(ONE),
+	  parallel_degree(LUN),
 	  seq_write_key_to_pointers_mapping(),
 	  detector(new Sequential_Pattern_Detector(WEARWOLF_LOCALITY_THRESHOLD)),
-	  strat(ROUND_ROBIN)
+	  strat(ROUND_ROBIN),
+	  random_number_generator(1111)
 {
 	detector->set_listener(this);
 }
@@ -19,9 +20,6 @@ Wearwolf_Locality::~Wearwolf_Locality() {
 }
 
 void Wearwolf_Locality::register_write_arrival(Event const& event) {
-
-
-
 	if (!event.is_original_application_io()) {
 		return;
 	}
@@ -34,6 +32,7 @@ void Wearwolf_Locality::register_write_arrival(Event const& event) {
 	if (tag != -1 && tag_map.count(tag) == 0) {
 		tagged_sequential_write tsw(lb, event.get_size());
 		tag_map[tag] = tsw;
+		printf("TAG SEEN FOR FIRST TIME!  KEY: %d   TAG: %d  SIZE: %d  \n", lb, tag, event.get_size());
 		set_pointers_for_tagged_sequential_write(tag, event.get_current_time());
 		return;
 	}
@@ -185,9 +184,11 @@ void Wearwolf_Locality::set_pointers_for_tagged_sequential_write(int tag, double
 	int key = tag_map[tag].key;
 	seq_write_key_to_pointers_mapping[key].tag = tag;
 	vector<vector<Address> >& pointers = seq_write_key_to_pointers_mapping[key].pointers = vector<vector<Address> >(SSD_SIZE, vector<Address>(PACKAGE_SIZE));
-	for (int i = 0; i < num_blocks_to_allocate_now; i++) {
-		uint package = i % SSD_SIZE;
-		uint die = (i / SSD_SIZE) % PACKAGE_SIZE;
+	int random_offset = random_number_generator();
+	for (int i = 0 ; i < num_blocks_to_allocate_now; i++) {
+		int random_index = random_offset + i;
+		uint package = random_index % SSD_SIZE;
+		uint die = (random_index / SSD_SIZE) % PACKAGE_SIZE;
 		Address free_block = find_free_unused_block(package, die, time);
 		if (has_free_pages(free_block)) {
 			tag_map[tag].free_allocated_space += BLOCK_SIZE - free_block.page;

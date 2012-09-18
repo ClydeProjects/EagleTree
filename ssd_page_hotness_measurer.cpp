@@ -27,9 +27,9 @@ using namespace ssd;
 
 Simple_Page_Hotness_Measurer::Simple_Page_Hotness_Measurer()
 	:	write_current_count(),
-		write_moving_average(NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE, 0),
+		write_moving_average(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE, 0),
 		read_current_count(),
-		read_moving_average(NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE, 0),
+		read_moving_average(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE, 0),
 		current_interval(0),
 		num_wcrh_pages_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
 		num_wcrc_pages_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
@@ -129,13 +129,13 @@ void Simple_Page_Hotness_Measurer::register_event(Event const& event) {
 
 void Simple_Page_Hotness_Measurer::start_new_interval_writes() {
 	average_write_hotness = 0;
-	for( uint addr = 0; addr < NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE; addr++  )
+	for( uint addr = 0; addr < NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE; addr++  )
 	{
 	    uint count = write_current_count[addr];
 	    write_moving_average[addr] = write_moving_average[addr] * WEIGHT + count * (1 - WEIGHT);
 	    average_write_hotness += write_moving_average[addr];
 	}
-	average_write_hotness /= NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
+	average_write_hotness /= NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
@@ -144,7 +144,7 @@ void Simple_Page_Hotness_Measurer::start_new_interval_writes() {
 		}
 	}
 
-	for( uint addr = 0; addr < NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE; addr++  )
+	for( uint addr = 0; addr < NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE; addr++  )
 	{
 		if (get_write_hotness(addr) == WRITE_COLD) {
 			Address a = Address(addr, PAGE);
@@ -159,13 +159,13 @@ void Simple_Page_Hotness_Measurer::start_new_interval_writes() {
 
 void Simple_Page_Hotness_Measurer::start_new_interval_reads() {
 	average_read_hotness = 0;
-	for( uint addr = 0; addr < NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE; addr++  )
+	for( uint addr = 0; addr < NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE; addr++  )
 	{
 	    uint count = read_current_count[addr];
 	    read_moving_average[addr] = read_moving_average[addr] * WEIGHT + count * (1 - WEIGHT);
 	    average_read_hotness += read_moving_average[addr];
 	}
-	average_read_hotness /= NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE;
+	average_read_hotness /= NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {

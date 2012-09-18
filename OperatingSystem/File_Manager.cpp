@@ -86,14 +86,26 @@ void File_Manager::handle_file_completion(double current_time) {
 		randomly_delete_files(current_time);
 	} while (num_free_pages == 0);
 	//StateVisualiser::print_page_status();
-	//StatisticsGatherer::get_instance()->print();
+	StatisticsGatherer::get_instance()->print();
 	write_next_file(current_time);
+}
+
+double File_Manager::generate_death_probability() {
+	double death_probability = double_generator();
+	if (death_probability < 0.5) {
+		death_probability *= 3.0/4.0;
+	} else {
+		death_probability -= 0.5;
+		death_probability *= 3.0/4.0;
+		death_probability = 1 - death_probability;
+	}
+	return death_probability;
 }
 
 void File_Manager::write_next_file(double current_time) {
 	assert(num_free_pages > 0); // deal with this problem later
-	//double death_probability = double_generator() / 2;
-	double death_probability = double_generator() / 2;
+	double death_probability = double_generator() / 4;
+	//double death_probability = generate_death_probability();
 	uint size = 1 + random_number_generator() % max_file_size;
 	if (size > num_free_pages) {
 		size = num_free_pages;
