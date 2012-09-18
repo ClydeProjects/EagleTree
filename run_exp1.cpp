@@ -208,7 +208,11 @@ void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string 
 }
 
 vector<Thread*> random_IO_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
-	Thread* t1 = new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1);
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
+	t1->add_follow_up_thread(new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1));
+
+
+	//Thread* t1 = new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1);
 	//Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
 	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1));
 
@@ -222,26 +226,22 @@ vector<Thread*> random_IO_experiment(int highest_lba, int num_IOs, double IO_sub
 double calibrate_IO_submission_rate(int highest_lba, int num_IOs, vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate)) {
 	double max_rate = calibration_starting_point;
 	double min_rate = 0;
-	double rate = min_rate + (max_rate - min_rate) / 2;
+	double current_rate;
 	bool success;
 	printf("Calibrating...\n");
 	do {
-		printf("Optimal submission rate in range %f - %f\n", min_rate, max_rate);
+		current_rate = min_rate + ((max_rate - min_rate) / 2);
+		printf("Optimal submission rate in range %f - %f. Trying %f.\n", min_rate, max_rate, current_rate);
 		success = true;
 		{
-			vector<Thread*> threads = experiment(highest_lba, num_IOs, rate);
+			vector<Thread*> threads = experiment(highest_lba, num_IOs, current_rate);
 			OperatingSystem* os = new OperatingSystem(threads);
-			try { os->run(); }
+			try        { os->run(); }
 			catch(...) { success = false; }
 			delete os;
 		}
-		if (success) {
-			max_rate = rate;
-			rate -= ((max_rate - min_rate) / 2);
-		} else if (!success) {
-			min_rate = rate;
-			rate += ((max_rate - min_rate) / 2);
-		}
+		if      ( success) max_rate = current_rate;
+		else if (!success) min_rate = current_rate;
 	} while ((max_rate - min_rate) > calibration_precision);
 
 	return max_rate;
@@ -253,11 +253,11 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 	// Experiment parameters ----------------------------------------------
 	const int graph_data_types[]					= {11};     // Draw these values on main graph (numbers correspond to each type of StatisticsGatherer output)
 	const int details_graphs_for_used_space[]		= {50,70,90}; // Draw age and wait time histograms plus queue length history for chosen used_space values
-	const int space_min								= 90;
-    const int space_max								= 90;
+	const int space_min								= 10;
+    const int space_max								= 10;
 	const int space_inc								= 5;
 	const int num_IOs								= 100000;
-    PRINT_LEVEL										= 1;
+    PRINT_LEVEL										= 0;
 	stringstream graph_name;
     graph_name << "Overprovisioning experiment (" << num_IOs << " random writes + " << num_IOs << " random reads)";
     // --------------------------------------------------------------------
@@ -289,7 +289,7 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
 
-		IO_submission_rate = 10;/*calibrate_IO_submission_rate(highest_lba, num_IOs, experiment);*/
+		IO_submission_rate = calibrate_IO_submission_rate(highest_lba, num_IOs, experiment);
 
 		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
 		vector<Thread*> threads = experiment(highest_lba, num_IOs, IO_submission_rate);
