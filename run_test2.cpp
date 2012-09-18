@@ -172,10 +172,12 @@ int main()
 	BLOCK_SIZE = 32;
 
 	long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
-	/*sequential_shortest_queues(logical_address_space_size, -1, 200);
-		sequential_detection_LUN(logical_address_space_size, -1, 200);
-		sequential_detection_CHANNEL(logical_address_space_size, -1, 200);
-		sequential_detection_BLOCK(logical_address_space_size, -1, 200);*/
+
+	/*sequential_tagging
+	 * sequential_shortest_queues
+		sequential_detection_LUN
+		sequential_detection_CHANNEL
+		sequential_detection_BLOCK*/
 
 	vector<Thread*> threads = sequential_tagging(logical_address_space_size, -1, 200);
 
