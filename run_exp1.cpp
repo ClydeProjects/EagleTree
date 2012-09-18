@@ -257,7 +257,7 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
     const int space_max								= 10;
 	const int space_inc								= 5;
 	const int num_IOs								= 100000;
-    PRINT_LEVEL										= 0;
+    PRINT_LEVEL										= 1;
 	stringstream graph_name;
     graph_name << "Overprovisioning experiment (" << num_IOs << " random writes + " << num_IOs << " random reads)";
     // --------------------------------------------------------------------
@@ -289,7 +289,7 @@ void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, 
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
 
-		IO_submission_rate = calibrate_IO_submission_rate(highest_lba, num_IOs, experiment);
+		IO_submission_rate = 10;//calibrate_IO_submission_rate(highest_lba, num_IOs, experiment);
 
 		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
 		vector<Thread*> threads = experiment(highest_lba, num_IOs, IO_submission_rate);
