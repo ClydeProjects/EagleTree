@@ -66,10 +66,6 @@ void OperatingSystem::run() {
 		}
 		else {
 			dispatch_event(event);
-			if (event.get_id() == 141 || event.get_id() == 148 || event.get_id() == 150) {
-				printf(" ");
-				event.print();
-			}
 			idle_time = 0;
 		}
 		finished_experiment = num_writes_to_stop_after != UNDEFINED && num_writes_to_stop_after <= num_writes_completed;
