@@ -203,6 +203,9 @@ extern uint MAX_SSD_QUEUE_SIZE;
 /* Defines the maximal number of locks that can be held by the OS  */
 extern uint MAX_OS_NUM_LOCKS;
 
+/* Defines how the sequential writes detection algorithm spreads a sequential write  */
+extern uint LOCALITY_PARALLEL_DEGREE;
+
 /* Enumerations to clarify status integers in simulation
  * Do not use typedefs on enums for reader clarity */
 
@@ -1592,15 +1595,18 @@ private:
 	string histogram_csv(map<double, uint> histogram);
 
 	vector<vector<double> > sum_bus_wait_time_for_reads_per_LUN;
+	vector<vector<vector<double> > > bus_wait_time_for_reads_per_LUN;
 	vector<vector<uint> > num_reads_per_LUN;
 
 	vector<vector<double> > sum_bus_wait_time_for_writes_per_LUN;
+	vector<vector<vector<double> > > bus_wait_time_for_writes_per_LUN;
 	vector<vector<uint> > num_writes_per_LUN;
 
 	vector<vector<uint> > num_gc_reads_per_LUN;
 	vector<vector<uint> > num_gc_writes_per_LUN_origin;
 	vector<vector<uint> > num_gc_writes_per_LUN_destination;
 	vector<vector<double> > sum_gc_wait_time_per_LUN;
+	vector<vector<vector<double> > > gc_wait_time_per_LUN;
 	vector<vector<uint> > num_copy_backs_per_LUN;
 
 	vector<vector<uint> > num_erases_per_LUN;

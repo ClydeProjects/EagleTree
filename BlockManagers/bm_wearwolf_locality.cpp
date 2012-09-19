@@ -12,6 +12,8 @@ Wearwolf_Locality::Wearwolf_Locality(Ssd& ssd, FtlParent& ftl)
 	  strat(ROUND_ROBIN),
 	  random_number_generator(1111)
 {
+	parallel_degree = LOCALITY_PARALLEL_DEGREE == 0 ? ONE : LOCALITY_PARALLEL_DEGREE == 1 ? CHANNEL : LUN;
+
 	detector->set_listener(this);
 }
 
@@ -32,7 +34,9 @@ void Wearwolf_Locality::register_write_arrival(Event const& event) {
 	if (tag != -1 && tag_map.count(tag) == 0) {
 		tagged_sequential_write tsw(lb, event.get_size());
 		tag_map[tag] = tsw;
-		printf("TAG SEEN FOR FIRST TIME!  KEY: %d   TAG: %d  SIZE: %d  \n", lb, tag, event.get_size());
+		if (PRINT_LEVEL > 1) {
+			printf("TAG SEEN FOR FIRST TIME!  KEY: %d   TAG: %d  SIZE: %d  \n", lb, tag, event.get_size());
+		}
 		set_pointers_for_tagged_sequential_write(tag, event.get_current_time());
 		return;
 	}

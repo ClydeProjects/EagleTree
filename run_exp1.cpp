@@ -21,13 +21,15 @@
  * Brendan Tauras 2010-08-03
  *
  * driver to create and run a very basic test of writes then reads */
-
+#define BOOST_FILESYSTEM_VERSION 3
 #include "ssd.h"
 #include <fstream>
 #include <sstream>
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+
+//#include <boost/filesystem.hpp>
 
 #define SIZE 2
 
@@ -43,7 +45,7 @@ static const double M = 1000000.0; // One million
 static const double K = 1000.0;    // One thousand
 
 static double calibration_precision = 0.1;        // microseconds
-static double calibration_starting_point = 100000.0; // microseconds
+static double calibration_starting_point = 100.0; // microseconds
 
 class Exp {
 public:
@@ -224,22 +226,6 @@ void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string 
 //    remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
-vector<Thread*> random_IO_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
-	//Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
-	//t1->add_follow_up_thread(new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1));
-
-
-	//Thread* t1 = new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1);
-	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1));
-
-	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 2, READ, IO_submission_rate, 0));
-
-	vector<Thread*> threads;
-	threads.push_back(t1);
-	return threads;
-}
-
 double calibrate_IO_submission_rate(int highest_lba, int num_IOs, vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate)) {
 	double max_rate = calibration_starting_point;
 	double min_rate = 0;
@@ -268,11 +254,11 @@ Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, i
 	// Experiment parameters ----------------------------------------------
 //	const int graph_data_types[]					= {11};     // Draw these values on main graph (numbers correspond to each type of StatisticsGatherer output)
 //	const int details_graphs_for_used_space[]		= {50,70,90}; // Draw age and wait time histograms plus queue length history for chosen used_space values
-	const int space_min								= 5;
-    const int space_max								= 15;
+	const int space_min								= 75;
+    const int space_max								= 95;
 	const int space_inc								= 5;
 	const int num_IOs								= 100;
-    PRINT_LEVEL										= 1;
+    PRINT_LEVEL										= 0;
 	stringstream graph_name;
     graph_name << "Overprovisioning experiment (" << num_IOs << " random writes + " << num_IOs << " random reads)";
     // --------------------------------------------------------------------
@@ -286,6 +272,9 @@ Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, i
     vector<string> histogram_commands;
 
     chdir(data_folder.c_str());
+    //boost::filesystem::path working_dir = boost::filesystem::current_path();
+    //boost::filesystem::create_directories(boost::filesystem::path(data_folder));
+    //boost::filesystem::current_path(boost::filesystem::path(data_folder));
 
     string throughput_column_name = "Throughput (IOs/s)";
 	string measurement_name       = "Used space (%)";
@@ -304,7 +293,7 @@ Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, i
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
 
-		IO_submission_rate = 10;//calibrate_IO_submission_rate(highest_lba, num_IOs, experiment);
+		IO_submission_rate = calibrate_IO_submission_rate(highest_lba, num_IOs, experiment);
 
 		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
 		vector<Thread*> threads = experiment(highest_lba, num_IOs, IO_submission_rate);
@@ -387,9 +376,11 @@ Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, i
 
 	vector<string> column_names;
 	column_names.push_back(measurement_name);
-	for (uint i = 0; i < original_column_names.size(); i++) column_names.push_back(original_column_names[i]);
-//	column_names.insert(column_names.end(), original_column_names.begin(), original_column_names.end());
+//	for (uint i = 0; i < original_column_names.size(); i++) column_names.push_back(original_column_names[i]);
+	column_names.insert(column_names.end(), original_column_names.begin(), original_column_names.end());
 	column_names.push_back(throughput_column_name);
+
+    //boost::filesystem::current_path(boost::filesystem::path(working_dir));
 
 	return Exp(name, data_folder, "Free space (%)", column_names);
 }
@@ -432,30 +423,113 @@ void graph(string title, string filename, int column, vector<Exp> experiments, i
 //    remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
+vector<Thread*> random_IO_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1));
+	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 2, READ, IO_submission_rate, 0));
+
+	vector<Thread*> threads;
+	threads.push_back(t1);
+	return threads;
+}
+
+vector<Thread*> basic_sequential_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
+	long log_space_per_thread = highest_lba / 2;
+	long max_file_size = log_space_per_thread / 4;
+	long num_files = 100;
+
+	Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1);
+	Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 2, 2);
+
+	vector<Thread*> threads;
+	threads.push_back(fm1);
+	threads.push_back(fm2);
+	return threads;
+}
+
+vector<Thread*> sequential_tagging(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = true;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	LOCALITY_PARALLEL_DEGREE = 0;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*> sequential_shortest_queues(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 0;
+	GREEDY_GC = true;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*> sequential_detection_LUN(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = false;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	LOCALITY_PARALLEL_DEGREE = 2;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*> sequential_detection_CHANNEL(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = false;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	LOCALITY_PARALLEL_DEGREE = 1;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*> sequential_detection_BLOCK(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = false;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	LOCALITY_PARALLEL_DEGREE = 0;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
 int main()
 {
 	load_config();
 	print_config(NULL);
 
+/*
 	vector<Exp> exp;
 
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	PLANE_SIZE = 4;
-	//BLOCK_SIZE = 8;
-
 	exp.push_back(overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp1/", "First experiment"));
 
 	PLANE_SIZE = 3;
-
 	exp.push_back(overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp2/", "Second experiment"));
 
 	chdir("/home/mkja/git/EagleTree/Graphs");
 	graph("Testgraphtitle","testgraph.eps", 11, exp, 16, 8);
 
-	//	PACKAGE_SIZE = 16;
-
 //	overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp2/");
+
+*/
+	vector<Exp> exp;
+
+	SSD_SIZE = 4;
+	PACKAGE_SIZE = 2;
+	DIE_SIZE = 1;
+	PLANE_SIZE = 64;
+	BLOCK_SIZE = 32;
+
+	exp.push_back( overprovisioning_experiment(sequential_tagging,			"/home/mkja/git/EagleTree/Exp2/", "Oracle") );
+	exp.push_back( overprovisioning_experiment(sequential_shortest_queues,	"/home/mkja/git/EagleTree/Exp3/", "Shortest Queues") );
+	exp.push_back( overprovisioning_experiment(sequential_detection_LUN,	"/home/mkja/git/EagleTree/Exp4/", "Seq Detect: LUN") );
+	exp.push_back( overprovisioning_experiment(sequential_detection_CHANNEL,"/home/mkja/git/EagleTree/Exp5/", "Seq Detect: CHANNEL") );
+	exp.push_back( overprovisioning_experiment(sequential_detection_BLOCK,  "/home/mkja/git/EagleTree/Exp6/", "Seq Detect: BLOCK") );
+
+	chdir("/home/mkja/git/EagleTree/Graphs");
+	graph("Testgraphtitle", "testgraph.eps", 14, exp, 16, 8);
+	graph("Testgraphtitle", "testgraph-dev.eps", 11, exp, 16, 8);
+
+	PACKAGE_SIZE = 16;
 
 	return 0;
 }

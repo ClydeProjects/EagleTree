@@ -10,7 +10,7 @@
 
 using namespace ssd;
 
-#define PRINT_FILE_INFO true
+#define PRINT_FILE_INFO false
 
 File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, double time_breaks, double start_time, ulong randseed)
 	: Thread(start_time), min_LBA(min_LBA), max_LBA(max_LBA),
@@ -86,7 +86,9 @@ void File_Manager::handle_file_completion(double current_time) {
 		randomly_delete_files(current_time);
 	} while (num_free_pages == 0);
 	//StateVisualiser::print_page_status();
-	StatisticsGatherer::get_instance()->print();
+	if (PRINT_FILE_INFO) {
+		StatisticsGatherer::get_instance()->print();
+	}
 	write_next_file(current_time);
 }
 
