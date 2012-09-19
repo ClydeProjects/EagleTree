@@ -12,6 +12,8 @@ Wearwolf_Locality::Wearwolf_Locality(Ssd& ssd, FtlParent& ftl)
 	  strat(ROUND_ROBIN),
 	  random_number_generator(1111)
 {
+	parallel_degree = LOCALITY_PARALLEL_DEGREE == 0 ? ONE : LOCALITY_PARALLEL_DEGREE == 1 ? CHANNEL : LUN;
+
 	detector->set_listener(this);
 }
 

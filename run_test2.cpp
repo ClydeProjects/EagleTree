@@ -96,57 +96,96 @@ void simple_experiment() {
 // problem: some of the pointers for the 6 block managers end up in the same LUNs. This is stupid.
 // solution: have a method in bm_parent that returns a free block from the LUN with the shortest queue.
 
-void file_manager_experiment() {
-	vector<Thread*> threads;
-	long logical_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
-	MAX_SSD_QUEUE_SIZE = 250;
-	long num_files = 100;
-	long log_space_per_thread = logical_space_size / 2;
-
+vector<Thread*> basic_sequential_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
+	long log_space_per_thread = highest_lba / 2;
 	long max_file_size = log_space_per_thread / 4;
+	long num_files = 100;
 
-	Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, 100, 1, 1);
-	Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, 120, 2, 2);
-	//Thread* t1 = new Asynchronous_Random_Thread(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 108, 1, WRITE, 10, 1);
-	//Thread* fm3 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, num_files, max_file_size, 40, 3, 3);
-	//Thread* fm4 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, num_files, max_file_size, 40, 4, 4);
-	//Thread* fm5 = new File_Manager(log_space_per_thread * 4 + 1, log_space_per_thread * 5, num_files, max_file_size, 40, 5, 5);
-	//Thread* fm6 = new File_Manager(log_space_per_thread * 5 + 1, log_space_per_thread * 6, num_files, max_file_size, 40, 6, 6);
+	Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1);
+	Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 2, 2);
+
+	vector<Thread*> threads;
 	threads.push_back(fm1);
 	threads.push_back(fm2);
-	//threads.push_back(t1);
-	/*threads.push_back(fm3);
-	threads.push_back(fm4);
-	threads.push_back(fm5);
-	threads.push_back(fm6);*/
-	OperatingSystem* os = new OperatingSystem(threads);
-	os->run();
-	//VisualTracer::get_instance()->print_horizontally_with_breaks();
-	//StatisticsGatherer::get_instance()->print();
-	//StateVisualiser::print_page_status();
-	delete os;
+	return threads;
+}
+
+vector<Thread*> sequential_tagging(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = true;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	LOCALITY_PARALLEL_DEGREE = 0;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*> sequential_shortest_queues(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 0;
+	GREEDY_GC = true;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*> sequential_detection_LUN(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = false;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	LOCALITY_PARALLEL_DEGREE = 2;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*> sequential_detection_CHANNEL(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = false;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	LOCALITY_PARALLEL_DEGREE = 1;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+}
+
+vector<Thread*> sequential_detection_BLOCK(int highest_lba, int num_IOs, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = false;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	LOCALITY_PARALLEL_DEGREE = 0;
+	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
 }
 
 
-void changing_threshold() {
-	for (int i = 2; i < 10; i++) {
-		WEARWOLF_LOCALITY_THRESHOLD = i;
-		file_manager_experiment();
-	}
-}
 
 int main()
 {
 	load_config();
-	BLOCK_MANAGER_ID = 0;
+	BLOCK_MANAGER_ID = 3;
 	PRINT_LEVEL = 0;
-	GREEDY_GC = true;
-	ENABLE_TAGGING = false;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = true;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 
 	//simple_experiment();
 
-	file_manager_experiment();
+	SSD_SIZE = 4;
+	PACKAGE_SIZE = 2;
+	DIE_SIZE = 1;
+	PLANE_SIZE = 32;
+	BLOCK_SIZE = 32;
+
+	long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
+
+	/*sequential_tagging
+	 * sequential_shortest_queues
+		sequential_detection_LUN
+		sequential_detection_CHANNEL
+		sequential_detection_BLOCK*/
+
+	vector<Thread*> threads = sequential_detection_BLOCK(logical_address_space_size, -1, 200);
+
+	OperatingSystem* os = new OperatingSystem(threads);
+	os->run();
+	StatisticsGatherer::get_instance()->print();
+	delete os;
+
 
 
 	return 0;

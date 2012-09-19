@@ -203,6 +203,9 @@ extern uint MAX_SSD_QUEUE_SIZE;
 /* Defines the maximal number of locks that can be held by the OS  */
 extern uint MAX_OS_NUM_LOCKS;
 
+/* Defines how the sequential writes detection algorithm spreads a sequential write  */
+extern uint LOCALITY_PARALLEL_DEGREE;
+
 /* Enumerations to clarify status integers in simulation
  * Do not use typedefs on enums for reader clarity */
 
