@@ -99,7 +99,7 @@ int main()
 			sequential_detection_CHANNEL
 			sequential_detection_BLOCK*/
 
-	vector<Thread*> threads = random_writes_lazy_gc(logical_address_space_size, 100000, 200);
+	vector<Thread*> threads = random_writes_lazy_gc(logical_address_space_size, 100000, 600);
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->set_num_writes_to_stop_after(10000);
 	os->run();

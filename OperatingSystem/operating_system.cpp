@@ -107,7 +107,7 @@ os_event OperatingSystem::pick_unlocked_event_with_shortest_start_time() {
 	int num_pending_events_confirmation = 0;
 	for (uint i = 0; i < events.size(); i++) {
 		Event* e = events[i].pending_event;
-		bool can_schedule = currently_executing_ios_counter == 0 || last_dispatched_event_minimal_finish_time >= e->get_start_time();
+		bool can_schedule = currently_executing_ios_counter == 0 || last_dispatched_event_minimal_finish_time >= e->get_current_time();
 		//assert(!is_LBA_locked(e->get_logical_address()));
 		if (can_schedule && e->get_current_time() < soonest_time) {
 			soonest_time = e->get_current_time();
@@ -213,7 +213,7 @@ void OperatingSystem::set_num_writes_to_stop_after(long num_writes) {
 }
 
 double OperatingSystem::get_event_minimal_completion_time(Event const*const event) const {
-	double result = event->get_start_time();
+	double result = event->get_current_time();
 	if (event->get_event_type() == WRITE) {
 		result += 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY + PAGE_WRITE_DELAY;
 	}

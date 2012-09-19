@@ -179,7 +179,7 @@ int main()
 		sequential_detection_CHANNEL
 		sequential_detection_BLOCK*/
 
-	vector<Thread*> threads = sequential_tagging(logical_address_space_size, -1, 200);
+	vector<Thread*> threads = sequential_detection_BLOCK(logical_address_space_size, -1, 200);
 
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();

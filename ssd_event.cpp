@@ -305,7 +305,7 @@ void Event::print(FILE *stream) const
 		merge_address.print(stream);
 	if(type == WRITE || type == TRIM || type == COPY_BACK)
 		replace_address.print(stream);
-	fprintf(stream, " Time[%d, %d, %d]", (int)start_time, (int)(start_time + time_taken), (int)bus_wait_time);
+	fprintf(stream, " Time[%d, %d, %d, %d]", (int)start_time, (int)get_ssd_submission_time(), (int)get_current_time(), (int)bus_wait_time);
 	fprintf(stream, " ID: %d ", id);
 	fprintf(stream, " appID: %d", application_io_id);
 
