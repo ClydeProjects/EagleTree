@@ -23,6 +23,7 @@
  * driver to create and run a very basic test of writes then reads */
 
 #include "ssd.h"
+#include <unistd.h>
 
 using namespace ssd;
 
@@ -55,7 +56,7 @@ vector<Thread*>  sequential_writes_lazy_gc(int highest_lba, double IO_submission
 }
 
 vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
-	long num_IOs = 5000;
+	long num_IOs = 100;
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
 	vector<Thread*> threads;
@@ -96,20 +97,26 @@ int main()
 		PLANE_SIZE = 128;
 		BLOCK_SIZE = 32;
 		PRINT_LEVEL = 0;
+
+		PAGE_READ_DELAY = 5;
+		PAGE_WRITE_DELAY = 20;
+		BUS_CTRL_DELAY = 1;
+		BUS_DATA_DELAY = 8;
+		BLOCK_ERASE_DELAY = 150;
+		//submission_rate = 10;
 	} else {
 		SSD_SIZE = 4;
 		PACKAGE_SIZE = 2;
 		DIE_SIZE = 1;
-		PLANE_SIZE = 64;
-		BLOCK_SIZE = 32;
+		PLANE_SIZE = 32;
+		BLOCK_SIZE = 16;
 		PRINT_LEVEL = 0;
 
-		PAGE_READ_DELAY = 2;
+		PAGE_READ_DELAY = 5;
 		PAGE_WRITE_DELAY = 20;
-		BUS_CTRL_DELAY = 2;
+		BUS_CTRL_DELAY = 1;
 		BUS_DATA_DELAY = 8;
 		BLOCK_ERASE_DELAY = 150;
-		submission_rate = 10;
 	}
 
 	//long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
@@ -132,7 +139,11 @@ int main()
     ////////////////////////////////////////////////
 
 	vector<Exp> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 60, 70, 5, "/home/mkja/git/EagleTree/ExpTest/", "Oracle") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 60, 90, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc, 60, 90, 5, "/home/niv/Desktop/EagleTree/rand_lazy/", "rand lazy") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_greedy_gc, 60, 90, 5, "/home/niv/Desktop/EagleTree/seq_greed/", "seq greed") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_lazy_gc, 60, 90, 5, "/home/niv/Desktop/EagleTree/seq_lazy/", "seq lazy") );
+
 
 	// Print column names for info
 	for (uint i = 0; i < exp[0].column_names.size(); i++)
@@ -141,12 +152,24 @@ int main()
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
 
-	chdir("/home/mkja/git/EagleTree/ExpTest/");
-	Experiment_Runner::graph					(16, 8, "Maximum sustainable throughput", "throughput.eps", 24, exp);
-	Experiment_Runner::waittime_boxplot  		(16, 8, "Oracle writes lazy GC, write latency boxplot", "boxplot.eps", mean_pos_in_datafile, exp[0]);
-	//Experiment_Runner::waittime_histogram		(16, 8, "waittime-histograms.eps", exp[0], {10,15,20});
-	//Experiment_Runner::age_histogram			(16, 8, "waittime-histograms.eps", exp[0], {10,15,20});
-	//Experiment_Runner::queue_length_history	(16, 8, "waittime-histograms.eps", exp[0], {10,15,20});
+	vector<int> used_space_values_to_show;
+	used_space_values_to_show.push_back(80);
+	used_space_values_to_show.push_back(85);
+	used_space_values_to_show.push_back(90);
+	used_space_values_to_show.push_back(95);
 
+	int sx = 16;
+	int sy = 8;
+
+	chdir("/home/niv/Desktop/EagleTree/");
+	Experiment_Runner::graph					(sx, sy,   "Maximum sustainable throughput", "throughput", 24, exp);
+
+	for (uint i = 0; i < exp.size(); i++) {
+		chdir(exp[i].data_folder.c_str());
+		Experiment_Runner::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
+		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms", exp[i], used_space_values_to_show);
+		Experiment_Runner::age_histogram			(sx, sy/2, "age-histograms", exp[i], used_space_values_to_show);
+		Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);
+	}
 	return 0;
 }

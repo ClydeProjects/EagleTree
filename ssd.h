@@ -1585,6 +1585,7 @@ public:
 	string wait_time_histogram_csv();
 	string queue_length_csv();
 	uint max_age();
+	uint max_age_freq();
 	uint total_reads();
 	uint total_writes();
 
@@ -1928,18 +1929,20 @@ private:
 
 class Exp {
 public:
-	Exp(string name_, string data_folder_, string x_axis_, vector<string> column_names_, uint max_age_)
+	Exp(string name_, string data_folder_, string x_axis_, vector<string> column_names_, uint max_age_, uint max_age_freq_)
 	:	name(name_),
 	 	data_folder(data_folder_),
 	 	x_axis(x_axis_),
 	 	column_names(column_names_),
-	 	max_age(max_age_)
+	 	max_age(max_age_),
+	 	max_age_freq(max_age_freq_)
 	{}
 	string name;
 	string data_folder;
 	string x_axis;
 	vector<string> column_names;
 	uint max_age;
+	uint max_age_freq;
 };
 
 class Experiment_Runner {
@@ -1954,12 +1957,12 @@ public:
 	static Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name);
 	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<Exp> experiments);
 	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Exp experiment);
-	static void waittime_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, int points[]);
-	static void age_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, int points[]);
-	static void queue_length_history(int sizeX, int sizeY, string outputFile, Exp experiment, int points[]);
+	static void waittime_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
+	static void age_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
+	static void queue_length_history(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
 
 private:
-	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands);
+	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
 
 	static uint max_age;
 	static const bool REMOVE_GLE_SCRIPTS_AGAIN;
