@@ -37,6 +37,9 @@ using namespace ssd;
 
 static uint max_age = 0;
 
+static const bool REMOVE_GLE_SCRIPTS_AGAIN = false;
+
+//static const string experiments_folder = "./Experiments/";
 static const string stats_filename = "stats.csv";
 
 static const string markers[] = {"circle", "square", "triangle", "diamond", "cross", "plus", "star", "star2", "star3", "star4", "flower"};
@@ -44,7 +47,7 @@ static const string markers[] = {"circle", "square", "triangle", "diamond", "cro
 static const double M = 1000000.0; // One million
 static const double K = 1000.0;    // One thousand
 
-static double calibration_precision = 0.1;        // microseconds
+static double calibration_precision = 0.0001;        // microseconds
 static double calibration_starting_point = 100.0; // microseconds
 
 class Exp {
@@ -145,7 +148,7 @@ void draw_graph(int sizeX, int sizeY, string outputFile, string dataFilename, st
     cout << gleCommand << "\n";
     system(gleCommand.c_str());
 
-//    remove(scriptFilename.c_str()); // Delete tempoary script file again
+    if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
 void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command, vector<string> histogram_commands) {
@@ -223,7 +226,7 @@ void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string 
     cout << gleCommand << "\n";
     system(gleCommand.c_str());
 
-//    remove(scriptFilename.c_str()); // Delete tempoary script file again
+    if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
 double calibrate_IO_submission_rate(int highest_lba, int num_IOs, vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate)) {
@@ -233,7 +236,7 @@ double calibrate_IO_submission_rate(int highest_lba, int num_IOs, vector<Thread*
 	bool success;
 	printf("Calibrating...\n");
 	do {
-		current_rate = min_rate + ((max_rate - min_rate) / 2);
+		current_rate = min_rate + ((max_rate - min_rate) / 2); // Pick a rate just between min and max
 		printf("Optimal submission rate in range %f - %f. Trying %f.\n", min_rate, max_rate, current_rate);
 		success = true;
 		{
@@ -271,12 +274,13 @@ Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, i
 	double IO_submission_rate	= 12.0 / IOs_per_microsecond;
     vector<string> histogram_commands;
 
+    mkdir(data_folder.c_str());
     chdir(data_folder.c_str());
     //boost::filesystem::path working_dir = boost::filesystem::current_path();
     //boost::filesystem::create_directories(boost::filesystem::path(data_folder));
     //boost::filesystem::current_path(boost::filesystem::path(data_folder));
 
-    string throughput_column_name = "Throughput (IOs/s)";
+    string throughput_column_name = "Max sustainable throughput (IOs/s)";
 	string measurement_name       = "Used space (%)";
     std::ofstream csv_file;
     csv_file.open(stats_filename.c_str());
@@ -396,12 +400,9 @@ void graph(string title, string filename, int column, vector<Exp> experiments, i
     "begin graph" << endl <<
     "   " << "key pos tl offset -0.0 0 compact" << endl <<
     "   scale auto" << endl <<
-//    "   nobox" << endl <<
     "   title  \"" << title << "\"" << endl <<
     "   xtitle \"" << experiments[0].x_axis << "\"" << endl <<
     "   ytitle \"" << experiments[0].column_names[column] << "\"" << endl <<
-//    "   xticks off" << endl <<
-//    "   " << xAxisConf << endl <<
     "   yaxis min 0" << endl;
 
     for (int i = 0; i < experiments.size(); i++) {
@@ -420,18 +421,61 @@ void graph(string title, string filename, int column, vector<Exp> experiments, i
     cout << gleCommand << "\n";
     system(gleCommand.c_str());
 
-//    remove(scriptFilename.c_str()); // Delete tempoary script file again
+    if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
-vector<Thread*> random_IO_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
-	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1));
-	//t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 2, READ, IO_submission_rate, 0));
+// Work in progress
+void waittime_graph(string title, string filename, Exp experiment, int sizeX, int sizeY) {
+	// Write tempoary file containing GLE script
+    string scriptFilename = filename + "-temp.gle"; // Name of tempoary script file
+    std::ofstream gleScript;
+    gleScript.open(scriptFilename.c_str());
+    gleScript <<
+    "size " << sizeX << " " << sizeY << endl << // 12 8
+    "set font texcmr" << endl <<
+    "begin graph" << endl <<
+    "   " << "key pos tl offset -0.0 0 compact" << endl <<
+    "   scale auto" << endl <<
+    "   title  \"" << title << "\"" << endl <<
+    "   xtitle \"" << experiment.x_axis << "\"" << endl <<
+    "   ytitle \"Wait time (µs)\"" << endl <<
+    "   yaxis min 0" << endl;
+
+	gleScript <<
+	"   data   \"" << experiment.data_folder << stats_filename << "\"" << " d1=c1,c2" << endl <<
+	"   d1 line marker " << markers[0] << " key " << "\"" << e.name << "\"" << endl;
+
+    gleScript <<
+    "end graph" << endl;
+    gleScript.close();
+
+    // Run gle to draw graph
+    string gleCommand = "gle \"" + scriptFilename + "\" \"" + filename + "\"";
+    cout << gleCommand << "\n";
+    system(gleCommand.c_str());
+
+    if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
+}
+
+
+vector<Thread*> random_writes_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
+	Thread* t1 = new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1);
 
 	vector<Thread*> threads;
 	threads.push_back(t1);
 	return threads;
 }
+
+vector<Thread*> random_read_writes_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1));
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 2, READ, IO_submission_rate, 0));
+
+	vector<Thread*> threads;
+	threads.push_back(t1);
+	return threads;
+}
+
 
 vector<Thread*> basic_sequential_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
 	long log_space_per_thread = highest_lba / 2;

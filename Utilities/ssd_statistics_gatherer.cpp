@@ -338,19 +338,32 @@ string StatisticsGatherer::totals_csv_header() {
 
 vector<string> StatisticsGatherer::totals_vector_header() {
 	vector<string> result;
+	// 1 "Used space %"
 	result.push_back("num writes");
 	result.push_back("num reads");
 	result.push_back("GC write");
-	result.push_back("GC reads");
+	result.push_back("GC reads"); // 5
 	result.push_back("GC scheduled");
 	result.push_back("GC wait");
 	result.push_back("copy backs");
 	result.push_back("erases");
-	result.push_back("avg write wait (µs)");
+	result.push_back("avg write wait (µs)"); //10
+//    local minv = datayvalue("d"+num$(ds0+1), i)
+//    local q25 = datayvalue("d"+num$(ds0+2), i)
+//    local q50 = datayvalue("d"+num$(ds0+3), i)
+//    local q75 = datayvalue("d"+num$(ds0+4), i)
+//    local maxv = datayvalue("d"+num$(ds0+5), i)
+
+
 	result.push_back("avg read wait (µs)");
 	result.push_back("stdev write wait (µs)");
 	result.push_back("stdev read wait (µs)");
 	result.push_back("stdev GC wait (µs)");
+
+	result.push_back("max write wait (µs)"); // 15
+	result.push_back("max read wait (µs)");
+	result.push_back("max GC wait (µs)");
+	// Sustainable throughput (µs) 18
 	return result;
 }
 
@@ -422,6 +435,9 @@ string StatisticsGatherer::totals_csv_line() {
 	avg_overall_gc_wait_time /= SSD_SIZE * PACKAGE_SIZE;
 
 	// Compute standard deviation of read, write and GC wait
+	double max_write_wait_time = 0;
+	double max_read_wait_time = 0;
+	double max_gc_wait_time = 0;
 	double stddev_overall_write_wait_time = 0;
 	double stddev_overall_read_wait_time = 0;
 	double stddev_overall_gc_wait_time = 0;
@@ -430,14 +446,21 @@ string StatisticsGatherer::totals_csv_line() {
 	uint gc_wait_time_population = 0;
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			for (uint k = 0; k < bus_wait_time_for_writes_per_LUN[i][j].size(); k++)
+			for (uint k = 0; k < bus_wait_time_for_writes_per_LUN[i][j].size(); k++) {
 				stddev_overall_write_wait_time += pow(bus_wait_time_for_writes_per_LUN[i][j][k] - avg_overall_write_wait_time, 2);
+				max_write_wait_time = max(bus_wait_time_for_writes_per_LUN[i][j][k], max_write_wait_time);
+			}
 			write_wait_time_population += bus_wait_time_for_writes_per_LUN[i][j].size();
-			for (uint k = 0; k < bus_wait_time_for_reads_per_LUN[i][j].size(); k++)
+			for (uint k = 0; k < bus_wait_time_for_reads_per_LUN[i][j].size(); k++) {
 				stddev_overall_read_wait_time += pow(bus_wait_time_for_reads_per_LUN[i][j][k] - avg_overall_read_wait_time, 2);
+				max_read_wait_time = max(bus_wait_time_for_reads_per_LUN[i][j][k], max_read_wait_time);
+			}
 			read_wait_time_population += bus_wait_time_for_reads_per_LUN[i][j].size();
-			for (uint k = 0; k < gc_wait_time_per_LUN[i][j].size(); k++)
+			for (uint k = 0; k < gc_wait_time_per_LUN[i][j].size(); k++) {
 				stddev_overall_gc_wait_time += pow(gc_wait_time_per_LUN[i][j][k] - avg_overall_gc_wait_time, 2);
+				max_gc_wait_time = max(gc_wait_time_per_LUN[i][j][k], max_gc_wait_time);
+
+			}
 			gc_wait_time_population += gc_wait_time_per_LUN[i][j].size();
 		}
 	}
@@ -458,9 +481,11 @@ string StatisticsGatherer::totals_csv_line() {
 	ss << avg_overall_read_wait_time << ", ";
 	ss << stddev_overall_write_wait_time << ", ";
 	ss << stddev_overall_read_wait_time << ", ";
-	ss << stddev_overall_gc_wait_time;
+	ss << stddev_overall_gc_wait_time << ", ";
+	ss << max_write_wait_time << ", ";
+	ss << max_read_wait_time << ", ";
+	ss << max_gc_wait_time;
 
-	//	ss << "\n";
 	return ss.str();
 }
 
