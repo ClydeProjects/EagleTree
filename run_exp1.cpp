@@ -48,7 +48,7 @@ const double Experiment_Runner::M = 1000000.0; // One million
 const double Experiment_Runner::K = 1000.0;    // One thousand
 
 double Experiment_Runner::calibration_precision = 0.0001;        // microseconds
-double Experiment_Runner::calibration_starting_point = 100.0; // microseconds
+double Experiment_Runner::calibration_starting_point = 1000.0; // microseconds
 
 
 double Experiment_Runner::CPU_time_user() {
@@ -216,18 +216,30 @@ void Experiment_Runner::draw_graph_with_histograms(int sizeX, int sizeY, string 
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
-double Experiment_Runner::calibrate_IO_submission_rate(int highest_lba, int num_IOs, vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate)) {
+double Experiment_Runner::calibrate_IO_submission_rate(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
 	double max_rate = calibration_starting_point;
 	double min_rate = 0;
 	double current_rate;
 	bool success;
 	printf("Calibrating...\n");
+
+	// finding an upper bound
+	do {
+		printf("Finding upper bound. Current is:  %f.\n", max_rate);
+		success = true;
+		vector<Thread*> threads = experiment(highest_lba, max_rate);
+		OperatingSystem* os = new OperatingSystem(threads);
+		try        { os->run(); }
+		catch(...) { success = false; max_rate *= 2; }
+		delete os;
+	} while (!success);
+
 	do {
 		current_rate = min_rate + ((max_rate - min_rate) / 2); // Pick a rate just between min and max
 		printf("Optimal submission rate in range %f - %f. Trying %f.\n", min_rate, max_rate, current_rate);
 		success = true;
 		{
-			vector<Thread*> threads = experiment(highest_lba, num_IOs, current_rate);
+			vector<Thread*> threads = experiment(highest_lba, current_rate);
 			OperatingSystem* os = new OperatingSystem(threads);
 			try        { os->run(); }
 			catch(...) { success = false; }
@@ -240,17 +252,16 @@ double Experiment_Runner::calibrate_IO_submission_rate(int highest_lba, int num_
 	return max_rate;
 }
 
-Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate), string data_folder, string name) {
+Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), string data_folder, string name) {
 	// Experiment parameters ----------------------------------------------
 //	const int graph_data_types[]					= {11};     // Draw these values on main graph (numbers correspond to each type of StatisticsGatherer output)
 //	const int details_graphs_for_used_space[]		= {50,70,90}; // Draw age and wait time histograms plus queue length history for chosen used_space values
 	const int space_min								= 75;
     const int space_max								= 95;
 	const int space_inc								= 5;
-	const int num_IOs								= 100;
-    PRINT_LEVEL										= 0;
+    //PRINT_LEVEL										= 0;
 	stringstream graph_name;
-    graph_name << "Overprovisioning experiment (" << num_IOs << " random writes + " << num_IOs << " random reads)";
+    //graph_name << "Overprovisioning experiment (" << num_IOs << " random writes + " << num_IOs << " random reads)";
     // --------------------------------------------------------------------
 
 	// -- unused for now, calibrating throughput instead --
@@ -284,10 +295,10 @@ Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
 
-		IO_submission_rate = calibrate_IO_submission_rate(highest_lba, num_IOs, experiment);
+		IO_submission_rate = calibrate_IO_submission_rate(highest_lba, experiment);
 
 		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
-		vector<Thread*> threads = experiment(highest_lba, num_IOs, IO_submission_rate);
+		vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->run();
 
@@ -443,82 +454,6 @@ void Experiment_Runner::waittime_graph(string title, string filename, Exp experi
 
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
-
-
-/*vector<Thread*> random_writes_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
-	Thread* t1 = new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1);
-
-	vector<Thread*> threads;
-	threads.push_back(t1);
-	return threads;
-}
-
-vector<Thread*> random_read_writes_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
-	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba-1, 1, WRITE, IO_submission_rate, 1);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1));
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 2, READ, IO_submission_rate, 0));
-
-	vector<Thread*> threads;
-	threads.push_back(t1);
-	return threads;
-}
-
-
-vector<Thread*> basic_sequential_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
-	long log_space_per_thread = highest_lba / 2;
-	long max_file_size = log_space_per_thread / 4;
-	long num_files = 100;
-
-	Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1);
-	Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 2, 2);
-
-	vector<Thread*> threads;
-	threads.push_back(fm1);
-	threads.push_back(fm2);
-	return threads;
-}
-
-vector<Thread*> sequential_tagging(int highest_lba, int num_IOs, double IO_submission_rate) {
-	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = false;
-	ENABLE_TAGGING = true;
-	WEARWOLF_LOCALITY_THRESHOLD = 10;
-	LOCALITY_PARALLEL_DEGREE = 0;
-	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
-}
-
-vector<Thread*> sequential_shortest_queues(int highest_lba, int num_IOs, double IO_submission_rate) {
-	BLOCK_MANAGER_ID = 0;
-	GREEDY_GC = true;
-	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
-}
-
-vector<Thread*> sequential_detection_LUN(int highest_lba, int num_IOs, double IO_submission_rate) {
-	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = false;
-	ENABLE_TAGGING = false;
-	WEARWOLF_LOCALITY_THRESHOLD = 10;
-	LOCALITY_PARALLEL_DEGREE = 2;
-	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
-}
-
-vector<Thread*> sequential_detection_CHANNEL(int highest_lba, int num_IOs, double IO_submission_rate) {
-	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = false;
-	ENABLE_TAGGING = false;
-	WEARWOLF_LOCALITY_THRESHOLD = 10;
-	LOCALITY_PARALLEL_DEGREE = 1;
-	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
-}
-
-vector<Thread*> sequential_detection_BLOCK(int highest_lba, int num_IOs, double IO_submission_rate) {
-	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = false;
-	ENABLE_TAGGING = false;
-	WEARWOLF_LOCALITY_THRESHOLD = 10;
-	LOCALITY_PARALLEL_DEGREE = 0;
-	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
-}*/
 
 /*int main()
 {

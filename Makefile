@@ -37,7 +37,7 @@ CXX = /usr/bin/g++
 CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
 ELF1 = run_trace
-ELF2 = run_test2
+ELF2 = run_test
 HDR = ssd.h 
 VPATH = FTLs MTRand BlockManagers OperatingSystem Utilities
 #SRC = ssd_address.cpp ssd_block.cpp ssd_bus.cpp ssd_channel.cpp ssd_config.cpp ssd_controller.cpp ssd_die.cpp ssd_event.cpp ssd_ftl.cpp ssd_gc.cpp ssd_package.cpp ssd_page.cpp ssd_plane.cpp ssd_quicksort.cpp ssd_ram.cpp ssd_ssd.cpp ssd_wl.cpp
@@ -55,7 +55,7 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
-all: test2
+all: test
 
 test: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o $(ELF2) run_test.cpp $(OBJ)
