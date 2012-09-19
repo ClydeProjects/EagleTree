@@ -277,7 +277,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	event_type scheduled_op_code = dependency_code_to_type[dependency_code_of_other_event];
 
 	if (existing_event == NULL) {
-		new_event->print();
+		//new_event->print();
 	}
 	//assert (existing_event != NULL || scheduled_op_code == COPY_BACK);
 
