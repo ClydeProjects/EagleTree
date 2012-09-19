@@ -77,8 +77,8 @@ extern const double RAM_WRITE_DELAY;
  * 	flag value to detect free table entry (keep this negative)
  * 	number of time entries bus has to keep track of future schedule usage
  * 	number of simultaneous communication channels - defined by SSD_SIZE */
-extern const double BUS_CTRL_DELAY;
-extern const double BUS_DATA_DELAY;
+extern double BUS_CTRL_DELAY;
+extern double BUS_DATA_DELAY;
 extern const uint BUS_MAX_CONNECT;
 extern const double BUS_CHANNEL_FREE_FLAG;
 extern const uint BUS_TABLE_SIZE;
@@ -112,13 +112,13 @@ extern const double PLANE_REG_WRITE_DELAY;
  * 	delay for erasing block */
 extern uint BLOCK_SIZE;
 extern const uint BLOCK_ERASES;
-extern const double BLOCK_ERASE_DELAY;
+extern double BLOCK_ERASE_DELAY;
 
 /* Page class:
  * 	delay for Page reads
  * 	delay for Page writes */
-extern const double PAGE_READ_DELAY;
-extern const double PAGE_WRITE_DELAY;
+extern double PAGE_READ_DELAY;
+extern double PAGE_WRITE_DELAY;
 extern const uint PAGE_SIZE;
 extern const bool PAGE_ENABLE_DATA;
 

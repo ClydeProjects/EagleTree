@@ -55,10 +55,10 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	tag(-1)
 {
 	assert(start_time >= 0.0);
-	if (VIRTUAL_PAGE_SIZE == 1)
-		assert((long long int) logical_address <= (long long int) SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE);
-	else
-		assert((long long int) logical_address*VIRTUAL_PAGE_SIZE <= (long long int) SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE);
+	if (logical_address > NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE) {
+		printf("invalid logical address, too big  %d   %d\n", logical_address, NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE);
+		assert(false);
+	}
 }
 
 Event::Event(Event& event) :

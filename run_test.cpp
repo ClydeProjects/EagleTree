@@ -55,7 +55,7 @@ vector<Thread*>  sequential_writes_lazy_gc(int highest_lba, double IO_submission
 }
 
 vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
-	long num_IOs = 100000;
+	long num_IOs = 5000;
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
 	vector<Thread*> threads;
@@ -87,6 +87,8 @@ int main()
 	 */
 	load_config();
 
+	double submission_rate = 100;
+
 	if (!debug) {
 		SSD_SIZE = 4;
 		PACKAGE_SIZE = 2;
@@ -95,15 +97,22 @@ int main()
 		BLOCK_SIZE = 32;
 		PRINT_LEVEL = 0;
 	} else {
-		SSD_SIZE = 2;
+		SSD_SIZE = 4;
 		PACKAGE_SIZE = 2;
 		DIE_SIZE = 1;
-		PLANE_SIZE = 2;
+		PLANE_SIZE = 64;
 		BLOCK_SIZE = 32;
 		PRINT_LEVEL = 0;
+
+		PAGE_READ_DELAY = 2;
+		PAGE_WRITE_DELAY = 20;
+		BUS_CTRL_DELAY = 2;
+		BUS_DATA_DELAY = 8;
+		BLOCK_ERASE_DELAY = 150;
+		submission_rate = 10;
 	}
 
-	long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
+	//long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
 
 		/*sequential_tagging
 		 * sequential_shortest_queues
@@ -111,17 +120,19 @@ int main()
 			sequential_detection_CHANNEL
 			sequential_detection_BLOCK*/
 
-	/*vector<Thread*> threads = random_writes_lazy_gc(logical_address_space_size, 10000, 100);
+	/*PRINT_LEVEL = 0;
+	vector<Thread*> threads = random_writes_greedy_gc(logical_address_space_size, submission_rate);
 	OperatingSystem* os = new OperatingSystem(threads);
 	//os->set_num_writes_to_stop_after(10000);
 	os->run();
 	StatisticsGatherer::get_instance()->print();
-	delete os;*/
+	delete os;
+	return 0;*/
 
     ////////////////////////////////////////////////
 
 	vector<Exp> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc, 10, 20, 5, "/home/mkja/git/EagleTree/ExpTest/", "Oracle") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 60, 70, 5, "/home/mkja/git/EagleTree/ExpTest/", "Oracle") );
 
 	// Print column names for info
 	for (uint i = 0; i < exp[0].column_names.size(); i++)

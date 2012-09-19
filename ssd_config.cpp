@@ -198,7 +198,7 @@ bool ENABLE_TAGGING = false;
 
 /* Defines the max number of copy back operations on a page before ECC check is performed.
  * Set to zero to disable copy back GC operations */
-uint MAX_REPEATED_COPY_BACKS_ALLOWED = 1;
+uint MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 
 /* Defines the max number of page addresses in map keeping track of each pages copy back count */
 uint MAX_ITEMS_IN_COPY_BACK_MAP = 1024;
