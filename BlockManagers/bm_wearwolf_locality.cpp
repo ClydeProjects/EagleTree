@@ -25,6 +25,7 @@ void Wearwolf_Locality::register_write_arrival(Event const& event) {
 	if (!event.is_original_application_io()) {
 		return;
 	}
+
 	if (PRINT_LEVEL > 1) {
 		printf("arrival: %d  in time: %f\n", event.get_logical_address(), event.get_current_time());
 	}
@@ -206,6 +207,7 @@ void Wearwolf_Locality::set_pointers_for_tagged_sequential_write(int tag, double
 
 // must handle situation in which a pointer was chosen for GC operation from choose_any_location
 void Wearwolf_Locality::process_write_completion(Event const& event, long key, pair<long, long> index) {
+
 	Block_manager_parent::register_write_outcome(event, SUCCESS);
 	page_hotness_measurer.register_event(event);
 
@@ -282,7 +284,7 @@ void Wearwolf_Locality::register_write_outcome(Event const& event, enum status s
 	for (; iter != seq_write_key_to_pointers_mapping.end(); iter++) {
 		vector<vector<Address> >& pointers = (*iter).second.pointers;
 		for (uint i = 0; i < pointers.size(); i++) {
-			for (uint j = 0; j < pointers.size(); j++) {
+			for (uint j = 0; j < pointers[i].size(); j++) {
 				if (has_free_pages(pointers[i][j]) && event.get_address().compare(pointers[i][j]) >= BLOCK) {
 
 					if (event.get_id() == 160537) {

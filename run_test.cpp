@@ -85,7 +85,7 @@ int main()
 	 */
 	load_config();
 	SSD_SIZE = 4;
-	PACKAGE_SIZE = 2;
+	PACKAGE_SIZE = 24;
 	DIE_SIZE = 1;
 	PLANE_SIZE = 32;
 	BLOCK_SIZE = 32;
@@ -99,7 +99,7 @@ int main()
 			sequential_detection_CHANNEL
 			sequential_detection_BLOCK*/
 
-	vector<Thread*> threads = random_writes_lazy_gc(logical_address_space_size, 100000, 600);
+	vector<Thread*> threads = random_writes_lazy_gc(logical_address_space_size, 100000, 1000);
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->set_num_writes_to_stop_after(10000);
 	os->run();
