@@ -55,7 +55,7 @@ vector<Thread*>  sequential_writes_lazy_gc(int highest_lba, double IO_submission
 }
 
 vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
-	long num_IOs = 10000;
+	long num_IOs = 10;
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
 	vector<Thread*> threads;
@@ -95,10 +95,10 @@ int main()
 		BLOCK_SIZE = 32;
 		PRINT_LEVEL = 0;
 	} else {
-		SSD_SIZE = 2;
+		SSD_SIZE = 4;
 		PACKAGE_SIZE = 2;
 		DIE_SIZE = 1;
-		PLANE_SIZE = 2;
+		PLANE_SIZE = 8;
 		BLOCK_SIZE = 32;
 		PRINT_LEVEL = 0;
 	}
@@ -121,7 +121,7 @@ int main()
     ////////////////////////////////////////////////
 
 	vector<Exp> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc, 10, 20, 5, "/home/mkja/git/EagleTree/ExpTest/", "Oracle") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 80, 95, 5, "/home/mkja/git/EagleTree/ExpTest/", "Oracle") );
 
 	// Print column names for info
 	for (uint i = 0; i < exp[0].column_names.size(); i++)
@@ -130,12 +130,21 @@ int main()
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
 
+	vector<int> used_space_values_to_show;
+	used_space_values_to_show.push_back(80);
+	used_space_values_to_show.push_back(85);
+	used_space_values_to_show.push_back(90);
+	used_space_values_to_show.push_back(95);
+	int sx = 16;
+	int sy = 8;
+
 	chdir("/home/mkja/git/EagleTree/ExpTest/");
-	Experiment_Runner::graph					(16, 8, "Maximum sustainable throughput", "throughput.eps", 24, exp);
-	Experiment_Runner::waittime_boxplot  		(16, 8, "Oracle writes lazy GC, write latency boxplot", "boxplot.eps", mean_pos_in_datafile, exp[0]);
-	//Experiment_Runner::waittime_histogram		(16, 8, "waittime-histograms.eps", exp[0], {10,15,20});
-	//Experiment_Runner::age_histogram			(16, 8, "waittime-histograms.eps", exp[0], {10,15,20});
-	//Experiment_Runner::queue_length_history	(16, 8, "waittime-histograms.eps", exp[0], {10,15,20});
+
+	Experiment_Runner::graph					(sx, sy, "Maximum sustainable throughput", "throughput", 24, exp);
+	Experiment_Runner::waittime_boxplot  		(sx, sy, "Oracle writes lazy GC, write latency boxplot", "boxplot", mean_pos_in_datafile, exp[0]);
+	Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms", exp[0], used_space_values_to_show);
+	Experiment_Runner::age_histogram			(sx, sy/2, "age-histograms", exp[0], used_space_values_to_show);
+	Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length-histograms", exp[0], used_space_values_to_show);
 
 	return 0;
 }

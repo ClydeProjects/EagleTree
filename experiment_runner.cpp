@@ -48,8 +48,8 @@ const string Experiment_Runner::queue_filename_prefix 		= "queue-";
 const double Experiment_Runner::M = 1000000.0; // One million
 const double Experiment_Runner::K = 1000.0;    // One thousand
 
-double Experiment_Runner::calibration_precision      = 0.0001; // microseconds
-double Experiment_Runner::calibration_starting_point = 1000.0; // microseconds
+double Experiment_Runner::calibration_precision      = 0.1; // microseconds
+double Experiment_Runner::calibration_starting_point = 0.1; // microseconds
 
 double Experiment_Runner::CPU_time_user() {
     struct rusage ru;
@@ -237,7 +237,7 @@ Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)
 // Plotting x number of experiments into one graph
 void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filename, int column, vector<Exp> experiments) {
 	// Write tempoary file containing GLE script
-    string scriptFilename = filename + "-temp.gle"; // Name of tempoary script file
+    string scriptFilename = filename + ".gle"; // Name of tempoary script file
     std::ofstream gleScript;
     gleScript.open(scriptFilename.c_str());
 
@@ -273,7 +273,7 @@ void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filenam
 
 void Experiment_Runner::waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Exp experiment) {
 	// Write tempoary file containing GLE script
-    string scriptFilename = filename + "-temp.gle"; // Name of tempoary script file
+    string scriptFilename = filename + ".gle"; // Name of tempoary script file
     std::ofstream gleScript;
     gleScript.open(scriptFilename.c_str());
 
@@ -286,9 +286,9 @@ void Experiment_Runner::waittime_boxplot(int sizeX, int sizeY, string title, str
     "   scale auto" << endl <<
     "   title  \"" << title << "\"" << endl <<
     "   xtitle \"" << experiment.x_axis << "\"" << endl <<
-    "   ytitle \"Wait time (µs)\"" <<
-	"   data   \"" << experiment.data_folder << stats_filename << "\"" << endl <<
-    "	xaxis min dminx(d1)-2.5 max dmaxx(d1)+2.5 dticks 5" << endl << // nolast nofirst
+    "   ytitle \"Wait time (µs)\"" << endl <<
+	"   data \"" << experiment.data_folder << stats_filename << "\"" << endl <<
+    "   xaxis min dminx(d1)-2.5 max dmaxx(d1)+2.5 dticks 5" << endl << // nolast nofirst
     "   dticks off" << endl <<
     "   yaxis min 0 max dmaxy(d" << mean_column+5 << ")*1.05" << endl << // mean_column+5 = max column
     "   draw boxplot bwidth 0.4 ds0 " << mean_column << endl;
@@ -336,44 +336,38 @@ void Experiment_Runner::draw_graph(int sizeX, int sizeY, string outputFile, stri
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
-void Experiment_Runner::waittime_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, int points[]) {
-	uint num_graphs = sizeof(points)/sizeof(int);
-
+void Experiment_Runner::waittime_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points) {
 	vector<string> commands;
-	for (uint i = 0; i < num_graphs; i++) {
+	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "hist 0 " << i << " \"" << waittime_filename_prefix << i << datafile_postfix << "\" \"Wait time histogram (" << experiment.x_axis << " = " << points[i] << ")\" \"log min 1\" \"Event wait time (µs)\" -1";
+		command << "hist 0 " << i << " \"" << waittime_filename_prefix << points[i] << datafile_postfix << "\" \"Wait time histogram (" << experiment.x_axis << " = " << points[i] << ")\" \"log min 1\" \"Event wait time (µs)\" -1";
 		commands.push_back(command.str());
 	}
 
 	multigraph(sizeX, sizeY, outputFile, commands);
 }
 
-void Experiment_Runner::age_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, int points[]) {
-	uint num_graphs = sizeof(points)/sizeof(int);
-
-	vector<string> commands;
-
+void Experiment_Runner::age_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points) {
+	vector<string> settings;
 	stringstream age_max;
-	age_max << "age_max = " << experiment.max_age << endl;
-	commands.push_back(age_max.str());
+	age_max << "age_max = " << experiment.max_age;
+	settings.push_back(age_max.str());
 
-	for (uint i = 0; i < num_graphs; i++) {
+	vector<string> commands;
+	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "hist 0 " << i << " \"" << age_filename_prefix << i << datafile_postfix << "\" \"Block age histogram (" << experiment.x_axis << " = " << points[i] << ")\" \"on\" \"Block age\" age_max";
+		command << "hist 0 " << i << " \"" << age_filename_prefix << points[i] << datafile_postfix << "\" \"Block age histogram (" << experiment.x_axis << " = " << points[i] << ")\" \"on\" \"Block age\" age_max";
 		commands.push_back(command.str());
 	}
 
-	multigraph(sizeX, sizeY, outputFile, commands);
+	multigraph(sizeX, sizeY, outputFile, commands, settings);
 }
 
-void Experiment_Runner::queue_length_history(int sizeX, int sizeY, string outputFile, Exp experiment, int points[]) {
-	uint num_graphs = sizeof(points)/sizeof(int);
-
+void Experiment_Runner::queue_length_history(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points) {
 	vector<string> commands;
-	for (uint i = 0; i < num_graphs; i++) {
+	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "plot 0 " << i << " \"" << queue_filename_prefix << i << datafile_postfix << "\" \"Queue length history (" << experiment.x_axis << " = " << points[i] << ")\" \"on\" \"Timeline (µs progressed)\" \"Items in event queue\"";
+		command << "plot 0 " << i << " \"" << queue_filename_prefix << points[i] << datafile_postfix << "\" \"Queue length history (" << experiment.x_axis << " = " << points[i] << ")\" \"on\" \"Timeline (µs progressed)\" \"Items in event queue\"";
 		commands.push_back(command.str());
 	}
 
@@ -395,7 +389,7 @@ void Experiment_Runner::queue_length_history(int sizeX, int sizeY, string output
 
 
 // Draw multiple smaller graphs in one image
-void Experiment_Runner::multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands) {
+void Experiment_Runner::multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings) {
 	// Write tempoary file containing GLE script
     string scriptFilename = outputFile + ".gle"; // Name of tempoary script file
     std::ofstream gleScript;
@@ -409,21 +403,21 @@ void Experiment_Runner::multigraph(int sizeX, int sizeY, string outputFile, vect
 	endl <<
 	"pad = 2" << endl <<
 	endl <<
-	"size std_sx+pad std_sy+(std_sy*hist_graphs/2)+pad" << endl <<
+	"size std_sx+pad std_sy*hist_graphs+pad" << endl <<
 	"set font texcmr" << endl <<
 	endl <<
 	"sub hist xp yp data$ title$ yaxis$ xaxistitle$ xmax" << endl <<
-	"   amove xp*(std_sx/2)+pad yp*(std_sy/2)+pad" << endl <<
+	"   amove xp*(std_sx/2)+pad yp*std_sy+pad" << endl <<
 	"   begin graph" << endl <<
 	"      fullsize" << endl <<
-	"      size 16-pad 5-pad" << endl <<
+	"      size std_sx-pad std_sy-pad" << endl <<
 	"      key off" << endl <<
 	"      data  data$" << endl <<
 	"      title title$" << endl <<
 	"      yaxis \\expr{yaxis$}" << endl <<
 	"!      xaxis dticks 1" << endl <<
-	"      if xmax<>-1 then" << endl <<
-	"         xaxis max xmax" << endl <<
+	"      if xmax>0 then" << endl <<
+	"         xaxis min 0 max xmax" << endl <<
 	"      end if" << endl <<
 	"      xtitle xaxistitle$" << endl <<
 	"      ytitle \"Frequency\"" << endl <<
@@ -432,10 +426,10 @@ void Experiment_Runner::multigraph(int sizeX, int sizeY, string outputFile, vect
 	"end sub" << endl <<
 	endl <<
 	"sub plot xp yp data$ title$ yaxis$ xaxistitle$ yaxistitle$" << endl <<
-	"   amove xp*(std_sx/2)+pad yp*(std_sy/2)+pad" << endl <<
+	"   amove xp*(std_sx/2)+pad yp*std_sy+pad" << endl <<
 	"   begin graph" << endl <<
 	"      fullsize" << endl <<
-	"      size 16-pad 5-pad" << endl <<
+	"      size std_sx-pad std_sy-pad" << endl <<
 	"      key off" << endl <<
 	"      data  data$" << endl <<
 	"      title title$" << endl <<
@@ -446,6 +440,9 @@ void Experiment_Runner::multigraph(int sizeX, int sizeY, string outputFile, vect
 	"   end graph" << endl <<
 	"end sub" << endl;
 
+    for (uint i = 0; i < settings.size(); i++) {
+    	gleScript << settings[i] << endl;
+    }
     for (uint i = 0; i < commands.size(); i++) {
     	gleScript << commands[i] << endl;
     }

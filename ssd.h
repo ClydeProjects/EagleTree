@@ -1954,12 +1954,12 @@ public:
 	static Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name);
 	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<Exp> experiments);
 	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Exp experiment);
-	static void waittime_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, int points[]);
-	static void age_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, int points[]);
-	static void queue_length_history(int sizeX, int sizeY, string outputFile, Exp experiment, int points[]);
+	static void waittime_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
+	static void age_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
+	static void queue_length_history(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
 
 private:
-	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands);
+	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
 
 	static uint max_age;
 	static const bool REMOVE_GLE_SCRIPTS_AGAIN;
