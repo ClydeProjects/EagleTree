@@ -54,8 +54,8 @@ Die::Die(const Package &parent, Channel &channel, uint die_size, long physical_a
 {
 	uint i;
 
-	if(channel.connect() == FAILURE)
-		fprintf(stderr, "Die error: %s: constructor unable to connect to Bus Channel\n", __func__);
+	//if(channel.connect() == FAILURE)
+	//	fprintf(stderr, "Die error: %s: constructor unable to connect to Bus Channel\n", __func__);
 
 	/* new cannot initialize an array with constructor args so
 	 * 	malloc the array
@@ -86,7 +86,7 @@ Die::~Die(void)
 	for(i = 0; i < size; i++)
 		data[i].~Plane();
 	free(data);
-	(void) channel.disconnect();
+	//(void) channel.disconnect();
 	return;
 }
 

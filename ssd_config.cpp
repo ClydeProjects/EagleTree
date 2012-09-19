@@ -207,7 +207,7 @@ uint MAX_ITEMS_IN_COPY_BACK_MAP = 1024;
 uint MAX_SSD_QUEUE_SIZE = 500;
 
 /* Defines the maximal number of locks that can be held by the OS  */
-uint MAX_OS_NUM_LOCKS = 500;
+uint MAX_OS_NUM_LOCKS = 1000;
 
 /* Defines how the sequential writes detection algorithm spreads a sequential write  */
 uint LOCALITY_PARALLEL_DEGREE = 0;

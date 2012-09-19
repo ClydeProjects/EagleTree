@@ -78,8 +78,8 @@ Channel::Channel(Ssd* ssd, double ctrl_delay, double data_delay, uint table_size
 /* free allocated bus channel state space */
 Channel::~Channel(void)
 {
-	if(num_connected > 0)
-		fprintf(stderr, "Bus channel warning: %s: %d connected devices when bus channel terminated\n", __func__, num_connected);
+	//if(num_connected > 0)
+	//	fprintf(stderr, "Bus channel warning: %s: %d connected devices when bus channel terminated\n", __func__, num_connected);
 	return;
 }
 
