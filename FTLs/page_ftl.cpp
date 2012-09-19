@@ -28,72 +28,65 @@
 using namespace ssd;
 
 FtlImpl_Page::FtlImpl_Page(Controller &controller):
-	FtlParent(controller)
-{
-	trim_map = new bool[NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE];
-
-	numPagesActive = 0;
-
-	return;
-}
+	FtlParent(controller),
+	logical_to_physical_map(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE, UNDEFINED),
+	physical_to_logical_map(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE, UNDEFINED)
+{}
 
 FtlImpl_Page::~FtlImpl_Page(void)
 {}
 
+Address FtlImpl_Page::get_physical_address(Event const& event) const {
+	long virtual_address = event.get_logical_address();
+	long phys_addr = logical_to_physical_map[virtual_address];
+	return phys_addr == UNDEFINED ? Address() : Address(phys_addr, PAGE);
+}
+
 void FtlImpl_Page::read(Event *event)
 {
-	controller.stats.numFTLRead++;
-	IOScheduler::instance()->schedule_event(event, event->get_logical_address(), READ);
+	IOScheduler::instance()->schedule_event(event);
 }
 
 void FtlImpl_Page::write(Event *event)
 {
-	controller.stats.numFTLWrite++;
-	IOScheduler::instance()->schedule_event(event, event->get_logical_address(), WRITE);
+	IOScheduler::instance()->schedule_event(event);
 }
 
 void FtlImpl_Page::trim(Event *event)
 {
-	IOScheduler::instance()->schedule_event(event, event->get_logical_address(), TRIM);
+	IOScheduler::instance()->schedule_event(event);
+}
+
+void FtlImpl_Page::register_write_completion(Event const& event, enum status result) {
+	long phys_addr = event.get_address().get_linear_address();
+	long logi_addr = event.get_logical_address();
+	logical_to_physical_map[logi_addr] = phys_addr;
+	physical_to_logical_map[phys_addr] = logi_addr;
+}
+
+void FtlImpl_Page::register_read_completion(Event const& event, enum status result) {
+
+}
+
+void FtlImpl_Page::register_trim_completion(Event & event) {
+	long phys_addr = event.get_address().get_linear_address();
+	long logi_addr = event.get_logical_address();
+	logical_to_physical_map[logi_addr] = UNDEFINED;
+	physical_to_logical_map[phys_addr] = UNDEFINED;
+}
+
+long FtlImpl_Page::get_logical_address(uint physical_address) const {
+	return physical_to_logical_map[physical_address];
+}
+
+void FtlImpl_Page::set_replace_address(Event& event) const {
+	Address target = get_physical_address(event);
+	event.set_replace_address(target);
+}
+
+void FtlImpl_Page::set_read_address(Event& event) {
+	Address target = get_physical_address(event);
+	event.set_address(target);
 }
 
 
-
-/*void FtlImpl_Page::trim(Event *event)
-{
-	controller.stats.numFTLTrim++;
-
-	uint dlpn = event->get_logical_address();
-
-	if (!trim_map[event->get_logical_address()])
-		trim_map[event->get_logical_address()] = true;
-
-	// Update trim map and update block map if all pages are trimmed. i.e. the state are reseted to optimal.
-	long addressStart = dlpn - dlpn % BLOCK_SIZE;
-	bool allTrimmed = true;
-	for (uint i=addressStart;i<addressStart+BLOCK_SIZE;i++)
-	{
-		if (!trim_map[i])
-			allTrimmed = false;
-	}
-
-	if (allTrimmed)
-	{
-		Event eraseEvent = Event(ERASE, event->get_logical_address(), 1, event->get_start_time());
-		eraseEvent.set_address(Address(0, PAGE));
-
-		if (controller.issue(eraseEvent) == FAILURE) printf("Erase failed");
-
-		event->incr_time_taken(eraseEvent.get_time_taken());
-
-		for (uint i=addressStart;i<addressStart+BLOCK_SIZE;i++)
-			trim_map[i] = false;
-
-		controller.stats.numFTLErase++;
-
-		numPagesActive -= BLOCK_SIZE;
-	}
-
-	return SUCCESS;
-}
-*/

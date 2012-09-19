@@ -55,7 +55,7 @@ vector<Thread*>  sequential_writes_lazy_gc(int highest_lba, double IO_submission
 }
 
 vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
-	long num_IOs = 100000;
+	long num_IOs = 10000;
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
 	vector<Thread*> threads;
@@ -88,7 +88,7 @@ int main()
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 128;
+	PLANE_SIZE = 32;
 	BLOCK_SIZE = 32;
 	PRINT_LEVEL = 0;
 
@@ -108,7 +108,7 @@ int main()
 	delete os;*/
 
 	vector<Exp> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc, "/home/mkja/git/EagleTree/Exp2/", "Oracle") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, "/home/mkja/git/EagleTree/Exp2/", "Oracle") );
 
 	return 0;
 }

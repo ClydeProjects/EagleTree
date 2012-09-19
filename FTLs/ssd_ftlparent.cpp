@@ -21,7 +21,7 @@
  * Implements parent interface for all FTL implementations to use.
  */
 
-#include "ssd.h"
+#include "../ssd.h"
 
 using namespace ssd;
 
@@ -54,35 +54,5 @@ Block *FtlParent::get_block_pointer(const Address &address)
 
 void FtlParent::print_ftl_statistics()
 {
-	return;
-}
-
-void FtlParent::register_write_completion(Event const& event, enum status result) {
-	assert(false);
-	return;
-}
-
-void FtlParent::register_read_completion(Event const& event, enum status result) {
-	assert(false);
-	return;
-}
-
-void FtlParent::register_trim_completion(Event & event) {
-	assert(false);
-	return;
-}
-
-long FtlParent::get_logical_address(uint physical_address) const {
-	assert(false);
-	return 0;
-}
-
-void FtlParent::set_replace_address(Event& event) const {
-	assert(false);
-	return;
-}
-
-void FtlParent::set_read_address(Event& event) {
-	assert(false);
 	return;
 }
