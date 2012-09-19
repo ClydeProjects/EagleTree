@@ -139,8 +139,8 @@ void IOScheduler::execute_current_waiting_ios() {
 
 	if (read_commands.size() + writes.size() >= MAX_SSD_QUEUE_SIZE) {
 		//StateVisualiser::print_page_status();
-		//printf("queue size:  %d\n", current_events.size());
-		throw "Events queue maximum size exceeded";
+		printf("Events queue maximum size exceeded:  %d\n", current_events.size());
+		throw "Events queue maximum size exceeded.";
 	}
 
 	while (events.size() > 0) {
