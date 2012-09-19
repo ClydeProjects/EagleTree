@@ -1585,6 +1585,7 @@ public:
 	string wait_time_histogram_csv();
 	string queue_length_csv();
 	uint max_age();
+	uint max_age_freq();
 	uint total_reads();
 	uint total_writes();
 
@@ -1928,18 +1929,20 @@ private:
 
 class Exp {
 public:
-	Exp(string name_, string data_folder_, string x_axis_, vector<string> column_names_, uint max_age_)
+	Exp(string name_, string data_folder_, string x_axis_, vector<string> column_names_, uint max_age_, uint max_age_freq_)
 	:	name(name_),
 	 	data_folder(data_folder_),
 	 	x_axis(x_axis_),
 	 	column_names(column_names_),
-	 	max_age(max_age_)
+	 	max_age(max_age_),
+	 	max_age_freq(max_age_freq_)
 	{}
 	string name;
 	string data_folder;
 	string x_axis;
 	vector<string> column_names;
 	uint max_age;
+	uint max_age_freq;
 };
 
 class Experiment_Runner {

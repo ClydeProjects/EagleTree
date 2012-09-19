@@ -135,13 +135,14 @@ int main()
 	used_space_values_to_show.push_back(85);
 	used_space_values_to_show.push_back(90);
 	used_space_values_to_show.push_back(95);
+
 	int sx = 16;
 	int sy = 8;
 
 	chdir("/home/mkja/git/EagleTree/ExpTest/");
 
-	Experiment_Runner::graph					(sx, sy, "Maximum sustainable throughput", "throughput", 24, exp);
-	Experiment_Runner::waittime_boxplot  		(sx, sy, "Oracle writes lazy GC, write latency boxplot", "boxplot", mean_pos_in_datafile, exp[0]);
+	Experiment_Runner::graph					(sx, sy,   "Maximum sustainable throughput", "throughput", 24, exp);
+	Experiment_Runner::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[0]);
 	Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms", exp[0], used_space_values_to_show);
 	Experiment_Runner::age_histogram			(sx, sy/2, "age-histograms", exp[0], used_space_values_to_show);
 	Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length-histograms", exp[0], used_space_values_to_show);

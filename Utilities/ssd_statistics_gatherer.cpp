@@ -538,6 +538,28 @@ uint StatisticsGatherer::max_age() {
 	return max_age;
 }
 
+uint StatisticsGatherer::max_age_freq() {
+	uint max_age_freq = 0;
+	map<double, uint> age_histogram;
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			for (uint k = 0; k < DIE_SIZE; k++) {
+				for (uint t = 0; t < PLANE_SIZE; t++) {
+					Block const& block = ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
+					uint age = BLOCK_ERASES - block.get_erases_remaining();
+					age_histogram[floor((double) age / age_histogram_steps)*age_histogram_steps]++;
+				}
+			}
+		}
+	}
+
+	for (map<double,uint>::iterator it = age_histogram.begin(); it != age_histogram.end(); ++it) {
+		max_age_freq = max(it->second, max_age_freq);
+	}
+
+	return max_age_freq;
+}
+
 string StatisticsGatherer::age_histogram_csv() {
 	map<double, uint> age_histogram;
 	for (uint i = 0; i < SSD_SIZE; i++) {

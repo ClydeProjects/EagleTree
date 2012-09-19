@@ -144,6 +144,7 @@ double Experiment_Runner::calibrate_IO_submission_rate(int highest_lba, vector<T
 
 Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name) {
 	uint max_age = 0;
+	uint max_age_freq = 0;
 	stringstream graph_name;
 
     vector<string> histogram_commands;
@@ -159,7 +160,7 @@ Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)
 	string measurement_name       = "Used space (%)";
     std::ofstream csv_file;
     csv_file.open(stats_filename.c_str());
-    csv_file << "\"" << measurement_name << "\", " << StatisticsGatherer::get_instance()->totals_csv_header() << ", \"" << throughput_column_name <<"\"" << "\n";
+    csv_file << "\"" << measurement_name << "\", " << StatisticsGatherer::get_instance()->totals_csv_header() << ", \"" << throughput_column_name << "\"" << "\n";
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 
@@ -203,6 +204,7 @@ Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)
 		age_file << StatisticsGatherer::get_instance()->age_histogram_csv();
 		age_file.close();
 		max_age = max(StatisticsGatherer::get_instance()->max_age(), max_age);
+		max_age_freq = max(StatisticsGatherer::get_instance()->max_age_freq(), max_age_freq);
 
 		std::ofstream queue_file;
 		queue_file.open(queue_filename.str().c_str());
@@ -231,7 +233,7 @@ Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)
 
     //boost::filesystem::current_path(boost::filesystem::path(working_dir));
 
-	return Exp(name, data_folder, "Free space (%)", column_names, max_age);
+	return Exp(name, data_folder, "Free space (%)", column_names, max_age, max_age_freq);
 }
 
 // Plotting x number of experiments into one graph
@@ -356,7 +358,7 @@ void Experiment_Runner::age_histogram(int sizeX, int sizeY, string outputFile, E
 	vector<string> commands;
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "hist 0 " << i << " \"" << age_filename_prefix << points[i] << datafile_postfix << "\" \"Block age histogram (" << experiment.x_axis << " = " << points[i] << ")\" \"on\" \"Block age\" age_max";
+		command << "hist 0 " << i << " \"" << age_filename_prefix << points[i] << datafile_postfix << "\" \"Block age histogram (" << experiment.x_axis << " = " << points[i] << ")\" \"on min 0 max " << experiment.max_age_freq << "\" \"Block age\" age_max";
 		commands.push_back(command.str());
 	}
 
@@ -373,20 +375,6 @@ void Experiment_Runner::queue_length_history(int sizeX, int sizeY, string output
 
 	multigraph(sizeX, sizeY, outputFile, commands);
 }
-//endl <<
-/*
-	stringstream waittime_commands;
-	waittime_commands << "hist 0 " << histogram_commands.size() << " \"" << hist_filename.str() << "\" \"Wait time histogram (" << used_space << "% used space)\" \"log min 1\" \"Event wait time (µs)\" -1";
-	histogram_commands.push_back(waittime_commands.str());
-
-	stringstream age_command;
-	age_command << "hist 0 " << histogram_commands.size() << " \"" << age_filename.str() << "\" \"Block age histogram (" << used_space << "% used space)\" \"on\" \"Block age\" age_max";
-	histogram_commands.push_back(age_command.str());
-
-	stringstream queue_command;
-	histogram_commands.push_back(queue_command.str());
-*/
-
 
 // Draw multiple smaller graphs in one image
 void Experiment_Runner::multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings) {
