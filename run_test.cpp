@@ -78,6 +78,7 @@ vector<Thread*>  random_writes_lazy_gc(int highest_lba, double IO_submission_rat
 
 int main()
 {
+	bool debug = true;
 	/*
 	 * sequential_writes_lazy_gc
 	 * random_writes_experiment
@@ -85,12 +86,22 @@ int main()
 	 * random_writes_lazy_gc
 	 */
 	load_config();
-	SSD_SIZE = 4;
-	PACKAGE_SIZE = 2;
-	DIE_SIZE = 1;
-	PLANE_SIZE = 32;
-	BLOCK_SIZE = 32;
-	PRINT_LEVEL = 0;
+
+	if (!debug) {
+		SSD_SIZE = 4;
+		PACKAGE_SIZE = 2;
+		DIE_SIZE = 1;
+		PLANE_SIZE = 128;
+		BLOCK_SIZE = 32;
+		PRINT_LEVEL = 0;
+	} else {
+		SSD_SIZE = 2;
+		PACKAGE_SIZE = 2;
+		DIE_SIZE = 1;
+		PLANE_SIZE = 2;
+		BLOCK_SIZE = 32;
+		PRINT_LEVEL = 0;
+	}
 
 	long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
 
@@ -107,8 +118,24 @@ int main()
 	StatisticsGatherer::get_instance()->print();
 	delete os;*/
 
+    ////////////////////////////////////////////////
+
 	vector<Exp> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, "/home/mkja/git/EagleTree/Exp2/", "Oracle") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc, 10, 20, 5, "/home/mkja/git/EagleTree/ExpTest/", "Oracle") );
+
+	// Print column names for info
+	for (uint i = 0; i < exp[0].column_names.size(); i++)
+		printf("%d: %s\n", i, exp[0].column_names[i].c_str());
+
+	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
+	assert(mean_pos_in_datafile != exp[0].column_names.size());
+
+	chdir("/home/mkja/git/EagleTree/ExpTest/");
+	Experiment_Runner::graph					(16, 8, "Maximum sustainable throughput", "throughput.eps", 24, exp);
+	Experiment_Runner::waittime_boxplot  		(16, 8, "Oracle writes lazy GC, write latency boxplot", "boxplot.eps", mean_pos_in_datafile, exp[0]);
+	//Experiment_Runner::waittime_histogram		(16, 8, "waittime-histograms.eps", exp[0], {10,15,20});
+	//Experiment_Runner::age_histogram			(16, 8, "waittime-histograms.eps", exp[0], {10,15,20});
+	//Experiment_Runner::queue_length_history	(16, 8, "waittime-histograms.eps", exp[0], {10,15,20});
 
 	return 0;
 }

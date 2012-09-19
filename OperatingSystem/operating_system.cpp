@@ -89,8 +89,8 @@ void OperatingSystem::get_next_event(int thread_id) {
 		num_locked_events++;
 		if (PRINT_LEVEL > 1) printf("num_locked_events:\t%d\n", num_locked_events);
 		if (num_locked_events >= MAX_OS_NUM_LOCKS) {
-			printf("The number of locks held by the system exceeded the permissible number");
-			throw;
+			printf("The number of locks held by the system exceeded the permissible number\n");
+			throw "The number of locks held by the system exceeded the permissible number";
 		}
 	}
 	if (event != NULL) {
