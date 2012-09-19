@@ -99,7 +99,7 @@ void simple_experiment() {
 vector<Thread*> basic_sequential_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
 	long log_space_per_thread = highest_lba / 2;
 	long max_file_size = log_space_per_thread / 4;
-	long num_files = 100;
+	long num_files = 5;
 
 	Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1);
 	Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 2, 2);
@@ -156,22 +156,7 @@ vector<Thread*> sequential_detection_BLOCK(int highest_lba, int num_IOs, double 
 
 int main()
 {
-	load_config();
-	BLOCK_MANAGER_ID = 3;
-	PRINT_LEVEL = 0;
-	GREEDY_GC = false;
-	ENABLE_TAGGING = true;
-	WEARWOLF_LOCALITY_THRESHOLD = 10;
 
-	//simple_experiment();
-
-	SSD_SIZE = 4;
-	PACKAGE_SIZE = 2;
-	DIE_SIZE = 1;
-	PLANE_SIZE = 32;
-	BLOCK_SIZE = 32;
-
-	long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
 
 	/*sequential_tagging
 	 * sequential_shortest_queues
@@ -179,14 +164,40 @@ int main()
 		sequential_detection_CHANNEL
 		sequential_detection_BLOCK*/
 
-	vector<Thread*> threads = sequential_detection_BLOCK(logical_address_space_size, -1, 200);
+	/*
+	 * long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
+	 * vector<Thread*> threads = sequential_detection_BLOCK(logical_address_space_size, -1, 200);
 
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
 	StatisticsGatherer::get_instance()->print();
 	delete os;
+*/
 
+	vector<Exp> exp;
 
+	load_config();
+	BLOCK_MANAGER_ID = 3;
+	PRINT_LEVEL = 0;
+	GREEDY_GC = false;
+	ENABLE_TAGGING = true;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+
+	SSD_SIZE = 4;
+	PACKAGE_SIZE = 2;
+	DIE_SIZE = 1;
+	PLANE_SIZE = 32;
+	BLOCK_SIZE = 32;
+
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_tagging,			"/home/mkja/git/EagleTree/Exp2/", "Oracle") );
+	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_shortest_queues,	"/home/mkja/git/EagleTree/Exp3/", "Shortest Queues") );
+	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_LUN,	"/home/mkja/git/EagleTree/Exp4/", "Seq Detect: LUN") );
+	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_CHANNEL,"/home/mkja/git/EagleTree/Exp5/", "Seq Detect: CHANNEL") );
+	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_BLOCK,  "/home/mkja/git/EagleTree/Exp6/", "Seq Detect: BLOCK") );
+
+	chdir("/home/mkja/git/EagleTree/Graphs");
+	Experiment_Runner::graph("Testgraphtitle", "testgraph.eps", 14, exp, 16, 8);
+	Experiment_Runner::graph("Testgraphtitle", "testgraph-dev.eps", 11, exp, 16, 8);
 
 	return 0;
 }

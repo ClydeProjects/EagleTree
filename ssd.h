@@ -1920,6 +1920,44 @@ private:
 
 };
 
+class Exp {
+public:
+	Exp(string name_, string data_folder_, string x_axis_, vector<string> column_names_)
+	:	name(name_),
+	 	data_folder(data_folder_),
+	 	x_axis(x_axis_),
+	 	column_names(column_names_)
+	{}
+	string name;
+	string data_folder;
+	string x_axis;
+	vector<string> column_names;
+};
+
+class Experiment_Runner {
+public:
+	static double CPU_time_user();
+	static double CPU_time_system();
+	static double wall_clock_time();
+	static string pretty_time(double time);
+	static void draw_graph(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command);
+	static void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command, vector<string> histogram_commands);
+	static double calibrate_IO_submission_rate(int highest_lba, int num_IOs, vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate));
+	static Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate), string data_folder, string name);
+	static void graph(string title, string filename, int column, vector<Exp> experiments, int sizeX, int sizeY);
+	static void waittime_graph(string title, string filename, Exp experiment, int sizeX, int sizeY);
+private:
+	static uint max_age;
+	static const bool REMOVE_GLE_SCRIPTS_AGAIN;
+	//static const string experiments_folder = "./Experiments/";
+	static const string stats_filename;
+	static const string markers[];
+	static const double M; // One million
+	static const double K;    // One thousand
+	static double calibration_precision;        // microseconds
+	static double calibration_starting_point; // microseconds
+};
+
 /*class Block_manager
 {
 public:

@@ -28,43 +28,30 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/resource.h>
-
+#include <sys/stat.h>
 //#include <boost/filesystem.hpp>
 
 #define SIZE 2
 
 using namespace ssd;
 
-static uint max_age = 0;
+uint Experiment_Runner::max_age = 0;
 
-static const bool REMOVE_GLE_SCRIPTS_AGAIN = false;
+const bool Experiment_Runner::REMOVE_GLE_SCRIPTS_AGAIN = false;
 
 //static const string experiments_folder = "./Experiments/";
-static const string stats_filename = "stats.csv";
+const string Experiment_Runner::stats_filename = "stats.csv";
 
-static const string markers[] = {"circle", "square", "triangle", "diamond", "cross", "plus", "star", "star2", "star3", "star4", "flower"};
+const string Experiment_Runner::markers[] = {"circle", "square", "triangle", "diamond", "cross", "plus", "star", "star2", "star3", "star4", "flower"};
 
-static const double M = 1000000.0; // One million
-static const double K = 1000.0;    // One thousand
+const double Experiment_Runner::M = 1000000.0; // One million
+const double Experiment_Runner::K = 1000.0;    // One thousand
 
-static double calibration_precision = 0.0001;        // microseconds
-static double calibration_starting_point = 100.0; // microseconds
+double Experiment_Runner::calibration_precision = 0.0001;        // microseconds
+double Experiment_Runner::calibration_starting_point = 100.0; // microseconds
 
-class Exp {
-public:
-	Exp(string name_, string data_folder_, string x_axis_, vector<string> column_names_)
-	:	name(name_),
-	 	data_folder(data_folder_),
-	 	x_axis(x_axis_),
-	 	column_names(column_names_)
-	{}
-	string name;
-	string data_folder;
-	string x_axis;
-	vector<string> column_names;
-};
 
-double CPU_time_user() {
+double Experiment_Runner::CPU_time_user() {
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
     struct timeval time = ru.ru_utime;
@@ -74,7 +61,7 @@ double CPU_time_user() {
     return result;
 }
 
-double CPU_time_system() {
+double Experiment_Runner::CPU_time_system() {
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
     struct timeval time = ru.ru_stime;
@@ -84,7 +71,7 @@ double CPU_time_system() {
     return result;
 }
 
-double wall_clock_time() {
+double Experiment_Runner::wall_clock_time() {
     struct timeval time;
     gettimeofday(&time, NULL);
 
@@ -93,7 +80,7 @@ double wall_clock_time() {
     return result;
 }
 
-string pretty_time(double time) {
+string Experiment_Runner::pretty_time(double time) {
 	stringstream time_text;
 	double t = time;
 	uint hours = (uint) floor(time / 3600.0);
@@ -120,7 +107,7 @@ string pretty_time(double time) {
 	return time_text.str();
 }
 
-void draw_graph(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command) {
+void Experiment_Runner::draw_graph(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command) {
     // Write tempoary file containing GLE script
     string scriptFilename = outputFile + ".gle"; // Name of tempoary script file
     std::ofstream gleScript;
@@ -151,7 +138,7 @@ void draw_graph(int sizeX, int sizeY, string outputFile, string dataFilename, st
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
-void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command, vector<string> histogram_commands) {
+void Experiment_Runner::draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command, vector<string> histogram_commands) {
     // Write tempoary file containing GLE script
     string scriptFilename = outputFile + ".gle"; // Name of tempoary script file
     std::ofstream gleScript;
@@ -229,7 +216,7 @@ void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string 
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
-double calibrate_IO_submission_rate(int highest_lba, int num_IOs, vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate)) {
+double Experiment_Runner::calibrate_IO_submission_rate(int highest_lba, int num_IOs, vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate)) {
 	double max_rate = calibration_starting_point;
 	double min_rate = 0;
 	double current_rate;
@@ -253,7 +240,7 @@ double calibrate_IO_submission_rate(int highest_lba, int num_IOs, vector<Thread*
 	return max_rate;
 }
 
-Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate), string data_folder, string name) {
+Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, int num_IOs, double IO_submission_rate), string data_folder, string name) {
 	// Experiment parameters ----------------------------------------------
 //	const int graph_data_types[]					= {11};     // Draw these values on main graph (numbers correspond to each type of StatisticsGatherer output)
 //	const int details_graphs_for_used_space[]		= {50,70,90}; // Draw age and wait time histograms plus queue length history for chosen used_space values
@@ -274,7 +261,7 @@ Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, i
 	double IO_submission_rate	= 12.0 / IOs_per_microsecond;
     vector<string> histogram_commands;
 
-    mkdir(data_folder.c_str());
+    mkdir(data_folder.c_str(), 0755);
     chdir(data_folder.c_str());
     //boost::filesystem::path working_dir = boost::filesystem::current_path();
     //boost::filesystem::create_directories(boost::filesystem::path(data_folder));
@@ -389,7 +376,7 @@ Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, i
 	return Exp(name, data_folder, "Free space (%)", column_names);
 }
 
-void graph(string title, string filename, int column, vector<Exp> experiments, int sizeX, int sizeY) {
+void Experiment_Runner::graph(string title, string filename, int column, vector<Exp> experiments, int sizeX, int sizeY) {
 	// Write tempoary file containing GLE script
     string scriptFilename = filename + "-temp.gle"; // Name of tempoary script file
     std::ofstream gleScript;
@@ -425,7 +412,7 @@ void graph(string title, string filename, int column, vector<Exp> experiments, i
 }
 
 // Work in progress
-void waittime_graph(string title, string filename, Exp experiment, int sizeX, int sizeY) {
+void Experiment_Runner::waittime_graph(string title, string filename, Exp experiment, int sizeX, int sizeY) {
 	// Write tempoary file containing GLE script
     string scriptFilename = filename + "-temp.gle"; // Name of tempoary script file
     std::ofstream gleScript;
@@ -443,7 +430,7 @@ void waittime_graph(string title, string filename, Exp experiment, int sizeX, in
 
 	gleScript <<
 	"   data   \"" << experiment.data_folder << stats_filename << "\"" << " d1=c1,c2" << endl <<
-	"   d1 line marker " << markers[0] << " key " << "\"" << e.name << "\"" << endl;
+	"   d1 line marker " << markers[0] << " key " << "\"" << experiment.name << "\"" << endl;
 
     gleScript <<
     "end graph" << endl;
@@ -458,7 +445,7 @@ void waittime_graph(string title, string filename, Exp experiment, int sizeX, in
 }
 
 
-vector<Thread*> random_writes_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
+/*vector<Thread*> random_writes_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
 	Thread* t1 = new Asynchronous_Random_Thread(0, highest_lba-1, num_IOs, 1, WRITE, IO_submission_rate, 1);
 
 	vector<Thread*> threads;
@@ -531,13 +518,13 @@ vector<Thread*> sequential_detection_BLOCK(int highest_lba, int num_IOs, double 
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 0;
 	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
-}
+}*/
 
-int main()
+/*int main()
 {
 	load_config();
 	print_config(NULL);
-
+*/
 /*
 	vector<Exp> exp;
 
@@ -555,25 +542,27 @@ int main()
 //	overprovisioning_experiment(random_IO_experiment, "/home/mkja/git/EagleTree/Exp2/");
 
 */
-	vector<Exp> exp;
+	//vector<Exp> exp;
 
-	SSD_SIZE = 4;
+	/*SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
 	PLANE_SIZE = 64;
 	BLOCK_SIZE = 32;
+*/
 
-	exp.push_back( overprovisioning_experiment(sequential_tagging,			"/home/mkja/git/EagleTree/Exp2/", "Oracle") );
-	exp.push_back( overprovisioning_experiment(sequential_shortest_queues,	"/home/mkja/git/EagleTree/Exp3/", "Shortest Queues") );
-	exp.push_back( overprovisioning_experiment(sequential_detection_LUN,	"/home/mkja/git/EagleTree/Exp4/", "Seq Detect: LUN") );
-	exp.push_back( overprovisioning_experiment(sequential_detection_CHANNEL,"/home/mkja/git/EagleTree/Exp5/", "Seq Detect: CHANNEL") );
-	exp.push_back( overprovisioning_experiment(sequential_detection_BLOCK,  "/home/mkja/git/EagleTree/Exp6/", "Seq Detect: BLOCK") );
-
+	/*exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_tagging,			"/home/mkja/git/EagleTree/Exp2/", "Oracle") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_shortest_queues,	"/home/mkja/git/EagleTree/Exp3/", "Shortest Queues") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_LUN,	"/home/mkja/git/EagleTree/Exp4/", "Seq Detect: LUN") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_CHANNEL,"/home/mkja/git/EagleTree/Exp5/", "Seq Detect: CHANNEL") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_BLOCK,  "/home/mkja/git/EagleTree/Exp6/", "Seq Detect: BLOCK") );
+*/
+/*
 	chdir("/home/mkja/git/EagleTree/Graphs");
-	graph("Testgraphtitle", "testgraph.eps", 14, exp, 16, 8);
-	graph("Testgraphtitle", "testgraph-dev.eps", 11, exp, 16, 8);
+	Experiment_Runner::graph("Testgraphtitle", "testgraph.eps", 14, exp, 16, 8);
+	Experiment_Runner::graph("Testgraphtitle", "testgraph-dev.eps", 11, exp, 16, 8);
 
 	PACKAGE_SIZE = 16;
 
 	return 0;
-}
+}*/
