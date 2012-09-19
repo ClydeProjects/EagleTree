@@ -79,13 +79,13 @@ int main()
 {
 	/*
 	 * sequential_writes_lazy_gc
-	 * random_writes_experiment
+	 * sequential_writes_greedy_gc
 	 * random_writes_greedy_gc
 	 * random_writes_lazy_gc
 	 */
 	load_config();
 	SSD_SIZE = 4;
-	PACKAGE_SIZE = 24;
+	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
 	PLANE_SIZE = 32;
 	BLOCK_SIZE = 32;
@@ -94,14 +94,14 @@ int main()
 	long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
 
 		/*sequential_tagging
-		 * sequential_shortest_queues
-			sequential_detection_LUN
+		 * sequential_writes_greedy_gc
+			sequential_writes_lazy_gc
 			sequential_detection_CHANNEL
 			sequential_detection_BLOCK*/
 
-	vector<Thread*> threads = random_writes_lazy_gc(logical_address_space_size, 100000, 1000);
+	vector<Thread*> threads = sequential_writes_greedy_gc(logical_address_space_size, 100000, 1000);
 	OperatingSystem* os = new OperatingSystem(threads);
-	os->set_num_writes_to_stop_after(10000);
+	//os->set_num_writes_to_stop_after(100000);
 	os->run();
 	StatisticsGatherer::get_instance()->print();
 	delete os;
