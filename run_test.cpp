@@ -55,7 +55,7 @@ vector<Thread*>  sequential_writes_lazy_gc(int highest_lba, double IO_submission
 }
 
 vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
-	long num_IOs = 100000;
+	long num_IOs = 10000;
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
 	vector<Thread*> threads;
@@ -86,6 +86,7 @@ int main()
 	 * random_writes_lazy_gc
 	 */
 	load_config();
+
 	if (!debug) {
 		SSD_SIZE = 4;
 		PACKAGE_SIZE = 2;
@@ -135,7 +136,6 @@ int main()
 	//Experiment_Runner::waittime_histogram		(16, 8, "waittime-histograms.eps", exp[0], {10,15,20});
 	//Experiment_Runner::age_histogram			(16, 8, "waittime-histograms.eps", exp[0], {10,15,20});
 	//Experiment_Runner::queue_length_history	(16, 8, "waittime-histograms.eps", exp[0], {10,15,20});
-
 
 	return 0;
 }

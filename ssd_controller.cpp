@@ -41,7 +41,9 @@ using namespace ssd;
 Controller::Controller(Ssd &parent):
 	ssd(parent)
 {
-	ftl = new FtlImpl_Dftl(*this);
+	//ftl = new FtlImpl_Dftl(*this);
+	ftl = new FtlImpl_Page(*this);
+
 	/*switch (FTL_IMPLEMENTATION)
 	{
 	case 0:

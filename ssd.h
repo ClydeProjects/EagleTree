@@ -1201,12 +1201,12 @@ public:
 	Address resolve_logical_address(unsigned int logicalAddress);
 	// TODO: this method should be abstract, but I am not making it so because
 	// I dont't want to implement it in BAST and FAST yet
-	virtual void register_write_completion(Event const& event, enum status result);
-	virtual void register_read_completion(Event const& event, enum status result);
-	virtual void register_trim_completion(Event & event);
-	virtual long get_logical_address(uint physical_address) const;
-	virtual void set_replace_address(Event& event) const;
-	virtual void set_read_address(Event& event);
+	virtual void register_write_completion(Event const& event, enum status result) = 0;
+	virtual void register_read_completion(Event const& event, enum status result) = 0;
+	virtual void register_trim_completion(Event & event) = 0;
+	virtual long get_logical_address(uint physical_address) const = 0;
+	virtual void set_replace_address(Event& event) const = 0;
+	virtual void set_read_address(Event& event) = 0;
 protected:
 	Controller &controller;
 };
@@ -1219,11 +1219,17 @@ public:
 	void read(Event *event);
 	void write(Event *event);
 	void trim(Event *event);
+
+	void register_write_completion(Event const& event, enum status result);
+	void register_read_completion(Event const& event, enum status result);
+	void register_trim_completion(Event & event);
+	long get_logical_address(uint physical_address) const;
+	void set_replace_address(Event& event) const;
+	void set_read_address(Event& event);
 private:
-	ulong currentPage;
-	ulong numPagesActive;
-	bool *trim_map;
-	long *map;
+	Address get_physical_address(Event const& event) const;
+	vector<long> logical_to_physical_map;
+	vector<long> physical_to_logical_map;
 };
 
 class FtlImpl_Bast : public FtlParent
