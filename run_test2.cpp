@@ -28,75 +28,11 @@
 
 using namespace ssd;
 
-// this experiement is to show
-void experiment1() {
-	vector<Thread*> threads;
-	threads.push_back(new Asynchronous_Random_Thread(0, 199, 108, 1, WRITE, 10, 1));
-	threads.push_back(new Asynchronous_Random_Thread(200, 399, 108, 1, WRITE, 10, 1));
-	threads.push_back(new Asynchronous_Random_Thread(400, 599, 108, 1, WRITE, 10, 1));
-	threads.push_back(new Asynchronous_Random_Thread(600, 799, 108, 1, WRITE, 10, 1));
-	/*threads.push_back(new Asynchronous_Sequential_Thread(200, 399, 1, WRITE));
-	threads.push_back(new Asynchronous_Sequential_Thread(400, 599, 1, WRITE));
-	threads.push_back(new Asynchronous_Sequential_Thread(600, 799, 1, WRITE));*/
-	OperatingSystem* os = new OperatingSystem(threads);
-	os->run();
-	VisualTracer::get_instance()->print_horizontally_with_breaks();
-	StateVisualiser::print_page_status();
-	delete os;
-}
-
-void experiment2() {
-
-	Thread* t1 = new Asynchronous_Sequential_Thread(0, 199, 1, WRITE, 17);
-	Thread* t2 = new Asynchronous_Sequential_Thread(200, 399, 1, WRITE, 17);
-	Thread* t3 = new Asynchronous_Sequential_Thread(400, 599, 1, WRITE, 17);
-	//Thread* t4 = new Asynchronous_Sequential_Thread(600, 799, 1, WRITE, 17);
-
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, 199, 1000, 1, WRITE, 30, 1));
-	t2->add_follow_up_thread(new Asynchronous_Random_Thread(200, 399, 1000, 2, WRITE, 30, 2));
-	t3->add_follow_up_thread(new Asynchronous_Random_Thread(400, 599, 1000, 3, WRITE, 30, 3));
-	//t4->add_follow_up_thread(new Asynchronous_Random_Thread(600, 799, 1000, 4, WRITE, 100, 4));
-
-	vector<Thread*> threads;
-	threads.push_back(t1);
-	threads.push_back(t2);
-	threads.push_back(t3);
-	//threads.push_back(t4);
-
-	OperatingSystem* os = new OperatingSystem(threads);
-	os->run();
-
-	VisualTracer::get_instance()->print_horizontally_with_breaks();
-	StateVisualiser::print_page_status();
-	delete os;
-}
-
-void simple_experiment() {
-	GREEDY_GC = true;
-	long logical_space_size = SSD_SIZE * PACKAGE_SIZE * PLANE_SIZE * BLOCK_SIZE * 0.5;
-	Thread* t1 = new Asynchronous_Sequential_Thread(0, logical_space_size, 1, WRITE, 50, 1);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, logical_space_size, 10000, 2, WRITE, 70, 1));
-	//t3->add_follow_up_thread(new Asynchronous_Random_Thread(400, 599, 1000, 3, WRITE, 30, 3));
-	//t4->add_follow_up_thread(new Asynchronous_Random_Thread(600, 799, 1000, 4, WRITE, 100, 4));
-
-	vector<Thread*> threads;
-	threads.push_back(t1);
-	//threads.push_back(t3);
-	//threads.push_back(t4);
-
-	OperatingSystem* os = new OperatingSystem(threads);
-	os->run();
-
-	//VisualTracer::get_instance()->print_horizontally_with_breaks();
-	StateVisualiser::print_page_status();
-	StatisticsGatherer::get_instance()->print();
-	delete os;
-}
 
 // problem: some of the pointers for the 6 block managers end up in the same LUNs. This is stupid.
 // solution: have a method in bm_parent that returns a free block from the LUN with the shortest queue.
 
-vector<Thread*> basic_sequential_experiment(int highest_lba, int num_IOs, double IO_submission_rate) {
+vector<Thread*> basic_sequential_experiment(int highest_lba, double IO_submission_rate) {
 	long log_space_per_thread = highest_lba / 2;
 	long max_file_size = log_space_per_thread / 4;
 	long num_files = 100;
@@ -110,46 +46,46 @@ vector<Thread*> basic_sequential_experiment(int highest_lba, int num_IOs, double
 	return threads;
 }
 
-vector<Thread*> sequential_tagging(int highest_lba, int num_IOs, double IO_submission_rate) {
+vector<Thread*> sequential_tagging(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
 	GREEDY_GC = false;
 	ENABLE_TAGGING = true;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 0;
-	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+	return basic_sequential_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<Thread*> sequential_shortest_queues(int highest_lba, int num_IOs, double IO_submission_rate) {
+vector<Thread*> sequential_shortest_queues(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 0;
 	GREEDY_GC = true;
-	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+	return basic_sequential_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<Thread*> sequential_detection_LUN(int highest_lba, int num_IOs, double IO_submission_rate) {
+vector<Thread*> sequential_detection_LUN(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
 	GREEDY_GC = false;
 	ENABLE_TAGGING = false;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 2;
-	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+	return basic_sequential_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<Thread*> sequential_detection_CHANNEL(int highest_lba, int num_IOs, double IO_submission_rate) {
+vector<Thread*> sequential_detection_CHANNEL(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
 	GREEDY_GC = false;
 	ENABLE_TAGGING = false;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 1;
-	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+	return basic_sequential_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<Thread*> sequential_detection_BLOCK(int highest_lba, int num_IOs, double IO_submission_rate) {
+vector<Thread*> sequential_detection_BLOCK(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
 	GREEDY_GC = false;
 	ENABLE_TAGGING = false;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 0;
-	return basic_sequential_experiment(highest_lba, num_IOs, IO_submission_rate);
+	return basic_sequential_experiment(highest_lba, IO_submission_rate);
 }
 
 
@@ -157,21 +93,6 @@ vector<Thread*> sequential_detection_BLOCK(int highest_lba, int num_IOs, double 
 int main()
 {
 	load_config();
-	BLOCK_MANAGER_ID = 3;
-	PRINT_LEVEL = 0;
-	GREEDY_GC = false;
-	ENABLE_TAGGING = true;
-	WEARWOLF_LOCALITY_THRESHOLD = 10;
-
-	//simple_experiment();
-
-	SSD_SIZE = 4;
-	PACKAGE_SIZE = 2;
-	DIE_SIZE = 1;
-	PLANE_SIZE = 32;
-	BLOCK_SIZE = 32;
-
-	long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
 
 	/*sequential_tagging
 	 * sequential_shortest_queues
@@ -179,7 +100,22 @@ int main()
 		sequential_detection_CHANNEL
 		sequential_detection_BLOCK*/
 
-	vector<Thread*> threads = sequential_detection_BLOCK(logical_address_space_size, -1, 200);
+	SSD_SIZE = 4;
+	PACKAGE_SIZE = 2;
+	DIE_SIZE = 1;
+	PLANE_SIZE = 64;
+	BLOCK_SIZE = 32;
+
+	PAGE_READ_DELAY = 1;
+	PAGE_WRITE_DELAY = 20;
+	BUS_CTRL_DELAY = 5;
+	BUS_DATA_DELAY = 9;
+	BLOCK_ERASE_DELAY = 150;
+
+	PRINT_LEVEL = 2;
+
+	long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
+	vector<Thread*> threads = sequential_detection_BLOCK(logical_address_space_size, 10);
 
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
@@ -187,6 +123,12 @@ int main()
 	delete os;
 
 
+	vector<Exp> exp;
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_tagging, 70, 90, 5,			"/home/mkja/git/EagleTree/Exp2/", "Oracle") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_shortest_queues, 70, 90, 5,	"/home/mkja/git/EagleTree/Exp3/", "Shortest Queues") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_LUN, 70, 90, 5,	"/home/mkja/git/EagleTree/Exp4/", "Seq Detect: LUN") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_CHANNEL, 70, 90, 5,"/home/mkja/git/EagleTree/Exp5/", "Seq Detect: CHANNEL") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_BLOCK, 70, 90, 5, "/home/mkja/git/EagleTree/Exp6/", "Seq Detect: BLOCK") );
 
 	return 0;
 }

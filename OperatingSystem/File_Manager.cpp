@@ -86,7 +86,9 @@ void File_Manager::handle_file_completion(double current_time) {
 		randomly_delete_files(current_time);
 	} while (num_free_pages == 0);
 	//StateVisualiser::print_page_status();
-	StatisticsGatherer::get_instance()->print();
+	if (PRINT_FILE_INFO) {
+		StatisticsGatherer::get_instance()->print();
+	}
 	write_next_file(current_time);
 }
 

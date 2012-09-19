@@ -622,7 +622,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 			deque<Event*> migration;
 
 			// If a copy back is allowed, try to reserve a page on the same die
-			Address copy_back_target = copy_back_allowed_on(logical_address) ? reserve_page_on(addr.package, addr.die, gc_event->get_current_time()) : Address(0, NONE);
+			Address copy_back_target = copy_back_allowed_on(logical_address) ? reserve_page_on(addr.package, addr.die, gc_event->get_current_time()) : Address();
 
 			// If a copy back is allowed, and a target page could be reserved, do it. Otherwise, just do a traditional and more expensive READ - WRITE garbage collection
 			if (copy_back_target.valid == PAGE) {

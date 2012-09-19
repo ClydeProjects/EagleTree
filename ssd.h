@@ -77,8 +77,8 @@ extern const double RAM_WRITE_DELAY;
  * 	flag value to detect free table entry (keep this negative)
  * 	number of time entries bus has to keep track of future schedule usage
  * 	number of simultaneous communication channels - defined by SSD_SIZE */
-extern const double BUS_CTRL_DELAY;
-extern const double BUS_DATA_DELAY;
+extern double BUS_CTRL_DELAY;
+extern double BUS_DATA_DELAY;
 extern const uint BUS_MAX_CONNECT;
 extern const double BUS_CHANNEL_FREE_FLAG;
 extern const uint BUS_TABLE_SIZE;
@@ -112,13 +112,13 @@ extern const double PLANE_REG_WRITE_DELAY;
  * 	delay for erasing block */
 extern uint BLOCK_SIZE;
 extern const uint BLOCK_ERASES;
-extern const double BLOCK_ERASE_DELAY;
+extern double BLOCK_ERASE_DELAY;
 
 /* Page class:
  * 	delay for Page reads
  * 	delay for Page writes */
-extern const double PAGE_READ_DELAY;
-extern const double PAGE_WRITE_DELAY;
+extern double PAGE_READ_DELAY;
+extern double PAGE_WRITE_DELAY;
 extern const uint PAGE_SIZE;
 extern const bool PAGE_ENABLE_DATA;
 
@@ -1201,12 +1201,12 @@ public:
 	Address resolve_logical_address(unsigned int logicalAddress);
 	// TODO: this method should be abstract, but I am not making it so because
 	// I dont't want to implement it in BAST and FAST yet
-	virtual void register_write_completion(Event const& event, enum status result);
-	virtual void register_read_completion(Event const& event, enum status result);
-	virtual void register_trim_completion(Event & event);
-	virtual long get_logical_address(uint physical_address) const;
-	virtual void set_replace_address(Event& event) const;
-	virtual void set_read_address(Event& event);
+	virtual void register_write_completion(Event const& event, enum status result) = 0;
+	virtual void register_read_completion(Event const& event, enum status result) = 0;
+	virtual void register_trim_completion(Event & event) = 0;
+	virtual long get_logical_address(uint physical_address) const = 0;
+	virtual void set_replace_address(Event& event) const = 0;
+	virtual void set_read_address(Event& event) = 0;
 protected:
 	Controller &controller;
 };
@@ -1219,11 +1219,17 @@ public:
 	void read(Event *event);
 	void write(Event *event);
 	void trim(Event *event);
+
+	void register_write_completion(Event const& event, enum status result);
+	void register_read_completion(Event const& event, enum status result);
+	void register_trim_completion(Event & event);
+	long get_logical_address(uint physical_address) const;
+	void set_replace_address(Event& event) const;
+	void set_read_address(Event& event);
 private:
-	ulong currentPage;
-	ulong numPagesActive;
-	bool *trim_map;
-	long *map;
+	Address get_physical_address(Event const& event) const;
+	vector<long> logical_to_physical_map;
+	vector<long> physical_to_logical_map;
 };
 
 class FtlImpl_Bast : public FtlParent
@@ -1571,12 +1577,15 @@ public:
 	void print();
 	void print_gc_info();
 	void print_csv();
+
 	string totals_csv_header();
+	vector<string> totals_vector_header();
 	string totals_csv_line();
 	string age_histogram_csv();
 	string wait_time_histogram_csv();
 	string queue_length_csv();
 	uint max_age();
+	uint max_age_freq();
 	uint total_reads();
 	uint total_writes();
 
@@ -1593,15 +1602,18 @@ private:
 	string histogram_csv(map<double, uint> histogram);
 
 	vector<vector<double> > sum_bus_wait_time_for_reads_per_LUN;
+	vector<vector<vector<double> > > bus_wait_time_for_reads_per_LUN;
 	vector<vector<uint> > num_reads_per_LUN;
 
 	vector<vector<double> > sum_bus_wait_time_for_writes_per_LUN;
+	vector<vector<vector<double> > > bus_wait_time_for_writes_per_LUN;
 	vector<vector<uint> > num_writes_per_LUN;
 
 	vector<vector<uint> > num_gc_reads_per_LUN;
 	vector<vector<uint> > num_gc_writes_per_LUN_origin;
 	vector<vector<uint> > num_gc_writes_per_LUN_destination;
 	vector<vector<double> > sum_gc_wait_time_per_LUN;
+	vector<vector<vector<double> > > gc_wait_time_per_LUN;
 	vector<vector<uint> > num_copy_backs_per_LUN;
 
 	vector<vector<uint> > num_erases_per_LUN;
@@ -1913,6 +1925,58 @@ private:
 
 	double time_of_last_event_completed;
 
+};
+
+class Exp {
+public:
+	Exp(string name_, string data_folder_, string x_axis_, vector<string> column_names_, uint max_age_, uint max_age_freq_)
+	:	name(name_),
+	 	data_folder(data_folder_),
+	 	x_axis(x_axis_),
+	 	column_names(column_names_),
+	 	max_age(max_age_),
+	 	max_age_freq(max_age_freq_)
+	{}
+	string name;
+	string data_folder;
+	string x_axis;
+	vector<string> column_names;
+	uint max_age;
+	uint max_age_freq;
+};
+
+class Experiment_Runner {
+public:
+	static double CPU_time_user();
+	static double CPU_time_system();
+	static double wall_clock_time();
+	static string pretty_time(double time);
+	static void draw_graph(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command);
+	static void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command, vector<string> histogram_commands);
+	static double calibrate_IO_submission_rate(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
+	static Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name);
+	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<Exp> experiments);
+	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Exp experiment);
+	static void waittime_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
+	static void age_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
+	static void queue_length_history(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
+
+private:
+	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
+
+	static uint max_age;
+	static const bool REMOVE_GLE_SCRIPTS_AGAIN;
+	//static const string experiments_folder = "./Experiments/";
+	static const string datafile_postfix;
+	static const string stats_filename;
+	static const string waittime_filename_prefix;
+	static const string age_filename_prefix;
+	static const string queue_filename_prefix;
+	static const string markers[];
+	static const double M; // One million
+	static const double K;    // One thousand
+	static double calibration_precision;        // microseconds
+	static double calibration_starting_point; // microseconds
 };
 
 /*class Block_manager

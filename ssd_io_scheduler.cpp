@@ -128,6 +128,7 @@ void IOScheduler::execute_current_waiting_ios() {
 	//printf("queue size:  %d\n", current_events.size());
 	//printf("current_events   %d\n", current_events.size());
 	vector<Event*> events = collect_soonest_events();
+	//printf(" events length    %d  \n", events.size());
 	//random_shuffle(future_events.begin(), future_events.end());
 	vector<Event*> read_commands;
 	vector<Event*> read_transfers;
@@ -139,8 +140,8 @@ void IOScheduler::execute_current_waiting_ios() {
 
 	if (read_commands.size() + writes.size() >= MAX_SSD_QUEUE_SIZE) {
 		//StateVisualiser::print_page_status();
-		//printf("queue size:  %d\n", current_events.size());
-		throw "Events queue maximum size exceeded";
+		printf("Events queue maximum size exceeded:  %d\n", current_events.size());
+		throw "Events queue maximum size exceeded.";
 	}
 
 	while (events.size() > 0) {
@@ -277,7 +278,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	event_type scheduled_op_code = dependency_code_to_type[dependency_code_of_other_event];
 
 	if (existing_event == NULL) {
-		new_event->print();
+		//new_event->print();
 	}
 	//assert (existing_event != NULL || scheduled_op_code == COPY_BACK);
 
@@ -524,6 +525,8 @@ bool IOScheduler::can_schedule_on_die(Event const* event) const {
 
 void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	if (outcome == FAILURE) {
+		event->print();
+		StateVisualiser::print_page_status();
 		assert(false); // events should not fail at this point. Any failure indicates application error
 	}
 

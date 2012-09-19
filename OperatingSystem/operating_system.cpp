@@ -17,13 +17,15 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	  last_dispatched_event_minimal_finish_time(1),
 	  threads(new_threads),
 	  num_writes_to_stop_after(UNDEFINED),
-	  num_writes_completed(0)
+	  num_writes_completed(0),
+	  time_of_last_event_completed(0)
 {
 	assert(threads.size() > 0);
 	for (uint thread_id = 0; thread_id < threads.size(); thread_id++) {
 		get_next_event(thread_id);
 	}
 	ssd->set_operating_system(this);
+	MAX_OS_NUM_LOCKS = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE / 2;
 }
 
 OperatingSystem::~OperatingSystem() {
@@ -88,6 +90,7 @@ void OperatingSystem::get_next_event(int thread_id) {
 		num_locked_events++;
 		if (PRINT_LEVEL > 1) printf("num_locked_events:\t%d\n", num_locked_events);
 		if (num_locked_events >= MAX_OS_NUM_LOCKS) {
+			printf("The number of locks held by the system exceeded the permissible number\n");
 			throw "The number of locks held by the system exceeded the permissible number";
 		}
 	}
