@@ -192,7 +192,7 @@ bool GREEDY_GC = true;
  */
 int PRINT_LEVEL = 0;
 
-bool OS_LOCK = true;
+bool OS_LOCK = false;
 int WEARWOLF_LOCALITY_THRESHOLD = 10;
 bool ENABLE_TAGGING = false;
 
