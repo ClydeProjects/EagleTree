@@ -28,6 +28,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 
 //#include <boost/filesystem.hpp>
 
@@ -47,7 +48,7 @@ static const string markers[] = {"circle", "square", "triangle", "diamond", "cro
 static const double M = 1000000.0; // One million
 static const double K = 1000.0;    // One thousand
 
-static double calibration_precision = 0.0001;        // microseconds
+static double calibration_precision = 0.0001;     // microseconds
 static double calibration_starting_point = 100.0; // microseconds
 
 class Exp {
@@ -95,7 +96,6 @@ double wall_clock_time() {
 
 string pretty_time(double time) {
 	stringstream time_text;
-	double t = time;
 	uint hours = (uint) floor(time / 3600.0);
 	uint minutes = (uint) floor(fmod(time, 3600.0)/60.0);
 	double seconds = fmod(time, 60.0);
@@ -217,7 +217,8 @@ void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string 
 	"   d11 line marker circle" << endl <<
 	"end graph" << endl <<
 	endl;
-    for (int i = 0; i < histogram_commands.size(); i++) {
+
+    for (uint i = 0; i < histogram_commands.size(); i++) {
     	gleScript << histogram_commands[i] << endl;
     }
 
@@ -257,8 +258,8 @@ Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, i
 	// Experiment parameters ----------------------------------------------
 //	const int graph_data_types[]					= {11};     // Draw these values on main graph (numbers correspond to each type of StatisticsGatherer output)
 //	const int details_graphs_for_used_space[]		= {50,70,90}; // Draw age and wait time histograms plus queue length history for chosen used_space values
-	const int space_min								= 75;
-    const int space_max								= 95;
+	const int space_min								= 5;
+    const int space_max								= 15;
 	const int space_inc								= 5;
 	const int num_IOs								= 100;
     PRINT_LEVEL										= 0;
@@ -274,7 +275,7 @@ Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, i
 	double IO_submission_rate	= 12.0 / IOs_per_microsecond;
     vector<string> histogram_commands;
 
-    mkdir(data_folder.c_str());
+    mkdir(data_folder.c_str(), 0755);
     chdir(data_folder.c_str());
     //boost::filesystem::path working_dir = boost::filesystem::current_path();
     //boost::filesystem::create_directories(boost::filesystem::path(data_folder));
@@ -296,7 +297,6 @@ Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, i
 		printf("Experiment with max %d pct used space: Writing to no LBA higher than %d (out of %d total available)\n", used_space, highest_lba, num_pages);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
-
 		IO_submission_rate = calibrate_IO_submission_rate(highest_lba, num_IOs, experiment);
 
 		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
@@ -313,7 +313,7 @@ Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, i
 		stringstream age_filename;
 		stringstream queue_filename;
 
-		hist_filename << "hist-" << used_space << ".csv";
+		hist_filename << "waittime-" << used_space << ".csv";
 		age_filename << "age-" << used_space << ".csv";
 		queue_filename << "queue-" << used_space << ".csv";
 
@@ -333,9 +333,9 @@ Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, i
 		queue_file << StatisticsGatherer::get_instance()->queue_length_csv();
 		queue_file.close();
 
-		stringstream hist_command;
-		hist_command << "hist 0 " << histogram_commands.size() << " \"" << hist_filename.str() << "\" \"Wait time histogram (" << used_space << "% used space)\" \"log min 1\" \"Event wait time (µs)\" -1";
-		histogram_commands.push_back(hist_command.str());
+		stringstream waittime_commands;
+		waittime_commands << "hist 0 " << histogram_commands.size() << " \"" << hist_filename.str() << "\" \"Wait time histogram (" << used_space << "% used space)\" \"log min 1\" \"Event wait time (µs)\" -1";
+		histogram_commands.push_back(waittime_commands.str());
 
 		stringstream age_command;
 		age_command << "hist 0 " << histogram_commands.size() << " \"" << age_filename.str() << "\" \"Block age histogram (" << used_space << "% used space)\" \"on\" \"Block age\" age_max";
@@ -353,34 +353,15 @@ Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, i
 		delete os;
 	}
 
-	double end_time = wall_clock_time();
-
-	double time_elapsed = end_time - start_time;
-
 	csv_file.close();
 
+	double end_time = wall_clock_time();
+	double time_elapsed = end_time - start_time;
 	printf("Experiment completed in %s.\n", pretty_time(time_elapsed).c_str());
 
-	/*
-	stringstream command;
-
-	for (uint i = 0; i < sizeof(graph_data_types)/sizeof(int); i++) {
-		command << "   " << "d" << graph_data_types[i] << " line marker " << markers[i] << "\n";
-    }
-
-    draw_graph_with_histograms(
-    	16, 10, "overprovisioning_experiment", csv_filename, graph_name.str(),
-    	measurement_name, "", "",
-    	command.str(),
-    	histogram_commands
-    );
-    */
-
 	vector<string> original_column_names = StatisticsGatherer::get_instance()->totals_vector_header();
-
 	vector<string> column_names;
 	column_names.push_back(measurement_name);
-//	for (uint i = 0; i < original_column_names.size(); i++) column_names.push_back(original_column_names[i]);
 	column_names.insert(column_names.end(), original_column_names.begin(), original_column_names.end());
 	column_names.push_back(throughput_column_name);
 
@@ -394,6 +375,7 @@ void graph(string title, string filename, int column, vector<Exp> experiments, i
     string scriptFilename = filename + "-temp.gle"; // Name of tempoary script file
     std::ofstream gleScript;
     gleScript.open(scriptFilename.c_str());
+
     gleScript <<
     "size " << sizeX << " " << sizeY << endl << // 12 8
     "set font texcmr" << endl <<
@@ -405,10 +387,10 @@ void graph(string title, string filename, int column, vector<Exp> experiments, i
     "   ytitle \"" << experiments[0].column_names[column] << "\"" << endl <<
     "   yaxis min 0" << endl;
 
-    for (int i = 0; i < experiments.size(); i++) {
+    for (uint i = 0; i < experiments.size(); i++) {
     	Exp e = experiments[i];
         gleScript <<
-       	"   data   \"" << e.data_folder << stats_filename << "\"" << " d"<<i+1<<"=c1,c" << column-1 << endl <<
+       	"   data   \"" << e.data_folder << stats_filename << "\"" << " d"<<i+1<<"=c1,c" << column+1 << endl <<
         "   d"<<i+1<<" line marker " << markers[i] << " key " << "\"" << e.name << "\"" << endl;
     }
 
@@ -425,25 +407,28 @@ void graph(string title, string filename, int column, vector<Exp> experiments, i
 }
 
 // Work in progress
-void waittime_graph(string title, string filename, Exp experiment, int sizeX, int sizeY) {
+void waittime_graph(string title, string filename, int mean_column, Exp experiment, int sizeX, int sizeY) {
 	// Write tempoary file containing GLE script
     string scriptFilename = filename + "-temp.gle"; // Name of tempoary script file
     std::ofstream gleScript;
     gleScript.open(scriptFilename.c_str());
     gleScript <<
     "size " << sizeX << " " << sizeY << endl << // 12 8
+    "include \"graphutil.gle\"" << endl <<
     "set font texcmr" << endl <<
     "begin graph" << endl <<
     "   " << "key pos tl offset -0.0 0 compact" << endl <<
     "   scale auto" << endl <<
     "   title  \"" << title << "\"" << endl <<
     "   xtitle \"" << experiment.x_axis << "\"" << endl <<
-    "   ytitle \"Wait time (µs)\"" << endl <<
-    "   yaxis min 0" << endl;
+    "   ytitle \"Wait time (µs)\"" << endl;
 
 	gleScript <<
-	"   data   \"" << experiment.data_folder << stats_filename << "\"" << " d1=c1,c2" << endl <<
-	"   d1 line marker " << markers[0] << " key " << "\"" << e.name << "\"" << endl;
+	"   data   \"" << experiment.data_folder << stats_filename << "\"" << endl <<
+    "	xaxis min dminx(d1)-2.5 max dmaxx(d1)+2.5 dticks 5" << endl << // nolast nofirst
+    "   dticks off" << endl <<
+    "   yaxis min 0 max dmaxy(d"<<mean_column+5<<")*1.05" << endl << // mean_column+5 = max column
+    "   draw boxplot bwidth 0.4 ds0 " << mean_column << endl;
 
     gleScript <<
     "end graph" << endl;
@@ -563,15 +548,24 @@ int main()
 	PLANE_SIZE = 64;
 	BLOCK_SIZE = 32;
 
+	exp.push_back( overprovisioning_experiment(random_writes_experiment,    "/home/mkja/git/EagleTree/ExpTest/", "Test experiment (random writes)"));
+/*
 	exp.push_back( overprovisioning_experiment(sequential_tagging,			"/home/mkja/git/EagleTree/Exp2/", "Oracle") );
 	exp.push_back( overprovisioning_experiment(sequential_shortest_queues,	"/home/mkja/git/EagleTree/Exp3/", "Shortest Queues") );
 	exp.push_back( overprovisioning_experiment(sequential_detection_LUN,	"/home/mkja/git/EagleTree/Exp4/", "Seq Detect: LUN") );
 	exp.push_back( overprovisioning_experiment(sequential_detection_CHANNEL,"/home/mkja/git/EagleTree/Exp5/", "Seq Detect: CHANNEL") );
 	exp.push_back( overprovisioning_experiment(sequential_detection_BLOCK,  "/home/mkja/git/EagleTree/Exp6/", "Seq Detect: BLOCK") );
+*/
+
+	for (uint i = 0; i < exp[0].column_names.size(); i++)
+		printf("%d: %s\n", i, exp[0].column_names[i].c_str());
+
+	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
+	assert(mean_pos_in_datafile != exp[0].column_names.size());
 
 	chdir("/home/mkja/git/EagleTree/Graphs");
-	graph("Testgraphtitle", "testgraph.eps", 14, exp, 16, 8);
-	graph("Testgraphtitle", "testgraph-dev.eps", 11, exp, 16, 8);
+	graph("Maximum sustainable throughput", "throughput.eps", 24, exp, 16, 8);
+	waittime_graph("Write latency boxplot", "boxplot.eps", mean_pos_in_datafile, exp[0], 16, 8);
 
 	PACKAGE_SIZE = 16;
 
