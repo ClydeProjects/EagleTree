@@ -126,7 +126,8 @@ vector<Event*> IOScheduler::collect_soonest_events() {
 // tries to execute all current events. Some events may be put back in the queue if they cannot be executed.
 void IOScheduler::execute_current_waiting_ios() {
 	//printf("queue size:  %d\n", current_events.size());
-	//printf("current_events   %d\n", current_events.size());
+	printf("current_events   %d\n", current_events.size());
+	printf("future_events   %d\n", future_events.size());
 	vector<Event*> events = collect_soonest_events();
 	//printf(" events length    %d  \n", events.size());
 	//random_shuffle(future_events.begin(), future_events.end());

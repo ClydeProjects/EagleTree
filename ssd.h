@@ -1737,6 +1737,21 @@ private:
 	double time_breaks;
 };
 
+class Collision_Free_Asynchronous_Random_Thread : public Thread
+{
+public:
+	Collision_Free_Asynchronous_Random_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed = 0, event_type type = WRITE,  double time_breaks = 5, double start_time = 1);
+	Event* issue_next_io();
+	void handle_event_completion(Event* event);
+private:
+	long min_LBA, max_LBA;
+	int number_of_times_to_repeat;
+	MTRand_int32 random_number_generator;
+	event_type type;
+	double time_breaks;
+	set<long> logical_addresses_submitted;
+};
+
 /*
 class Reliable_Random_Int_Generator {
 public:

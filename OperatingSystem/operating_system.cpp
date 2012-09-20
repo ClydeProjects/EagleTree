@@ -107,6 +107,7 @@ void OperatingSystem::get_next_event(int thread_id) {
 		lba_locks[event->get_logical_address()] = thread_id;
 		currently_pending_ios_counter++;
 	}
+	printf("pending events in OS:  %d\n", events.size());
 }
 
 
