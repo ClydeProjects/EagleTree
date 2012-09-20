@@ -128,7 +128,6 @@ void IOScheduler::execute_current_waiting_ios() {
 	//printf("current_events   %d\n", current_events.size());
 	//printf("future_events   %d\n", future_events.size());
 	vector<Event*> events = collect_soonest_events();
-	//random_shuffle(future_events.begin(), future_events.end());
 	vector<Event*> read_commands;
 	vector<Event*> read_transfers;
 	vector<Event*> gc_writes;
@@ -137,16 +136,11 @@ void IOScheduler::execute_current_waiting_ios() {
 	vector<Event*> copy_backs;
 	vector<Event*> noop_events;
 
-	/*if (read_commands.size() + writes.size() >= MAX_SSD_QUEUE_SIZE) {
-		//StateVisualiser::print_page_status();
-		printf("Events queue maximum size exceeded:  %d\n", current_events.size());
-		throw "Events queue maximum size exceeded.";
-	}*/
-
 	while (events.size() > 0) {
 		Event * event = events.back();
 		events.pop_back();
 		event_type type = event->get_event_type();
+
 		if (event->get_noop()) {
 			noop_events.push_back(event);
 		}
@@ -155,6 +149,9 @@ void IOScheduler::execute_current_waiting_ios() {
 		}
 		else if (type == READ_TRANSFER) {
 			read_transfers.push_back(event);
+		}
+		else if (!PRIORITISE_GC && type == WRITE) {
+			writes.push_back(event);
 		}
 		else if (type == WRITE && !event->is_garbage_collection_op()) {
 			writes.push_back(event);

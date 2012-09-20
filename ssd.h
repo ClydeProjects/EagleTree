@@ -206,6 +206,8 @@ extern uint MAX_OS_NUM_LOCKS;
 /* Defines how the sequential writes detection algorithm spreads a sequential write  */
 extern uint LOCALITY_PARALLEL_DEGREE;
 
+extern bool PRIORITISE_GC;
+
 /* Enumerations to clarify status integers in simulation
  * Do not use typedefs on enums for reader clarity */
 

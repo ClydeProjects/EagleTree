@@ -24,8 +24,6 @@
 
 #include "ssd.h"
 
-#define SIZE 2
-
 using namespace ssd;
 
 
