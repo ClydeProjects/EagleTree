@@ -78,6 +78,9 @@ void OperatingSystem::run() {
 
 void OperatingSystem::get_next_event(int thread_id) {
 	Event* event = threads[thread_id]->run();
+	if (PRINT_LEVEL > 1 && event != NULL) {
+		printf("creating:   "); event->print();
+	}
 	while (event != NULL && is_LBA_locked(event->get_logical_address())) {
 		os_event le = os_event(thread_id, event);
 		assert(event->get_event_type() != NOT_VALID);
@@ -87,10 +90,14 @@ void OperatingSystem::get_next_event(int thread_id) {
 		}
 		locked_events[event->get_logical_address()].push(le);
 		event = threads[thread_id]->run();
+		if (PRINT_LEVEL > 1 && event != NULL) {
+			printf("creating:   "); event->print();
+		}
 		num_locked_events++;
 		if (PRINT_LEVEL > 1) printf("num_locked_events:\t%d\n", num_locked_events);
 		if (num_locked_events >= MAX_OS_NUM_LOCKS) {
 			printf("The number of locks held by the system exceeded the permissible number\n");
+			print_lock_map();
 			throw "The number of locks held by the system exceeded the permissible number";
 		}
 	}
@@ -147,6 +154,15 @@ void OperatingSystem::dispatch_event(os_event event) {
 	assert(ssd_event->get_event_type() != NOT_VALID);
 	ssd->event_arrive(ssd_event);
 	get_next_event(event.thread_id);
+}
+
+void OperatingSystem::print_lock_map() {
+	map<long, queue<os_event> >::iterator i = locked_events.begin();
+	printf("currently_executing_ios:  %d\n", currently_pending_ios_counter);
+	printf("printing number of events waiting for each LBA \n");
+	for (; i != locked_events.end(); i++) {
+		printf("  lba: %d   num: %d \n", (*i).first, (*i).second.size());
+	}
 }
 
 int OperatingSystem::release_lock(Event* event_just_finished) {

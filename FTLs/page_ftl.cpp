@@ -58,10 +58,16 @@ void FtlImpl_Page::trim(Event *event)
 }
 
 void FtlImpl_Page::register_write_completion(Event const& event, enum status result) {
-	long phys_addr = event.get_address().get_linear_address();
+	long new_phys_addr = event.get_address().get_linear_address();
+
 	long logi_addr = event.get_logical_address();
-	logical_to_physical_map[logi_addr] = phys_addr;
-	physical_to_logical_map[phys_addr] = logi_addr;
+	logical_to_physical_map[logi_addr] = new_phys_addr;
+	physical_to_logical_map[new_phys_addr] = logi_addr;
+
+	if (event.get_replace_address().valid == PAGE) {
+		long old_phys_addr = event.get_replace_address().get_linear_address();
+		physical_to_logical_map[old_phys_addr] = UNDEFINED;
+	}
 }
 
 void FtlImpl_Page::register_read_completion(Event const& event, enum status result) {
@@ -69,7 +75,7 @@ void FtlImpl_Page::register_read_completion(Event const& event, enum status resu
 }
 
 void FtlImpl_Page::register_trim_completion(Event & event) {
-	long phys_addr = event.get_address().get_linear_address();
+	long phys_addr = event.get_replace_address().get_linear_address();
 	long logi_addr = event.get_logical_address();
 	logical_to_physical_map[logi_addr] = UNDEFINED;
 	physical_to_logical_map[phys_addr] = UNDEFINED;

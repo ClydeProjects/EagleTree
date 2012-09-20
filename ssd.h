@@ -1713,7 +1713,7 @@ private:
 class Synchronous_Random_Thread : public Thread
 {
 public:
-	Synchronous_Random_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed, event_type type = WRITE, double start_time = 1);
+	Synchronous_Random_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed, event_type type = WRITE, double time_breaks = 0, double start_time = 1);
 	Event* issue_next_io();
 	void handle_event_completion(Event* event);
 private:
@@ -1722,6 +1722,7 @@ private:
 	int number_of_times_to_repeat;
 	MTRand_int32 random_number_generator;
 	event_type type;
+	double time_breaks;
 };
 
 class Asynchronous_Random_Thread : public Thread
@@ -1899,7 +1900,7 @@ public:
 	void set_num_writes_to_stop_after(long num_writes);
 	double get_total_runtime() const;
 private:
-
+	void print_lock_map();
 	void dispatch_event(os_event event);
 	double get_event_minimal_completion_time(Event const*const event) const;
 	bool is_LBA_locked(ulong lba);
@@ -1955,7 +1956,9 @@ public:
 	static string pretty_time(double time);
 	static void draw_graph(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command);
 	static void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command, vector<string> histogram_commands);
-	static double calibrate_IO_submission_rate(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
+	static double calibrate_IO_submission_rate_queue_based(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
+	static double measure_throughput(int highest_lba, double IO_submission_rate, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
+	static double calibrate_IO_submission_rate_throughput_based(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
 	static Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name);
 	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<Exp> experiments);
 	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Exp experiment);

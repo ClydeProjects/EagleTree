@@ -110,14 +110,15 @@ void Asynchronous_Sequential_Thread::handle_event_completion(Event* event) {
 
 // =================  Synchronous_Random_Writer  =============================
 
-Synchronous_Random_Thread::Synchronous_Random_Thread(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed, event_type type, double start_time)
+Synchronous_Random_Thread::Synchronous_Random_Thread(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed, event_type type, double time_breaks, double start_time)
 	: Thread(start_time),
 	  min_LBA(min_LBA),
 	  max_LBA(max_LBA),
 	  ready_to_issue_next_write(true),
 	  number_of_times_to_repeat(num_ios_to_issue),
 	  type(type),
-	  random_number_generator(randseed)
+	  random_number_generator(randseed),
+	  time_breaks(time_breaks)
 {}
 
 Event* Synchronous_Random_Thread::issue_next_io() {
@@ -132,7 +133,7 @@ Event* Synchronous_Random_Thread::issue_next_io() {
 void Synchronous_Random_Thread::handle_event_completion(Event* event) {
 	assert(!ready_to_issue_next_write);
 	ready_to_issue_next_write = true;
-	time = event->get_current_time();
+	time = event->get_current_time() + time_breaks;
 }
 
 

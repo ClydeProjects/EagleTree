@@ -106,7 +106,56 @@ string Experiment_Runner::pretty_time(double time) {
 	return time_text.str();
 }
 
-double Experiment_Runner::calibrate_IO_submission_rate(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
+double Experiment_Runner::measure_throughput(int highest_lba, double IO_submission_rate, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
+	vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
+	OperatingSystem* os = new OperatingSystem(threads);
+	os->run();
+	int total_IOs_issued = StatisticsGatherer::get_instance()->total_reads() + StatisticsGatherer::get_instance()->total_writes();
+	return (double) total_IOs_issued / os->get_total_runtime();
+}
+
+double Experiment_Runner::calibrate_IO_submission_rate_throughput_based(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
+	double max_rate = 100;
+	double min_rate = 0;
+	double current_rate;
+	double precision = 0.001;
+	bool success;
+
+	printf("Calibrating...\n");
+	double standing_throughput = numeric_limits<double>::max();
+
+	// finding an upper bound
+	do {
+		printf("Finding upper bound. Current is:  %f.\n", max_rate);
+		success = true;
+		double current_throughput = measure_throughput(highest_lba, max_rate, experiment);
+		if (current_throughput >= standing_throughput + precision) { // if throughput did not increase
+			standing_throughput = current_throughput;
+			max_rate *= 2;
+			success = false;
+		}
+	} while (!success);
+
+
+	do {
+		current_rate = min_rate + ((max_rate - min_rate) / 2); // Pick a rate just between min and max
+		printf("Optimal submission rate in range %f - %f. Trying %f.\n", min_rate, max_rate, current_rate);
+		success = true;
+		{
+			vector<Thread*> threads = experiment(highest_lba, current_rate);
+			OperatingSystem* os = new OperatingSystem(threads);
+			try        { os->run(); }
+			catch(...) { success = false; }
+			delete os;
+		}
+		if      ( success) max_rate = current_rate;
+		else if (!success) min_rate = current_rate;
+	} while ((max_rate - min_rate) > calibration_precision);
+
+
+}
+
+double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
 	double max_rate = calibration_starting_point;
 	double min_rate = 0;
 	double current_rate;
@@ -175,7 +224,7 @@ Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
 		// Calibrate IO submission rate
-		double IO_submission_rate = calibrate_IO_submission_rate(highest_lba, experiment);
+		double IO_submission_rate = calibrate_IO_submission_rate_queue_based(highest_lba, experiment);
 		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
 
 		// Run experiment

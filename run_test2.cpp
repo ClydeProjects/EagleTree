@@ -112,15 +112,13 @@ int main()
 	BUS_DATA_DELAY = 9;
 	BLOCK_ERASE_DELAY = 150;
 
-	PRINT_LEVEL = 0;
-
-	long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
+	//PRINT_LEVEL = 2;
+	/*long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.7;
 	vector<Thread*> threads = sequential_detection_BLOCK(logical_address_space_size, 10);
-
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
 	StatisticsGatherer::get_instance()->print();
-	delete os;
+	delete os;*/
 
 
 	vector<Exp> exp;

@@ -23,16 +23,16 @@
  * driver to create and run a very basic test of writes then reads */
 
 #include "ssd.h"
-#include <unistd.h>
+#include <unistd.h>   // chdir
+#include <sys/stat.h> // mkdir
 
 using namespace ssd;
 
 vector<Thread*> basic_sequential_experiment(int highest_lba, double IO_submission_rate) {
-	long log_space_per_thread = highest_lba / 2;
-	long max_file_size = log_space_per_thread / 4;
-	long num_files = 100;
+	long max_file_size = highest_lba / 4;
+	long num_files = 200;
 
-	Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1);
+	Thread* fm1 = new File_Manager(0, highest_lba, num_files, max_file_size, IO_submission_rate, 1, 1);
 
 	vector<Thread*> threads;
 	threads.push_back(fm1);
@@ -55,8 +55,25 @@ vector<Thread*>  sequential_writes_lazy_gc(int highest_lba, double IO_submission
 	return basic_sequential_experiment(highest_lba, IO_submission_rate);
 }
 
+vector<Thread*>  synch_random_writes_experiment(int highest_lba, double IO_submission_rate) {
+	long num_IOs = 2000;
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
+	double num_threads = SSD_SIZE * PACKAGE_SIZE;
+	long space_per_thread = highest_lba / num_threads;
+
+	for (uint i = 0; i < num_threads; i++) {
+		long min_lba = space_per_thread * i;
+		long max_lba = space_per_thread * (i + 1) - 1;
+		t1->add_follow_up_thread(new Synchronous_Random_Thread(min_lba, max_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
+	}
+
+	vector<Thread*> threads;
+	threads.push_back(t1);
+	return threads;
+}
+
 vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
-	long num_IOs = 10000;
+	long num_IOs = 50000;
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
 	vector<Thread*> threads;
@@ -82,13 +99,14 @@ int main()
 	bool debug = false;
 	/*
 	 * sequential_writes_lazy_gc
-	 * random_writes_experiment
+	 * sequential_writes_greedy_gc
 	 * random_writes_greedy_gc
 	 * random_writes_lazy_gc
 	 */
 	load_config();
 
 	double submission_rate = 1000;
+	PRINT_LEVEL = 0;
 
 	if (!debug) {
 		SSD_SIZE = 4;
@@ -96,7 +114,6 @@ int main()
 		DIE_SIZE = 1;
 		PLANE_SIZE = 128;
 		BLOCK_SIZE = 32;
-		PRINT_LEVEL = 0;
 
 		PAGE_READ_DELAY = 5;
 		PAGE_WRITE_DELAY = 20;
@@ -108,9 +125,8 @@ int main()
 		SSD_SIZE = 4;
 		PACKAGE_SIZE = 2;
 		DIE_SIZE = 1;
-		PLANE_SIZE = 32;
-		BLOCK_SIZE = 16;
-		PRINT_LEVEL = 0;
+		PLANE_SIZE = 64;
+		BLOCK_SIZE = 32;
 
 		PAGE_READ_DELAY = 5;
 		PAGE_WRITE_DELAY = 20;
@@ -119,33 +135,39 @@ int main()
 		BLOCK_ERASE_DELAY = 150;
 	}
 
-	//long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
+
 
 		/*sequential_tagging
-		 * sequential_shortest_queues
-			sequential_detection_LUN
+		 * sequential_writes_greedy_gc
+			sequential_writes_lazy_gc
 			sequential_detection_CHANNEL
 			sequential_detection_BLOCK*/
 
-	/*PRINT_LEVEL = 0;
-	vector<Thread*> threads = random_writes_greedy_gc(logical_address_space_size, submission_rate);
+	/*long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.8;
+	printf("logical_address_space_size  %d\n", logical_address_space_size);
+	vector<Thread*> threads = random_writes_greedy_gc(logical_address_space_size, 100);
 	OperatingSystem* os = new OperatingSystem(threads);
-	//os->set_num_writes_to_stop_after(10000);
 	os->run();
 	StatisticsGatherer::get_instance()->print();
 	delete os;
 	return 0;*/
 
+	Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 80, 90, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed");
+
     ////////////////////////////////////////////////
 
 	string home_folder = "/home/mkja/git/EagleTree/";
+	string exp_folder  = "gc_experiment/";
+	string folder      = home_folder + exp_folder;
+
+	mkdir(folder.c_str(), 0755);
 
 	vector<Exp> exp;
-//	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 60, 90, 5, home_folder + "rand_greed/", "rand greed") );
-//	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc, 60, 90, 5, home_folder + "rand_lazy/", "rand lazy") );
-//	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_greedy_gc, 60, 90, 5, home_folder + "seq_greed/", "seq greed") );
-//	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_lazy_gc, 60, 90, 5, home_folder + "seq_lazy/", "seq lazy") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_lazy_gc, 60, 90, 5, home_folder + "ExpTest/", "seq lazy ~ test") );
+//	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 60, 90, 5, folder + "rand_greed/", "rand greed") );
+//	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc, 60, 90, 5, folder + "rand_lazy/", "rand lazy") );
+//	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_greedy_gc, 60, 90, 5, folder + "seq_greed/", "seq greed") );
+//	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_lazy_gc, 60, 90, 5, folder + "seq_lazy/", "seq lazy") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_lazy_gc, 60, 90, 5, folder + "ExpTest/", "seq lazy ~ test") );
 
 
 	// Print column names for info
@@ -165,8 +187,8 @@ int main()
 	int sx = 16;
 	int sy = 8;
 
-	//chdir(home_folder);
-	//Experiment_Runner::graph					(sx, sy,   "Maximum sustainable throughput", "throughput", 24, exp);
+	chdir(folder.c_str());
+	Experiment_Runner::graph(sx, sy,   "Maximum sustainable throughput", "throughput", 24, exp);
 
 	for (uint i = 0; i < exp.size(); i++) {
 		chdir(exp[i].data_folder.c_str());
