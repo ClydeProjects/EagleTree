@@ -54,26 +54,43 @@ vector<Thread*>  sequential_writes_lazy_gc(int highest_lba, double IO_submission
 	return basic_sequential_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
-	long num_IOs = 10000;
+vector<Thread*>  synch_random_writes_experiment(int highest_lba, double IO_submission_rate) {
+	long num_IOs = 2000;
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
+	double num_threads = SSD_SIZE * PACKAGE_SIZE;
+	long space_per_thread = highest_lba / num_threads;
+
+	for (uint i = 0; i < num_threads; i++) {
+		long min_lba = space_per_thread * i;
+		long max_lba = space_per_thread * (i + 1) - 1;
+		t1->add_follow_up_thread(new Synchronous_Random_Thread(min_lba, max_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
+	}
+
 	vector<Thread*> threads;
 	threads.push_back(t1);
 	return threads;
 }
 
+/*vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
+	long num_IOs = 50000;
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
+	vector<Thread*> threads;
+	threads.push_back(t1);
+	return threads;
+}*/
+
 
 vector<Thread*>  random_writes_greedy_gc(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 0;
 	GREEDY_GC = true;
-	return random_writes_experiment(highest_lba, IO_submission_rate);
+	return synch_random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*>  random_writes_lazy_gc(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 0;
 	GREEDY_GC = false;
-	return random_writes_experiment(highest_lba, IO_submission_rate);
+	return synch_random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
 int main()
@@ -87,7 +104,7 @@ int main()
 	 */
 	load_config();
 
-	PRINT_LEVEL = 0;
+	PRINT_LEVEL = 1;
 
 	if (!debug) {
 		SSD_SIZE = 4;
@@ -106,8 +123,8 @@ int main()
 		SSD_SIZE = 4;
 		PACKAGE_SIZE = 2;
 		DIE_SIZE = 1;
-		PLANE_SIZE = 32;
-		BLOCK_SIZE = 16;
+		PLANE_SIZE = 64;
+		BLOCK_SIZE = 32;
 
 		PAGE_READ_DELAY = 5;
 		PAGE_WRITE_DELAY = 20;
@@ -124,13 +141,16 @@ int main()
 			sequential_detection_CHANNEL
 			sequential_detection_BLOCK*/
 
-	long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.8;
-	vector<Thread*> threads = random_writes_greedy_gc(logical_address_space_size, 50);
+	/*long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.8;
+	printf("logical_address_space_size  %d\n", logical_address_space_size);
+	vector<Thread*> threads = random_writes_greedy_gc(logical_address_space_size, 100);
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
 	StatisticsGatherer::get_instance()->print();
 	delete os;
-	return 0;
+	return 0;*/
+
+	Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 80, 90, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed");
 
     ////////////////////////////////////////////////
 
