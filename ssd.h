@@ -1356,7 +1356,7 @@ protected:
 	const int num_mapping_pages;
 	const uint totalCMTentries;
 
-	deque<Event*> current_dependent_events;
+	//deque<Event*> current_dependent_events;
 	map<long, long> global_translation_directory; // a map from virtual translation pages to physical translation pages
 	map<long, vector<long> > ongoing_mapping_reads; // maps the address of ongoing mapping reads to LBAs that need to be inserted into the cache
 
@@ -1656,7 +1656,7 @@ public:
 	num_pages_in_each_LUN(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 	num_writes_to_each_LUN(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 	threads_to_start_when_this_thread_finishes() {}
-	virtual ~Thread() {}
+	virtual ~Thread();
 	Event* run() {
 		return finished ? NULL : issue_next_io();
 	}

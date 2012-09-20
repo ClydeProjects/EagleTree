@@ -53,7 +53,6 @@ void IOScheduler::instance_initialize(Ssd& ssd, FtlParent& ftl)
 		inst->future_events.clear();
 
 		assert(inst->future_events.size() == 0);
-		printf("size: %d\n", inst->current_events.size());
 		for (uint i = 0; i < inst->current_events.size(); i++) {
 			delete inst->current_events[i];
 		}

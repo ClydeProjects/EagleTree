@@ -12,6 +12,15 @@ using namespace ssd;
 
 // =================  Thread =============================
 
+Thread::~Thread() {
+	for (uint i = 0; i < threads_to_start_when_this_thread_finishes.size(); i++) {
+		Thread* t = threads_to_start_when_this_thread_finishes[i];
+		if (t != NULL) {
+			delete t;
+		}
+	}
+}
+
 void Thread::register_event_completion(Event* event) {
 	Address phys = event->get_address();
 	Address ra = event->get_replace_address();
