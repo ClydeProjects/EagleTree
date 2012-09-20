@@ -10,8 +10,6 @@
 
 using namespace ssd;
 
-#define PRINT_FILE_INFO false
-
 File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, double time_breaks, double start_time, ulong randseed)
 	: Thread(start_time), min_LBA(min_LBA), max_LBA(max_LBA),
 	  num_files_to_write(num_files_to_write), time_breaks(time_breaks),
@@ -26,25 +24,11 @@ File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, 
 }
 
 File_Manager::~File_Manager() {
-	set<int> deleted_ids;
 	for (uint i = 0; i < files_history.size(); i++) {
 		File* f = files_history[i];
 		if (f != NULL) {
-			deleted_ids.insert(f->id);
 			delete f;
 		}
-	}
-	files_history.clear();
-	for (uint i = 0; i < live_files.size(); i++) {
-		File* f = live_files[i];
-		if (f != NULL && deleted_ids.count(f->id) == 0) {
-			deleted_ids.insert(f->id);
-			delete f;
-		}
-	}
-	live_files.clear();
-	if (current_file != NULL && deleted_ids.count(current_file->id) == 0) {
-		delete current_file;
 	}
 }
 
@@ -93,7 +77,6 @@ void File_Manager::handle_event_completion(Event*event) {
 void File_Manager::handle_file_completion(double current_time) {
 	current_file->finish(current_time);
 	live_files.push_back(current_file);
-	files_history.push_back(current_file);
 
 	if (num_files_to_write-- == 0) {
 		finished = true;
@@ -103,7 +86,7 @@ void File_Manager::handle_file_completion(double current_time) {
 		randomly_delete_files(current_time);
 	} while (num_free_pages == 0);
 	//StateVisualiser::print_page_status();
-	if (PRINT_FILE_INFO) {
+	if (PRINT_FILE_MANAGER_INFO) {
 		StatisticsGatherer::get_instance()->print();
 	}
 	write_next_file(current_time);
@@ -131,6 +114,7 @@ void File_Manager::write_next_file(double current_time) {
 	}
 	num_free_pages -= size;
 	current_file = new File(size, death_probability, current_time);
+	files_history.push_back(current_file);
 	assign_new_range();
 }
 
@@ -161,7 +145,7 @@ void File_Manager::randomly_delete_files(double current_time) {
 }
 
 void File_Manager::delete_file(File* victim, double current_time) {
-	if (PRINT_FILE_INFO) {
+	if (PRINT_FILE_MANAGER_INFO) {
 		printf("deleting file  %d\n", victim->id);
 	}
 	num_free_pages += victim->size;
@@ -277,7 +261,7 @@ File_Manager::File::File(uint size, double death_probability, double creation_ti
 	  time_deleted(0), size(size), id(file_id_generator++),
 	  num_pages_written(0), current_range_being_written(-1, -1), num_pages_allocated_so_far(0)
 {
-	if (PRINT_FILE_INFO) {
+	if (PRINT_FILE_MANAGER_INFO) {
 		printf("creating file: %d  %d   %f\n", id, size, death_probability);
 	}
 	assert(death_probability >= 0 && death_probability <= 1);
@@ -287,7 +271,7 @@ File_Manager::File::File(uint size, double death_probability, double creation_ti
 void File_Manager::File::finish(double time) {
 	time_finished_writing = time;
 	ranges_comprising_file.push_back(current_range_being_written);
-	if (PRINT_FILE_INFO) {
+	if (PRINT_FILE_MANAGER_INFO) {
 		printf("finished with file  %d\n", id);
 	}
 }
@@ -320,7 +304,7 @@ long File_Manager::File::get_num_pages_left_to_allocate() const {
 }
 
 void File_Manager::File::register_new_range(Address_Range range) {
-	if (PRINT_FILE_INFO) {
+	if (PRINT_FILE_MANAGER_INFO) {
 		printf("new range for file: %d    (%d - %d)  in total: %d\n", id, range.min, range.max, range.get_size());
 	}
 	assert(logical_addresses_to_be_written_in_current_range.size() == 0);
@@ -334,4 +318,8 @@ void File_Manager::File::register_new_range(Address_Range range) {
 	for (int i = range.min; i <= range.max; i++) {
 		logical_addresses_to_be_written_in_current_range.insert(i);
 	}
+}
+
+void File_Manager::reset_id_generator() {
+	File_Manager::File::file_id_generator = 0;
 }

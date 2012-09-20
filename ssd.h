@@ -184,7 +184,7 @@ extern bool ENABLE_TAGGING;
  * Controls the level of detail of output
  */
 extern int PRINT_LEVEL;
-
+extern bool PRINT_FILE_MANAGER_INFO;
 /*
  * tells the Operating System class to either lock or not lock LBAs after dispatching IOs to them
  */
@@ -472,6 +472,7 @@ public:
 	double incr_time_taken(double time_incr);
 	double get_best_case_finish_time();
 	void print(FILE *stream = stdout) const;
+	static void reset_id_generators();
 private:
 	double start_time;
 	double time_taken;
@@ -1829,6 +1830,7 @@ public:
 	Event* issue_next_io();
 	void handle_event_completion(Event* event);
 	virtual void print_thread_stats();
+	static void reset_id_generator();
 private:
 
 	struct Address_Range {
