@@ -26,21 +26,24 @@ File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, 
 }
 
 File_Manager::~File_Manager() {
+	set<int> deleted_ids;
 	for (uint i = 0; i < files_history.size(); i++) {
 		File* f = files_history[i];
 		if (f != NULL) {
+			deleted_ids.insert(f->id);
 			delete f;
 		}
 	}
 	files_history.clear();
 	for (uint i = 0; i < live_files.size(); i++) {
 		File* f = live_files[i];
-		if (f != NULL) {
+		if (f != NULL && deleted_ids.count(f->id) == 0) {
+			deleted_ids.insert(f->id);
 			delete f;
 		}
 	}
 	live_files.clear();
-	if (current_file != NULL) {
+	if (current_file != NULL && deleted_ids.count(current_file->id) == 0) {
 		delete current_file;
 	}
 }
