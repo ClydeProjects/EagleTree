@@ -56,7 +56,7 @@ vector<Thread*>  sequential_writes_lazy_gc(int highest_lba, double IO_submission
 }
 
 vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
-	long num_IOs = 100;
+	long num_IOs = 10000;
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
 	vector<Thread*> threads;
@@ -79,7 +79,7 @@ vector<Thread*>  random_writes_lazy_gc(int highest_lba, double IO_submission_rat
 
 int main()
 {
-	bool debug = true;
+	bool debug = false;
 	/*
 	 * sequential_writes_lazy_gc
 	 * random_writes_experiment
@@ -88,7 +88,7 @@ int main()
 	 */
 	load_config();
 
-	double submission_rate = 100;
+	double submission_rate = 1000;
 
 	if (!debug) {
 		SSD_SIZE = 4;
@@ -138,11 +138,14 @@ int main()
 
     ////////////////////////////////////////////////
 
+	string home_folder = "/home/mkja/git/EagleTree/";
+
 	vector<Exp> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 60, 90, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc, 60, 90, 5, "/home/niv/Desktop/EagleTree/rand_lazy/", "rand lazy") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_greedy_gc, 60, 90, 5, "/home/niv/Desktop/EagleTree/seq_greed/", "seq greed") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_lazy_gc, 60, 90, 5, "/home/niv/Desktop/EagleTree/seq_lazy/", "seq lazy") );
+//	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 60, 90, 5, home_folder + "rand_greed/", "rand greed") );
+//	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc, 60, 90, 5, home_folder + "rand_lazy/", "rand lazy") );
+//	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_greedy_gc, 60, 90, 5, home_folder + "seq_greed/", "seq greed") );
+//	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_lazy_gc, 60, 90, 5, home_folder + "seq_lazy/", "seq lazy") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_lazy_gc, 60, 90, 5, home_folder + "ExpTest/", "seq lazy ~ test") );
 
 
 	// Print column names for info
@@ -153,16 +156,17 @@ int main()
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
 
 	vector<int> used_space_values_to_show;
+	used_space_values_to_show.push_back(60);
+	used_space_values_to_show.push_back(70);
 	used_space_values_to_show.push_back(80);
 	used_space_values_to_show.push_back(85);
 	used_space_values_to_show.push_back(90);
-	used_space_values_to_show.push_back(95);
 
 	int sx = 16;
 	int sy = 8;
 
-	chdir("/home/niv/Desktop/EagleTree/");
-	Experiment_Runner::graph					(sx, sy,   "Maximum sustainable throughput", "throughput", 24, exp);
+	//chdir(home_folder);
+	//Experiment_Runner::graph					(sx, sy,   "Maximum sustainable throughput", "throughput", 24, exp);
 
 	for (uint i = 0; i < exp.size(); i++) {
 		chdir(exp[i].data_folder.c_str());

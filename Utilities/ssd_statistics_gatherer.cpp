@@ -91,7 +91,7 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	} else if (event.get_event_type() == COPY_BACK) {
 		num_copy_backs_per_LUN[a.package][a.die]++;
 	}
-	wait_time_histogram[floor(event.get_bus_wait_time() / wait_time_histogram_steps)*wait_time_histogram_steps]++;
+	wait_time_histogram[ceil((max(0.0, event.get_bus_wait_time() - wait_time_histogram_bin_size / 2)) / wait_time_histogram_bin_size)*wait_time_histogram_bin_size]++;
 }
 
 void StatisticsGatherer::register_scheduled_gc(Event const& gc) {
@@ -547,7 +547,7 @@ uint StatisticsGatherer::max_age_freq() {
 				for (uint t = 0; t < PLANE_SIZE; t++) {
 					Block const& block = ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
 					uint age = BLOCK_ERASES - block.get_erases_remaining();
-					age_histogram[floor((double) age / age_histogram_steps)*age_histogram_steps]++;
+					age_histogram[floor((double) age / age_histogram_bin_size)*age_histogram_bin_size]++;
 				}
 			}
 		}
@@ -568,7 +568,7 @@ string StatisticsGatherer::age_histogram_csv() {
 				for (uint t = 0; t < PLANE_SIZE; t++) {
 					Block const& block = ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
 					uint age = BLOCK_ERASES - block.get_erases_remaining();
-					age_histogram[floor((double) age / age_histogram_steps)*age_histogram_steps]++;
+					age_histogram[floor((double) age / age_histogram_bin_size)*age_histogram_bin_size]++;
 				}
 			}
 		}
