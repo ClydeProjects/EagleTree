@@ -24,8 +24,6 @@
 
 #include "ssd.h"
 
-#define SIZE 2
-
 using namespace ssd;
 #include <unistd.h>   // chdir
 #include <sys/stat.h> // mkdir
