@@ -309,6 +309,7 @@ class Wearwolf_Locality;
 
 class Sequential_Pattern_Detector;
 class Page_Hotness_Measurer;
+class Random_Order_Iterator;
 
 class OperatingSystem;
 class Thread;
@@ -894,6 +895,15 @@ private:
 
 };
 
+class Random_Order_Iterator {
+public:
+	Random_Order_Iterator();
+	vector<int> get_iterator(int needed_length);
+private:
+	void shuffle(vector<int>&);
+	MTRand_int32 random_number_generator;
+};
+
 class Block_manager_parent {
 public:
 	Block_manager_parent(Ssd& ssd, FtlParent& ftl, int classes = 1);
@@ -966,6 +976,7 @@ private:
 	map<int, int> blocks_being_garbage_collected;   // maps block physical address to the number of pages that still need to be migrated
 	vector<vector<vector<set<long> > > > gc_candidates;  // each age class has a vector of candidates for GC
 	vector<vector<uint> > num_blocks_being_garbaged_collected_per_LUN;
+	Random_Order_Iterator order_randomiser;
 };
 
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation
@@ -1776,10 +1787,7 @@ private:
 };
 */
 
-class Random_Order_Iterator {
-public:
-	static vector<int> get_iterator(int needed_length);
-};
+
 
 // assuming the relation is made of contigouse pages
 // RAM_available is the number of pages that fit into RAM
