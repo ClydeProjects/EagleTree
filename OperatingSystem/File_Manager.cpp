@@ -335,3 +335,7 @@ void File_Manager::File::register_new_range(Address_Range range) {
 		logical_addresses_to_be_written_in_current_range.insert(i);
 	}
 }
+
+void File_Manager::reset_id_generator() {
+	File_Manager::File::file_id_generator = 0;
+}

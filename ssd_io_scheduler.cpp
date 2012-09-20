@@ -233,7 +233,7 @@ double IOScheduler::get_current_time() const {
 	return floor(get_soonest_event_time(future_events));
 }
 
-// Generates a number between 0 and i-1, used by the random_shuffle in update_current_events()
+// Generates a number between 0 and limit-1, used by the random_shuffle in update_current_events()
 ptrdiff_t random_range(ptrdiff_t limit) {
 	return IOScheduler::instance()->random_number_generator() % limit;
 }

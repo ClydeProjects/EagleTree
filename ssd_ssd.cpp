@@ -116,6 +116,8 @@ Ssd::Ssd(uint ssd_size):
 	StateVisualiser::init(this);
 	StatisticsGatherer::init(this);
 
+	Event::reset_id_generators(); // reset id generator
+
 	return;
 }
 

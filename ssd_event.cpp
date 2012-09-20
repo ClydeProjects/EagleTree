@@ -323,6 +323,11 @@ void Event::print(FILE *stream) const
 	fprintf(stream, "\n");
 }
 
+void Event::reset_id_generators() {
+	Event::id_generator = 0;
+	Event::application_io_id_generator = 0;
+}
+
 #if 0
 /* may be useful for further integration with DiskSim */
 
