@@ -72,9 +72,9 @@ vector<Thread*>  sequential_writes_lazy_gc(int highest_lba, double IO_submission
 }*/
 
 vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
-	long num_IOs = 50000;
+	long num_IOs = 10000;
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
-	t1->add_follow_up_thread(new Collision_Free_Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
 	vector<Thread*> threads;
 	threads.push_back(t1);
 	return threads;
@@ -143,7 +143,7 @@ int main()
 
 	long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.8;
 	printf("logical_address_space_size  %d\n", logical_address_space_size);
-	vector<Thread*> threads = random_writes_greedy_gc(logical_address_space_size, 100);
+	vector<Thread*> threads = random_writes_greedy_gc(logical_address_space_size, 25);
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
 	StatisticsGatherer::get_instance()->print();
