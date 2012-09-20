@@ -145,6 +145,7 @@ int main()
 	printf("logical_address_space_size  %d\n", logical_address_space_size);
 	vector<Thread*> threads = random_writes_greedy_gc(logical_address_space_size, 25);
 	OperatingSystem* os = new OperatingSystem(threads);
+	os->set_num_writes_to_stop_after(17000);
 	os->run();
 	StatisticsGatherer::get_instance()->print();
 	delete os;
