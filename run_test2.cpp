@@ -113,20 +113,20 @@ int main()
 	BLOCK_ERASE_DELAY = 150;
 
 	//PRINT_LEVEL = 2;
-	/*long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.7;
-	vector<Thread*> threads = sequential_detection_BLOCK(logical_address_space_size, 10);
+	/*long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.95;
+	vector<Thread*> threads = sequential_tagging(logical_address_space_size, 40);
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
 	StatisticsGatherer::get_instance()->print();
-	delete os;*/
-
+	delete os;
+*/
 
 	vector<Exp> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_tagging, 70, 90, 5,			"/home/mkja/git/EagleTree/Exp2/", "Oracle") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_shortest_queues, 70, 90, 5,	"/home/mkja/git/EagleTree/Exp3/", "Shortest Queues") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_LUN, 70, 90, 5,	"/home/mkja/git/EagleTree/Exp4/", "Seq Detect: LUN") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_CHANNEL, 70, 90, 5,"/home/mkja/git/EagleTree/Exp5/", "Seq Detect: CHANNEL") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_BLOCK, 70, 90, 5, "/home/mkja/git/EagleTree/Exp6/", "Seq Detect: BLOCK") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_tagging, 80, 95, 5,			"/home/mkja/git/EagleTree/Exp2/", "Oracle") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_shortest_queues, 80, 95, 5,	"/home/mkja/git/EagleTree/Exp3/", "Shortest Queues") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_LUN, 80, 95, 5,	"/home/mkja/git/EagleTree/Exp4/", "Seq Detect: LUN") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_CHANNEL, 80, 95, 5,"/home/mkja/git/EagleTree/Exp5/", "Seq Detect: CHANNEL") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_BLOCK, 80, 95, 5, "/home/mkja/git/EagleTree/Exp6/", "Seq Detect: BLOCK") );
 
 	return 0;
 }
