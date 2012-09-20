@@ -96,7 +96,7 @@ int main()
 	string exp_folder  = "gc_experiment/";
 	string folder      = home_folder + exp_folder;
 
-	mkdir(folder.c_str(), 0755);
+	//mkdir(folder.c_str(), 0755);
 
 	load_config();
 
@@ -128,7 +128,7 @@ int main()
 	StatisticsGatherer::get_instance()->print();
 	delete os;
 */
-	int space_min = 80;
+	int space_min = 90;
 	int space_max = 95;
 	int space_inc = 5;
 

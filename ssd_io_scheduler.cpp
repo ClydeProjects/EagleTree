@@ -39,6 +39,27 @@ IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
 
 
 IOScheduler::~IOScheduler(){
+	for (uint i = 0; i < future_events.size(); i++) {
+		delete future_events[i];
+	}
+	future_events.clear();
+
+	assert(future_events.size() == 0);
+	for (uint i = 0; i < current_events.size(); i++) {
+		delete current_events[i];
+	}
+	current_events.clear();
+
+	map<uint, deque<Event*> >::iterator i = dependencies.begin();
+
+	for (; i != dependencies.end(); i++) {
+		deque<Event*> d = (*i).second;
+		for (uint j = 0; j < d.size(); j++) {
+			delete d[j];
+		}
+		d.clear();
+	}
+	dependencies.clear();
 	delete bm;
 }
 
@@ -47,30 +68,6 @@ IOScheduler *IOScheduler::inst = NULL;
 void IOScheduler::instance_initialize(Ssd& ssd, FtlParent& ftl)
 {
 	if (inst != NULL) {
-
-		for (uint i = 0; i < inst->future_events.size(); i++) {
-			delete inst->future_events[i];
-		}
-		inst->future_events.clear();
-
-		assert(inst->future_events.size() == 0);
-		for (uint i = 0; i < inst->current_events.size(); i++) {
-			delete inst->current_events[i];
-		}
-		inst->current_events.clear();
-		assert(inst->current_events.size() == 0);
-
-		map<uint, deque<Event*> >::iterator i = inst->dependencies.begin();
-
-		for (; i != inst->dependencies.end(); i++) {
-			deque<Event*> d = (*i).second;
-			for (uint j = 0; j < d.size(); j++) {
-				delete d[j];
-			}
-			d.clear();
-		}
-		inst->dependencies.clear();
-		assert(inst->dependencies.size() == 0);
 		delete inst;
 	}
 	inst = new IOScheduler(ssd, ftl);
@@ -600,8 +597,8 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	else if (existing_event != NULL && existing_event->is_garbage_collection_op() && (new_op_code == WRITE || new_op_code == TRIM)) {
 		if (new_op_code == TRIM) {
-			new_event->print();
-			existing_event->print();
+			//new_event->print();
+			//existing_event->print();
 			bm->register_trim_making_gc_redundant();
 		}
 

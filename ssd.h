@@ -184,7 +184,7 @@ extern bool ENABLE_TAGGING;
  * Controls the level of detail of output
  */
 extern int PRINT_LEVEL;
-
+extern bool PRINT_FILE_MANAGER_INFO;
 /*
  * tells the Operating System class to either lock or not lock LBAs after dispatching IOs to them
  */

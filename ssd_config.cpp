@@ -192,6 +192,7 @@ bool GREEDY_GC = true;
  * 2 -> Detailed
  */
 int PRINT_LEVEL = 0;
+int PRINT_FILE_MANAGER_INFO = false;
 
 bool OS_LOCK = false;
 int WEARWOLF_LOCALITY_THRESHOLD = 10;
