@@ -23,6 +23,8 @@
  * driver to create and run a very basic test of writes then reads */
 
 #include "ssd.h"
+#include <unistd.h>   // chdir
+#include <sys/stat.h> // mkdir
 
 using namespace ssd;
 
@@ -117,7 +119,7 @@ int main()
 	BLOCK_ERASE_DELAY = 150;
 
 
-	{
+	/*{
 		//PRINT_LEVEL = 1;
 		PRINT_FILE_MANAGER_INFO = true;
 		long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.95;
@@ -140,7 +142,7 @@ int main()
 			StatisticsGatherer::get_instance()->print();
 			delete os;
 		}
-	return 1;
+	/7return 1;*/
 
 
 	int space_min = 95;
