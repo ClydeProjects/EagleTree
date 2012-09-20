@@ -286,11 +286,6 @@ void Wearwolf_Locality::register_write_outcome(Event const& event, enum status s
 		for (uint i = 0; i < pointers.size(); i++) {
 			for (uint j = 0; j < pointers[i].size(); j++) {
 				if (has_free_pages(pointers[i][j]) && event.get_address().compare(pointers[i][j]) >= BLOCK) {
-
-					if (event.get_id() == 160537) {
-						StateVisualiser::print_page_status();
-					}
-
 					long key = (*iter).first;
 					pair<long, long> index(i, j);
 					process_write_completion(event, key, index);

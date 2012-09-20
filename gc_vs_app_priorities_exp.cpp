@@ -11,7 +11,7 @@
 using namespace ssd;
 
 vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
-	long num_IOs = 10000;
+	long num_IOs = 5000;
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
 	vector<Thread*> threads;
@@ -50,7 +50,7 @@ int main()
 	BLOCK_ERASE_DELAY = 150;
 
 	vector<Exp> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(app_and_gc_have_same_priority, 70, 80, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(app_and_gc_have_same_priority, 80, 80, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed") );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(gc_has_priority, 70, 80, 5, "/home/niv/Desktop/EagleTree/rand_lazy/", "rand lazy") );
 
 
