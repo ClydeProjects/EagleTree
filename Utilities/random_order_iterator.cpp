@@ -17,14 +17,13 @@ Random_Order_Iterator::Random_Order_Iterator()
 
 void Random_Order_Iterator::shuffle (std::vector<int> & order)
 {
-    int deckSize = order.size();
-    while (deckSize > 1)
+    int i = order.size();
+    while (i > 1)
     {
-       int k = random_number_generator();
-       k = k %24;
-       deckSize--;
-       int temp = order[deckSize];
-       order[deckSize] = order[k];
+       int k = random_number_generator() % order.size();
+       i--;
+       int temp = order[i];
+       order[i] = order[k];
        order[k] = temp;
     }
 }

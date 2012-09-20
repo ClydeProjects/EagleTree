@@ -56,7 +56,7 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
-all: gc_priorities gc_tuning sequential
+all: gc_priorities gc_tuning sequential load_balancing
 
 gc_priorities: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o gc_priorities exp_gc_priorities.cpp $(OBJ)
@@ -72,6 +72,12 @@ sequential: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o sequential exp_sequential.cpp $(OBJ)
 	-chmod $(PERMS) $(OBJ)
 	-chmod $(EPERMS) sequential
+	
+load_balancing: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o load_balancing exp_load_balancing.cpp $(OBJ)
+	-chmod $(PERMS) $(OBJ)
+	-chmod $(EPERMS) load_balancing
+
 
 exp1: $(HDR) $(OBJ)
 	#$(CXX) $(CXXFLAGS) -I/home/niv/install/boost_1_47_0 -L/home/niv/install/boost_1_47_0/libs -o $(ELF2) run_exp1.cpp $(OBJ)
