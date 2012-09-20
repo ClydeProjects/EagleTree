@@ -104,7 +104,7 @@ int main()
 	 */
 	load_config();
 
-	PRINT_LEVEL = 1;
+	PRINT_LEVEL = 0;
 
 	if (!debug) {
 		SSD_SIZE = 4;
@@ -141,7 +141,7 @@ int main()
 			sequential_detection_CHANNEL
 			sequential_detection_BLOCK*/
 
-	long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.8;
+	/*long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.8;
 	printf("logical_address_space_size  %d\n", logical_address_space_size);
 	vector<Thread*> threads = random_writes_greedy_gc(logical_address_space_size, 25);
 	OperatingSystem* os = new OperatingSystem(threads);
@@ -149,9 +149,7 @@ int main()
 	os->run();
 	StatisticsGatherer::get_instance()->print();
 	delete os;
-	return 0;
-
-	//Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 80, 90, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed");
+	return 0;*/
 
     ////////////////////////////////////////////////
 

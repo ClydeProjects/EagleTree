@@ -169,7 +169,7 @@ double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_l
 		vector<Thread*> threads = experiment(highest_lba, max_rate);
 		OperatingSystem* os = new OperatingSystem(threads);
 		try        { os->run(); }
-		catch(...) { success = false; max_rate *= 2; }
+		catch(...) { success = false; min_rate = max_rate; max_rate *= 2; }
 		delete os;
 	} while (!success);
 

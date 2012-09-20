@@ -137,11 +137,11 @@ void IOScheduler::execute_current_waiting_ios() {
 	vector<Event*> copy_backs;
 	vector<Event*> noop_events;
 
-	if (read_commands.size() + writes.size() >= MAX_SSD_QUEUE_SIZE) {
+	/*if (read_commands.size() + writes.size() >= MAX_SSD_QUEUE_SIZE) {
 		//StateVisualiser::print_page_status();
 		printf("Events queue maximum size exceeded:  %d\n", current_events.size());
 		throw "Events queue maximum size exceeded.";
-	}
+	}*/
 
 	while (events.size() > 0) {
 		Event * event = events.back();
@@ -180,7 +180,11 @@ void IOScheduler::execute_current_waiting_ios() {
 	handle_writes(gc_writes);
 	handle_writes(writes);
 
-	// Queue length track here?
+	if (current_events.size() >= MAX_SSD_QUEUE_SIZE) {
+		//StateVisualiser::print_page_status();
+		printf("Events queue maximum size exceeded:  %d\n", current_events.size());
+		throw "Events queue maximum size exceeded.";
+	}
 }
 
 double get_soonest_event_time(vector<Event*> events) {
