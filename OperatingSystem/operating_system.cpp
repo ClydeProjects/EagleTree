@@ -16,7 +16,8 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	  last_dispatched_event_minimal_finish_time(1),
 	  threads(new_threads),
 	  num_writes_to_stop_after(UNDEFINED),
-	  num_writes_completed(0)
+	  num_writes_completed(0),
+	  time_of_last_event_completed(0)
 {
 	assert(threads.size() > 0);
 	for (uint i = 0; i < threads.size(); i++) {

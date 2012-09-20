@@ -12,6 +12,9 @@
 using namespace ssd;
 
 IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
+	future_events(0),
+	current_events(0),
+	dependencies(),
 	ssd(ssd),
 	ftl(ftl),
 	dependency_code_to_LBA(),
@@ -33,6 +36,7 @@ IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
 	}
 }
 
+
 IOScheduler::~IOScheduler(){
 	delete bm;
 }
@@ -42,6 +46,31 @@ IOScheduler *IOScheduler::inst = NULL;
 void IOScheduler::instance_initialize(Ssd& ssd, FtlParent& ftl)
 {
 	if (inst != NULL) {
+
+		for (uint i = 0; i < inst->future_events.size(); i++) {
+			delete inst->future_events[i];
+		}
+		inst->future_events.clear();
+
+		assert(inst->future_events.size() == 0);
+		printf("size: %d\n", inst->current_events.size());
+		for (uint i = 0; i < inst->current_events.size(); i++) {
+			delete inst->current_events[i];
+		}
+		inst->current_events.clear();
+		assert(inst->current_events.size() == 0);
+
+		map<uint, deque<Event*> >::iterator i = inst->dependencies.begin();
+
+		for (; i != inst->dependencies.end(); i++) {
+			deque<Event*> d = (*i).second;
+			for (uint j = 0; j < d.size(); j++) {
+				delete d[j];
+			}
+			d.clear();
+		}
+		inst->dependencies.clear();
+		assert(inst->dependencies.size() == 0);
 		delete inst;
 	}
 	inst = new IOScheduler(ssd, ftl);
