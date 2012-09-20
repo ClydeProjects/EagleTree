@@ -184,6 +184,7 @@ public:
    {
       salt_count_ = p.optimal_parameters.number_of_hashes;
       table_size_ = p.optimal_parameters.table_size;
+      srand(17); random_seed_ = 0; // Inserted by MKS - ensure bloom filter determinism for experiment repeatability
       generate_unique_salt();
       raw_table_size_ = table_size_ / bits_per_char;
       bit_table_ = new cell_type[static_cast<std::size_t>(raw_table_size_)];

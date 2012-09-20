@@ -48,8 +48,8 @@ const string Experiment_Runner::queue_filename_prefix 		= "queue-";
 const double Experiment_Runner::M = 1000000.0; // One million
 const double Experiment_Runner::K = 1000.0;    // One thousand
 
-double Experiment_Runner::calibration_precision      = 1.0; // microseconds
-double Experiment_Runner::calibration_starting_point = 12.0; // microseconds
+double Experiment_Runner::calibration_precision      = 25; // microseconds
+double Experiment_Runner::calibration_starting_point = 25.0; // microseconds
 
 double Experiment_Runner::CPU_time_user() {
     struct rusage ru;

@@ -23,6 +23,8 @@
  * driver to create and run a very basic test of writes then reads */
 
 #include "ssd.h"
+#include <unistd.h>   // chdir
+#include <sys/stat.h> // mkdir
 
 using namespace ssd;
 
