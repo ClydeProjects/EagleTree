@@ -1126,6 +1126,7 @@ public:
 	static IOScheduler *instance();
 	static void instance_initialize(Ssd& ssd, FtlParent& ftl);
 	void print_stats();
+	MTRand_int32 random_number_generator;
 private:
 	IOScheduler(Ssd& ssd, FtlParent& ftl);
 	~IOScheduler();
@@ -1176,7 +1177,6 @@ private:
 		io_scheduler_stats() : num_write_cancellations(0)  {}
 	};
 	io_scheduler_stats stats;
-
 };
 
 class FtlParent

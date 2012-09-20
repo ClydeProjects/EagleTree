@@ -16,7 +16,8 @@ IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
 	ftl(ftl),
 	dependency_code_to_LBA(),
 	dependency_code_to_type(),
-	stats()
+	stats(),
+	random_number_generator(42)
 {
 	if (BLOCK_MANAGER_ID == 0) {
 		bm = new Block_manager_parallel(ssd, ftl);
@@ -128,7 +129,6 @@ void IOScheduler::execute_current_waiting_ios() {
 	//printf("current_events   %d\n", current_events.size());
 	//printf("future_events   %d\n", future_events.size());
 	vector<Event*> events = collect_soonest_events();
-	//random_shuffle(future_events.begin(), future_events.end());
 	vector<Event*> read_commands;
 	vector<Event*> read_transfers;
 	vector<Event*> gc_writes;
@@ -207,14 +207,17 @@ double IOScheduler::get_current_time() const {
 	return floor(get_soonest_event_time(future_events));
 }
 
-
+// Generates a number between 0 and i-1, used by the random_shuffle in update_current_events()
+ptrdiff_t random_range(ptrdiff_t limit) {
+	return IOScheduler::instance()->random_number_generator() % limit;
+}
 
 // goes through all the events that has just been submitted (i.e. bus_wait_time = 0)
 // in light of these new events, see if any other existing pending events are now redundant
 void IOScheduler::update_current_events() {
 	StatisticsGatherer::get_instance()->register_events_queue_length(current_events.size(), get_current_time());
 	double current_time = get_current_time();
-	random_shuffle(future_events.begin(), future_events.end()); // Process events with same timestamp in random order to prevent imbalances
+	random_shuffle(future_events.begin(), future_events.end(), random_range); // Process events with same timestamp in random order to prevent imbalances
 	for (uint i = 0; i < future_events.size(); i++) {
 		Event* e = future_events[i];
 	    if (e->get_current_time() < current_time + 1) {
