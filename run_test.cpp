@@ -23,7 +23,8 @@
  * driver to create and run a very basic test of writes then reads */
 
 #include "ssd.h"
-#include <unistd.h>
+#include <unistd.h>   // chdir
+#include <sys/stat.h> // mkdir
 
 using namespace ssd;
 
@@ -95,7 +96,13 @@ vector<Thread*>  random_writes_lazy_gc(int highest_lba, double IO_submission_rat
 
 int main()
 {
-	bool debug = true;
+	string home_folder = "/home/mkja/git/EagleTree/";
+	string exp_folder  = "gc_experiment/";
+	string folder      = home_folder + exp_folder;
+
+	mkdir(folder.c_str(), 0755);
+
+	bool debug = false;
 	/*
 	 * sequential_writes_lazy_gc
 	 * sequential_writes_greedy_gc
@@ -126,41 +133,24 @@ int main()
 		PLANE_SIZE = 64;
 		BLOCK_SIZE = 32;
 
-		PAGE_READ_DELAY = 5;
+		PAGE_READ_DELAY = 1;
 		PAGE_WRITE_DELAY = 20;
 		BUS_CTRL_DELAY = 1;
-		BUS_DATA_DELAY = 8;
+		BUS_DATA_DELAY = 9;
 		BLOCK_ERASE_DELAY = 150;
 	}
 
-
-
-		/*sequential_tagging
-		 * sequential_writes_greedy_gc
-			sequential_writes_lazy_gc
-			sequential_detection_CHANNEL
-			sequential_detection_BLOCK*/
-
-	/*long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.8;
-	printf("logical_address_space_size  %d\n", logical_address_space_size);
-	vector<Thread*> threads = random_writes_greedy_gc(logical_address_space_size, 25);
-	OperatingSystem* os = new OperatingSystem(threads);
-	os->set_num_writes_to_stop_after(17000);
-	os->run();
-	StatisticsGatherer::get_instance()->print();
-	delete os;
-	return 0;*/
-
-    ////////////////////////////////////////////////
+	int space_min = 60;
+	int space_max = 90;
+	int space_inc = 5;
 
 	//Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 80, 90, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed");
 
 	vector<Exp> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 60, 90, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc, 60, 90, 5, "/home/niv/Desktop/EagleTree/rand_lazy/", "rand lazy") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_greedy_gc, 60, 90, 5, "/home/niv/Desktop/EagleTree/seq_greed/", "seq greed") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_lazy_gc, 60, 90, 5, "/home/niv/Desktop/EagleTree/seq_lazy/", "seq lazy") );
-
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc,		space_min, space_max, space_inc, folder + "rand_greed/", "rand greed") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc,		space_min, space_max, space_inc, folder + "rand_lazy/", "rand lazy") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_greedy_gc,	space_min, space_max, space_inc, folder + "seq_greed/", "seq greed") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_lazy_gc,	space_min, space_max, space_inc, folder + "seq_lazy/", "seq lazy") );
 
 	// Print column names for info
 	for (uint i = 0; i < exp[0].column_names.size(); i++)
@@ -170,16 +160,14 @@ int main()
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
 
 	vector<int> used_space_values_to_show;
-	used_space_values_to_show.push_back(80);
-	used_space_values_to_show.push_back(85);
-	used_space_values_to_show.push_back(90);
-	used_space_values_to_show.push_back(95);
+	for (int i = space_min; i <= space_max; i += space_inc)
+		used_space_values_to_show.push_back(i); // Show all used spaces values in multi-graphs
 
 	int sx = 16;
 	int sy = 8;
 
-	chdir("/home/niv/Desktop/EagleTree/");
-	Experiment_Runner::graph					(sx, sy,   "Maximum sustainable throughput", "throughput", 24, exp);
+	chdir(folder.c_str());
+	Experiment_Runner::graph(sx, sy,   "Maximum sustainable throughput", "throughput", 24, exp);
 
 	for (uint i = 0; i < exp.size(); i++) {
 		chdir(exp[i].data_folder.c_str());
@@ -188,5 +176,6 @@ int main()
 		Experiment_Runner::age_histogram			(sx, sy/2, "age-histograms", exp[i], used_space_values_to_show);
 		Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);
 	}
+
 	return 0;
 }

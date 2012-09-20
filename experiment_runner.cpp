@@ -49,7 +49,7 @@ const double Experiment_Runner::M = 1000000.0; // One million
 const double Experiment_Runner::K = 1000.0;    // One thousand
 
 double Experiment_Runner::calibration_precision      = 1.0; // microseconds
-double Experiment_Runner::calibration_starting_point = 10.0; // microseconds
+double Experiment_Runner::calibration_starting_point = 12.0; // microseconds
 
 double Experiment_Runner::CPU_time_user() {
     struct rusage ru;
@@ -162,7 +162,7 @@ double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_l
 	bool success;
 	printf("Calibrating...\n");
 
-	// finding an upper bound
+	// Finding an upper bound
 	do {
 		printf("Finding upper bound. Current is:  %f.\n", max_rate);
 		success = true;
@@ -173,7 +173,8 @@ double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_l
 		delete os;
 	} while (!success);
 
-	do {
+	while ((max_rate - min_rate) > calibration_precision)
+	{
 		current_rate = min_rate + ((max_rate - min_rate) / 2); // Pick a rate just between min and max
 		printf("Optimal submission rate in range %f - %f. Trying %f.\n", min_rate, max_rate, current_rate);
 		success = true;
@@ -186,7 +187,7 @@ double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_l
 		}
 		if      ( success) max_rate = current_rate;
 		else if (!success) min_rate = current_rate;
-	} while ((max_rate - min_rate) > calibration_precision);
+	}
 
 	return max_rate;
 }
@@ -391,7 +392,7 @@ void Experiment_Runner::waittime_histogram(int sizeX, int sizeY, string outputFi
 	vector<string> commands;
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "hist 0 " << i << " \"" << waittime_filename_prefix << points[i] << datafile_postfix << "\" \"Wait time histogram (" << experiment.x_axis << " = " << points[i] << ")\" \"log min 1\" \"Event wait time (µs)\" -1";
+		command << "hist 0 " << i << " \"" << waittime_filename_prefix << points[i] << datafile_postfix << "\" \"Wait time histogram (" << experiment.x_axis << " = " << points[i] << ")\" \"log min 1\" \"Event wait time (µs)\" -1 " << StatisticsGatherer::get_instance()->get_wait_time_histogram_bin_size();
 		commands.push_back(command.str());
 	}
 
@@ -407,7 +408,7 @@ void Experiment_Runner::age_histogram(int sizeX, int sizeY, string outputFile, E
 	vector<string> commands;
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "hist 0 " << i << " \"" << age_filename_prefix << points[i] << datafile_postfix << "\" \"Block age histogram (" << experiment.x_axis << " = " << points[i] << ")\" \"on min 0 max " << experiment.max_age_freq << "\" \"Block age\" age_max";
+		command << "hist 0 " << i << " \"" << age_filename_prefix << points[i] << datafile_postfix << "\" \"Block age histogram (" << experiment.x_axis << " = " << points[i] << ")\" \"on min 0 max " << experiment.max_age_freq << "\" \"Block age\" age_max " << StatisticsGatherer::get_instance()->get_age_histogram_bin_size();
 		commands.push_back(command.str());
 	}
 
@@ -443,7 +444,7 @@ void Experiment_Runner::multigraph(int sizeX, int sizeY, string outputFile, vect
 	"size std_sx+pad std_sy*hist_graphs+pad" << endl <<
 	"set font texcmr" << endl <<
 	endl <<
-	"sub hist xp yp data$ title$ yaxis$ xaxistitle$ xmax" << endl <<
+	"sub hist xp yp data$ title$ yaxis$ xaxistitle$ xmax binsize" << endl <<
 	"   amove xp*(std_sx/2)+pad yp*std_sy+pad" << endl <<
 	"   begin graph" << endl <<
 	"      fullsize" << endl <<
@@ -452,13 +453,18 @@ void Experiment_Runner::multigraph(int sizeX, int sizeY, string outputFile, vect
 	"      data  data$" << endl <<
 	"      title title$" << endl <<
 	"      yaxis \\expr{yaxis$}" << endl <<
-	"!      xaxis dticks 1" << endl <<
+	"      xaxis dticks int(xmax/25+1)" << endl <<
+	"      xaxis min -binsize/2" << endl <<
+	"      xsubticks off" << endl <<
+	"      x2ticks off" << endl <<
+	"      x2subticks off" << endl <<
+	"      xticks length -.1" << endl <<
 	"      if xmax>0 then" << endl <<
-	"         xaxis min 0 max xmax" << endl <<
+	"         xaxis max xmax+binsize/2" << endl <<
 	"      end if" << endl <<
 	"      xtitle xaxistitle$" << endl <<
 	"      ytitle \"Frequency\"" << endl <<
-	"      d1 line steps" << endl <<
+	"      bar d1 width binsize dist binsize fill gray" << endl <<
 	"   end graph" << endl <<
 	"end sub" << endl <<
 	endl <<

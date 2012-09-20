@@ -1579,6 +1579,8 @@ public:
 	void print();
 	void print_gc_info();
 	void print_csv();
+	inline double get_wait_time_histogram_bin_size() { return wait_time_histogram_bin_size; }
+	inline double get_age_histogram_bin_size() { return age_histogram_bin_size; }
 
 	string totals_csv_header();
 	vector<string> totals_vector_header();
@@ -1628,8 +1630,8 @@ private:
 	vector<vector<uint> > num_executed_gc_ops;
 	vector<vector<uint> > num_live_pages_in_gc_exec;
 
-	static const double wait_time_histogram_steps = 250;
-	static const double age_histogram_steps = 1;
+	static const double wait_time_histogram_bin_size = 250;
+	static const double age_histogram_bin_size = 1;
 	map<double, uint> wait_time_histogram;
 
 	// garbage collection stats
