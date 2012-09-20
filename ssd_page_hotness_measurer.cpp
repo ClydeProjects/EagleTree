@@ -199,9 +199,9 @@ BloomFilter_Page_Hotness_Measurer::BloomFilter_Page_Hotness_Measurer(uint num_bl
 	//parameters.random_seed                = ++random_seed;
 	if (!parameters) std::cout << "Error - Invalid set of bloom filter parameters!" << std::endl;
 
-	printf("Chosen false positive probability: %f\nChosen projected element count: %llu\n", parameters.false_positive_probability, parameters.projected_element_count);
+	if (PRINT_LEVEL >= 1) printf("Chosen false positive probability: %f\nChosen projected element count: %llu\n", parameters.false_positive_probability, parameters.projected_element_count);
 	parameters.compute_optimal_parameters();
-	printf("bloom_filter optimal parameters:\nNumber of hashes: %d\nTable size: %llu bits (%llu bytes)\n", parameters.optimal_parameters.number_of_hashes, parameters.optimal_parameters.table_size, parameters.optimal_parameters.table_size / 8);
+	if (PRINT_LEVEL >= 1) printf("bloom_filter optimal parameters:\nNumber of hashes: %d\nTable size: %llu bits (%llu bytes)\n", parameters.optimal_parameters.number_of_hashes, parameters.optimal_parameters.table_size, parameters.optimal_parameters.table_size / 8);
 
 	read_bloom.resize(num_bloom_filters, bloom_filter(parameters));
 	write_bloom.resize(num_bloom_filters, bloom_filter(parameters));
