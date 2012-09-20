@@ -49,7 +49,7 @@ const double Experiment_Runner::M = 1000000.0; // One million
 const double Experiment_Runner::K = 1000.0;    // One thousand
 
 double Experiment_Runner::calibration_precision      = 1.0; // microseconds
-double Experiment_Runner::calibration_starting_point = 1.0; // microseconds
+double Experiment_Runner::calibration_starting_point = 12.0; // microseconds
 
 double Experiment_Runner::CPU_time_user() {
     struct rusage ru;
@@ -162,20 +162,19 @@ double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_l
 	bool success;
 	printf("Calibrating...\n");
 
-	if ((max_rate - min_rate) <= calibration_precision) return max_rate; // Don't do unnecessary work...
-
-	// finding an upper bound
+	// Finding an upper bound
 	do {
 		printf("Finding upper bound. Current is:  %f.\n", max_rate);
 		success = true;
 		vector<Thread*> threads = experiment(highest_lba, max_rate);
 		OperatingSystem* os = new OperatingSystem(threads);
 		try        { os->run(); }
-		catch(...) { success = false; max_rate *= 2; }
+		catch(...) { success = false; min_rate = max_rate; max_rate *= 2; }
 		delete os;
 	} while (!success);
 
-	do {
+	while ((max_rate - min_rate) > calibration_precision)
+	{
 		current_rate = min_rate + ((max_rate - min_rate) / 2); // Pick a rate just between min and max
 		printf("Optimal submission rate in range %f - %f. Trying %f.\n", min_rate, max_rate, current_rate);
 		success = true;
@@ -188,7 +187,7 @@ double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_l
 		}
 		if      ( success) max_rate = current_rate;
 		else if (!success) min_rate = current_rate;
-	} while ((max_rate - min_rate) > calibration_precision);
+	}
 
 	return max_rate;
 }

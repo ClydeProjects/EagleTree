@@ -170,3 +170,40 @@ Event* Asynchronous_Random_Thread::issue_next_io() {
 void Asynchronous_Random_Thread::handle_event_completion(Event* event) {
 	//time += event->get_bus_wait_time();
 }
+
+// =================  Collision_Free_Asynchronous_Random_Writer  =============================
+
+Collision_Free_Asynchronous_Random_Thread::Collision_Free_Asynchronous_Random_Thread(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed, event_type type, double time_breaks, double start_time)
+	: Thread(start_time),
+	  min_LBA(min_LBA),
+	  max_LBA(max_LBA),
+	  number_of_times_to_repeat(num_ios_to_issue),
+	  type(type),
+	  time_breaks(time_breaks),
+	  random_number_generator(randseed)
+{}
+
+Event* Collision_Free_Asynchronous_Random_Thread::issue_next_io() {
+	Event* event;
+	if (0 < number_of_times_to_repeat) {
+		long address;
+		do {
+			address = min_LBA + random_number_generator() % (max_LBA - min_LBA + 1);
+		} while (logical_addresses_submitted.count(address) == 1);
+		printf("num events submitted:  %d\n", logical_addresses_submitted.size());
+		logical_addresses_submitted.insert(address);
+		event =  new Event(type, address, 1, time);
+		time += time_breaks;
+	} else {
+		event = NULL;
+	}
+	number_of_times_to_repeat--;
+	if (number_of_times_to_repeat == 0) {
+		finished = true;
+	}
+	return event;
+}
+
+void Collision_Free_Asynchronous_Random_Thread::handle_event_completion(Event* event) {
+	logical_addresses_submitted.erase(event->get_logical_address());
+}

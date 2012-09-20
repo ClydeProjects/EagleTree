@@ -55,7 +55,7 @@ vector<Thread*>  sequential_writes_lazy_gc(int highest_lba, double IO_submission
 	return basic_sequential_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<Thread*>  synch_random_writes_experiment(int highest_lba, double IO_submission_rate) {
+/*vector<Thread*>  synch_random_writes_experiment(int highest_lba, double IO_submission_rate) {
 	long num_IOs = 2000;
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
 	double num_threads = SSD_SIZE * PACKAGE_SIZE;
@@ -70,10 +70,10 @@ vector<Thread*>  synch_random_writes_experiment(int highest_lba, double IO_submi
 	vector<Thread*> threads;
 	threads.push_back(t1);
 	return threads;
-}
+}*/
 
 vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
-	long num_IOs = 50000;
+	long num_IOs = 10000;
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
 	vector<Thread*> threads;
@@ -105,7 +105,6 @@ int main()
 	 */
 	load_config();
 
-	double submission_rate = 1000;
 	PRINT_LEVEL = 0;
 
 	if (!debug) {
@@ -145,14 +144,13 @@ int main()
 
 	/*long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.8;
 	printf("logical_address_space_size  %d\n", logical_address_space_size);
-	vector<Thread*> threads = random_writes_greedy_gc(logical_address_space_size, 100);
+	vector<Thread*> threads = random_writes_greedy_gc(logical_address_space_size, 25);
 	OperatingSystem* os = new OperatingSystem(threads);
+	os->set_num_writes_to_stop_after(17000);
 	os->run();
 	StatisticsGatherer::get_instance()->print();
 	delete os;
 	return 0;*/
-
-	Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 80, 90, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed");
 
     ////////////////////////////////////////////////
 

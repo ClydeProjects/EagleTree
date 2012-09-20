@@ -1739,6 +1739,21 @@ private:
 	double time_breaks;
 };
 
+class Collision_Free_Asynchronous_Random_Thread : public Thread
+{
+public:
+	Collision_Free_Asynchronous_Random_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed = 0, event_type type = WRITE,  double time_breaks = 5, double start_time = 1);
+	Event* issue_next_io();
+	void handle_event_completion(Event* event);
+private:
+	long min_LBA, max_LBA;
+	int number_of_times_to_repeat;
+	MTRand_int32 random_number_generator;
+	event_type type;
+	double time_breaks;
+	set<long> logical_addresses_submitted;
+};
+
 /*
 class Reliable_Random_Int_Generator {
 public:
@@ -1900,26 +1915,24 @@ public:
 	void set_num_writes_to_stop_after(long num_writes);
 	double get_total_runtime() const;
 private:
-	void print_lock_map();
-	void dispatch_event(os_event event);
+	int pick_event_with_shortest_start_time();
+	void dispatch_event(int thread_id);
 	double get_event_minimal_completion_time(Event const*const event) const;
 	bool is_LBA_locked(ulong lba);
-	void get_next_event(int thread_id);
-	int release_lock(Event* event_just_finished);
 	Ssd * ssd;
 	vector<Thread*> threads;
-
+	vector<Event*> events;
 
 	//map<long, uint> LBA_to_thread_id_map;
 
-	os_event pick_unlocked_event_with_shortest_start_time();
-	vector<os_event> events;
-	map<long, queue<os_event> > locked_events;
-	map<long, int> lba_locks;
+	map<long, queue<uint> > write_LBA_to_thread_id;
+	map<long, queue<uint> > read_LBA_to_thread_id;
+	map<long, queue<uint> > trim_LBA_to_thread_id;
+
+	map<long, queue<uint> >& get_relevant_LBA_to_thread_map(event_type);
 
 	int currently_executing_ios_counter;
 	int currently_pending_ios_counter;
-	int num_locked_events;
 	double last_dispatched_event_minimal_finish_time;
 
 	set<uint> currently_executing_ios;
@@ -1927,7 +1940,6 @@ private:
 	long num_writes_completed;
 
 	double time_of_last_event_completed;
-
 };
 
 class Exp {
