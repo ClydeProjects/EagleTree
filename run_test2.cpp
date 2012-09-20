@@ -145,7 +145,7 @@ int main()
 	/7return 1;*/
 
 
-	int space_min = 95;
+	int space_min = 80;
 	int space_max = 95;
 	int space_inc = 5;
 
