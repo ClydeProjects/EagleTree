@@ -38,7 +38,7 @@ CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
 ELF1 = run_trace
 #ELF2 = test2
-ELF2 = run_test2
+#ELF2 = run_test2
 HDR = ssd.h 
 VPATH = FTLs MTRand BlockManagers OperatingSystem Utilities
 #SRC = ssd_address.cpp ssd_block.cpp ssd_bus.cpp ssd_channel.cpp ssd_config.cpp ssd_controller.cpp ssd_die.cpp ssd_event.cpp ssd_ftl.cpp ssd_gc.cpp ssd_package.cpp ssd_page.cpp ssd_plane.cpp ssd_quicksort.cpp ssd_ram.cpp ssd_ssd.cpp ssd_wl.cpp
@@ -56,22 +56,22 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
-all: test2
+all: gc_priorities gc_tuning sequential
 
-test: $(HDR) $(OBJ)
-	$(CXX) $(CXXFLAGS) -o $(ELF2) run_test.cpp $(OBJ)
+gc_priorities: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o gc_priorities exp_gc_priorities.cpp $(OBJ)
 	-chmod $(PERMS) $(OBJ)
-	-chmod $(EPERMS) $(ELF2)
+	-chmod $(EPERMS) gc_priorities
 	
-gc_vs_app_priorities_exp: $(HDR) $(OBJ)
-	$(CXX) $(CXXFLAGS) -o $(ELF2) gc_vs_app_priorities_exp.cpp $(OBJ)
+gc_tuning: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o gc_tuning exp_gc_tuning.cpp $(OBJ)
 	-chmod $(PERMS) $(OBJ)
-	-chmod $(EPERMS) $(ELF2)
+	-chmod $(EPERMS) gc_tuning
 
-test2: $(HDR) $(OBJ)
-	$(CXX) $(CXXFLAGS) -o $(ELF2) run_test2.cpp $(OBJ)
+sequential: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o sequential exp_sequential.cpp $(OBJ)
 	-chmod $(PERMS) $(OBJ)
-	-chmod $(EPERMS) $(ELF2)
+	-chmod $(EPERMS) sequential
 
 exp1: $(HDR) $(OBJ)
 	#$(CXX) $(CXXFLAGS) -I/home/niv/install/boost_1_47_0 -L/home/niv/install/boost_1_47_0/libs -o $(ELF2) run_exp1.cpp $(OBJ)
