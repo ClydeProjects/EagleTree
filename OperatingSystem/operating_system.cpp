@@ -31,10 +31,19 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 
 OperatingSystem::~OperatingSystem() {
 	for (uint i = 0; i < threads.size(); i++) {
-		//threads[i]->print_thread_stats();
-		delete threads[i];
-		delete events[i];
+		Thread* t = threads[i];
+		if (t != NULL) {
+			delete t;
+		}
 	}
+	threads.clear();
+	for (uint i = 0; i < events.size(); i++) {
+		Event* e = events[i];
+		if (e != NULL) {
+			delete e;
+		}
+	}
+	events.clear();
 	delete ssd;
 }
 
