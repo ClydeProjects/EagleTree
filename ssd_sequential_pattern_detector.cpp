@@ -20,6 +20,14 @@ Sequential_Pattern_Detector::Sequential_Pattern_Detector(uint threshold)
   threshold(threshold) {}
 
 Sequential_Pattern_Detector::~Sequential_Pattern_Detector() {
+	map<logical_address, sequential_writes_tracking*>::iterator i = sequential_writes_identification_and_data.begin();
+	for (; i != sequential_writes_identification_and_data.end(); i++) {
+		sequential_writes_tracking* s = (*i).second;
+		if (s != NULL) {
+			delete s;
+		}
+	}
+	sequential_writes_identification_and_data.clear();
 }
 
 sequential_writes_tracking const& Sequential_Pattern_Detector::register_event(logical_address lb, double time) {

@@ -1128,6 +1128,7 @@ public:
 	static IOScheduler *instance();
 	static void instance_initialize(Ssd& ssd, FtlParent& ftl);
 	void print_stats();
+	MTRand_int32 random_number_generator;
 private:
 	IOScheduler(Ssd& ssd, FtlParent& ftl);
 	~IOScheduler();
@@ -1178,7 +1179,6 @@ private:
 		io_scheduler_stats() : num_write_cancellations(0)  {}
 	};
 	io_scheduler_stats stats;
-
 };
 
 class FtlParent
@@ -1656,7 +1656,7 @@ public:
 	num_pages_in_each_LUN(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 	num_writes_to_each_LUN(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 	threads_to_start_when_this_thread_finishes() {}
-	virtual ~Thread() {}
+	virtual ~Thread();
 	Event* run() {
 		return finished ? NULL : issue_next_io();
 	}

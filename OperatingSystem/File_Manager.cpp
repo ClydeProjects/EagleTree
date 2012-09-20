@@ -27,7 +27,21 @@ File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, 
 
 File_Manager::~File_Manager() {
 	for (uint i = 0; i < files_history.size(); i++) {
-		delete files_history[i];
+		File* f = files_history[i];
+		if (f != NULL) {
+			delete f;
+		}
+	}
+	files_history.clear();
+	for (uint i = 0; i < live_files.size(); i++) {
+		File* f = live_files[i];
+		if (f != NULL) {
+			delete f;
+		}
+	}
+	live_files.clear();
+	if (current_file != NULL) {
+		delete current_file;
 	}
 }
 
