@@ -51,7 +51,7 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
 	}
 }
 
-Block_manager_parent::~Block_manager_parent(void){}
+Block_manager_parent::~Block_manager_parent() {}
 
 
 Address Block_manager_parent::choose_address(Event const& write) {

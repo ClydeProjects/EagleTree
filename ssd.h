@@ -206,6 +206,8 @@ extern uint MAX_OS_NUM_LOCKS;
 /* Defines how the sequential writes detection algorithm spreads a sequential write  */
 extern uint LOCALITY_PARALLEL_DEGREE;
 
+extern bool PRIORITISE_GC;
+
 /* Enumerations to clarify status integers in simulation
  * Do not use typedefs on enums for reader clarity */
 
@@ -1654,7 +1656,7 @@ public:
 	num_pages_in_each_LUN(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 	num_writes_to_each_LUN(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 	threads_to_start_when_this_thread_finishes() {}
-	virtual ~Thread() {}
+	virtual ~Thread();
 	Event* run() {
 		return finished ? NULL : issue_next_io();
 	}

@@ -144,6 +144,8 @@ int main()
 	int space_max = 90;
 	int space_inc = 5;
 
+	//Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 80, 90, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed");
+
 	vector<Exp> exp;
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc,		space_min, space_max, space_inc, folder + "rand_greed/", "rand greed") );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc,		space_min, space_max, space_inc, folder + "rand_lazy/", "rand lazy") );

@@ -12,6 +12,9 @@
 using namespace ssd;
 
 IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
+	future_events(0),
+	current_events(0),
+	dependencies(),
 	ssd(ssd),
 	ftl(ftl),
 	dependency_code_to_LBA(),
@@ -34,6 +37,7 @@ IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
 	}
 }
 
+
 IOScheduler::~IOScheduler(){
 	delete bm;
 }
@@ -43,6 +47,30 @@ IOScheduler *IOScheduler::inst = NULL;
 void IOScheduler::instance_initialize(Ssd& ssd, FtlParent& ftl)
 {
 	if (inst != NULL) {
+
+		for (uint i = 0; i < inst->future_events.size(); i++) {
+			delete inst->future_events[i];
+		}
+		inst->future_events.clear();
+
+		assert(inst->future_events.size() == 0);
+		for (uint i = 0; i < inst->current_events.size(); i++) {
+			delete inst->current_events[i];
+		}
+		inst->current_events.clear();
+		assert(inst->current_events.size() == 0);
+
+		map<uint, deque<Event*> >::iterator i = inst->dependencies.begin();
+
+		for (; i != inst->dependencies.end(); i++) {
+			deque<Event*> d = (*i).second;
+			for (uint j = 0; j < d.size(); j++) {
+				delete d[j];
+			}
+			d.clear();
+		}
+		inst->dependencies.clear();
+		assert(inst->dependencies.size() == 0);
 		delete inst;
 	}
 	inst = new IOScheduler(ssd, ftl);
@@ -137,16 +165,11 @@ void IOScheduler::execute_current_waiting_ios() {
 	vector<Event*> copy_backs;
 	vector<Event*> noop_events;
 
-	/*if (read_commands.size() + writes.size() >= MAX_SSD_QUEUE_SIZE) {
-		//StateVisualiser::print_page_status();
-		printf("Events queue maximum size exceeded:  %d\n", current_events.size());
-		throw "Events queue maximum size exceeded.";
-	}*/
-
 	while (events.size() > 0) {
 		Event * event = events.back();
 		events.pop_back();
 		event_type type = event->get_event_type();
+
 		if (event->get_noop()) {
 			noop_events.push_back(event);
 		}
@@ -155,6 +178,9 @@ void IOScheduler::execute_current_waiting_ios() {
 		}
 		else if (type == READ_TRANSFER) {
 			read_transfers.push_back(event);
+		}
+		else if (!PRIORITISE_GC && type == WRITE) {
+			writes.push_back(event);
 		}
 		else if (type == WRITE && !event->is_garbage_collection_op()) {
 			writes.push_back(event);

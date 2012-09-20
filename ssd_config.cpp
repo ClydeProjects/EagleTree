@@ -172,6 +172,7 @@ uint NUMBER_OF_ADDRESSABLE_BLOCKS = 0;
 /* RAISSDs: Number of physical SSDs */
 uint RAID_NUMBER_OF_PHYSICAL_SSDS = 0;
 
+bool PRIORITISE_GC = true;
 
 /*
  * Block manager
