@@ -600,8 +600,9 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if there is a read, and a write is scheduled, then the contents of the write must be buffered, so the read can wait
 	else if (new_op_code == READ && scheduled_op_code == WRITE) {
-		remove_current_operation(new_event);
-		current_events.push_back(new_event);
+		//remove_current_operation(new_event);
+		//current_events.push_back(new_event);
+		make_dependent(new_event, dependency_code_of_other_event);
 	}
 	// if there are two reads to the same address, there is no point reading the same page twice.
 	else if ((new_op_code == READ || new_op_code == READ_COMMAND || new_op_code == READ_TRANSFER) && (scheduled_op_code == READ || scheduled_op_code == READ_COMMAND || scheduled_op_code == READ_TRANSFER)) {
