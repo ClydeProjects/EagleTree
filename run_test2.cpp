@@ -121,16 +121,33 @@ int main()
 	BLOCK_ERASE_DELAY = 150;
 
 
+	{
+		//PRINT_LEVEL = 1;
+		PRINT_FILE_MANAGER_INFO = true;
+		long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.95;
+		vector<Thread*> threads = sequential_tagging(logical_address_space_size, 40);
+		OperatingSystem* os = new OperatingSystem(threads);
+		os->set_num_writes_to_stop_after(1000);
+		os->run();
+		StatisticsGatherer::get_instance()->print();
+		delete os;
+	}
+	printf("\n\n\n\n\n\n\n\n");
+	{
+			//PRINT_LEVEL = 1;
+			long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.95;
+			vector<Thread*> threads = sequential_tagging(logical_address_space_size, 40);
+			OperatingSystem* os = new OperatingSystem(threads);
+			os->set_num_writes_to_stop_after(1000);
+			os->run();
 
-	//PRINT_LEVEL = 2;
-	/*long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.95;
-	vector<Thread*> threads = sequential_tagging(logical_address_space_size, 40);
-	OperatingSystem* os = new OperatingSystem(threads);
-	os->run();
-	StatisticsGatherer::get_instance()->print();
-	delete os;
-*/
-	int space_min = 90;
+			StatisticsGatherer::get_instance()->print();
+			delete os;
+		}
+	return 1;
+
+
+	int space_min = 95;
 	int space_max = 95;
 	int space_inc = 5;
 
