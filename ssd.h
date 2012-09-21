@@ -428,10 +428,19 @@ public:
 class Event 
 {
 public:
+	bool debug_deleted;
 	Event(enum event_type type, ulong logical_address, uint size, double start_time);
 	Event();
 	Event(Event& event);
-	~Event() {}
+	~Event() {
+		/* DEBUG STUFF */
+		if (debug_deleted) {
+			printf("=!=!=!= Event was already deleted! \n");
+			print();
+		}
+		debug_deleted = true;
+		/* DEBUG STUFF */
+	}
 	ulong get_logical_address(void) const;
 	const Address &get_address(void) const;
 	const Address &get_merge_address(void) const;
