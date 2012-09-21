@@ -49,10 +49,9 @@ int main()
 	BUS_DATA_DELAY = 9;
 	BLOCK_ERASE_DELAY = 150;
 
+	int IO_limit = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 3;
+
 	vector<Exp> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(app_and_gc_have_same_priority, 80, 80, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(gc_has_priority, 70, 80, 5, "/home/niv/Desktop/EagleTree/rand_lazy/", "rand lazy") );
-
-
-
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(app_and_gc_have_same_priority, 80, 80, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(gc_has_priority, 70, 80, 5, "/home/niv/Desktop/EagleTree/rand_lazy/", "rand lazy", IO_limit) );
 }

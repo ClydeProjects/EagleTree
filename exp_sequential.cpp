@@ -27,6 +27,8 @@
 #include <sys/stat.h> // mkdir
 
 using namespace ssd;
+#include <unistd.h>   // chdir
+#include <sys/stat.h> // mkdir
 
 
 // problem: some of the pointers for the 6 block managers end up in the same LUNs. This is stupid.
@@ -92,11 +94,10 @@ vector<Thread*> sequential_detection_BLOCK(int highest_lba, double IO_submission
 
 int main()
 {
-	string home_folder = "/home/mkja/git/EagleTree/";
-	string exp_folder  = "gc_experiment/";
-	string folder      = home_folder + exp_folder;
+	string exp_folder  = "exp_sequential/";
+	mkdir(exp_folder.c_str(), 0755);
 
-	//mkdir(folder.c_str(), 0755);
+	bool debug = true;
 
 	load_config();
 
@@ -106,55 +107,45 @@ int main()
 		sequential_detection_CHANNEL
 		sequential_detection_BLOCK*/
 
-	SSD_SIZE = 4;
-	PACKAGE_SIZE = 2;
-	DIE_SIZE = 1;
-	PLANE_SIZE = 64;
-	BLOCK_SIZE = 32;
+	if (debug) {
+		SSD_SIZE = 4;
+		PACKAGE_SIZE = 2;
+		DIE_SIZE = 1;
+		PLANE_SIZE = 64;
+		BLOCK_SIZE = 32;
 
-	PAGE_READ_DELAY = 1;
-	PAGE_WRITE_DELAY = 20;
-	BUS_CTRL_DELAY = 5;
-	BUS_DATA_DELAY = 9;
-	BLOCK_ERASE_DELAY = 150;
+		PAGE_READ_DELAY = 5;
+		PAGE_WRITE_DELAY = 20;
+		BUS_CTRL_DELAY = 1;
+		BUS_DATA_DELAY = 9;
+		BLOCK_ERASE_DELAY = 150;
+	} else { // Real size
+		SSD_SIZE = 4;
+		PACKAGE_SIZE = 2;
+		DIE_SIZE = 1;
+		PLANE_SIZE = 128;
+		BLOCK_SIZE = 32;
 
-
-	/*{
-		//PRINT_LEVEL = 1;
-		PRINT_FILE_MANAGER_INFO = true;
-		long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.95;
-		vector<Thread*> threads = sequential_tagging(logical_address_space_size, 40);
-		OperatingSystem* os = new OperatingSystem(threads);
-		os->set_num_writes_to_stop_after(1000);
-		os->run();
-		StatisticsGatherer::get_instance()->print();
-		delete os;
+		PAGE_READ_DELAY = 5;
+		PAGE_WRITE_DELAY = 20;
+		BUS_CTRL_DELAY = 1;
+		BUS_DATA_DELAY = 8;
+		BLOCK_ERASE_DELAY = 150;
 	}
-	printf("\n\n\n\n\n\n\n\n");
-	{
-			//PRINT_LEVEL = 1;
-			long logical_address_space_size = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.95;
-			vector<Thread*> threads = sequential_tagging(logical_address_space_size, 40);
-			OperatingSystem* os = new OperatingSystem(threads);
-			os->set_num_writes_to_stop_after(1000);
-			os->run();
 
-			StatisticsGatherer::get_instance()->print();
-			delete os;
-		}
-	/7return 1;*/
-
-
-	int space_min = 80;
+	int IO_limit = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 3;
+	int space_min = 70;
 	int space_max = 95;
 	int space_inc = 5;
 
+	double start_time = Experiment_Runner::wall_clock_time();
+
 	vector<Exp> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_tagging, 			space_min, space_max, space_inc, folder + "oracle/",				"Oracle") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_shortest_queues,	space_min, space_max, space_inc, folder + "shortest_queues/",	"Shortest Queues") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_LUN, 	space_min, space_max, space_inc, folder + "seq_detect_lun/",		"Seq Detect: LUN") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_CHANNEL, space_min, space_max, space_inc, folder + "seq_detect_channel/",	"Seq Detect: CHANNEL") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_BLOCK, 	space_min, space_max, space_inc, folder + "seq_detect_block/",	"Seq Detect: BLOCK") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_tagging, 			space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_CHANNEL, space_min, space_max, space_inc, exp_folder + "seq_detect_channel/","Seq Detect: CHANNEL", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_BLOCK, 	space_min, space_max, space_inc, exp_folder + "seq_detect_block/",	"Seq Detect: BLOCK", IO_limit) );
 
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
@@ -166,16 +157,20 @@ int main()
 	int sx = 16;
 	int sy = 8;
 
-	chdir(folder.c_str());
+	chdir(exp_folder.c_str());
 	Experiment_Runner::graph(sx, sy,   "Maximum sustainable throughput", "throughput", 24, exp);
 
 	for (uint i = 0; i < exp.size(); i++) {
+		printf("%s\n", exp[i].data_folder.c_str());
 		chdir(exp[i].data_folder.c_str());
 		Experiment_Runner::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
 		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms", exp[i], used_space_values_to_show);
 		Experiment_Runner::age_histogram			(sx, sy/2, "age-histograms", exp[i], used_space_values_to_show);
 		Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);
 	}
+
+	double end_time = Experiment_Runner::wall_clock_time();
+	printf("Entire experiment finished in %s\n", Experiment_Runner::pretty_time(end_time - start_time).c_str());
 
 	return 0;
 }

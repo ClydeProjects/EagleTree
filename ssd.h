@@ -429,10 +429,19 @@ public:
 class Event 
 {
 public:
+	bool debug_deleted;
 	Event(enum event_type type, ulong logical_address, uint size, double start_time);
 	Event();
 	Event(Event& event);
-	~Event() {}
+	~Event() {
+		/* DEBUG STUFF */
+		if (debug_deleted) {
+			printf("=!=!=!= Event was already deleted! \n");
+			print();
+		}
+		debug_deleted = true;
+		/* DEBUG STUFF */
+	}
 	ulong get_logical_address(void) const;
 	const Address &get_address(void) const;
 	const Address &get_merge_address(void) const;
@@ -1930,15 +1939,16 @@ public:
 	static string pretty_time(double time);
 	static void draw_graph(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command);
 	static void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command, vector<string> histogram_commands);
-	static double calibrate_IO_submission_rate_queue_based(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
-	static double measure_throughput(int highest_lba, double IO_submission_rate, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
+	static double calibrate_IO_submission_rate_queue_based(int highest_lba, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
+	static double measure_throughput(int highest_lba, double IO_submission_rate, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
 	static double calibrate_IO_submission_rate_throughput_based(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
-	static Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name);
+	static Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
 	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<Exp> experiments);
 	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Exp experiment);
 	static void waittime_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
 	static void age_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
 	static void queue_length_history(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
+	static string get_working_dir();
 
 private:
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());

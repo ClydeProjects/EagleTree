@@ -54,6 +54,7 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	age_class(0),
 	tag(-1)
 {
+	debug_deleted = false;
 	assert(start_time >= 0.0);
 	if (logical_address > NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE) {
 		printf("invalid logical address, too big  %d   %d\n", logical_address, NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE);
@@ -78,7 +79,7 @@ Event::Event(Event& event) :
 	original_application_io(event.original_application_io),
 	age_class(event.age_class),
 	tag(event.tag)
-{}
+{debug_deleted = false;}
 
 Event::Event() : type(NOT_VALID) {}
 

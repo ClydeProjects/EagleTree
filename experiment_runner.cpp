@@ -29,6 +29,8 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <stdio.h>  /* defines FILENAME_MAX */
+
 //#include <boost/filesystem.hpp>
 
 #define SIZE 2
@@ -48,8 +50,8 @@ const string Experiment_Runner::queue_filename_prefix 		= "queue-";
 const double Experiment_Runner::M = 1000000.0; // One million
 const double Experiment_Runner::K = 1000.0;    // One thousand
 
-double Experiment_Runner::calibration_precision      = 1; // microseconds
-double Experiment_Runner::calibration_starting_point = 25.0; // microseconds
+double Experiment_Runner::calibration_precision      = 1.0; // microseconds
+double Experiment_Runner::calibration_starting_point = 12.00; // microseconds
 
 double Experiment_Runner::CPU_time_user() {
     struct rusage ru;
@@ -106,56 +108,16 @@ string Experiment_Runner::pretty_time(double time) {
 	return time_text.str();
 }
 
-double Experiment_Runner::measure_throughput(int highest_lba, double IO_submission_rate, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
+double Experiment_Runner::measure_throughput(int highest_lba, double IO_submission_rate, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
 	vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
 	OperatingSystem* os = new OperatingSystem(threads);
+	os->set_num_writes_to_stop_after(IO_limit);
 	os->run();
 	int total_IOs_issued = StatisticsGatherer::get_instance()->total_reads() + StatisticsGatherer::get_instance()->total_writes();
 	return (double) total_IOs_issued / os->get_total_runtime();
 }
 
-double Experiment_Runner::calibrate_IO_submission_rate_throughput_based(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
-	double max_rate = 100;
-	double min_rate = 0;
-	double current_rate;
-	double precision = 0.001;
-	bool success;
-
-	printf("Calibrating...\n");
-	double standing_throughput = numeric_limits<double>::max();
-
-	// finding an upper bound
-	do {
-		printf("Finding upper bound. Current is:  %f.\n", max_rate);
-		success = true;
-		double current_throughput = measure_throughput(highest_lba, max_rate, experiment);
-		if (current_throughput >= standing_throughput + precision) { // if throughput did not increase
-			standing_throughput = current_throughput;
-			max_rate *= 2;
-			success = false;
-		}
-	} while (!success);
-
-
-	do {
-		current_rate = min_rate + ((max_rate - min_rate) / 2); // Pick a rate just between min and max
-		printf("Optimal submission rate in range %f - %f. Trying %f.\n", min_rate, max_rate, current_rate);
-		success = true;
-		{
-			vector<Thread*> threads = experiment(highest_lba, current_rate);
-			OperatingSystem* os = new OperatingSystem(threads);
-			try        { os->run(); }
-			catch(...) { success = false; }
-			delete os;
-		}
-		if      ( success) max_rate = current_rate;
-		else if (!success) min_rate = current_rate;
-	} while ((max_rate - min_rate) > calibration_precision);
-
-
-}
-
-double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
+double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_lba, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
 	double max_rate = calibration_starting_point;
 	double min_rate = 0;
 	double current_rate;
@@ -168,6 +130,7 @@ double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_l
 		success = true;
 		vector<Thread*> threads = experiment(highest_lba, max_rate);
 		OperatingSystem* os = new OperatingSystem(threads);
+		os->set_num_writes_to_stop_after(IO_limit);
 		try        { os->run(); }
 		catch(...) { success = false; min_rate = max_rate; max_rate *= 2; }
 		delete os;
@@ -181,6 +144,7 @@ double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_l
 		{
 			vector<Thread*> threads = experiment(highest_lba, current_rate);
 			OperatingSystem* os = new OperatingSystem(threads);
+			os->set_num_writes_to_stop_after(IO_limit);
 			try        { os->run(); }
 			catch(...) { success = false; }
 			delete os;
@@ -192,12 +156,14 @@ double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_l
 	return max_rate;
 }
 
-Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name) {
+Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit) {
 	uint max_age = 0;
 	uint max_age_freq = 0;
 	stringstream graph_name;
 
     vector<string> histogram_commands;
+
+    string working_dir = Experiment_Runner::get_working_dir();
 
     mkdir(data_folder.c_str(), 0755);
     chdir(data_folder.c_str());
@@ -209,7 +175,7 @@ Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)
     string throughput_column_name = "Max sustainable throughput (IOs/s)";
 	string measurement_name       = "Used space (%)";
     std::ofstream csv_file;
-    csv_file.open(stats_filename.c_str());
+    csv_file.open((stats_filename + datafile_postfix).c_str());
     csv_file << "\"" << measurement_name << "\", " << StatisticsGatherer::get_instance()->totals_csv_header() << ", \"" << throughput_column_name << "\"" << "\n";
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
@@ -223,12 +189,13 @@ Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
 		// Calibrate IO submission rate
-		double IO_submission_rate = calibrate_IO_submission_rate_queue_based(highest_lba, experiment);
+		double IO_submission_rate = calibrate_IO_submission_rate_queue_based(highest_lba, IO_limit, experiment);
 		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
 
 		// Run experiment
 		vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
 		OperatingSystem* os = new OperatingSystem(threads);
+		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
 
 		// Compute throughput, save statistics in csv format
@@ -283,7 +250,9 @@ Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)
 
     //boost::filesystem::current_path(boost::filesystem::path(working_dir));
 
-	return Exp(name, data_folder, "Free space (%)", column_names, max_age, max_age_freq);
+	chdir(working_dir.c_str());
+
+	return Exp(name, working_dir + "/" + data_folder, "Free space (%)", column_names, max_age, max_age_freq);
 }
 
 // Plotting x number of experiments into one graph
@@ -307,7 +276,7 @@ void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filenam
     for (uint i = 0; i < experiments.size(); i++) {
     	Exp e = experiments[i];
         gleScript <<
-       	"   data   \"" << e.data_folder << stats_filename << "\"" << " d"<<i+1<<"=c1,c" << column+1 << endl <<
+       	"   data   \"" << e.data_folder << stats_filename << datafile_postfix << "\"" << " d"<<i+1<<"=c1,c" << column+1 << endl <<
         "   d"<<i+1<<" line marker " << markers[i] << " key " << "\"" << e.name << "\"" << endl;
     }
 
@@ -339,7 +308,7 @@ void Experiment_Runner::waittime_boxplot(int sizeX, int sizeY, string title, str
     "   title  \"" << title << "\"" << endl <<
     "   xtitle \"" << experiment.x_axis << "\"" << endl <<
     "   ytitle \"Wait time (µs)\"" << endl <<
-	"   data \"" << experiment.data_folder << stats_filename << "\"" << endl <<
+	"   data \"" << experiment.data_folder << stats_filename << datafile_postfix << "\"" << endl <<
     "   xaxis min dminx(d1)-2.5 max dmaxx(d1)+2.5 dticks 5" << endl << // nolast nofirst
     "   dticks off" << endl <<
     "   yaxis min 0 max dmaxy(d" << mean_column+5 << ")*1.05" << endl << // mean_column+5 = max column
@@ -496,4 +465,12 @@ void Experiment_Runner::multigraph(int sizeX, int sizeY, string outputFile, vect
     system(gleCommand.c_str());
 
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
+}
+
+string Experiment_Runner::get_working_dir() {
+	char cCurrentPath[FILENAME_MAX];
+	if (!getcwd(cCurrentPath, sizeof(cCurrentPath))) { return "<?>"; }
+	cCurrentPath[sizeof(cCurrentPath) - 1] = '\0'; /* not really required */
+	string currentPath(cCurrentPath);
+	return currentPath;
 }

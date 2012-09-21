@@ -51,6 +51,7 @@
 #define MTRAND_H
 
 #include <iostream>
+#include <assert.h> // MKS DEBUG
 
 class MTRand_int32 { // Mersenne Twister random number generator
 public:
@@ -92,6 +93,7 @@ inline unsigned long MTRand_int32::twiddle(unsigned long u, unsigned long v) {
 }
 
 inline unsigned long MTRand_int32::rand_int32() { // generate 32 bit random int
+  /*DEBUG LINE INSERTED BY MK*/assert(init == true);
   if (p == n) gen_state(); // new state vector needed
 // gen_state() is split off to be non-inline, because it is only called once
 // in every 624 calls and otherwise irand() would become too big to get inlined
