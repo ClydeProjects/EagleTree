@@ -140,8 +140,8 @@ int main()
 		BLOCK_ERASE_DELAY = 150;
 	}
 
-	int space_min = 60;
-	int space_max = 90;
+	int space_min = 80;
+	int space_max = 95;
 	int space_inc = 5;
 
 	//Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 80, 90, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed");
