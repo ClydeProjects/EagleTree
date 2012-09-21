@@ -658,7 +658,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 // finds and returns a free block from anywhere in the SSD. Returns Address(0, NONE) is there is no such block
 Address Block_manager_parent::find_free_unused_block(double time) {
-	vector<int> order = Random_Order_Iterator::get_iterator(SSD_SIZE);
+	vector<int> order = order_randomiser.get_iterator(SSD_SIZE);
 	while (order.size() > 0) {
 		int index = order.back();
 		order.pop_back();
@@ -672,7 +672,7 @@ Address Block_manager_parent::find_free_unused_block(double time) {
 
 Address Block_manager_parent::find_free_unused_block(uint package_id, double time) {
 	assert(package_id < SSD_SIZE);
-	vector<int> order = Random_Order_Iterator::get_iterator(PACKAGE_SIZE);
+	vector<int> order = order_randomiser.get_iterator(PACKAGE_SIZE);
 	while (order.size() > 0) {
 		int index = order.back();
 		order.pop_back();
@@ -687,7 +687,7 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, double tim
 // finds and returns a free block from a particular die in the SSD
 Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_id, double time) {
 	assert(package_id < SSD_SIZE && die_id < PACKAGE_SIZE);
-	vector<int> order = Random_Order_Iterator::get_iterator(num_age_classes);
+	vector<int> order = order_randomiser.get_iterator(num_age_classes);
 	while (order.size() > 0) {
 		int index = order.back();
 		order.pop_back();
