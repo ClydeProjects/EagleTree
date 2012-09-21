@@ -96,7 +96,7 @@ trace: $(HDR) $(OBJ)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 clean:
-	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2)
+	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) gc_priorities gc_tuning sequential load_balancing
 
 files:
 	echo $(SRC) $(HDR)

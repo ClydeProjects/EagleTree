@@ -49,6 +49,7 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	id(id_generator++),
 	application_io_id(application_io_id_generator++),
 	garbage_collection_op(false),
+	wear_leveling_op(false),
 	mapping_op(false),
 	original_application_io(false),
 	age_class(0),
@@ -75,6 +76,7 @@ Event::Event(Event& event) :
 	id(id_generator++),
 	application_io_id(event.application_io_id),
 	garbage_collection_op(event.garbage_collection_op),
+	wear_leveling_op(event.wear_leveling_op),
 	mapping_op(event.mapping_op),
 	original_application_io(event.original_application_io),
 	age_class(event.age_class),
@@ -229,6 +231,10 @@ void Event::set_garbage_collection_op(bool value) {
 	garbage_collection_op = value;
 }
 
+void Event::set_wear_leveling_op(bool value) {
+	wear_leveling_op = value;
+}
+
 void Event::set_mapping_op(bool value) {
 	mapping_op = value;
 }
@@ -243,6 +249,10 @@ int Event::get_age_class() const {
 
 bool Event::is_garbage_collection_op() const {
 	return garbage_collection_op;
+}
+
+bool Event::is_wear_leveling_op() const {
+	return wear_leveling_op;
 }
 
 bool Event::is_mapping_op() const {

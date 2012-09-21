@@ -73,6 +73,9 @@ int main()
 	BUS_DATA_DELAY = 9;
 	BLOCK_ERASE_DELAY = 150;
 
+	ENABLE_WEAR_LEVELING = true;
+	WEAR_LEVEL_THRESHOLD = 50;
+
 	long address_space = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
 	vector<Thread*> threads = sequential_writes_greedy_gc(address_space, 40);
 	OperatingSystem* os = new OperatingSystem(threads);

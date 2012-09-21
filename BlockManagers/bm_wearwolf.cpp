@@ -5,7 +5,7 @@ using namespace ssd;
 
 Wearwolf::Wearwolf(Ssd& ssd, FtlParent& ftl)
 	: Block_manager_parent(ssd, ftl, 4),
-	  page_hotness_measurer()
+	  page_hotness_measurer(new Simple_Page_Hotness_Measurer())
 {
 	wcrh_pointer = find_free_unused_block(0, 0, YOUNG, 0);
 	if (SSD_SIZE > 1) {
@@ -17,13 +17,17 @@ Wearwolf::Wearwolf(Ssd& ssd, FtlParent& ftl)
 	}
 }
 
+Wearwolf::~Wearwolf() {
+	delete page_hotness_measurer;
+}
+
 void Wearwolf::register_write_outcome(Event const& event, enum status status) {
 	assert(event.get_event_type() == WRITE || event.get_event_type() == COPY_BACK);
 	if (status == FAILURE) {
 		return;
 	}
 	Block_manager_parent::register_write_outcome(event, status);
-	page_hotness_measurer.register_event(event);
+	page_hotness_measurer->register_event(event);
 
 	if (event.get_address().compare(wcrh_pointer) >= BLOCK) {
 		wcrh_pointer.page = wcrh_pointer.page + 1;
@@ -40,7 +44,7 @@ void Wearwolf::register_write_outcome(Event const& event, enum status status) {
 }
 
 void Wearwolf::handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time) {
-	Address addr = page_hotness_measurer.get_best_target_die_for_WC(rh);
+	Address addr = page_hotness_measurer->get_best_target_die_for_WC(rh);
 	Address& pointer = rh == READ_COLD ? wcrc_pointer : wcrh_pointer;
 	Address block = find_free_unused_block(addr.package, addr.die, OLD, start_time);
 	if (has_free_pages(block)) {
@@ -76,8 +80,8 @@ void Wearwolf::reset_any_filled_pointers(Event const& event) {
 
 
 Address Wearwolf::choose_best_address(Event const& write) {
-	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
-	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(write.get_logical_address());
+	enum write_hotness w_hotness = page_hotness_measurer->get_write_hotness(write.get_logical_address());
+	enum read_hotness r_hotness = page_hotness_measurer->get_read_hotness(write.get_logical_address());
 
 	if (w_hotness == WRITE_HOT) {
 		return get_free_block_pointer_with_shortest_IO_queue();
@@ -95,7 +99,7 @@ Address Wearwolf::choose_any_address() {
 
 void Wearwolf::register_read_outcome(Event const& event, enum status status){
 	if (status == SUCCESS && !event.is_garbage_collection_op()) {
-		page_hotness_measurer.register_event(event);
+		page_hotness_measurer->register_event(event);
 	}
 }
 

@@ -90,8 +90,9 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 
 	if (b->get_age() > max_age) {
 		max_age = b->get_age();
-		StateVisualiser::print_block_ages();
+		//StateVisualiser::print_block_ages();
 	}
+	Wear_Level(event);
 
 	uint age_class = sort_into_age_class(a);
 	free_blocks[a.package][a.die][age_class].push_back(a);
@@ -117,7 +118,6 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	}
 
 	Block_manager_parent::check_if_should_trigger_more_GC(event.get_current_time());
-	Wear_Level(event);
 }
 
 void Block_manager_parent::register_write_arrival(Event const& write) {
@@ -127,6 +127,7 @@ void Block_manager_parent::register_write_arrival(Event const& write) {
 double Block_manager_parent::get_normalised_age(uint age) const {
 	double min_age = get_min_age();
 	double normalized_age = (age - min_age) / (max_age - min_age);
+	assert(normalized_age >= 0 && normalized_age <= 1);
 	return normalized_age;
 }
 
@@ -134,7 +135,7 @@ uint Block_manager_parent::sort_into_age_class(Address const& a) const {
 	Block* b = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 	uint age = b->get_age();
 	double normalized_age = get_normalised_age(age);
-	uint klass = floor(normalized_age * num_age_classes * 0.99999);
+	int klass = floor(normalized_age * num_age_classes * 0.99999);
 	return klass;
 }
 
@@ -313,7 +314,7 @@ void Block_manager_parent::Wear_Level(Event const& event) {
 		blocks_with_min_age.erase(b);
 	}
 	else if (blocks_with_min_age.count(b) == 1 && blocks_with_min_age.size() == 1) {
-		int min_age = get_min_age();
+		int min_age = b->get_age() - 1;
 		blocks_with_min_age.erase(b);
 		update_blocks_with_min_age(min_age + 1);
 	}
@@ -323,8 +324,10 @@ void Block_manager_parent::Wear_Level(Event const& event) {
 		assert(blocks_being_wl.size() == 0);
 	}
 
-	if (blocks_to_wl.size() == 0 && blocks_being_wl.size() == 0 && max_age > get_min_age() + 50) {
+	if (ENABLE_WEAR_LEVELING && blocks_to_wl.size() == 0 && blocks_being_wl.size() == 0 && max_age > get_min_age() + WEAR_LEVEL_THRESHOLD) {
 		find_wl_candidates(event.get_current_time());
+		//StateVisualiser::print_block_ages();
+		//StatisticsGatherer::get_instance()->print();
 	}
 
 	if (blocks_to_wl.size() > 0 && blocks_being_wl.size() == 0) {
@@ -350,7 +353,6 @@ void Block_manager_parent::update_blocks_with_min_age(uint min_age) {
 }
 
 void Block_manager_parent::find_wl_candidates(double current_time) {
-	StateVisualiser::print_block_ages();
 	for (uint i = 0; i < all_blocks.size(); i++) {
 		Block* b = all_blocks[i];
 		int age = BLOCK_ERASES - b->get_erases_remaining();
@@ -704,6 +706,11 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 				Event* write = new Event(WRITE, logical_address, 1, gc_event->get_start_time());
 				write->set_garbage_collection_op(true);
 				write->set_replace_address(addr);
+
+				if (is_wear_leveling_op) {
+					read->set_wear_leveling_op(true);
+					write->set_wear_leveling_op(true);
+				}
 
 				migration.push_back(read);
 				migration.push_back(write);
