@@ -481,7 +481,7 @@ void Block_manager_parent::schedule_gc(double time, int package, int die, int bl
 	gc->set_age_class(klass);
 	if (PRINT_LEVEL > 1) {
 		//StateTracer::print();
-		printf("scheduling gc in (%d %d %d)  -  ", package, die, klass); gc->print();
+		printf("scheduling gc in (%d %d %d %d)  -  ", package, die, block, klass); gc->print();
 	}
 	IOScheduler::instance()->schedule_event(gc);
 }

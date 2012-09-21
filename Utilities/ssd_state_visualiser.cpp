@@ -65,7 +65,7 @@ void StateVisualiser::print_block_ages() {
 			for (uint k = 0; k < DIE_SIZE; k++) {
 				for (uint t = 0; t < PLANE_SIZE; t++) {
 					Block const& block = ssd_ref.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
-					uint age = BLOCK_ERASES - block.get_erases_remaining();
+					uint age = block.get_age();
 					printf("% 7d|", age);
 					total_age += age;
 					oldest_age = max(oldest_age, age);

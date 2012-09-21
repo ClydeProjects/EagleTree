@@ -501,6 +501,7 @@ private:
 	bool noop;
 
 	bool garbage_collection_op;
+	bool wear_leveling_op;
 	bool mapping_op;
 	bool original_application_io;
 

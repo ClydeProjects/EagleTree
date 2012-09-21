@@ -27,7 +27,7 @@ vector<Thread*>  sequential_writes_greedy_gc(int highest_lba, double IO_submissi
 	LOCALITY_PARALLEL_DEGREE = 0;
 	ENABLE_TAGGING = false;
 
-	long space_per_thread = highest_lba / 2;
+	long space_per_thread = highest_lba / 4;
 
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, space_per_thread, 1, WRITE, IO_submission_rate, 1);
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, space_per_thread, 10000, 2, WRITE, IO_submission_rate, 1));
@@ -58,7 +58,7 @@ int main()
 {
 	load_config();
 
-	PRINT_LEVEL = 1;
+	PRINT_LEVEL = 0;
 	PRINT_FILE_MANAGER_INFO = true;
 
 	SSD_SIZE = 4;
