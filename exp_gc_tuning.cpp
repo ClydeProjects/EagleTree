@@ -96,24 +96,33 @@ vector<Thread*>  random_writes_lazy_gc(int highest_lba, double IO_submission_rat
 
 int main()
 {
-	string home_folder = "/home/mkja/git/EagleTree/";
-	string exp_folder  = "gc_experiment/";
-	string folder      = home_folder + exp_folder;
+	string exp_folder  = "exp_gc_tuning/";
+	mkdir(exp_folder.c_str(), 0755);
 
-	mkdir(folder.c_str(), 0755);
+	bool debug = true;
 
-	bool debug = false;
+	load_config();
+
 	/*
 	 * sequential_writes_lazy_gc
 	 * sequential_writes_greedy_gc
 	 * random_writes_greedy_gc
 	 * random_writes_lazy_gc
 	 */
-	load_config();
 
-	PRINT_LEVEL = 0;
+	if (debug) {
+		SSD_SIZE = 4;
+		PACKAGE_SIZE = 2;
+		DIE_SIZE = 1;
+		PLANE_SIZE = 64;
+		BLOCK_SIZE = 32;
 
-	if (!debug) {
+		PAGE_READ_DELAY = 5;
+		PAGE_WRITE_DELAY = 20;
+		BUS_CTRL_DELAY = 1;
+		BUS_DATA_DELAY = 9;
+		BLOCK_ERASE_DELAY = 150;
+	} else { // Real size
 		SSD_SIZE = 4;
 		PACKAGE_SIZE = 2;
 		DIE_SIZE = 1;
@@ -125,32 +134,20 @@ int main()
 		BUS_CTRL_DELAY = 1;
 		BUS_DATA_DELAY = 8;
 		BLOCK_ERASE_DELAY = 150;
-		//submission_rate = 10;
-	} else {
-		SSD_SIZE = 4;
-		PACKAGE_SIZE = 2;
-		DIE_SIZE = 1;
-		PLANE_SIZE = 64;
-		BLOCK_SIZE = 32;
-
-		PAGE_READ_DELAY = 1;
-		PAGE_WRITE_DELAY = 20;
-		BUS_CTRL_DELAY = 1;
-		BUS_DATA_DELAY = 9;
-		BLOCK_ERASE_DELAY = 150;
 	}
 
-	int space_min = 80;
-	int space_max = 95;
+	int IO_limit = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 3;
+	int space_min = 60;
+	int space_max = 90;
 	int space_inc = 5;
 
-	//Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc, 80, 90, 5, "/home/niv/Desktop/EagleTree/rand_greed/", "rand greed");
+	double start_time = Experiment_Runner::wall_clock_time();
 
 	vector<Exp> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc,		space_min, space_max, space_inc, folder + "rand_greed/", "rand greed") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc,		space_min, space_max, space_inc, folder + "rand_lazy/", "rand lazy") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_greedy_gc,	space_min, space_max, space_inc, folder + "seq_greed/", "seq greed") );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_lazy_gc,	space_min, space_max, space_inc, folder + "seq_lazy/", "seq lazy") );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc,		space_min, space_max, space_inc, exp_folder + "rand_greed/", "rand greed", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc,		space_min, space_max, space_inc, exp_folder + "rand_lazy/", "rand lazy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_greedy_gc,	space_min, space_max, space_inc, exp_folder + "seq_greed/", "seq greed", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_lazy_gc,	space_min, space_max, space_inc, exp_folder + "seq_lazy/", "seq lazy", IO_limit) );
 
 	// Print column names for info
 	for (uint i = 0; i < exp[0].column_names.size(); i++)
@@ -166,7 +163,7 @@ int main()
 	int sx = 16;
 	int sy = 8;
 
-	chdir(folder.c_str());
+	chdir(exp_folder.c_str());
 	Experiment_Runner::graph(sx, sy,   "Maximum sustainable throughput", "throughput", 24, exp);
 
 	for (uint i = 0; i < exp.size(); i++) {
@@ -176,6 +173,9 @@ int main()
 		Experiment_Runner::age_histogram			(sx, sy/2, "age-histograms", exp[i], used_space_values_to_show);
 		Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);
 	}
+
+	double end_time = Experiment_Runner::wall_clock_time();
+	printf("Entire experiment finished in %s\n", Experiment_Runner::pretty_time(end_time - start_time).c_str());
 
 	return 0;
 }
