@@ -208,6 +208,8 @@ extern uint LOCALITY_PARALLEL_DEGREE;
 
 extern bool PRIORITISE_GC;
 
+extern bool ENABLE_WEAR_LEVELING;
+
 /* Enumerations to clarify status integers in simulation
  * Do not use typedefs on enums for reader clarity */
 
@@ -472,10 +474,12 @@ public:
 	void set_noop(bool value);
 	void set_application_io_id(uint application_io_id);
 	void set_garbage_collection_op(bool value);
+	void set_wear_leveling_op(bool value);
 	void set_mapping_op(bool value);
 	void set_age_class(int value);
 	int get_age_class() const;
 	bool is_garbage_collection_op() const;
+	bool is_wear_leveling_op() const;
 	bool is_mapping_op() const;
 	void *get_payload(void) const;
 	double incr_bus_wait_time(double time);
@@ -786,9 +790,7 @@ public:
 	void register_event(Event const& event);
 	enum write_hotness get_write_hotness(unsigned long page_address) const;
 	enum read_hotness get_read_hotness(unsigned long page_address) const;
-	// Address get_die_with_least_wcrh() const;
-	// Address get_die_with_least_wcrc() const;
-	Address get_die_with_least_WC(enum read_hotness rh) const;
+	Address get_best_target_die_for_WC(enum read_hotness rh) const;
 private:
 	void start_new_interval_writes();
 	void start_new_interval_reads();
@@ -805,6 +807,8 @@ private:
 	vector<vector<uint> > current_reads_per_die;
 	uint writes_counter;
 	uint reads_counter;
+	const uint WINDOW_LENGTH;
+	const uint KICK_START;
 };
 
 
@@ -1053,7 +1057,7 @@ private:
 class Wearwolf : public Block_manager_parent {
 public:
 	Wearwolf(Ssd& ssd, FtlParent& ftl);
-	~Wearwolf() {}
+	~Wearwolf();
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
@@ -1061,7 +1065,7 @@ protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	virtual Address choose_best_address(Event const& write);
 	virtual Address choose_any_address();
-	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
+	Page_Hotness_Measurer* page_hotness_measurer;
 private:
 	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
 	void reset_any_filled_pointers(Event const& event);
@@ -1618,7 +1622,8 @@ private:
 	long num_gc_targeting_class;
 	long num_gc_targeting_anything;
 
-
+	vector<vector<uint> > num_wl_writes_per_LUN_origin;
+	vector<vector<uint> > num_wl_writes_per_LUN_destination;
 };
 
 class Thread

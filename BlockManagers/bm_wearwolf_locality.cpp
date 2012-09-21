@@ -208,7 +208,7 @@ void Wearwolf_Locality::set_pointers_for_tagged_sequential_write(int tag, double
 void Wearwolf_Locality::process_write_completion(Event const& event, long key, pair<long, long> index) {
 
 	Block_manager_parent::register_write_outcome(event, SUCCESS);
-	page_hotness_measurer.register_event(event);
+	page_hotness_measurer->register_event(event);
 
 	sequential_writes_pointers& swp = seq_write_key_to_pointers_mapping[key];
 

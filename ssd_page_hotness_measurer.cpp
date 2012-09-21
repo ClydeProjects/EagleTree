@@ -22,7 +22,6 @@ using namespace ssd;
  * Naïve implementation
  */
 
-#define INTERVAL_LENGTH 500
 #define WEIGHT 0.5
 
 Simple_Page_Hotness_Measurer::Simple_Page_Hotness_Measurer()
@@ -36,17 +35,21 @@ Simple_Page_Hotness_Measurer::Simple_Page_Hotness_Measurer()
 		average_reads_per_die(SSD_SIZE, std::vector<double>(PACKAGE_SIZE, 0)),
 		current_reads_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
 		writes_counter(0),
-		reads_counter(0)
+		reads_counter(0),
+		WINDOW_LENGTH(500),
+		KICK_START(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 2)
 {}
 
 Simple_Page_Hotness_Measurer::~Simple_Page_Hotness_Measurer(void) {}
 
 enum write_hotness Simple_Page_Hotness_Measurer::get_write_hotness(ulong page_address) const {
-	return write_moving_average[page_address] >= average_write_hotness ? WRITE_HOT : WRITE_COLD;
+	return writes_counter < KICK_START ? WRITE_HOT :
+			write_moving_average[page_address] >= average_write_hotness ? WRITE_HOT : WRITE_COLD;
 }
 
 enum read_hotness Simple_Page_Hotness_Measurer::get_read_hotness(ulong page_address) const {
-	return read_moving_average[page_address] >= average_read_hotness ? READ_HOT : READ_COLD;
+	return reads_counter < KICK_START ? READ_HOT :
+			read_moving_average[page_address] >= average_read_hotness ? READ_HOT : READ_COLD;
 }
 
 /*Address Simple_Page_Hotness_Measurer::get_die_with_least_wcrh() const {
@@ -82,7 +85,7 @@ enum read_hotness Simple_Page_Hotness_Measurer::get_read_hotness(ulong page_addr
 	return Address(package, die, 0,0,0, DIE);
 }*/
 
-Address Simple_Page_Hotness_Measurer::get_die_with_least_WC(enum read_hotness rh) const {
+Address Simple_Page_Hotness_Measurer::get_best_target_die_for_WC(enum read_hotness rh) const {
 	uint package;
 	uint die;
 	std::vector<std::vector<uint> > num_such_pages_per_die;
@@ -113,16 +116,20 @@ void Simple_Page_Hotness_Measurer::register_event(Event const& event) {
 	ulong page_address = event.get_logical_address();
 	if (type == WRITE) {
 		write_current_count[page_address]++;
-		if (++writes_counter == INTERVAL_LENGTH) {
-			writes_counter = 0;
+		if (++writes_counter % WINDOW_LENGTH == 0) {
 			start_new_interval_writes();
+		}
+		if (writes_counter == KICK_START && PRINT_LEVEL >= 1) {
+			printf("Start read temperature Identification\n");
 		}
 	} else if (type == READ_COMMAND) {
 		current_reads_per_die[event.get_address().package][event.get_address().die]++;
 		read_current_count[page_address]++;
-		if (++reads_counter == INTERVAL_LENGTH) {
-			reads_counter = 0;
+		if (++reads_counter % WINDOW_LENGTH == 0) {
 			start_new_interval_reads();
+		}
+		if (reads_counter == KICK_START && PRINT_LEVEL >= 1) {
+			printf("Start write temperature Identification\n");
 		}
 	}
 }

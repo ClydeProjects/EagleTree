@@ -174,6 +174,8 @@ uint RAID_NUMBER_OF_PHYSICAL_SSDS = 0;
 
 bool PRIORITISE_GC = true;
 
+bool ENABLE_WEAR_LEVELING = true;
+
 /*
  * Block manager
  * 0 -> Shortest Queues
