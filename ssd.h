@@ -267,6 +267,8 @@ enum read_hotness {READ_HOT, READ_COLD};
 
 #define BOOST_MULTI_INDEX_ENABLE_SAFE_MODE 1
 
+enum age {YOUNG, OLD};
+
 /* List classes up front for classes that have references to their "parent"
  * (e.g. a Package's parent is a Ssd).
  *
@@ -300,7 +302,6 @@ class Ssd;
 
 class IOScheduler;
 
-class Block_manager;
 class Block_manager_parent;
 class Block_manager_parallel;
 class Shortest_Queue_Hot_Cold_BM;
@@ -616,6 +617,7 @@ public:
 	enum page_state get_state(uint page) const;
 	enum page_state get_state(const Address &address) const;
 	double get_last_erase_time(void) const;
+	double get_second_last_erase_time(void) const;
 	double get_modification_time(void) const;
 	ulong get_erases_remaining(void) const;
 	uint get_size(void) const;
@@ -626,6 +628,7 @@ public:
 	block_type get_block_type(void) const;
 	void set_block_type(block_type value);
 	const Page *getPages() const;
+	ulong get_age() const;
 private:
 	uint size;
 	Page * const data;
@@ -634,6 +637,7 @@ private:
 	enum block_state state;
 	ulong erases_remaining;
 	double last_erase_time;
+	double erase_before_last_erase_time;
 	double erase_delay;
 	double modification_time;
 
@@ -929,14 +933,16 @@ protected:
 
 	bool can_write(Event const& write) const;
 
-	void schedule_gc(double time, int package_id = -1, int die_id = -1, int klass = -1);
+	void schedule_gc(double time, int package_id, int die_id, int block, int klass);
 	vector<long> get_relevant_gc_candidates(int package_id, int die_id, int klass) const;
 
-	Address find_free_unused_block(uint package_id, uint die_id, uint klass, double time);
+	Address find_free_unused_block(uint package_id, uint die_id, enum age age, double time);
 	Address find_free_unused_block(uint package_id, uint die_id, double time);
 	Address find_free_unused_block(uint package_id, double time);
 	Address find_free_unused_block(double time);
-	Address find_free_unused_block_with_class(uint klass, double time);
+	Address find_free_unused_block(enum age age, double time);
+
+
 
 	void return_unfilled_block(Address block_address);
 
@@ -953,9 +959,10 @@ protected:
 
 	map<long, uint> page_copy_back_count; // Pages that have experienced a copy-back, mapped to a count of the number of copy-backs
 private:
+	Address find_free_unused_block(uint package_id, uint die_id, uint age_class, double time);
 	Block* choose_gc_victim(vector<long> candidates) const;
 	void update_blocks_with_min_age(uint age);
-	uint sort_into_age_class(Address const& address);
+	uint sort_into_age_class(Address const& address) const;
 	void issue_erase(Address a, double time);
 	void remove_as_gc_candidate(Address const& phys_address);
 	void Wear_Level(Event const& event);
@@ -964,12 +971,15 @@ private:
 	Address reserve_page_on(uint package, uint die, double time);
 	void register_copy_back_operation_on(uint logical_address);
 	void register_ECC_check_on(uint logical_address);
+	double get_min_age() const;
+	double get_normalised_age(uint age) const;
+	void find_wl_candidates(double current_time);
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 	bool greedy_gc;
+
 	// WL structures
 	uint max_age;
-	uint min_age;
 	int num_age_classes;
 	set<Block*> blocks_with_min_age;
 	uint num_free_pages;
@@ -978,6 +988,11 @@ private:
 	vector<vector<vector<set<long> > > > gc_candidates;  // each age class has a vector of candidates for GC
 	vector<vector<uint> > num_blocks_being_garbaged_collected_per_LUN;
 	Random_Order_Iterator order_randomiser;
+	set<Block*> blocks_to_wl;
+	double average_erase_cycle_time;
+	MTRand_int32 random_number_generator;
+	set<Block*> blocks_being_wl;
+	uint num_erases_up_to_date;
 };
 
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation
@@ -1245,71 +1260,6 @@ private:
 	vector<long> logical_to_physical_map;
 	vector<long> physical_to_logical_map;
 };
-
-class FtlImpl_Bast : public FtlParent
-{
-public:
-	FtlImpl_Bast(Controller &controller);
-	~FtlImpl_Bast();
-	enum status read(Event &event);
-	enum status write(Event &event);
-	enum status trim(Event &event);
-private:
-	map<long, LogPageBlock*> log_map;
-
-	long *data_list;
-
-	void dispose_logblock(LogPageBlock *logBlock, long lba);
-	void allocate_new_logblock(LogPageBlock *logBlock, long lba, Event &event);
-
-	bool is_sequential(LogPageBlock* logBlock, long lba, Event &event);
-	bool random_merge(LogPageBlock *logBlock, long lba, Event &event);
-
-	void update_map_block(Event &event);
-
-	void print_ftl_statistics();
-
-	int addressShift;
-	int addressSize;
-};
-
-class FtlImpl_Fast : public FtlParent
-{
-public:
-	FtlImpl_Fast(Controller &controller);
-	~FtlImpl_Fast();
-	enum status read(Event &event);
-	enum status write(Event &event);
-	enum status trim(Event &event);
-private:
-	void initialize_log_pages();
-
-	map<long, LogPageBlock*> log_map;
-
-	long *data_list;
-	bool *pin_list;
-
-	bool write_to_log_block(Event &event, long logicalBlockAddress);
-
-	void switch_sequential(Event &event);
-	void merge_sequential(Event &event);
-	bool random_merge(LogPageBlock *logBlock, Event &event);
-
-	void update_map_block(Event &event);
-
-	void print_ftl_statistics();
-
-	long sequential_logicalblock_address;
-	Address sequential_address;
-	uint sequential_offset;
-
-	uint log_page_next;
-	LogPageBlock *log_pages;
-
-	int addressShift;
-	int addressSize;
-};
-
 
 
 class FtlImpl_DftlParent : public FtlParent
@@ -2080,5 +2030,69 @@ private:
 };*/
 
 } /* end namespace ssd */
+
+/*class FtlImpl_Bast : public FtlParent
+{
+public:
+	FtlImpl_Bast(Controller &controller);
+	~FtlImpl_Bast();
+	enum status read(Event &event);
+	enum status write(Event &event);
+	enum status trim(Event &event);
+private:
+	map<long, LogPageBlock*> log_map;
+
+	long *data_list;
+
+	void dispose_logblock(LogPageBlock *logBlock, long lba);
+	void allocate_new_logblock(LogPageBlock *logBlock, long lba, Event &event);
+
+	bool is_sequential(LogPageBlock* logBlock, long lba, Event &event);
+	bool random_merge(LogPageBlock *logBlock, long lba, Event &event);
+
+	void update_map_block(Event &event);
+
+	void print_ftl_statistics();
+
+	int addressShift;
+	int addressSize;
+};
+
+class FtlImpl_Fast : public FtlParent
+{
+public:
+	FtlImpl_Fast(Controller &controller);
+	~FtlImpl_Fast();
+	enum status read(Event &event);
+	enum status write(Event &event);
+	enum status trim(Event &event);
+private:
+	void initialize_log_pages();
+
+	map<long, LogPageBlock*> log_map;
+
+	long *data_list;
+	bool *pin_list;
+
+	bool write_to_log_block(Event &event, long logicalBlockAddress);
+
+	void switch_sequential(Event &event);
+	void merge_sequential(Event &event);
+	bool random_merge(LogPageBlock *logBlock, Event &event);
+
+	void update_map_block(Event &event);
+
+	void print_ftl_statistics();
+
+	long sequential_logicalblock_address;
+	Address sequential_address;
+	uint sequential_offset;
+
+	uint log_page_next;
+	LogPageBlock *log_pages;
+
+	int addressShift;
+	int addressSize;
+};*/
 
 #endif

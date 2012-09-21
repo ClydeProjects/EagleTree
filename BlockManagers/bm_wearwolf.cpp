@@ -4,16 +4,16 @@
 using namespace ssd;
 
 Wearwolf::Wearwolf(Ssd& ssd, FtlParent& ftl)
-	: Block_manager_parent(ssd, ftl, 1),
+	: Block_manager_parent(ssd, ftl, 4),
 	  page_hotness_measurer()
 {
-	wcrh_pointer = find_free_unused_block(0, 0, 0);
+	wcrh_pointer = find_free_unused_block(0, 0, YOUNG, 0);
 	if (SSD_SIZE > 1) {
-		wcrc_pointer = find_free_unused_block(1, 0, 0);
+		wcrc_pointer = find_free_unused_block(1, 0, YOUNG, 0);
 	} else if (PACKAGE_SIZE > 1) {
-		wcrc_pointer = find_free_unused_block(0, 1, 0);
+		wcrc_pointer = find_free_unused_block(0, 1, YOUNG, 0);
 	} else {
-		wcrc_pointer = find_free_unused_block(0, 0, 0);
+		wcrc_pointer = find_free_unused_block(0, 0, YOUNG, 0);
 	}
 }
 
@@ -42,12 +42,12 @@ void Wearwolf::register_write_outcome(Event const& event, enum status status) {
 void Wearwolf::handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time) {
 	Address addr = page_hotness_measurer.get_best_target_die_for_WC(rh);
 	Address& pointer = rh == READ_COLD ? wcrc_pointer : wcrh_pointer;
-	Address block = find_free_unused_block(addr.package, addr.die, start_time);
+	Address block = find_free_unused_block(addr.package, addr.die, OLD, start_time);
 	if (has_free_pages(block)) {
 		pointer = block;
 	} else {
 		//perform_gc(addr.package, addr.die, 1, start_time);
-		schedule_gc(start_time, addr.package, addr.die, 0);
+		schedule_gc(start_time, addr.package, addr.die, -1, -1);
 	}
 }
 
@@ -65,12 +65,12 @@ void Wearwolf::reset_any_filled_pointers(Event const& event) {
 	// TODO: Need better logic for this assignment. Easiest to remember some state.
 	// when we trigger GC for a cold pointer, remember which block was chosen.
 	if (!has_free_pages(free_block_pointers[package_id][die_id])) {
-		free_block_pointers[package_id][die_id] = find_free_unused_block(package_id, die_id, event.get_current_time());
+		free_block_pointers[package_id][die_id] = find_free_unused_block(package_id, die_id, YOUNG, event.get_current_time());
 	}
 	else if (!has_free_pages(wcrh_pointer)) {
-		wcrh_pointer = find_free_unused_block(package_id, die_id, event.get_current_time());
+		wcrh_pointer = find_free_unused_block(package_id, die_id, OLD, event.get_current_time());
 	} else if (!has_free_pages(wcrc_pointer)) {
-		wcrc_pointer = find_free_unused_block(package_id, die_id, event.get_current_time() );
+		wcrc_pointer = find_free_unused_block(package_id, die_id, OLD, event.get_current_time() );
 	}
 }
 

@@ -35,24 +35,17 @@ Block::Block(const Plane &parent, uint block_size, ulong erases_remaining, doubl
 	pages_invalid(0),
 	physical_address(physical_address),
 	size(block_size),
-
 	/* use a const pointer (Page * const data) to use as an array
 	 * but like a reference, we cannot reseat the pointer */
 	data((Page *) malloc(block_size * sizeof(Page))),
 	parent(parent),
 	pages_valid(0),
-
 	state(FREE),
-
-	/* set erases remaining to BLOCK_ERASES to match Block constructor args 
-	 * in Plane class
-	 * this is the cheap implementation but can change to pass through classes */
 	erases_remaining(erases_remaining),
-
 	/* assume hardware created at time 0 and had an implied free erasure */
 	last_erase_time(0.0),
+	erase_before_last_erase_time(0.0),
 	erase_delay(erase_delay),
-
 	modification_time(-1)
 
 {
@@ -136,6 +129,10 @@ enum status Block::replace(Event &event)
 	return SUCCESS;
 }
 
+ulong Block::get_age() const {
+	return BLOCK_ERASES - erases_remaining;
+}
+
 /* updates Event time_taken
  * sets Page statuses to EMPTY
  * updates last_erase_time and erases_remaining
@@ -161,7 +158,8 @@ enum status Block::_erase(Event &event)
 
 
 		event.incr_time_taken(erase_delay);
-		last_erase_time = event.get_start_time() + event.get_time_taken();
+		erase_before_last_erase_time = last_erase_time;
+		last_erase_time = event.get_current_time();
 		erases_remaining--;
 		pages_valid = 0;
 		pages_invalid = 0;
@@ -209,6 +207,10 @@ enum page_state Block::get_state(const Address &address) const
 double Block::get_last_erase_time(void) const
 {
 	return last_erase_time;
+}
+
+double Block::get_second_last_erase_time(void) const {
+	return erase_before_last_erase_time;
 }
 
 ulong Block::get_erases_remaining(void) const
