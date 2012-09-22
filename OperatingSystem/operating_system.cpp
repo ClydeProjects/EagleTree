@@ -68,6 +68,11 @@ void OperatingSystem::run() {
 		else {
 			dispatch_event(thread_id);
 			idle_time = 0;
+			if (currently_executing_ios_counter >= MAX_SSD_QUEUE_SIZE) {
+				printf("Limit on number of queued application IOs exceeded:  %d\n", currently_executing_ios_counter);
+				throw "Limit on number of queued application IOs exceeded:";
+			}
+
 		}
 		finished_experiment = num_writes_to_stop_after != UNDEFINED && num_writes_to_stop_after <= num_writes_completed;
 		still_more_work = currently_executing_ios_counter > 0 || currently_pending_ios_counter > 0;

@@ -199,11 +199,13 @@ void IOScheduler::execute_current_waiting_ios() {
 	handle_writes(writes);
 
 	long size = get_current_events_size();
+/*
 	if (size >= MAX_SSD_QUEUE_SIZE) {
 		//StateVisualiser::print_page_status();
 		printf("Events queue maximum size exceeded:  %d\n", size);
 		throw "Events queue maximum size exceeded.";
 	}
+*/
 }
 
 double get_soonest_event_time(vector<Event*> events) {
