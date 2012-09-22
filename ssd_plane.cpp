@@ -282,7 +282,8 @@ Block *Plane::get_block_pointer(const Address & address)
 	return data[address.block].get_pointer();
 }
 
-Block *Plane::getBlocks() {
+// Inlined for speed
+/*Block *Plane::getBlocks() {
 	return data;
-}
+}*/
 

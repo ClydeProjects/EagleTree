@@ -195,6 +195,7 @@ Block *Package::get_block_pointer(const Address & address)
 	return data[address.die].get_block_pointer(address);
 }
 
-Die *Package::getDies() {
+// Inlined for speed
+/*Die *Package::getDies() {
 	return data;
-}
+}*/

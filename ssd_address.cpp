@@ -42,6 +42,8 @@ Address::Address(void):
 	return;
 }
 
+// Copy constructors inlined for speed
+/*
 Address::Address(const Address &address)
 {
 	*this = address;
@@ -53,6 +55,7 @@ Address::Address(const Address *address)
 	*this = *address;
 	return;
 }
+*/
 
 /* see "enum address_valid" in ssd.h for details on valid status */
 Address::Address(uint package, uint die, uint plane, uint block, uint page, enum address_valid valid):
