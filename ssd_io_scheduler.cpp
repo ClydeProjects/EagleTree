@@ -150,15 +150,10 @@ void IOScheduler::execute_current_waiting_ios() {
 	//printf("future_events   %d\n", future_events.size());
 	vector<Event*> events = collect_soonest_events();
 	vector<Event*> read_commands;
-	read_commands.reserve(events.size());
 	vector<Event*> read_transfers;
-	read_transfers.reserve(events.size());
 	vector<Event*> gc_writes;
-	gc_writes.reserve(events.size());
 	vector<Event*> writes;
-	writes.reserve(events.size());
 	vector<Event*> erases;
-	erases.reserve(events.size());
 	vector<Event*> copy_backs;
 	vector<Event*> noop_events;
 
