@@ -43,6 +43,7 @@
 #include "bloom_filter.hpp"
 #include <sys/types.h>
 #include "MTRand/mtrand.h" // Marsenne Twister random number generator
+#include <fstream>
 
 
 #ifndef _SSD_H
@@ -1979,22 +1980,36 @@ private:
 	double time_of_last_event_completed;
 };
 
-class Exp {
+class ExperimentResult {
 public:
-	Exp(string name_, string data_folder_, string x_axis_, vector<string> column_names_, uint max_age_, uint max_age_freq_)
-	:	name(name_),
-	 	data_folder(data_folder_),
-	 	x_axis(x_axis_),
-	 	column_names(column_names_),
-	 	max_age(max_age_),
-	 	max_age_freq(max_age_freq_)
-	{}
-	string name;
+	ExperimentResult(string experiment_name, string data_folder, string variable_parameter_name, string throughput_column_name);
+	~ExperimentResult();
+	void start_experiment();
+	void collect_stats(uint variable_parameter_value, long double throughput);
+	void finalize_experiment();
+	double time_elapsed() { return end_time - start_time; }
+
+	bool experiment_started;
+	bool experiment_finished;
+	string experiment_name;
 	string data_folder;
-	string x_axis;
+	string variable_parameter_name; // e.g. "Used space (%)". Becomes x-axis
 	vector<string> column_names;
 	uint max_age;
 	uint max_age_freq;
+    string throughput_column_name; // e.g. "Max sustainable throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
+    std::ofstream* stats_file;
+    string working_dir;
+    double start_time;
+    double end_time;
+
+	static const string datafile_postfix;
+	static const string stats_filename;
+	static const string waittime_filename_prefix;
+	static const string age_filename_prefix;
+	static const string queue_filename_prefix;
+	static const double M;
+	static const double K;
 };
 
 class Experiment_Runner {
@@ -2008,12 +2023,12 @@ public:
 	static double calibrate_IO_submission_rate_queue_based(int highest_lba, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
 	static double measure_throughput(int highest_lba, double IO_submission_rate, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
 	static double calibrate_IO_submission_rate_throughput_based(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
-	static Exp overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
-	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<Exp> experiments);
-	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Exp experiment);
-	static void waittime_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
-	static void age_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
-	static void queue_length_history(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points);
+	static ExperimentResult overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
+	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments);
+	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, ExperimentResult experiment);
+	static void waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
+	static void age_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
+	static void queue_length_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static string get_working_dir();
 
 private:
@@ -2022,11 +2037,6 @@ private:
 	static uint max_age;
 	static const bool REMOVE_GLE_SCRIPTS_AGAIN;
 	//static const string experiments_folder = "./Experiments/";
-	static const string datafile_postfix;
-	static const string stats_filename;
-	static const string waittime_filename_prefix;
-	static const string age_filename_prefix;
-	static const string queue_filename_prefix;
 	static const string markers[];
 	static const double M; // One million
 	static const double K;    // One thousand

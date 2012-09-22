@@ -143,7 +143,7 @@ int main()
 
 	double start_time = Experiment_Runner::wall_clock_time();
 
-	vector<Exp> exp;
+	vector<ExperimentResult> exp;
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc,		space_min, space_max, space_inc, exp_folder + "rand_greed/", "rand greed", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc,		space_min, space_max, space_inc, exp_folder + "rand_lazy/", "rand lazy", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_greedy_gc,	space_min, space_max, space_inc, exp_folder + "seq_greed/", "seq greed", IO_limit) );
@@ -175,7 +175,7 @@ int main()
 	}
 
 	double end_time = Experiment_Runner::wall_clock_time();
-	printf("Entire experiment finished in %s\n", Experiment_Runner::pretty_time(end_time - start_time).c_str());
+	printf("=== Entire experiment finished in %s ===\n", Experiment_Runner::pretty_time(end_time - start_time).c_str());
 
 	return 0;
 }
