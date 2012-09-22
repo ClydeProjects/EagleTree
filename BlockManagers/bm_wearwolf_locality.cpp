@@ -130,7 +130,7 @@ Address Wearwolf_Locality::perform_sequential_write(Event const& event, long key
 }
 
 Address Wearwolf_Locality::perform_sequential_write_shortest_queue(sequential_writes_pointers& swp) {
-	pair<bool, pair<uint, uint> > best_die_id = get_free_block_pointer_with_shortest_IO_queue(swp.pointers);
+	pair<bool, pair<int, int> > best_die_id = get_free_block_pointer_with_shortest_IO_queue(swp.pointers);
 	bool can_write = best_die_id.first;
 	if (can_write) {
 		Address chosen = swp.pointers[best_die_id.second.first][best_die_id.second.second];

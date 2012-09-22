@@ -1,5 +1,5 @@
-/* Copyright 2009, 2010 Brendan Tauras */
 
+/* Copyright 2009, 2010 Brendan Tauras */
 /* run_test.cpp is part of FlashSim. */
 
 /* FlashSim is free software: you can redistribute it and/or modify
@@ -137,7 +137,7 @@ int main()
 	}
 
 	int IO_limit = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 3;
-	int space_min = 60;
+	int space_min = 75;
 	int space_max = 90;
 	int space_inc = 5;
 

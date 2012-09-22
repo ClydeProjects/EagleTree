@@ -328,6 +328,7 @@ void IOScheduler::remove_current_operation(Event* event) {
 	event->set_noop(true);
 	if (event->get_event_type() == READ_TRANSFER) {
 		ssd.getPackages()[event->get_address().package].getDies()[event->get_address().die].clear_register();
+		bm->register_register_cleared();
 	}
 }
 
@@ -483,12 +484,16 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	} else if (event->get_event_type() == ERASE) {
 		bm->register_erase_outcome(*event, outcome);
 	} else if (event->get_event_type() == READ_COMMAND) {
-		bm->register_read_outcome(*event, outcome);
+		bm->register_read_command_outcome(*event, outcome);
 	} else if (event->get_event_type() == READ_TRANSFER) {
 		ftl.register_read_completion(*event, outcome);
+		bm->register_read_transfer_outcome(*event, outcome);
 	} else if (event->get_event_type() == TRIM) {
 		ftl.register_trim_completion(*event);
 		bm->trim(*event);
+	} else {
+		printf("LOOK HERE ");
+		event->print();
 	}
 	StatisticsGatherer::get_instance()->register_completed_event(*event);
 

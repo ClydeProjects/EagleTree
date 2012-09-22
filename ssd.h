@@ -432,19 +432,10 @@ public:
 class Event 
 {
 public:
-	bool debug_deleted;
 	Event(enum event_type type, ulong logical_address, uint size, double start_time);
 	Event();
 	Event(Event& event);
-	~Event() {
-		/* DEBUG STUFF */
-		if (debug_deleted) {
-			printf("=!=!=!= Event was already deleted! \n");
-			print();
-		}
-		debug_deleted = true;
-		/* DEBUG STUFF */
-	}
+	~Event() {}
 	ulong get_logical_address(void) const;
 	const Address &get_address(void) const;
 	const Address &get_merge_address(void) const;
@@ -940,8 +931,10 @@ public:
 	Block_manager_parent(Ssd& ssd, FtlParent& ftl, int classes = 1);
 	virtual ~Block_manager_parent();
 	virtual void register_write_outcome(Event const& event, enum status status);
-	virtual void register_read_outcome(Event const& event, enum status status);
+	virtual void register_read_command_outcome(Event const& event, enum status status);
+	virtual void register_read_transfer_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
+	virtual void register_register_cleared();
 	virtual Address choose_address(Event const& write);
 	virtual void register_write_arrival(Event const& write);
 	virtual void trim(Event const& write);
@@ -972,8 +965,8 @@ protected:
 
 	void return_unfilled_block(Address block_address);
 
-	pair<bool, pair<uint, uint> > get_free_block_pointer_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
-	Address get_free_block_pointer_with_shortest_IO_queue() const;
+	pair<bool, pair<int, int> > get_free_block_pointer_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
+	Address get_free_block_pointer_with_shortest_IO_queue();
 
 	uint how_many_gc_operations_are_scheduled() const;
 
@@ -1019,6 +1012,8 @@ private:
 	MTRand_int32 random_number_generator;
 	set<Block*> blocks_being_wl;
 	uint num_erases_up_to_date;
+	pair<bool, pair<int, int> > last_get_free_block_pointer_with_shortest_IO_queue_result;
+	bool IO_has_completed_since_last_shortest_queue_search;
 };
 
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation
@@ -1053,7 +1048,7 @@ public:
 	Shortest_Queue_Hot_Cold_BM(Ssd& ssd, FtlParent& ftl);
 	~Shortest_Queue_Hot_Cold_BM();
 	void register_write_outcome(Event const& event, enum status status);
-	void register_read_outcome(Event const& event, enum status status);
+	void register_read_command_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
 protected:
 	Address choose_best_address(Event const& write);
@@ -1071,7 +1066,7 @@ public:
 	Wearwolf(Ssd& ssd, FtlParent& ftl);
 	~Wearwolf();
 	virtual void register_write_outcome(Event const& event, enum status status);
-	virtual void register_read_outcome(Event const& event, enum status status);
+	virtual void register_read_command_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);

@@ -103,7 +103,7 @@ Address Wearwolf::choose_any_address() {
 	return has_free_pages(a) ? a : has_free_pages(wcrh_pointer) ? wcrh_pointer : wcrc_pointer;
 }
 
-void Wearwolf::register_read_outcome(Event const& event, enum status status){
+void Wearwolf::register_read_command_outcome(Event const& event, enum status status){
 	if (status == SUCCESS && event.is_original_application_io()) {
 		page_hotness_measurer->register_event(event);
 	}

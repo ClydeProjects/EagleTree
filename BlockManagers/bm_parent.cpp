@@ -32,7 +32,8 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
    num_blocks_being_garbaged_collected_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
    order_randomiser(),
    random_number_generator(90),
-   num_erases_up_to_date(0)
+   num_erases_up_to_date(0),
+   IO_has_completed_since_last_shortest_queue_search(true)
 {
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		Package& package = ssd.getPackages()[i];
@@ -83,6 +84,8 @@ Address Block_manager_parent::choose_any_address() {
 
 
 void Block_manager_parent::register_erase_outcome(Event const& event, enum status status) {
+	IO_has_completed_since_last_shortest_queue_search = true;
+
 	Address a = event.get_address();
 	a.valid = PAGE;
 	a.page = 0;
@@ -131,6 +134,10 @@ double Block_manager_parent::get_normalised_age(uint age) const {
 	return normalized_age;
 }
 
+void Block_manager_parent::register_register_cleared() {
+	IO_has_completed_since_last_shortest_queue_search = true;
+}
+
 uint Block_manager_parent::sort_into_age_class(Address const& a) const {
 	Block* b = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 	uint age = b->get_age();
@@ -155,6 +162,8 @@ void Block_manager_parent::increment_pointer(Address& pointer) {
 }
 
 void Block_manager_parent::register_write_outcome(Event const& event, enum status status) {
+	IO_has_completed_since_last_shortest_queue_search = true;
+
 	assert(num_free_pages > 0);
 	num_free_pages--;
 
@@ -190,6 +199,8 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 }
 
 void Block_manager_parent::trim(Event const& event) {
+	IO_has_completed_since_last_shortest_queue_search = true;
+
 	Address ra = event.get_replace_address();
 
 	if (ra.valid == NONE) {
@@ -271,8 +282,14 @@ void Block_manager_parent::issue_erase(Address ra, double time) {
 	IOScheduler::instance()->schedule_event(erase);
 }
 
-void Block_manager_parent::register_read_outcome(Event const& event, enum status status) {
+void Block_manager_parent::register_read_command_outcome(Event const& event, enum status status) {
+	IO_has_completed_since_last_shortest_queue_search = true;
 	assert(event.get_event_type() == READ_COMMAND);
+}
+
+void Block_manager_parent::register_read_transfer_outcome(Event const& event, enum status status) {
+	IO_has_completed_since_last_shortest_queue_search = true;
+	assert(event.get_event_type() == READ_TRANSFER);
 }
 
 bool Block_manager_parent::can_write(Event const& write) const {
@@ -370,9 +387,9 @@ void Block_manager_parent::find_wl_candidates(double current_time) {
 // This function takes a vector of channels, each of each has a vector of dies
 // it finds the die with the shortest queue, and returns its ID
 // if all dies are busy, the boolean field is returned as false
-pair<bool, pair<uint, uint> > Block_manager_parent::get_free_block_pointer_with_shortest_IO_queue(vector<vector<Address> > const& dies) const {
-	uint best_channel_id;
-	uint best_die_id;
+pair<bool, pair<int, int> > Block_manager_parent::get_free_block_pointer_with_shortest_IO_queue(vector<vector<Address> > const& dies) const {
+	uint best_channel_id = UNDEFINED;
+	uint best_die_id = UNDEFINED;
 	bool can_write = false;
 	bool at_least_one_address = false;
 	double shortest_time = std::numeric_limits<double>::max( );
@@ -408,11 +425,18 @@ pair<bool, pair<uint, uint> > Block_manager_parent::get_free_block_pointer_with_
 		}
 	}
 	//assert(at_least_one_address);
-	return pair<bool, pair<uint, uint> >(can_write, pair<uint, uint>(best_channel_id, best_die_id));
+	return pair<bool, pair<int, int> >(can_write, pair<int, int>(best_channel_id, best_die_id));
 }
 
-Address Block_manager_parent::get_free_block_pointer_with_shortest_IO_queue() const {
-	pair<bool, pair<uint, uint> > best_die = get_free_block_pointer_with_shortest_IO_queue(free_block_pointers);
+Address Block_manager_parent::get_free_block_pointer_with_shortest_IO_queue() {
+	pair<bool, pair<int, int> > best_die;
+	if (IO_has_completed_since_last_shortest_queue_search) {
+	    best_die = get_free_block_pointer_with_shortest_IO_queue(free_block_pointers);
+		last_get_free_block_pointer_with_shortest_IO_queue_result = best_die;
+		IO_has_completed_since_last_shortest_queue_search = false;
+	} else {
+		best_die = last_get_free_block_pointer_with_shortest_IO_queue_result;
+	}
 	if (!best_die.first) {
 		return Address();
 	} else {
