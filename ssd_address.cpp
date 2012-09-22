@@ -196,7 +196,8 @@ Address &Address::operator+=(const uint i)
 }
 
 
-Address &Address::operator=(const Address &rhs)
+// Inlined for speed
+/*Address &Address::operator=(const Address &rhs)
 {
 	if(this == &rhs)
 		return *this;
@@ -208,4 +209,4 @@ Address &Address::operator=(const Address &rhs)
 	valid = rhs.valid;
 	real_address = rhs.real_address;
 	return *this;
-}
+}*/

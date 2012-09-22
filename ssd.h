@@ -342,7 +342,18 @@ public:
 	void operator+(int);
 	void operator+(uint);
 	Address &operator+=(const uint rhs);
-	Address &operator=(const Address &rhs);
+	inline Address &operator=(const Address &rhs) {
+		if(this == &rhs)
+			return *this;
+		package = rhs.package;
+		die = rhs.die;
+		plane = rhs.plane;
+		block = rhs.block;
+		page = rhs.page;
+		valid = rhs.valid;
+		real_address = rhs.real_address;
+		return *this;
+	}
 
 	void set_linear_address(ulong address, enum address_valid valid);
 	void set_linear_address(ulong address);
