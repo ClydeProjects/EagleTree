@@ -158,6 +158,36 @@ void StatisticsGatherer::register_events_queue_length(uint queue_size, double ti
 	}
 }
 
+template <class T>
+double get_average(vector<vector<T> > vector)
+{
+	double avg = 0;
+	for (uint i = 0; i < vector.size(); i++) {
+		for (uint j = 0; j < vector[i].size(); j++) {
+			avg += vector[i][j];
+		}
+	}
+    avg /= vector.size() * vector[0].size();
+    return avg;
+}
+
+template <class T>
+double get_std(vector<vector<T> > vector)
+{
+	double avg = get_average(vector);
+	double std = 0;
+	for (uint i = 0; i < vector.size(); i++) {
+		for (uint j = 0; j < vector[i].size(); j++) {
+			double diff = (vector[i][j] - avg);
+			diff *= diff;
+			std += diff;
+		}
+	}
+	std /= vector.size() * vector[0].size();
+	std = sqrt (std);
+    return std;
+}
+
 void StatisticsGatherer::print() {
 	printf("\n\t");
 	printf("num writes\t");
@@ -246,6 +276,9 @@ void StatisticsGatherer::print() {
 	printf("%d\t\t", total_erases);
 	printf("%f\t\t", avg_overall_write_wait_time);
 	printf("%f\t\t", avg_overall_read_wait_time);
+	printf("\n\n");
+	printf("Erase avg:\t%f \n", get_average(num_erases_per_LUN));
+	printf("Erase std:\t%f \n", get_std(num_erases_per_LUN));
 	printf("\n\n");
 }
 

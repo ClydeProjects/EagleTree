@@ -339,6 +339,7 @@ void Block_manager_parent::Wear_Level(Event const& event) {
 	if (blocks_being_wl.count(b) == 1) {
 		blocks_being_wl.erase(b);
 		assert(blocks_being_wl.size() == 0);
+		StatisticsGatherer::get_instance()->print();
 	}
 
 	if (ENABLE_WEAR_LEVELING && blocks_to_wl.size() == 0 && blocks_being_wl.size() == 0 && max_age > get_min_age() + WEAR_LEVEL_THRESHOLD) {
