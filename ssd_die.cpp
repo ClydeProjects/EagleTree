@@ -239,9 +239,10 @@ Block *Die::get_block_pointer(const Address & address)
 	return data[address.plane].get_block_pointer(address);
 }
 
-Plane *Die::getPlanes() {
+// Inlined for speed
+/*Plane *Die::getPlanes() {
 	return data;
-}
+}*/
 
 int Die::get_last_read_application_io() {
 	return last_read_io;

@@ -336,8 +336,8 @@ public:
 	ulong real_address;
 	enum address_valid valid;
 	Address(void);
-	Address(const Address &address);
-	Address(const Address *address);
+	inline Address(const Address &address) { *this = address; }
+	inline Address(const Address *address) { *this = *address; }
 	Address(uint package, uint die, uint plane, uint block, uint page, enum address_valid valid);
 	Address(uint address, enum address_valid valid);
 	~Address();
@@ -348,7 +348,18 @@ public:
 	void operator+(int);
 	void operator+(uint);
 	Address &operator+=(const uint rhs);
-	Address &operator=(const Address &rhs);
+	inline Address &operator=(const Address &rhs) {
+		if(this == &rhs)
+			return *this;
+		package = rhs.package;
+		die = rhs.die;
+		plane = rhs.plane;
+		block = rhs.block;
+		page = rhs.page;
+		valid = rhs.valid;
+		real_address = rhs.real_address;
+		return *this;
+	}
 
 	void set_linear_address(ulong address, enum address_valid valid);
 	void set_linear_address(ulong address);
@@ -581,7 +592,7 @@ public:
 	enum status lock(uint channel, double start_time, double duration, Event &event);
 	enum status connect(uint channel);
 	enum status disconnect(uint channel);
-	Channel &get_channel(uint channel);
+	inline Channel &get_channel(uint channel) { assert(channels != NULL && channel < num_channels); return channels[channel]; }
 	double ready_time(uint channel);
 private:
 	uint num_channels;
@@ -640,7 +651,7 @@ public:
 	Block *get_pointer(void);
 	block_type get_block_type(void) const;
 	void set_block_type(block_type value);
-	const Page *getPages() const;
+	const Page *getPages() const { return data; }
 	ulong get_age() const;
 private:
 	uint size;
@@ -680,7 +691,7 @@ public:
 	uint get_num_valid(const Address &address) const;
 	uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
-	Block *getBlocks();
+	inline Block *getBlocks() { return data; }
 private:
 	void update_wear_stats(void);
 	enum status get_next_page(void);
@@ -717,7 +728,7 @@ public:
 	uint get_num_valid(const Address &address) const;
 	uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
-	Plane *getPlanes();
+	inline Plane *getPlanes() { return data; }
 	void clear_register();
 	int get_last_read_application_io();
 	bool register_is_busy();
@@ -758,7 +769,7 @@ public:
 	uint get_num_valid(const Address &address) const;
 	uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
-	Die *getDies();
+	inline Die *getDies() { return data; }
 private:
 	void update_wear_stats (const Address &address);
 	uint size;
@@ -1481,7 +1492,7 @@ public:
 	friend class IOScheduler;
 	friend class Block_manager_parent;
 	const Controller &get_controller(void);
-	Package* getPackages();
+	inline Package* getPackages() { return data; }
 	void set_operating_system(OperatingSystem* os);
 private:
 	enum status read(Event &event);

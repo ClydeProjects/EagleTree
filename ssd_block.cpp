@@ -290,6 +290,7 @@ void Block::set_block_type(block_type value)
 	this->btype = value;
 }
 
-const Page *Block::getPages() const {
+// Inlined for speed
+/*const Page *Block::getPages() const {
 	return data;
-}
+}*/

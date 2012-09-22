@@ -272,7 +272,7 @@ void IOScheduler::push_into_current_events(Event* event) {
 
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_writes(vector<Event*>& events) {
-	sort(events.begin(), events.end(), bus_wait_time_comparator);
+	//sort(events.begin(), events.end(), bus_wait_time_comparator);
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
@@ -367,13 +367,9 @@ void IOScheduler::make_dependent(Event* dependent_event, uint independent_code/*
 
 // executes read_commands, read_transfers and erases
 void IOScheduler::handle_next_batch(vector<Event*>& events) {
-	sort(events.begin(), events.end(), bus_wait_time_comparator);
+	//sort(events.begin(), events.end(), bus_wait_time_comparator);
 	for(uint i = 0; i < events.size(); i++) {
 		Event* event = events[i];
-		if (event->get_id() == 484) {
-			int i = 0;
-			i++;
-		}
 		double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
 		bool can_schedule = can_schedule_on_die(event);
 		if (can_schedule && time == 0) {

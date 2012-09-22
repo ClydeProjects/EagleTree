@@ -121,11 +121,12 @@ enum status Bus::lock(uint channel, double start_time, double duration, Event &e
 	return channels[channel].lock(start_time, duration, event);
 }
 
-Channel &Bus::get_channel(uint channel)
+// Inlined for speed
+/*Channel &Bus::get_channel(uint channel)
 {
 	assert(channels != NULL && channel < num_channels);
 	return channels[channel];
-}
+}*/
 
 double Bus::ready_time(uint channel)
 {

@@ -341,9 +341,10 @@ const Controller &Ssd::get_controller(void)
 	return controller;
 }
 
-Package* Ssd::getPackages() {
+// Inlined for speed
+/*Package* Ssd::getPackages() {
 	return data;
-}
+}*/
 
 void Ssd::set_operating_system(OperatingSystem* new_os) {
 	os = new_os;
