@@ -61,7 +61,7 @@ Address Shortest_Queue_Hot_Cold_BM::choose_any_address() {
 	return has_free_pages(a) ? a : cold_pointer;
 }
 
-void Shortest_Queue_Hot_Cold_BM::register_read_outcome(Event const& event, enum status status){
+void Shortest_Queue_Hot_Cold_BM::register_read_command_outcome(Event const& event, enum status status){
 	if (status == SUCCESS && !event.is_garbage_collection_op()) {
 		page_hotness_measurer.register_event(event);
 	}
