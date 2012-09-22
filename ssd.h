@@ -776,18 +776,29 @@ const int UNDEFINED = -1;
 class Page_Hotness_Measurer {
 public:
 //	virtual Page_Hotness_Measurer() = 0;
-	virtual ~Page_Hotness_Measurer(void) {};
+	virtual ~Page_Hotness_Measurer() {};
 	virtual void register_event(Event const& event) = 0; // Inform hotness measurer about a read or write event
 	virtual enum write_hotness get_write_hotness(unsigned long page_address) const = 0; // Return write hotness of a given page address
 	virtual enum read_hotness get_read_hotness(unsigned long page_address) const = 0; // Return read hotness of a given page address
 	virtual Address get_best_target_die_for_WC(enum read_hotness rh) const = 0; // Return address of die with leads WC data (with chosen read hotness)
 };
 
+class Ignorant_Hotness_Measurer : public Page_Hotness_Measurer {
+public:
+//	virtual Page_Hotness_Measurer() = 0;
+	Ignorant_Hotness_Measurer() {};
+	~Ignorant_Hotness_Measurer() {};
+	void register_event(Event const& event) {};
+	enum write_hotness get_write_hotness(unsigned long page_address) const { return WRITE_HOT; }
+	enum read_hotness get_read_hotness(unsigned long page_address) const { return READ_HOT; }
+	Address get_best_target_die_for_WC(enum read_hotness rh) const { return Address(); }
+};
+
 // Simple (naïve page hotness measurer implementation)
 class Simple_Page_Hotness_Measurer : public Page_Hotness_Measurer {
 public:
 	Simple_Page_Hotness_Measurer();
-	~Simple_Page_Hotness_Measurer(void);
+	~Simple_Page_Hotness_Measurer();
 	void register_event(Event const& event);
 	enum write_hotness get_write_hotness(unsigned long page_address) const;
 	enum read_hotness get_read_hotness(unsigned long page_address) const;

@@ -5,7 +5,7 @@ using namespace ssd;
 
 Wearwolf::Wearwolf(Ssd& ssd, FtlParent& ftl)
 	: Block_manager_parent(ssd, ftl, 4),
-	  page_hotness_measurer(new Simple_Page_Hotness_Measurer())
+	  page_hotness_measurer(new Ignorant_Hotness_Measurer())
 {
 	wcrh_pointer = find_free_unused_block(0, 0, YOUNG, 0);
 	if (SSD_SIZE > 1) {
@@ -104,7 +104,7 @@ Address Wearwolf::choose_any_address() {
 }
 
 void Wearwolf::register_read_outcome(Event const& event, enum status status){
-	if (status == SUCCESS && !event.is_garbage_collection_op()) {
+	if (status == SUCCESS && event.is_original_application_io()) {
 		page_hotness_measurer->register_event(event);
 	}
 }
