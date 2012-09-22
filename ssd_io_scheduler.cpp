@@ -371,7 +371,7 @@ void IOScheduler::handle_next_batch(vector<Event*>& events) {
 	for(uint i = 0; i < events.size(); i++) {
 		Event* event = events[i];
 		double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
-		bool can_schedule = can_schedule_on_die(event);
+		bool can_schedule = time == 0 ? can_schedule_on_die(event) : false;
 		if (can_schedule && time == 0) {
 			execute_next(event);
 		}
