@@ -1171,8 +1171,11 @@ private:
 
 	void manage_operation_completion(Event* event);
 
+	void push_into_current_events(Event* event);
+
 	vector<Event*> future_events;
-	vector<Event*> current_events;
+	//vector<Event*> current_events;
+	map<long, vector<Event*> > current_events;
 	map<uint, deque<Event*> > dependencies;
 
 	static IOScheduler *inst;
@@ -1189,6 +1192,7 @@ private:
 	map<uint, queue<uint> > op_code_to_dependent_op_codes;
 
 	void update_current_events();
+	long get_current_events_size();
 	Event* find_scheduled_event(uint dependency_code);
 	void remove_current_operation(Event* event);
 	void promote_to_gc(Event* event_to_promote);
