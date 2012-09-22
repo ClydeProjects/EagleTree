@@ -146,8 +146,6 @@ int main()
 	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 5000;
 
-	vector<Exp> exp;
-
 	vector<ExperimentResult> exp;
 
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_tagging, 			space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );
