@@ -339,14 +339,14 @@ string StatisticsGatherer::totals_csv_header() {
 vector<string> StatisticsGatherer::totals_vector_header() {
 	vector<string> result;
 	// 1 "Used space %"
-	result.push_back("num writes");
-	result.push_back("num reads");
-	result.push_back("GC write");
-	result.push_back("GC reads");
-	result.push_back("GC scheduled");
-	result.push_back("GC wait");
-	result.push_back("copy backs");
-	result.push_back("erases");
+	result.push_back("Num Writes");
+	result.push_back("Num Reads");
+	result.push_back("GC Write");
+	result.push_back("GC Reads");
+	result.push_back("GC Scheduled");
+	result.push_back("GC Wait");
+	result.push_back("Copybacks");
+	result.push_back("Erases");
 
 	result.push_back("Write wait, mean (µs)"); // 10
 	result.push_back("Write wait, min (µs)");

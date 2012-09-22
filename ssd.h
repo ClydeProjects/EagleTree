@@ -193,10 +193,10 @@ extern const bool OS_LOCK;
 
 /* Defines the max number of copy back operations on a page before ECC check is performed.
  * Set to zero to disable copy back GC operations */
-extern const uint MAX_REPEATED_COPY_BACKS_ALLOWED;
+extern uint MAX_REPEATED_COPY_BACKS_ALLOWED;
 
 /* Defines the max number of page addresses in map keeping track of each pages copy back count */
-extern const uint MAX_ITEMS_IN_COPY_BACK_MAP;
+extern uint MAX_ITEMS_IN_COPY_BACK_MAP;
 
 /* Defines the maximal length of the SSD queue  */
 extern uint MAX_SSD_QUEUE_SIZE;
@@ -1986,7 +1986,7 @@ public:
 	~ExperimentResult();
 	void start_experiment();
 	void collect_stats(uint variable_parameter_value, long double throughput);
-	void finalize_experiment();
+	void end_experiment();
 	double time_elapsed() { return end_time - start_time; }
 
 	bool experiment_started;
@@ -2023,13 +2023,15 @@ public:
 	static double calibrate_IO_submission_rate_queue_based(int highest_lba, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
 	static double measure_throughput(int highest_lba, double IO_submission_rate, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
 	static double calibrate_IO_submission_rate_throughput_based(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
-	static ExperimentResult overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
 	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments);
 	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, ExperimentResult experiment);
 	static void waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static void age_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static void queue_length_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static string get_working_dir();
+
+	static ExperimentResult overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
+	static ExperimentResult copyback_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
 
 private:
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
