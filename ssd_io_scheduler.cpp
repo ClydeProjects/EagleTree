@@ -80,7 +80,7 @@ IOScheduler *IOScheduler::instance()
 }
 
 
-bool bus_wait_time_comparator (const Event* i, const Event* j) {
+inline bool bus_wait_time_comparator (const Event* i, const Event* j) {
 	return i->get_bus_wait_time() < j->get_bus_wait_time();
 }
 
