@@ -211,6 +211,8 @@ extern bool PRIORITISE_GC;
 extern bool ENABLE_WEAR_LEVELING;
 extern int WEAR_LEVEL_THRESHOLD;
 
+extern int PAGE_HOTNESS_MEASURER;
+
 /* Enumerations to clarify status integers in simulation
  * Do not use typedefs on enums for reader clarity */
 

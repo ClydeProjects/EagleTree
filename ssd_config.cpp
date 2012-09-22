@@ -217,6 +217,8 @@ uint MAX_OS_NUM_LOCKS = 1000;
 /* Defines how the sequential writes detection algorithm spreads a sequential write  */
 uint LOCALITY_PARALLEL_DEGREE = 0;
 
+int PAGE_HOTNESS_MEASURER = 0;
+
 void load_entry(char *name, double value, uint line_number) {
 	/* cheap implementation - go through all possibilities and match entry */
 	if (!strcmp(name, "RAM_READ_DELAY"))

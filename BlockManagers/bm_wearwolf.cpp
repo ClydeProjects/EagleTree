@@ -7,6 +7,14 @@ Wearwolf::Wearwolf(Ssd& ssd, FtlParent& ftl)
 	: Block_manager_parent(ssd, ftl, 4),
 	  page_hotness_measurer(new Ignorant_Hotness_Measurer())
 {
+	if (PAGE_HOTNESS_MEASURER == 0) {
+		page_hotness_measurer = new Ignorant_Hotness_Measurer();
+	} else if (PAGE_HOTNESS_MEASURER == 1) {
+		page_hotness_measurer = new Simple_Page_Hotness_Measurer();
+	} else {
+		page_hotness_measurer = new BloomFilter_Page_Hotness_Measurer();
+	}
+
 	wcrh_pointer = find_free_unused_block(0, 0, YOUNG, 0);
 	if (SSD_SIZE > 1) {
 		wcrc_pointer = find_free_unused_block(1, 0, YOUNG, 0);

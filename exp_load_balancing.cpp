@@ -30,10 +30,10 @@ vector<Thread*>  sequential_writes_greedy_gc(int highest_lba, double IO_submissi
 	long space_per_thread = highest_lba / 4;
 	printf("space division:   %d    %d\n", space_per_thread, space_per_thread * 4 );
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, space_per_thread, 1, WRITE, IO_submission_rate, 1);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, space_per_thread, 20000, 2, WRITE, IO_submission_rate, 1));
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, space_per_thread, 40000, 2, WRITE, IO_submission_rate, 1));
 
 	Thread* t2 = new Asynchronous_Sequential_Thread(space_per_thread + 1, space_per_thread * 4, 1, WRITE, IO_submission_rate, 2);
-	t2->add_follow_up_thread(new Asynchronous_Random_Thread(space_per_thread + 1, space_per_thread * 4, 20000, 2, READ, IO_submission_rate / 2, 1));
+	t2->add_follow_up_thread(new Asynchronous_Random_Thread(space_per_thread + 1, space_per_thread * 4, 50000, 2, READ, IO_submission_rate / 2, 1));
 
 	vector<Thread*> threads;
 	threads.push_back(t1);
@@ -65,7 +65,7 @@ int main()
 	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
 	PLANE_SIZE = 32;
-	BLOCK_SIZE = 8;
+	BLOCK_SIZE = 32;
 
 	PAGE_READ_DELAY = 1;
 	PAGE_WRITE_DELAY = 20;
@@ -75,8 +75,9 @@ int main()
 
 	ENABLE_WEAR_LEVELING = false;
 	WEAR_LEVEL_THRESHOLD = 50;
+	PAGE_HOTNESS_MEASURER = 0;
 
-	long address_space = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.8;
+	long address_space = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.85;
 	vector<Thread*> threads = sequential_writes_greedy_gc(address_space, 40);
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
