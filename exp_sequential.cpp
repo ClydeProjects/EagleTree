@@ -37,16 +37,17 @@ using namespace ssd;
 vector<Thread*> basic_sequential_experiment(int highest_lba, double IO_submission_rate) {
 	long log_space_per_thread = highest_lba / 2;
 	long max_file_size = log_space_per_thread / 4;
-	long num_files = 100;
+	long num_files = 50;
 
-	Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1);
+	//Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1);
 	//Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 2, 2);
 
-	Thread* t1 = new Asynchronous_Sequential_Thread(log_space_per_thread + 1, log_space_per_thread * 2, 1, WRITE, IO_submission_rate, 1);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(log_space_per_thread + 1, log_space_per_thread * 2, 50000, 2, WRITE, IO_submission_rate, 1));
+	Thread* t1 = new Asynchronous_Sequential_Thread(log_space_per_thread + 1, log_space_per_thread * 2, 1, WRITE, 30, 1);
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(log_space_per_thread + 1, log_space_per_thread * 2, 5000, 2, WRITE, IO_submission_rate * 2, 1));
+	t1->add_follow_up_thread(new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1));
 
 	vector<Thread*> threads;
-	threads.push_back(fm1);
+	//threads.push_back(fm1);
 	//threads.push_back(fm2);
 	threads.push_back(t1);
 	return threads;
@@ -137,7 +138,7 @@ int main()
 
 	int IO_limit = 100000;
 	int space_min = 70;
-	int space_max = 75;
+	int space_max = 70;
 	int space_inc = 5;
 
 	double start_time = Experiment_Runner::wall_clock_time();
@@ -149,7 +150,7 @@ int main()
 	vector<ExperimentResult> exp;
 
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_tagging, 			space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
+	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
 	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
 	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_CHANNEL, space_min, space_max, space_inc, exp_folder + "seq_detect_channel/","Seq Detect: CHANNEL", IO_limit) );
 	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_BLOCK, 	space_min, space_max, space_inc, exp_folder + "seq_detect_block/",	"Seq Detect: BLOCK", IO_limit) );
