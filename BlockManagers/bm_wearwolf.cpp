@@ -4,8 +4,7 @@
 using namespace ssd;
 
 Wearwolf::Wearwolf(Ssd& ssd, FtlParent& ftl)
-	: Block_manager_parent(ssd, ftl, 4),
-	  page_hotness_measurer(new Ignorant_Hotness_Measurer())
+	: Block_manager_parent(ssd, ftl, 4)
 {
 	if (PAGE_HOTNESS_MEASURER == 0) {
 		page_hotness_measurer = new Ignorant_Hotness_Measurer();
@@ -34,6 +33,7 @@ void Wearwolf::register_write_outcome(Event const& event, enum status status) {
 	if (status == FAILURE) {
 		return;
 	}
+	//StateVisualiser::print_page_status();
 	Block_manager_parent::register_write_outcome(event, status);
 	page_hotness_measurer->register_event(event);
 
