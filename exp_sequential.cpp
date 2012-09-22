@@ -94,8 +94,6 @@ vector<Thread*> sequential_detection_BLOCK(int highest_lba, double IO_submission
 	return basic_sequential_experiment(highest_lba, IO_submission_rate);
 }
 
-
-
 int main()
 {
 	string exp_folder  = "exp_sequential/";
@@ -139,20 +137,24 @@ int main()
 
 	int IO_limit = 100000;
 	int space_min = 70;
-	int space_max = 95;
+	int space_max = 75;
 	int space_inc = 5;
 
 	double start_time = Experiment_Runner::wall_clock_time();
+
 
 	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 5000;
 
 	vector<Exp> exp;
+
+	vector<ExperimentResult> exp;
+
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_tagging, 			space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_CHANNEL, space_min, space_max, space_inc, exp_folder + "seq_detect_channel/","Seq Detect: CHANNEL", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_BLOCK, 	space_min, space_max, space_inc, exp_folder + "seq_detect_block/",	"Seq Detect: BLOCK", IO_limit) );
+	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
+	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_CHANNEL, space_min, space_max, space_inc, exp_folder + "seq_detect_channel/","Seq Detect: CHANNEL", IO_limit) );
+	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_BLOCK, 	space_min, space_max, space_inc, exp_folder + "seq_detect_block/",	"Seq Detect: BLOCK", IO_limit) );
 
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
@@ -177,7 +179,7 @@ int main()
 	}
 
 	double end_time = Experiment_Runner::wall_clock_time();
-	printf("Entire experiment finished in %s\n", Experiment_Runner::pretty_time(end_time - start_time).c_str());
+	printf("=== Entire experiment finished in %s ===\n", Experiment_Runner::pretty_time(end_time - start_time).c_str());
 
 	return 0;
 }

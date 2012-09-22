@@ -41,17 +41,110 @@ const string Experiment_Runner::markers[] = {"circle", "square", "triangle", "di
 
 const bool Experiment_Runner::REMOVE_GLE_SCRIPTS_AGAIN = false;
 
-const string Experiment_Runner::datafile_postfix 			= ".csv";
-const string Experiment_Runner::stats_filename 				= "stats";
-const string Experiment_Runner::waittime_filename_prefix 	= "waittime-";
-const string Experiment_Runner::age_filename_prefix 		= "age-";
-const string Experiment_Runner::queue_filename_prefix 		= "queue-";
-
 const double Experiment_Runner::M = 1000000.0; // One million
 const double Experiment_Runner::K = 1000.0;    // One thousand
 
 double Experiment_Runner::calibration_precision      = 1.0; // microseconds
 double Experiment_Runner::calibration_starting_point = 15.00; // microseconds
+
+const string ExperimentResult::datafile_postfix 			= ".csv";
+const string ExperimentResult::stats_filename 				= "stats";
+const string ExperimentResult::waittime_filename_prefix 	= "waittime-";
+const string ExperimentResult::age_filename_prefix 			= "age-";
+const string ExperimentResult::queue_filename_prefix 		= "queue-";
+const double ExperimentResult::M 							= 1000000.0; // One million
+const double ExperimentResult::K 							= 1000.0;    // One thousand
+
+ExperimentResult::ExperimentResult(string experiment_name, string data_folder_, string variable_parameter_name, string throughput_column_name)
+:	experiment_name(experiment_name),
+ 	variable_parameter_name(variable_parameter_name),
+ 	max_age(0),
+ 	max_age_freq(0),
+ 	throughput_column_name(throughput_column_name),
+ 	experiment_started(false),
+ 	experiment_finished(false)
+{
+	working_dir = Experiment_Runner::get_working_dir();
+	data_folder = working_dir + "/" + data_folder_;
+ 	stats_file = NULL;
+
+	//boost::filesystem::path working_dir = boost::filesystem::current_path();
+    //boost::filesystem::create_directories(boost::filesystem::path(data_folder));
+    //boost::filesystem::current_path(boost::filesystem::path(data_folder));
+}
+
+ExperimentResult::~ExperimentResult() {
+}
+
+void ExperimentResult::start_experiment() {
+	assert(!experiment_started && !experiment_finished);
+	experiment_started = true;
+	start_time = Experiment_Runner::wall_clock_time();
+    printf("=== Starting experiment '%s' ===\n", experiment_name.c_str());
+
+	mkdir(data_folder.c_str(), 0755);
+    chdir(data_folder.c_str());
+
+	// Write header of stat csv file
+    stats_file = new std::ofstream();
+    stats_file->open((stats_filename + datafile_postfix).c_str());
+    (*stats_file) << "\"" << variable_parameter_name << "\", " << StatisticsGatherer::get_instance()->totals_csv_header() << ", \"" << throughput_column_name << "\"" << "\n";
+}
+
+void ExperimentResult::collect_stats(uint variable_parameter_value, long double throughput) {
+	assert(experiment_started && !experiment_finished);
+
+	(*stats_file) << variable_parameter_value << ", " << StatisticsGatherer::get_instance()->totals_csv_line() << ", " << throughput << "\n";
+
+	stringstream hist_filename;
+	stringstream age_filename;
+	stringstream queue_filename;
+
+	hist_filename << waittime_filename_prefix << variable_parameter_value << datafile_postfix;
+	age_filename << age_filename_prefix << variable_parameter_value << datafile_postfix;
+	queue_filename << queue_filename_prefix << variable_parameter_value << datafile_postfix;
+
+	std::ofstream hist_file;
+	hist_file.open(hist_filename.str().c_str());
+	hist_file << StatisticsGatherer::get_instance()->wait_time_histogram_csv();
+	hist_file.close();
+
+	std::ofstream age_file;
+	age_file.open(age_filename.str().c_str());
+	age_file << StatisticsGatherer::get_instance()->age_histogram_csv();
+	age_file.close();
+	max_age = max(StatisticsGatherer::get_instance()->max_age(), max_age);
+	max_age_freq = max(StatisticsGatherer::get_instance()->max_age_freq(), max_age_freq);
+
+	std::ofstream queue_file;
+	queue_file.open(queue_filename.str().c_str());
+	queue_file << StatisticsGatherer::get_instance()->queue_length_csv();
+	queue_file.close();
+}
+
+void ExperimentResult::finalize_experiment() {
+	assert(experiment_started && !experiment_finished);
+	experiment_finished = true;
+
+	stats_file->close();
+
+	end_time = Experiment_Runner::wall_clock_time();
+
+	printf("=== Experiment '%s' completed in %s. ===\n", experiment_name.c_str(), Experiment_Runner::pretty_time(time_elapsed()).c_str());
+	printf("\n");
+
+	vector<string> original_column_names = StatisticsGatherer::get_instance()->totals_vector_header();
+	column_names.push_back(variable_parameter_name);
+	column_names.insert(column_names.end(), original_column_names.begin(), original_column_names.end());
+	column_names.push_back(throughput_column_name);
+
+    //boost::filesystem::current_path(boost::filesystem::path(working_dir));
+
+	chdir(working_dir.c_str());
+
+	delete stats_file;
+}
+
 
 double Experiment_Runner::CPU_time_user() {
     struct rusage ru;
@@ -156,47 +249,12 @@ double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_l
 	return max_rate;
 }
 
-/*class StatisticsCollector {
-public:
-	StatisticsCollector();
-	~StatisticsCollector();
-	void CollectStatistics(int variable_param_value);
-private:
-	string working_dir;
-};*/
-
-Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit) {
-	uint max_age = 0;
-	uint max_age_freq = 0;
-	stringstream graph_name;
-
-    vector<string> histogram_commands;
-
-    string working_dir = Experiment_Runner::get_working_dir();
-
-    mkdir(data_folder.c_str(), 0755);
-    chdir(data_folder.c_str());
-
-    //boost::filesystem::path working_dir = boost::filesystem::current_path();
-    //boost::filesystem::create_directories(boost::filesystem::path(data_folder));
-    //boost::filesystem::current_path(boost::filesystem::path(data_folder));
-
-    string throughput_column_name = "Max sustainable throughput (IOs/s)";
-	string measurement_name       = "Used space (%)";
-
-	/*------*/
-	std::ofstream csv_file;
-    csv_file.open((stats_filename + datafile_postfix).c_str());
-    csv_file << "\"" << measurement_name << "\", " << StatisticsGatherer::get_instance()->totals_csv_header() << ", \"" << throughput_column_name << "\"" << "\n";
-	/*------*/
+ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit) {
+    ExperimentResult experiment_result(name, data_folder, "Used space (%)", "Max sustainable throughput (IOs/s)");
+    experiment_result.start_experiment();
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
-
-    printf("========== Starting experiment '%s' ==========\n", name.c_str());
-
-    double start_time = wall_clock_time();
-
-	for (int used_space = space_min; used_space <= space_max; used_space += space_inc) {
+    for (int used_space = space_min; used_space <= space_max; used_space += space_inc) {
 		int highest_lba = (int) ((double) num_pages * used_space / 100);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		printf("Experiment with max %d pct used space: Writing to no LBA higher than %d (out of %d total available)\n", used_space, highest_lba, num_pages);
@@ -212,36 +270,14 @@ Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
 
-		// Compute throughput, save statistics in csv format
+		// Compute throughput
 		int total_IOs_issued = StatisticsGatherer::get_instance()->total_reads() + StatisticsGatherer::get_instance()->total_writes();
 		long double throughput = (double) total_IOs_issued / os->get_total_runtime() * 1000; // IOs/sec
-		csv_file << used_space << ", " << StatisticsGatherer::get_instance()->totals_csv_line() << ", " << throughput << "\n";
 
-		stringstream hist_filename;
-		stringstream age_filename;
-		stringstream queue_filename;
+		// Collect statistics from this experiment iteration (save in csv files)
+		experiment_result.collect_stats(used_space, throughput);
 
-		hist_filename << waittime_filename_prefix << used_space << datafile_postfix;
-		age_filename << age_filename_prefix << used_space << datafile_postfix;
-		queue_filename << queue_filename_prefix << used_space << datafile_postfix;
-
-		std::ofstream hist_file;
-		hist_file.open(hist_filename.str().c_str());
-		hist_file << StatisticsGatherer::get_instance()->wait_time_histogram_csv();
-		hist_file.close();
-
-		std::ofstream age_file;
-		age_file.open(age_filename.str().c_str());
-		age_file << StatisticsGatherer::get_instance()->age_histogram_csv();
-		age_file.close();
-		max_age = max(StatisticsGatherer::get_instance()->max_age(), max_age);
-		max_age_freq = max(StatisticsGatherer::get_instance()->max_age_freq(), max_age_freq);
-
-		std::ofstream queue_file;
-		queue_file.open(queue_filename.str().c_str());
-		queue_file << StatisticsGatherer::get_instance()->queue_length_csv();
-		queue_file.close();
-
+		// Print shit
 		if (PRINT_LEVEL >= 1) {
 			StateVisualiser::print_page_status();
 			StateVisualiser::print_block_ages();
@@ -250,27 +286,12 @@ Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)
 		delete os;
 	}
 
-	csv_file.close();
-
-	double end_time = wall_clock_time();
-	double time_elapsed = end_time - start_time;
-	printf("Experiment completed in %s.\n", pretty_time(time_elapsed).c_str());
-
-	vector<string> original_column_names = StatisticsGatherer::get_instance()->totals_vector_header();
-	vector<string> column_names;
-	column_names.push_back(measurement_name);
-	column_names.insert(column_names.end(), original_column_names.begin(), original_column_names.end());
-	column_names.push_back(throughput_column_name);
-
-    //boost::filesystem::current_path(boost::filesystem::path(working_dir));
-
-	chdir(working_dir.c_str());
-
-	return Exp(name, working_dir + "/" + data_folder, measurement_name, column_names, max_age, max_age_freq);
+	experiment_result.finalize_experiment();
+	return experiment_result;
 }
 
 // Plotting x number of experiments into one graph
-void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filename, int column, vector<Exp> experiments) {
+void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments) {
 	// Write tempoary file containing GLE script
     string scriptFilename = filename + ".gle"; // Name of tempoary script file
     std::ofstream gleScript;
@@ -280,18 +301,18 @@ void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filenam
     "size " << sizeX << " " << sizeY << endl << // 12 8
     "set font texcmr" << endl <<
     "begin graph" << endl <<
-    "   key pos tl offset -0.0 0 compact" << endl <<
+    "   key pos bl offset -0.0 0 compact" << endl <<
     "   scale auto" << endl <<
     "   title  \"" << title << "\"" << endl <<
-    "   xtitle \"" << experiments[0].x_axis << "\"" << endl <<
+    "   xtitle \"" << experiments[0].variable_parameter_name << "\"" << endl <<
     "   ytitle \"" << experiments[0].column_names[column] << "\"" << endl <<
     "   yaxis min 0" << endl;
 
     for (uint i = 0; i < experiments.size(); i++) {
-    	Exp e = experiments[i];
+    	ExperimentResult e = experiments[i];
         gleScript <<
-       	"   data   \"" << e.data_folder << stats_filename << datafile_postfix << "\"" << " d"<<i+1<<"=c1,c" << column+1 << endl <<
-        "   d"<<i+1<<" line marker " << markers[i] << " key " << "\"" << e.name << "\"" << endl;
+       	"   data   \"" << e.data_folder << ExperimentResult::stats_filename << ExperimentResult::datafile_postfix << "\"" << " d"<<i+1<<"=c1,c" << column+1 << endl <<
+        "   d"<<i+1<<" line marker " << markers[i] << " key " << "\"" << e.experiment_name << "\"" << endl;
     }
 
     gleScript <<
@@ -306,7 +327,9 @@ void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filenam
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
-void Experiment_Runner::waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Exp experiment) {
+void Experiment_Runner::waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, ExperimentResult experiment) {
+	chdir(experiment.data_folder.c_str());
+
 	// Write tempoary file containing GLE script
     string scriptFilename = filename + ".gle"; // Name of tempoary script file
     std::ofstream gleScript;
@@ -320,9 +343,9 @@ void Experiment_Runner::waittime_boxplot(int sizeX, int sizeY, string title, str
     "   key pos tl offset -0.0 0 compact" << endl <<
     "   scale auto" << endl <<
     "   title  \"" << title << "\"" << endl <<
-    "   xtitle \"" << experiment.x_axis << "\"" << endl <<
+    "   xtitle \"" << experiment.variable_parameter_name << "\"" << endl <<
     "   ytitle \"Wait time (µs)\"" << endl <<
-	"   data \"" << experiment.data_folder << stats_filename << datafile_postfix << "\"" << endl <<
+	"   data \"" << experiment.data_folder << ExperimentResult::stats_filename << ExperimentResult::datafile_postfix << "\"" << endl <<
     "   xaxis min dminx(d1)-2.5 max dmaxx(d1)+2.5 dticks 5" << endl << // nolast nofirst
     "   dticks off" << endl <<
     "   yaxis min 0 max dmaxy(d" << mean_column+5 << ")*1.05" << endl << // mean_column+5 = max column
@@ -371,18 +394,18 @@ void Experiment_Runner::draw_graph(int sizeX, int sizeY, string outputFile, stri
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
-void Experiment_Runner::waittime_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points) {
+void Experiment_Runner::waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points) {
 	vector<string> commands;
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "hist 0 " << i << " \"" << waittime_filename_prefix << points[i] << datafile_postfix << "\" \"Wait time histogram (" << experiment.x_axis << " = " << points[i] << ")\" \"log min 1\" \"Event wait time (µs)\" -1 " << StatisticsGatherer::get_instance()->get_wait_time_histogram_bin_size();
+		command << "hist 0 " << i << " \"" << ExperimentResult::waittime_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Wait time histogram (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"log min 1\" \"Event wait time (µs)\" -1 " << StatisticsGatherer::get_instance()->get_wait_time_histogram_bin_size();
 		commands.push_back(command.str());
 	}
 
 	multigraph(sizeX, sizeY, outputFile, commands);
 }
 
-void Experiment_Runner::age_histogram(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points) {
+void Experiment_Runner::age_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points) {
 	vector<string> settings;
 	stringstream age_max;
 	age_max << "age_max = " << experiment.max_age;
@@ -391,18 +414,18 @@ void Experiment_Runner::age_histogram(int sizeX, int sizeY, string outputFile, E
 	vector<string> commands;
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "hist 0 " << i << " \"" << age_filename_prefix << points[i] << datafile_postfix << "\" \"Block age histogram (" << experiment.x_axis << " = " << points[i] << ")\" \"on min 0 max " << experiment.max_age_freq << "\" \"Block age\" age_max " << StatisticsGatherer::get_instance()->get_age_histogram_bin_size();
+		command << "hist 0 " << i << " \"" << ExperimentResult::age_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Block age histogram (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"on min 0 max " << experiment.max_age_freq << "\" \"Block age\" age_max " << StatisticsGatherer::get_instance()->get_age_histogram_bin_size();
 		commands.push_back(command.str());
 	}
 
 	multigraph(sizeX, sizeY, outputFile, commands, settings);
 }
 
-void Experiment_Runner::queue_length_history(int sizeX, int sizeY, string outputFile, Exp experiment, vector<int> points) {
+void Experiment_Runner::queue_length_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points) {
 	vector<string> commands;
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "plot 0 " << i << " \"" << queue_filename_prefix << points[i] << datafile_postfix << "\" \"Queue length history (" << experiment.x_axis << " = " << points[i] << ")\" \"on\" \"Timeline (µs progressed)\" \"Items in event queue\"";
+		command << "plot 0 " << i << " \"" << ExperimentResult::queue_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Queue length history (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"on\" \"Timeline (µs progressed)\" \"Items in event queue\"";
 		commands.push_back(command.str());
 	}
 
