@@ -40,11 +40,15 @@ vector<Thread*> basic_sequential_experiment(int highest_lba, double IO_submissio
 	long num_files = 100;
 
 	Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1);
-	Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 2, 2);
+	//Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 2, 2);
+
+	Thread* t1 = new Asynchronous_Sequential_Thread(log_space_per_thread + 1, log_space_per_thread * 2, 1, WRITE, IO_submission_rate, 1);
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(log_space_per_thread + 1, log_space_per_thread * 2, 50000, 2, WRITE, IO_submission_rate, 1));
 
 	vector<Thread*> threads;
 	threads.push_back(fm1);
-	threads.push_back(fm2);
+	//threads.push_back(fm2);
+	threads.push_back(t1);
 	return threads;
 }
 
@@ -133,12 +137,15 @@ int main()
 		BLOCK_ERASE_DELAY = 150;
 	}
 
-	int IO_limit = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 3;
+	int IO_limit = 100000;
 	int space_min = 70;
 	int space_max = 95;
 	int space_inc = 5;
 
 	double start_time = Experiment_Runner::wall_clock_time();
+
+	PRINT_LEVEL = 0;
+	MAX_SSD_QUEUE_SIZE = 5000;
 
 	vector<Exp> exp;
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_tagging, 			space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );
