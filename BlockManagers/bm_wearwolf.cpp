@@ -55,7 +55,8 @@ void Wearwolf::handle_cold_pointer_out_of_space(enum read_hotness rh, double sta
 		pointer = block;
 	} else {
 		//perform_gc(addr.package, addr.die, 1, start_time);
-		schedule_gc(start_time, addr.package, addr.die, -1, -1);
+		//schedule_gc(start_time, addr.package, addr.die, -1, -1);
+		pointer = find_free_unused_block(start_time);
 	}
 }
 

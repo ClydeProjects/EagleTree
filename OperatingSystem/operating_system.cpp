@@ -73,6 +73,7 @@ void OperatingSystem::run() {
 		still_more_work = currently_executing_ios_counter > 0 || currently_pending_ios_counter > 0;
 		//printf("num_writes   %d\n", num_writes_completed);
 	} while (!finished_experiment && still_more_work);
+	printf(" ");
 }
 
 int OperatingSystem::pick_event_with_shortest_start_time() {

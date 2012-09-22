@@ -28,12 +28,12 @@ vector<Thread*>  sequential_writes_greedy_gc(int highest_lba, double IO_submissi
 	ENABLE_TAGGING = false;
 
 	long space_per_thread = highest_lba / 4;
-	printf("space division:   %d    %d\n", space_per_thread, space_per_thread * 3 );
+	printf("space division:   %d    %d\n", space_per_thread, space_per_thread * 4 );
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, space_per_thread, 1, WRITE, IO_submission_rate, 1);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, space_per_thread, 10000, 2, WRITE, IO_submission_rate, 1));
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, space_per_thread, 20000, 2, WRITE, IO_submission_rate, 1));
 
 	Thread* t2 = new Asynchronous_Sequential_Thread(space_per_thread + 1, space_per_thread * 4, 1, WRITE, IO_submission_rate, 2);
-	t2->add_follow_up_thread(new Asynchronous_Random_Thread(space_per_thread + 1, space_per_thread * 4, 10000, 2, READ, IO_submission_rate, 1));
+	t2->add_follow_up_thread(new Asynchronous_Random_Thread(space_per_thread + 1, space_per_thread * 4, 20000, 2, READ, IO_submission_rate / 2, 1));
 
 	vector<Thread*> threads;
 	threads.push_back(t1);
@@ -58,7 +58,7 @@ int main()
 {
 	load_config();
 
-	PRINT_LEVEL = 1;
+	PRINT_LEVEL = 0;
 	PRINT_FILE_MANAGER_INFO = true;
 
 	SSD_SIZE = 4;
@@ -73,14 +73,15 @@ int main()
 	BUS_DATA_DELAY = 9;
 	BLOCK_ERASE_DELAY = 150;
 
-	ENABLE_WEAR_LEVELING = true;
+	ENABLE_WEAR_LEVELING = false;
 	WEAR_LEVEL_THRESHOLD = 50;
 
-	long address_space = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.9;
+	long address_space = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.8;
 	vector<Thread*> threads = sequential_writes_greedy_gc(address_space, 40);
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();
 	StatisticsGatherer::get_instance()->print();
+	StateVisualiser::print_block_ages();
 	//VisualTracer::get_instance()->print_horizontally_with_breaks();
 	delete os;
 }
