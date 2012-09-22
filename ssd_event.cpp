@@ -82,7 +82,9 @@ Event::Event(Event& event) :
 
 Event::Event() : type(NOT_VALID) {}
 
-ulong Event::get_logical_address(void) const
+// Outcommented - all setters and getters inlined
+/*
+inline ulong Event::get_logical_address(void) const
 {
 	return logical_address;
 }
@@ -140,8 +142,8 @@ void Event::set_event_type(const enum event_type &type)
 	this->type = type;
 }
 
-double Event::get_start_time(void) const
 {
+double Event::get_start_time(void) const
 	assert(start_time >= 0.0);
 	return start_time;
 }
@@ -273,7 +275,7 @@ double Event::incr_os_wait_time(double time_incr)
 		os_wait_time += time_incr;
 	return os_wait_time;
 }
-
+*/
 void Event::print(FILE *stream) const
 {
 	if (type == NOT_VALID)

@@ -432,45 +432,50 @@ public:
 	Event();
 	Event(Event& event);
 	~Event() {}
-	ulong get_logical_address(void) const;
-	const Address &get_address(void) const;
-	const Address &get_merge_address(void) const;
-	const Address &get_log_address(void) const;
-	const Address &get_replace_address(void) const;
-	uint get_size(void) const;
-	enum event_type get_event_type(void) const;
-	double get_start_time(void) const;
-	bool is_original_application_io(void) const;
-	void set_original_application_io(bool);
-	double get_time_taken(void) const;
-	double get_current_time(void) const;
-	double get_ssd_submission_time() const;
-	uint get_application_io_id(void) const;
-	double get_bus_wait_time(void) const;
-	double get_os_wait_time(void) const;
-	bool get_noop(void) const;
-	uint get_id(void) const;
-	int get_tag() const;
-	void set_tag(int new_tag);
-	void set_address(const Address &address);
-	void set_merge_address(const Address &address);
-	void set_log_address(const Address &address);
-	void set_replace_address(const Address &address);
-	void set_start_time(double start_time);
-	void set_payload(void *payload);
-	void set_event_type(const enum event_type &type);
-	void set_noop(bool value);
-	void set_application_io_id(uint application_io_id);
-	void set_garbage_collection_op(bool value);
-	void set_mapping_op(bool value);
-	void set_age_class(int value);
-	int get_age_class() const;
-	bool is_garbage_collection_op() const;
-	bool is_mapping_op() const;
-	void *get_payload(void) const;
-	double incr_bus_wait_time(double time);
-	double incr_os_wait_time(double time);
-	double incr_time_taken(double time_incr);
+	inline ulong get_logical_address(void) const { return logical_address; }
+	inline const Address &get_address(void) const { return address; }
+	inline const Address &get_merge_address(void) const { return merge_address; }
+	inline const Address &get_log_address(void) const { return log_address; }
+	inline const Address &get_replace_address(void) const { return replace_address; }
+	inline uint get_size(void) const { return size; }
+	inline enum event_type get_event_type(void) const { return type; }
+	inline double get_start_time(void) const { assert(start_time >= 0.0); return start_time; }
+	inline bool is_original_application_io(void) const { return original_application_io; }
+	inline void set_original_application_io(bool val) { original_application_io = val; }
+	inline double get_time_taken(void) const { assert(time_taken >= 0.0); return time_taken; }
+	inline double get_current_time(void) const { return start_time + time_taken; }
+	inline double get_ssd_submission_time() const { return start_time + os_wait_time; }
+	inline uint get_application_io_id(void) const { return application_io_id; }
+	inline double get_bus_wait_time(void) const { assert(bus_wait_time >= 0.0); return bus_wait_time; }
+	inline double get_os_wait_time(void) const { return os_wait_time; }
+	inline bool get_noop(void) const { return noop; }
+	inline uint get_id(void) const { return id; }
+	inline int get_tag() const { return tag; }
+	inline void set_tag(int new_tag) { tag = new_tag; }
+	inline void set_address(const Address &address) {
+		if (type == WRITE || type == READ || type == READ_COMMAND || type == READ_TRANSFER) {
+			assert(address.valid == PAGE);
+		}
+		this -> address = address;
+	}
+	inline void set_merge_address(const Address &address) { merge_address = address; }
+	inline void set_log_address(const Address &address) { log_address = address; }
+	inline void set_replace_address(const Address &address) { replace_address = address; }
+	inline void set_start_time(double value) { assert(value > 0); start_time = value; }
+	inline void set_payload(void *payload) { this->payload = payload; }
+	inline void set_event_type(const enum event_type &type) { this->type = type; }
+	inline void set_noop(bool value) { noop = value; }
+	inline void set_application_io_id(uint value) { application_io_id = value; }
+	inline void set_garbage_collection_op(bool value) { garbage_collection_op = value; }
+	inline void set_mapping_op(bool value) { mapping_op = value; }
+	inline void set_age_class(int value) { age_class = value; }
+	inline int get_age_class() const { return age_class; }
+	inline bool is_garbage_collection_op() const { return garbage_collection_op; }
+	inline bool is_mapping_op() const { return mapping_op; }
+	inline void *get_payload(void) const { return payload; }
+	inline double incr_bus_wait_time(double time_incr) { if(time_incr > 0.0) bus_wait_time += time_incr; return bus_wait_time; }
+	inline double incr_os_wait_time(double time_incr) { if(time_incr > 0.0) os_wait_time += time_incr; return os_wait_time; }
+	inline double incr_time_taken(double time_incr) { if(time_incr > 0.0) time_taken += time_incr; return time_taken; }
 	double get_best_case_finish_time();
 	void print(FILE *stream = stdout) const;
 	static void reset_id_generators();
