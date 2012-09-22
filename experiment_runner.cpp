@@ -74,6 +74,8 @@ ExperimentResult::ExperimentResult(string experiment_name, string data_folder_, 
 }
 
 ExperimentResult::~ExperimentResult() {
+	// Don't stop in the middle of an experiment. You finish what you have begun!
+	assert((!experiment_started && !experiment_finished) || (experiment_started && experiment_finished));
 }
 
 void ExperimentResult::start_experiment() {
@@ -122,7 +124,7 @@ void ExperimentResult::collect_stats(uint variable_parameter_value, long double 
 	queue_file.close();
 }
 
-void ExperimentResult::finalize_experiment() {
+void ExperimentResult::end_experiment() {
 	assert(experiment_started && !experiment_finished);
 	experiment_finished = true;
 
@@ -188,8 +190,8 @@ string Experiment_Runner::pretty_time(double time) {
 
 	if (minutes > 0 || hours > 0) {
 		time_text << minutes;
-		if (minutes == 1) time_text << " minute, ";
-		else time_text << " minutes, ";
+		if (minutes == 1) time_text << " minute and ";
+		else time_text << " minutes and ";
 	}
 
 	time_text << seconds;
@@ -278,6 +280,7 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 		experiment_result.collect_stats(used_space, throughput);
 
 		// Print shit
+		StatisticsGatherer::get_instance()->print();
 		if (PRINT_LEVEL >= 1) {
 			StateVisualiser::print_page_status();
 			StateVisualiser::print_block_ages();
@@ -286,7 +289,51 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 		delete os;
 	}
 
-	experiment_result.finalize_experiment();
+	experiment_result.end_experiment();
+	return experiment_result;
+}
+
+ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int used_space, int max_copybacks, string data_folder, string name, int IO_limit) {
+    ExperimentResult experiment_result(name, data_folder, "CopyBacks allowed before ECC check", "Max sustainable throughput (IOs/s)");
+    experiment_result.start_experiment();
+
+    const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
+    for (int copybacks_allowed = 0; copybacks_allowed <= max_copybacks; copybacks_allowed += 1) {
+		int highest_lba = (int) ((double) num_pages * used_space / 100);
+		printf("---------------------------------------\n");
+		printf("Experiment with %d copybacks allowed.\n", copybacks_allowed);
+		printf("---------------------------------------\n");
+
+		MAX_REPEATED_COPY_BACKS_ALLOWED = copybacks_allowed;
+
+		// Calibrate IO submission rate
+		double IO_submission_rate = calibrate_IO_submission_rate_queue_based(highest_lba, IO_limit, experiment);
+		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
+
+		// Run experiment
+		vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
+		OperatingSystem* os = new OperatingSystem(threads);
+		os->set_num_writes_to_stop_after(IO_limit);
+		os->run();
+
+		// Compute throughput
+		int total_IOs_issued = StatisticsGatherer::get_instance()->total_reads() + StatisticsGatherer::get_instance()->total_writes();
+		long double throughput = (double) total_IOs_issued / os->get_total_runtime() * 1000; // IOs/sec
+
+		// Collect statistics from this experiment iteration (save in csv files)
+		experiment_result.collect_stats(copybacks_allowed, throughput);
+
+		// Print shit
+		StatisticsGatherer::get_instance()->print();
+		if (PRINT_LEVEL >= 1) {
+			StateVisualiser::print_page_status();
+			StateVisualiser::print_block_ages();
+		}
+
+		delete os;
+	}
+
+	experiment_result.end_experiment();
 	return experiment_result;
 }
 
