@@ -810,7 +810,6 @@ private:
 	uint reads_counter;
 	const uint WINDOW_LENGTH;
 	const uint KICK_START;
-	FtlParent& ftl;
 };
 
 
