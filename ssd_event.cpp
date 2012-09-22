@@ -325,6 +325,9 @@ void Event::print(FILE *stream) const
 	} else if (mapping_op)  {
 		fprintf(stream, " MAPPING");
 	}
+	if (wear_leveling_op) {
+		fprintf(stream, " WL");
+	}
 	if (original_application_io) {
 		fprintf(stream, " APP");
 	}

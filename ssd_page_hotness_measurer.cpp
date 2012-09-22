@@ -30,8 +30,8 @@ Simple_Page_Hotness_Measurer::Simple_Page_Hotness_Measurer()
 		read_current_count(),
 		read_moving_average(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE, 0),
 		current_interval(0),
-		num_wcrh_pages_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
-		num_wcrc_pages_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
+		writes_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
+		reads_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
 		average_reads_per_die(SSD_SIZE, std::vector<double>(PACKAGE_SIZE, 0)),
 		current_reads_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
 		writes_counter(0),
@@ -88,17 +88,17 @@ enum read_hotness Simple_Page_Hotness_Measurer::get_read_hotness(ulong page_addr
 Address Simple_Page_Hotness_Measurer::get_best_target_die_for_WC(enum read_hotness rh) const {
 	uint package;
 	uint die;
-	std::vector<std::vector<uint> > num_such_pages_per_die;
+	vector<vector<uint> > num_such_pages_per_die;
 	if (rh == READ_COLD) {
-		num_such_pages_per_die = num_wcrc_pages_per_die;
+		num_such_pages_per_die = reads_per_die;
 	} else if (rh == READ_HOT) {
-		num_such_pages_per_die = num_wcrh_pages_per_die;
+		num_such_pages_per_die = writes_per_die;
 	}
 
 	double min = PLANE_SIZE * BLOCK_SIZE;
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			//printf("%d\n", num_wcrc_pages_per_die[i][j]);
+			printf("%d\n", reads_per_die[i][j]);
 			if (min >= num_such_pages_per_die[i][j]) {
 				min = num_such_pages_per_die[i][j];
 				package = i;
@@ -112,8 +112,8 @@ Address Simple_Page_Hotness_Measurer::get_best_target_die_for_WC(enum read_hotne
 void Simple_Page_Hotness_Measurer::register_event(Event const& event) {
 	enum event_type type = event.get_event_type();
 	assert(type == WRITE || type == READ_COMMAND);
-	double time = event.get_start_time() + event.get_time_taken();
 	ulong page_address = event.get_logical_address();
+	Address phys_addr = event.get_address();
 	if (type == WRITE) {
 		write_current_count[page_address]++;
 		if (++writes_counter % WINDOW_LENGTH == 0) {
@@ -122,6 +122,7 @@ void Simple_Page_Hotness_Measurer::register_event(Event const& event) {
 		if (writes_counter == KICK_START && PRINT_LEVEL >= 1) {
 			printf("Start read temperature Identification\n");
 		}
+		writes_per_die[phys_addr.package][phys_addr.die]++;
 	} else if (type == READ_COMMAND) {
 		current_reads_per_die[event.get_address().package][event.get_address().die]++;
 		read_current_count[page_address]++;
@@ -131,6 +132,7 @@ void Simple_Page_Hotness_Measurer::register_event(Event const& event) {
 		if (reads_counter == KICK_START && PRINT_LEVEL >= 1) {
 			printf("Start write temperature Identification\n");
 		}
+		reads_per_die[phys_addr.package][phys_addr.die]++;
 	}
 }
 
@@ -146,12 +148,12 @@ void Simple_Page_Hotness_Measurer::start_new_interval_writes() {
 
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			num_wcrc_pages_per_die[i][j] = 0;
-			num_wcrh_pages_per_die[i][j] = 0;
+			reads_per_die[i][j] = 0;
+			writes_per_die[i][j] = 0;
 		}
 	}
 
-	for( uint addr = 0; addr < NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE; addr++  )
+	/*for( uint addr = 0; addr < NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE; addr++  )
 	{
 		if (get_write_hotness(addr) == WRITE_COLD) {
 			Address a = Address(addr, PAGE);
@@ -161,7 +163,7 @@ void Simple_Page_Hotness_Measurer::start_new_interval_writes() {
 				num_wcrh_pages_per_die[a.package][a.die]++;
 			}
 		}
-	}
+	}*/
 }
 
 void Simple_Page_Hotness_Measurer::start_new_interval_reads() {

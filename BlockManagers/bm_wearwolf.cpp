@@ -36,15 +36,19 @@ void Wearwolf::register_write_outcome(Event const& event, enum status status) {
 	}
 
 	if (!has_free_pages(wcrh_pointer)) {
+		event.print();
 		handle_cold_pointer_out_of_space(READ_HOT, event.get_current_time());
 	}
 	else if (!has_free_pages(wcrc_pointer)) {
+		event.print();
 		handle_cold_pointer_out_of_space(READ_COLD, event.get_current_time());
 	}
 }
 
 void Wearwolf::handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time) {
 	Address addr = page_hotness_measurer->get_best_target_die_for_WC(rh);
+	printf("Best place "); addr.print(); printf("\n");
+	StatisticsGatherer::get_instance()->print();
 	Address& pointer = rh == READ_COLD ? wcrc_pointer : wcrh_pointer;
 	Address block = find_free_unused_block(addr.package, addr.die, OLD, start_time);
 	if (has_free_pages(block)) {
@@ -86,8 +90,10 @@ Address Wearwolf::choose_best_address(Event const& write) {
 	if (w_hotness == WRITE_HOT) {
 		return get_free_block_pointer_with_shortest_IO_queue();
 	} else if (w_hotness == WRITE_COLD && r_hotness == READ_COLD) {
+		write.print();
 		return wcrc_pointer;
 	} else /* if (w_hotness == WRITE_COLD && r_hotness == READ_HOT) */ {
+		write.print();
 		return wcrh_pointer;
 	}
 }

@@ -802,14 +802,15 @@ private:
 	uint current_interval;
 	double average_write_hotness;
 	double average_read_hotness;
-	vector<vector<uint> > num_wcrh_pages_per_die;
-	vector<vector<uint> > num_wcrc_pages_per_die;
+	vector<vector<uint> > writes_per_die;
+	vector<vector<uint> > reads_per_die;
 	vector<vector<double> > average_reads_per_die;
 	vector<vector<uint> > current_reads_per_die;
 	uint writes_counter;
 	uint reads_counter;
 	const uint WINDOW_LENGTH;
 	const uint KICK_START;
+	FtlParent& ftl;
 };
 
 
