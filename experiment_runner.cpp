@@ -51,7 +51,7 @@ const double Experiment_Runner::M = 1000000.0; // One million
 const double Experiment_Runner::K = 1000.0;    // One thousand
 
 double Experiment_Runner::calibration_precision      = 1.0; // microseconds
-double Experiment_Runner::calibration_starting_point = 12.00; // microseconds
+double Experiment_Runner::calibration_starting_point = 15.00; // microseconds
 
 double Experiment_Runner::CPU_time_user() {
     struct rusage ru;
@@ -156,6 +156,15 @@ double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_l
 	return max_rate;
 }
 
+/*class StatisticsCollector {
+public:
+	StatisticsCollector();
+	~StatisticsCollector();
+	void CollectStatistics(int variable_param_value);
+private:
+	string working_dir;
+};*/
+
 Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit) {
 	uint max_age = 0;
 	uint max_age_freq = 0;
@@ -174,11 +183,16 @@ Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)
 
     string throughput_column_name = "Max sustainable throughput (IOs/s)";
 	string measurement_name       = "Used space (%)";
-    std::ofstream csv_file;
+
+	/*------*/
+	std::ofstream csv_file;
     csv_file.open((stats_filename + datafile_postfix).c_str());
     csv_file << "\"" << measurement_name << "\", " << StatisticsGatherer::get_instance()->totals_csv_header() << ", \"" << throughput_column_name << "\"" << "\n";
+	/*------*/
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
+
+    printf("========== Starting experiment '%s' ==========\n", name.c_str());
 
     double start_time = wall_clock_time();
 
@@ -252,7 +266,7 @@ Exp Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)
 
 	chdir(working_dir.c_str());
 
-	return Exp(name, working_dir + "/" + data_folder, "Free space (%)", column_names, max_age, max_age_freq);
+	return Exp(name, working_dir + "/" + data_folder, measurement_name, column_names, max_age, max_age_freq);
 }
 
 // Plotting x number of experiments into one graph
