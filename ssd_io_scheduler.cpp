@@ -628,8 +628,6 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	else if (existing_event != NULL && existing_event->is_garbage_collection_op() && (new_op_code == WRITE || new_op_code == TRIM)) {
 		if (new_op_code == TRIM) {
-			//new_event->print();
-			//existing_event->print();
 			bm->register_trim_making_gc_redundant();
 		}
 
@@ -689,7 +687,10 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if something is to be trimmed, and a read is sent, invalidate the read
 	else if ((new_op_code == READ || new_op_code == READ_TRANSFER || new_op_code == READ_COMMAND) && scheduled_op_code == TRIM) {
-		remove_current_operation(new_event);
+		if (new_event->is_garbage_collection_op()) {
+			bm->register_trim_making_gc_redundant();
+			remove_current_operation(new_event);
+		}
 		//new_event->set_noop(true);
 	} else {
 		printf(" ");
