@@ -25,6 +25,7 @@
 #include "ssd.h"
 #include <unistd.h>   // chdir
 #include <sys/stat.h> // mkdir
+#include <sstream>
 
 using namespace ssd;
 
@@ -96,7 +97,7 @@ vector<Thread*>  random_writes_lazy_gc(int highest_lba, double IO_submission_rat
 
 int main()
 {
-	string exp_folder  = "exp_copybacks/";
+	string exp_folder  = "exp_copyback_map/";
 	mkdir(exp_folder.c_str(), 0755);
 
 	bool debug = true;
@@ -140,17 +141,32 @@ int main()
 
 	MAX_ITEMS_IN_COPY_BACK_MAP = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 
+	printf("Number of addressable blocks: %d\n", NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE);
+
 	int IO_limit = 100000;//NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 3;
-	int used_space = 80;
-	int max_copybacks = 4;
+	int used_space = 85;
+	int cb_map_min = 0;
+	int cb_map_max = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
+	int cb_map_inc = 1000;
+	int max_copybacks = 5;
+
+	stringstream space_usage_string;
+	space_usage_string << used_space << "% used space";
 
 	double start_time = Experiment_Runner::wall_clock_time();
 
 	vector<ExperimentResult> exp;
 
-	exp.push_back( Experiment_Runner::copyback_experiment(random_writes_lazy_gc,   used_space, max_copybacks, exp_folder + "rand_lazy/",  "rand lazy", IO_limit) );
-	exp.push_back( Experiment_Runner::copyback_experiment(random_writes_greedy_gc, used_space, max_copybacks, exp_folder + "rand_greed/", "rand greed", IO_limit) );
-
+	for (int copybacks = 0; copybacks <= max_copybacks; copybacks++) {
+		MAX_REPEATED_COPY_BACKS_ALLOWED = copybacks;
+		stringstream folder;
+		stringstream expname;
+		folder << exp_folder << "copybacks-" << copybacks << "/";
+		if      (copybacks == 0) expname << "Copybacks disabled";
+		else if (copybacks == 1) expname << copybacks << " copyback allowed";
+		else                     expname << copybacks << " copybacks allowed";
+		exp.push_back( Experiment_Runner::copyback_map_experiment(random_writes_greedy_gc, cb_map_min, cb_map_max, cb_map_inc, used_space, folder.str(), expname.str(), IO_limit) );
+	}
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
 
@@ -158,15 +174,15 @@ int main()
 	assert(gc_pos_in_datafile != exp[0].column_names.size());
 
 	vector<int> used_space_values_to_show;
-	for (int i = 0; i <= max_copybacks; i += 1)
-		used_space_values_to_show.push_back(i); // Show all used spaces values in multi-graphs
+	for (int copybacks_in_map = cb_map_min; copybacks_in_map <= cb_map_max; copybacks_in_map += cb_map_inc)
+		used_space_values_to_show.push_back(copybacks_in_map); // Show all used spaces values in multi-graphs
 
 	int sx = 16;
 	int sy = 8;
 
 	chdir(exp_folder.c_str());
-	Experiment_Runner::graph(sx, sy,   "Maximum sustainable throughput", "throughput", 24, exp);
-	Experiment_Runner::graph(sx, sy,   "# Copyback operations", "copybacks", gc_pos_in_datafile, exp);
+	Experiment_Runner::graph(sx, sy,   "Average throughput for random writes with different copyback parameters (" + space_usage_string.str() + ")", "throughput", 24, exp);
+	Experiment_Runner::graph(sx, sy,   "Copybacks operations performed (" + space_usage_string.str() + ")", "copybacks", gc_pos_in_datafile, exp);
 
 	for (uint i = 0; i < exp.size(); i++) {
 		chdir(exp[i].data_folder.c_str());

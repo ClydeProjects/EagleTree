@@ -346,6 +346,51 @@ ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experi
 	return experiment_result;
 }
 
+ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit) {
+    ExperimentResult experiment_result(name, data_folder, "Max copyback map size", "Average throughput (IOs/s)");
+    experiment_result.start_experiment();
+
+    const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
+    for (int copyback_map_size = cb_map_min; copyback_map_size <= cb_map_max; copyback_map_size += cb_map_inc) {
+		int highest_lba = (int) ((double) num_pages * used_space / 100);
+		printf("-------------------------------------------------------\n");
+		printf("Experiment with %d copybacks allowed in copyback map.  \n", copyback_map_size);
+		printf("-------------------------------------------------------\n");
+
+		MAX_ITEMS_IN_COPY_BACK_MAP = copyback_map_size;
+
+		// Calibrate IO submission rate
+		double IO_submission_rate = 10;//calibrate_IO_submission_rate_queue_based(highest_lba, IO_limit, experiment);
+		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
+
+		// Run experiment
+		vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
+		OperatingSystem* os = new OperatingSystem(threads);
+		os->set_num_writes_to_stop_after(IO_limit);
+		os->run();
+
+		// Compute throughput
+		int total_IOs_issued = StatisticsGatherer::get_instance()->total_reads() + StatisticsGatherer::get_instance()->total_writes();
+		long double throughput = (double) total_IOs_issued / os->get_total_runtime() * 1000; // IOs/sec
+
+		// Collect statistics from this experiment iteration (save in csv files)
+		experiment_result.collect_stats(copyback_map_size, throughput);
+
+		// Print shit
+		StatisticsGatherer::get_instance()->print();
+		if (PRINT_LEVEL >= 1) {
+			StateVisualiser::print_page_status();
+			StateVisualiser::print_block_ages();
+		}
+
+		delete os;
+	}
+
+	experiment_result.end_experiment();
+	return experiment_result;
+}
+
+
 // Plotting x number of experiments into one graph
 void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments) {
 	// Write tempoary file containing GLE script
