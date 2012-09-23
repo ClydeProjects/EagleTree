@@ -1673,7 +1673,7 @@ private:
 	static const double age_histogram_bin_size = 1;
 	map<double, uint> wait_time_histogram;
 
-	static const double io_counter_window_size = 1000;
+	static const double io_counter_window_size = 100;
 	vector<uint> application_io_history;
 	vector<uint> non_application_io_history;
 

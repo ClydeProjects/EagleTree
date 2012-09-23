@@ -492,7 +492,7 @@ void Experiment_Runner::throughput_history(int sizeX, int sizeY, string outputFi
 	vector<string> commands;
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "plot 0 " << i << " \"" << ExperimentResult::throughput_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Queue length history (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"on\" \"Timeline (µs progressed)\" \"Throughput (IOs/s)\" " << 2;
+		command << "plot 0 " << i << " \"" << ExperimentResult::throughput_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Throughput history (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"on\" \"Timeline (µs progressed)\" \"Throughput (IOs/s)\" " << 2;
 		commands.push_back(command.str());
 	}
 
