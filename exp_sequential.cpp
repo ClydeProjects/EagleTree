@@ -37,7 +37,7 @@ using namespace ssd;
 vector<Thread*> basic_sequential_experiment(int highest_lba, double IO_submission_rate) {
 	long log_space_per_thread = highest_lba / 2;
 	long max_file_size = log_space_per_thread / 4;
-	long num_files = 50;
+	long num_files = 200;
 
 	//Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1);
 	//Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 2, 2);
@@ -103,7 +103,7 @@ int main()
 	string exp_folder  = "exp_sequential/";
 	mkdir(exp_folder.c_str(), 0755);
 
-	bool debug = true;
+	bool debug = false;
 
 	load_config();
 
@@ -117,7 +117,7 @@ int main()
 		SSD_SIZE = 4;
 		PACKAGE_SIZE = 2;
 		DIE_SIZE = 1;
-		PLANE_SIZE = 64;
+		PLANE_SIZE = 128;
 		BLOCK_SIZE = 32;
 
 		PAGE_READ_DELAY = 5;
@@ -140,8 +140,8 @@ int main()
 	}
 
 	int IO_limit = 50000;
-	int space_min = 80;
-	int space_max = 80;
+	int space_min = 70;
+	int space_max = 90;
 	int space_inc = 5;
 
 	double start_time = Experiment_Runner::wall_clock_time();
@@ -152,13 +152,11 @@ int main()
 
 	vector<ExperimentResult> exp;
 
-	Experiment_Runner::overprovisioning_experiment(sequential_shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit);
-	return 0;
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_tagging, 			space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_CHANNEL, space_min, space_max, space_inc, exp_folder + "seq_detect_channel/","Seq Detect: CHANNEL", IO_limit) );
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_BLOCK, 	space_min, space_max, space_inc, exp_folder + "seq_detect_block/",	"Seq Detect: BLOCK", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_tagging, 			space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_CHANNEL, space_min, space_max, space_inc, exp_folder + "seq_detect_channel/","Seq Detect: CHANNEL", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_BLOCK, 	space_min, space_max, space_inc, exp_folder + "seq_detect_block/",	"Seq Detect: BLOCK", IO_limit) );
 
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
