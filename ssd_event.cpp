@@ -65,6 +65,7 @@ Event::Event(Event& event) :
 	start_time(event.start_time),
 	time_taken(event.time_taken),
 	bus_wait_time(event.bus_wait_time),
+	os_wait_time(0.0),
 	type(event.type),
 	logical_address(event.logical_address),
 	size(event.size),

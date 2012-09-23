@@ -98,7 +98,7 @@ Address Wearwolf_Locality::choose_any_address() {
 	for (; iter != seq_write_key_to_pointers_mapping.end(); iter++) {
 		vector<vector<Address> >& pointers = (*iter).second.pointers;
 		for (uint i = 0; i < pointers.size(); i++) {
-			for (uint j = 0; j < pointers.size(); j++) {
+			for (uint j = 0; j < pointers[i].size(); j++) {
 				if (has_free_pages(pointers[i][j])) {
 					return pointers[i][j];
 				}

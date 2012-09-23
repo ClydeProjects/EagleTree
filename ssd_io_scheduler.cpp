@@ -340,7 +340,6 @@ void IOScheduler::handle_noop_events(vector<Event*>& events) {
 		events.pop_back();
 		uint dependency_code = event->get_application_io_id();
 		deque<Event*>& dependents = dependencies[dependency_code];
-		ssd.register_event_completion(event);
 		while (dependents.size() > 0) {
 			Event *e = dependents.front();
 			dependents.pop_front();
@@ -353,6 +352,7 @@ void IOScheduler::handle_noop_events(vector<Event*>& events) {
 		dependency_code_to_LBA.erase(dependency_code);
 		dependency_code_to_type.erase(dependency_code);
 		manage_operation_completion(event);
+		ssd.register_event_completion(event);
 	}
 }
 
