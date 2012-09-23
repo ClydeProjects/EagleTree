@@ -144,7 +144,7 @@ int main()
 
 	vector<ExperimentResult> exp;
 	exp.push_back( Experiment_Runner::copyback_experiment(random_writes_greedy_gc, used_space, max_copybacks, exp_folder + "rand_greed/", "rand greed", IO_limit) );
-	exp.push_back( Experiment_Runner::copyback_experiment(random_writes_lazy_gc,   used_space, max_copybacks, exp_folder + "rand_lazy/", "rand lazy", IO_limit) );
+	exp.push_back( Experiment_Runner::copyback_experiment(random_writes_lazy_gc,   used_space, max_copybacks, exp_folder + "rand_lazy/",  "rand lazy", IO_limit) );
 
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
@@ -169,6 +169,7 @@ int main()
 		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms", exp[i], used_space_values_to_show);
 		Experiment_Runner::age_histogram			(sx, sy/2, "age-histograms", exp[i], used_space_values_to_show);
 		Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);
+		Experiment_Runner::throughput_history		(sx, sy/2, "throughput_history", exp[i], used_space_values_to_show);
 	}
 
 	double end_time = Experiment_Runner::wall_clock_time();

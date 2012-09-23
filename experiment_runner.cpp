@@ -52,6 +52,7 @@ const string ExperimentResult::stats_filename 				= "stats";
 const string ExperimentResult::waittime_filename_prefix 	= "waittime-";
 const string ExperimentResult::age_filename_prefix 			= "age-";
 const string ExperimentResult::queue_filename_prefix 		= "queue-";
+const string ExperimentResult::throughput_filename_prefix   = "throughput-";
 const double ExperimentResult::M 							= 1000000.0; // One million
 const double ExperimentResult::K 							= 1000.0;    // One thousand
 
@@ -101,10 +102,12 @@ void ExperimentResult::collect_stats(uint variable_parameter_value, long double 
 	stringstream hist_filename;
 	stringstream age_filename;
 	stringstream queue_filename;
+	stringstream throughput_filename;
 
 	hist_filename << waittime_filename_prefix << variable_parameter_value << datafile_postfix;
 	age_filename << age_filename_prefix << variable_parameter_value << datafile_postfix;
 	queue_filename << queue_filename_prefix << variable_parameter_value << datafile_postfix;
+	throughput_filename << throughput_filename_prefix << variable_parameter_value << datafile_postfix;
 
 	std::ofstream hist_file;
 	hist_file.open(hist_filename.str().c_str());
@@ -122,6 +125,12 @@ void ExperimentResult::collect_stats(uint variable_parameter_value, long double 
 	queue_file.open(queue_filename.str().c_str());
 	queue_file << StatisticsGatherer::get_instance()->queue_length_csv();
 	queue_file.close();
+
+	std::ofstream throughput_file;
+	queue_file.open(throughput_filename.str().c_str());
+	queue_file << StatisticsGatherer::get_instance()->app_and_gc_throughput_csv();
+	queue_file.close();
+
 }
 
 void ExperimentResult::end_experiment() {
@@ -479,6 +488,17 @@ void Experiment_Runner::queue_length_history(int sizeX, int sizeY, string output
 	multigraph(sizeX, sizeY, outputFile, commands);
 }
 
+void Experiment_Runner::throughput_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points) {
+	vector<string> commands;
+	for (uint i = 0; i < points.size(); i++) {
+		stringstream command;
+		command << "plot 0 " << i << " \"" << ExperimentResult::throughput_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Queue length history (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"on\" \"Timeline (µs progressed)\" \"Throughput (IOs/s)\" " << 2;
+		commands.push_back(command.str());
+	}
+
+	multigraph(sizeX, sizeY, outputFile, commands);
+}
+
 // Draw multiple smaller graphs in one image
 void Experiment_Runner::multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings) {
 	// Write tempoary file containing GLE script
@@ -521,18 +541,24 @@ void Experiment_Runner::multigraph(int sizeX, int sizeY, string outputFile, vect
 	"   end graph" << endl <<
 	"end sub" << endl <<
 	endl <<
-	"sub plot xp yp data$ title$ yaxis$ xaxistitle$ yaxistitle$" << endl <<
+	"sub plot xp yp data$ title$ yaxis$ xaxistitle$ yaxistitle$ num_plots" << endl <<
+	"   default num_plots 1" << endl <<
 	"   amove xp*(std_sx/2)+pad yp*std_sy+pad" << endl <<
 	"   begin graph" << endl <<
 	"      fullsize" << endl <<
 	"      size std_sx-pad std_sy-pad" << endl <<
-	"      key off" << endl <<
+	"      if num_plots <= 1 then" << endl <<
+	"         key off" << endl <<
+	"      end if" << endl <<
 	"      data  data$" << endl <<
 	"      title title$" << endl <<
 	"      yaxis \\expr{yaxis$}" << endl <<
 	"      xtitle xaxistitle$" << endl <<
 	"      ytitle yaxistitle$" << endl <<
 	"      d1 line" << endl <<
+	"      if num_plots >= 2 then" << endl <<
+	"         d2 line color red" << endl <<
+	"      end if" << endl <<
 	"   end graph" << endl <<
 	"end sub" << endl;
 
