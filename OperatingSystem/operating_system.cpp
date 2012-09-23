@@ -17,7 +17,8 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	  threads(new_threads),
 	  NUM_WRITES_TO_STOP_AFTER(UNDEFINED),
 	  num_writes_completed(0),
-	  time_of_last_event_completed(1)
+	  time_of_last_event_completed(1),
+	  counter_for_user(0)
 {
 	assert(threads.size() > 0);
 	for (uint i = 0; i < threads.size(); i++) {
@@ -49,10 +50,11 @@ OperatingSystem::~OperatingSystem() {
 }
 
 void OperatingSystem::run() {
-	const int idle_limit = 1000000; // 10 minutes
+	const int idle_limit = 100000000; // 10 minutes
 	int idle_time = 0;
 	bool finished_experiment, still_more_work;
 	do {
+
 		int thread_id = pick_unlocked_event_with_shortest_start_time();
 
 		bool no_pending_event = thread_id == UNDEFINED;
@@ -60,14 +62,14 @@ void OperatingSystem::run() {
 		bool queue_is_full = currently_executing_ios_counter >= MAX_SSD_QUEUE_SIZE;
 
 		if (no_pending_event /* || pending_event_starts_much_later */|| queue_is_full) {
-			/*if (idle_time >= idle_limit) {
+			if (idle_time >= idle_limit) {
 				printf("Idle time limit reached\n");
 				printf("Running IOs:\n");
 				for (set<uint>::iterator it = currently_executing_ios.begin(); it != currently_executing_ios.end(); it++) {
 					printf("%d ", *it);
 				}
 				throw;
-			}*/
+			}
 
 			ssd->progress_since_os_is_waiting();
 			idle_time++;
@@ -79,6 +81,11 @@ void OperatingSystem::run() {
 				printf("Limit on number of queued application IOs exceeded:  %d\n", currently_executing_ios_counter);
 				throw "Limit on number of queued application IOs exceeded:";
 			}*/
+		}
+
+		if (counter_for_user * 10000 < num_writes_completed) {
+			printf("finished app writes:  %d\n", counter_for_user * 10000);
+			counter_for_user++;
 		}
 
 		finished_experiment = NUM_WRITES_TO_STOP_AFTER != UNDEFINED && NUM_WRITES_TO_STOP_AFTER <= num_writes_completed;

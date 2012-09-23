@@ -46,6 +46,8 @@ vector<Thread*> basic_sequential_experiment(int highest_lba, double IO_submissio
 
 	t1->add_follow_up_thread(new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1));
 
+	//t1->add_follow_up_thread(new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 1, 2));
+
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(log_space_per_thread + 1, log_space_per_thread * 2, 50000, 2, WRITE, IO_submission_rate * 2, 1));
 
 
@@ -58,7 +60,7 @@ vector<Thread*> basic_sequential_experiment(int highest_lba, double IO_submissio
 
 vector<Thread*> sequential_tagging(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = false;
+	GREEDY_GC = true;
 	ENABLE_TAGGING = true;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 0;
@@ -73,7 +75,7 @@ vector<Thread*> sequential_shortest_queues(int highest_lba, double IO_submission
 
 vector<Thread*> sequential_detection_LUN(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = false;
+	GREEDY_GC = true;
 	ENABLE_TAGGING = false;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 2;
@@ -82,7 +84,7 @@ vector<Thread*> sequential_detection_LUN(int highest_lba, double IO_submission_r
 
 vector<Thread*> sequential_detection_CHANNEL(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = false;
+	GREEDY_GC = true;
 	ENABLE_TAGGING = false;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 1;
@@ -91,7 +93,7 @@ vector<Thread*> sequential_detection_CHANNEL(int highest_lba, double IO_submissi
 
 vector<Thread*> sequential_detection_BLOCK(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = false;
+	GREEDY_GC = true;
 	ENABLE_TAGGING = false;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 0;
@@ -139,24 +141,26 @@ int main()
 		BLOCK_ERASE_DELAY = 150;
 	}
 
-	int IO_limit = 50000;
+	int IO_limit = 100000;
 	int space_min = 70;
-	int space_max = 90;
+	int space_max = 95;
 	int space_inc = 5;
 
 	double start_time = Experiment_Runner::wall_clock_time();
 
 
 	PRINT_LEVEL = 0;
-	MAX_SSD_QUEUE_SIZE = 10;
+	MAX_SSD_QUEUE_SIZE = 15;
 
 	vector<ExperimentResult> exp;
 
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_tagging, 			space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
+	space_max = 90;
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
+	space_max = 95;
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_CHANNEL, space_min, space_max, space_inc, exp_folder + "seq_detect_channel/","Seq Detect: CHANNEL", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_BLOCK, 	space_min, space_max, space_inc, exp_folder + "seq_detect_block/",	"Seq Detect: BLOCK", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_detection_BLOCK, 	space_min, space_max, space_inc, exp_folder + "seq_detect_block/",	"Seq Detect: SSD", IO_limit) );
 
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
@@ -168,8 +172,12 @@ int main()
 	int sx = 16;
 	int sy = 8;
 
+//	for (int i = 0; i < exp[0].column_names.size(); i++) printf("%d: %s\n", i, exp[0].column_names[i].c_str());
+
 	chdir(exp_folder.c_str());
-	Experiment_Runner::graph(sx, sy,   "Maximum sustainable throughput", "throughput", 24, exp);
+	Experiment_Runner::graph(sx, sy,   "Block Manager Effect on Average Throughput, for mixed SW and RW", "throughput", 24, exp);
+
+	Experiment_Runner::graph(sx, sy,   "Total number of erases", "num erases", 8, exp);
 
 	for (uint i = 0; i < exp.size(); i++) {
 		printf("%s\n", exp[i].data_folder.c_str());

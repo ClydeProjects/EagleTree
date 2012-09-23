@@ -1985,6 +1985,8 @@ private:
 	long num_writes_completed;
 
 	double time_of_last_event_completed;
+
+	int counter_for_user;
 };
 
 class ExperimentResult {
