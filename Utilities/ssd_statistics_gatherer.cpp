@@ -42,7 +42,6 @@ StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
 	  num_gc_targeting_package(0),
 	  num_gc_targeting_class(0),
 	  num_gc_targeting_anything(0)
-
 {}
 
 vector<vector<double> > num_valid_pages_per_gc_op;
@@ -62,6 +61,12 @@ StatisticsGatherer *StatisticsGatherer::get_instance()
 }
 
 void StatisticsGatherer::register_completed_event(Event const& event) {
+	uint current_window = floor(event.get_current_time() / io_counter_window_size);
+	while (application_io_history.size() < current_window+1) application_io_history.push_back(0);
+	while (non_application_io_history.size() < current_window+1) non_application_io_history.push_back(0);
+	if (event.is_original_application_io()) application_io_history[current_window]++;
+	else non_application_io_history[current_window]++;
+
 	Address a = event.get_address();
 	if (event.get_event_type() == WRITE) {
 		sum_bus_wait_time_for_writes_per_LUN[a.package][a.die] += event.get_latency();
@@ -589,6 +594,14 @@ string StatisticsGatherer::queue_length_csv() {
 	return ss.str();
 }
 
+string StatisticsGatherer::app_and_gc_throughput_csv() {
+	stringstream ss;
+	ss << "\"Time (µs)\", \"Application IOs/s\", \"Non-application IOs/s\"" << "\n";
+	for (uint i = 0; i < application_io_history.size(); i++) {
+		ss << io_counter_window_size * i << ", " << (double) application_io_history[i]/io_counter_window_size*1000 << ", " << (double) non_application_io_history[i]/io_counter_window_size*1000 << "\n";
+	}
+	return ss.str();
+}
 void StatisticsGatherer::print_csv() {
 	printf("\n");
 	printf("Channel,");

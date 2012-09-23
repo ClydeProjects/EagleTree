@@ -1627,6 +1627,7 @@ public:
 	string age_histogram_csv();
 	string wait_time_histogram_csv();
 	string queue_length_csv();
+	string app_and_gc_throughput_csv();
 	uint max_age();
 	uint max_age_freq();
 	uint total_reads();
@@ -1672,6 +1673,10 @@ private:
 	static const double wait_time_histogram_bin_size = 250;
 	static const double age_histogram_bin_size = 1;
 	map<double, uint> wait_time_histogram;
+
+	static const double io_counter_window_size = 1000;
+	vector<uint> application_io_history;
+	vector<uint> non_application_io_history;
 
 	// garbage collection stats
 	long num_gc_executed;
@@ -2012,6 +2017,7 @@ public:
 	static const string waittime_filename_prefix;
 	static const string age_filename_prefix;
 	static const string queue_filename_prefix;
+	static const string throughput_filename_prefix;
 	static const double M;
 	static const double K;
 };
@@ -2032,6 +2038,7 @@ public:
 	static void waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static void age_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static void queue_length_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
+	static void throughput_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static string get_working_dir();
 
 	static ExperimentResult overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
