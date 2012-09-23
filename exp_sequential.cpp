@@ -75,7 +75,7 @@ vector<Thread*> sequential_shortest_queues(int highest_lba, double IO_submission
 
 vector<Thread*> sequential_detection_LUN(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = false;
+	GREEDY_GC = true;
 	ENABLE_TAGGING = false;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 2;
@@ -84,7 +84,7 @@ vector<Thread*> sequential_detection_LUN(int highest_lba, double IO_submission_r
 
 vector<Thread*> sequential_detection_CHANNEL(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = false;
+	GREEDY_GC = true;
 	ENABLE_TAGGING = false;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 1;
@@ -93,7 +93,7 @@ vector<Thread*> sequential_detection_CHANNEL(int highest_lba, double IO_submissi
 
 vector<Thread*> sequential_detection_BLOCK(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = false;
+	GREEDY_GC = true;
 	ENABLE_TAGGING = false;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 0;
