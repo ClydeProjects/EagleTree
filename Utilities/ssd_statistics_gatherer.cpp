@@ -64,8 +64,8 @@ StatisticsGatherer *StatisticsGatherer::get_instance()
 void StatisticsGatherer::register_completed_event(Event const& event) {
 	Address a = event.get_address();
 	if (event.get_event_type() == WRITE) {
-		sum_bus_wait_time_for_writes_per_LUN[a.package][a.die] += event.get_bus_wait_time();
-		bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_bus_wait_time());
+		sum_bus_wait_time_for_writes_per_LUN[a.package][a.die] += event.get_latency();
+		bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_latency());
 		if (event.is_original_application_io()) {
 			num_writes_per_LUN[a.package][a.die]++;
 		} else if (event.is_garbage_collection_op()) {
@@ -73,12 +73,12 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 			num_gc_writes_per_LUN_origin[replace_add.package][replace_add.die]++;
 			num_gc_writes_per_LUN_destination[a.package][a.die]++;
 
-			sum_gc_wait_time_per_LUN[a.package][a.die] += event.get_bus_wait_time();
-			gc_wait_time_per_LUN[a.package][a.die].push_back(event.get_bus_wait_time());
+			sum_gc_wait_time_per_LUN[a.package][a.die] += event.get_latency();
+			gc_wait_time_per_LUN[a.package][a.die].push_back(event.get_latency());
 		}
 	} else if (event.get_event_type() == READ_COMMAND || event.get_event_type() == READ_TRANSFER) {
-		sum_bus_wait_time_for_reads_per_LUN[a.package][a.die] += event.get_bus_wait_time();
-		bus_wait_time_for_reads_per_LUN[a.package][a.die].push_back(event.get_bus_wait_time());
+		sum_bus_wait_time_for_reads_per_LUN[a.package][a.die] += event.get_latency();
+		bus_wait_time_for_reads_per_LUN[a.package][a.die].push_back(event.get_latency());
 		if (event.get_event_type() == READ_TRANSFER) {
 			if (event.is_original_application_io()) {
 				num_reads_per_LUN[a.package][a.die]++;
@@ -91,7 +91,7 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	} else if (event.get_event_type() == COPY_BACK) {
 		num_copy_backs_per_LUN[a.package][a.die]++;
 	}
-	wait_time_histogram[ceil((max(0.0, event.get_bus_wait_time() - wait_time_histogram_bin_size / 2)) / wait_time_histogram_bin_size)*wait_time_histogram_bin_size]++;
+	wait_time_histogram[ceil((max(0.0, event.get_latency() - wait_time_histogram_bin_size / 2)) / wait_time_histogram_bin_size)*wait_time_histogram_bin_size]++;
 }
 
 void StatisticsGatherer::register_scheduled_gc(Event const& gc) {

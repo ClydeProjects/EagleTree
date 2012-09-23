@@ -444,24 +444,25 @@ public:
 	Event();
 	Event(Event& event);
 	~Event() {}
-	inline ulong get_logical_address(void) const { return logical_address; }
-	inline const Address &get_address(void) const { return address; }
-	inline const Address &get_merge_address(void) const { return merge_address; }
-	inline const Address &get_log_address(void) const { return log_address; }
-	inline const Address &get_replace_address(void) const { return replace_address; }
-	inline uint get_size(void) const { return size; }
-	inline enum event_type get_event_type(void) const { return type; }
-	inline double get_start_time(void) const { assert(start_time >= 0.0); return start_time; }
-	inline bool is_original_application_io(void) const { return original_application_io; }
+	inline ulong get_logical_address() const { return logical_address; }
+	inline const Address &get_address() const { return address; }
+	inline const Address &get_merge_address() const { return merge_address; }
+	inline const Address &get_log_address() const { return log_address; }
+	inline const Address &get_replace_address() const { return replace_address; }
+	inline uint get_size() const { return size; }
+	inline enum event_type get_event_type() const { return type; }
+	inline double get_start_time() const { assert(start_time >= 0.0); return start_time; }
+	inline bool is_original_application_io() const { return original_application_io; }
 	inline void set_original_application_io(bool val) { original_application_io = val; }
-	inline double get_time_taken(void) const { assert(time_taken >= 0.0); return time_taken; }
-	inline double get_current_time(void) const { return start_time + time_taken; }
+	inline double get_time_taken() const { assert(time_taken >= 0.0); return time_taken; }
+	inline double get_current_time() const { return start_time + time_taken; }
 	inline double get_ssd_submission_time() const { return start_time + os_wait_time; }
-	inline uint get_application_io_id(void) const { return application_io_id; }
-	inline double get_bus_wait_time(void) const { assert(bus_wait_time >= 0.0); return bus_wait_time; }
-	inline double get_os_wait_time(void) const { return os_wait_time; }
-	inline bool get_noop(void) const { return noop; }
-	inline uint get_id(void) const { return id; }
+	inline uint get_application_io_id() const { return application_io_id; }
+	inline double get_bus_wait_time() const { assert(bus_wait_time >= 0.0); return bus_wait_time; }
+	inline double get_latency() const { return os_wait_time + bus_wait_time; }
+	inline double get_os_wait_time() const { return os_wait_time; }
+	inline bool get_noop() const { return noop; }
+	inline uint get_id() const { return id; }
 	inline int get_tag() const { return tag; }
 	inline void set_tag(int new_tag) { tag = new_tag; }
 	inline void set_address(const Address &address) {
@@ -484,7 +485,7 @@ public:
 	inline int get_age_class() const { return age_class; }
 	inline bool is_garbage_collection_op() const { return garbage_collection_op; }
 	inline bool is_mapping_op() const { return mapping_op; }
-	inline void *get_payload(void) const { return payload; }
+	inline void *get_payload() const { return payload; }
 	inline double incr_bus_wait_time(double time_incr) { if(time_incr > 0.0) bus_wait_time += time_incr; return bus_wait_time; }
 	inline double incr_os_wait_time(double time_incr) { if(time_incr > 0.0) os_wait_time += time_incr; return os_wait_time; }
 	inline double incr_time_taken(double time_incr) { if(time_incr > 0.0) time_taken += time_incr; return time_taken; }

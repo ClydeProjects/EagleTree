@@ -56,10 +56,10 @@ void OperatingSystem::run() {
 		int thread_id = pick_unlocked_event_with_shortest_start_time();
 
 		bool no_pending_event = thread_id == UNDEFINED;
-		bool pending_event_starts_much_later = thread_id != UNDEFINED && currently_executing_ios_counter > 0 && last_dispatched_event_minimal_finish_time < events[thread_id]->get_start_time();
+		//bool pending_event_starts_much_later = thread_id != UNDEFINED && currently_executing_ios_counter > 0 && last_dispatched_event_minimal_finish_time < events[thread_id]->get_start_time();
 		bool queue_is_full = currently_executing_ios_counter >= MAX_SSD_QUEUE_SIZE;
 
-		if (no_pending_event || pending_event_starts_much_later || queue_is_full) {
+		if (no_pending_event /* || pending_event_starts_much_later */|| queue_is_full) {
 			/*if (idle_time >= idle_limit) {
 				printf("Idle time limit reached\n");
 				printf("Running IOs:\n");
@@ -80,11 +80,12 @@ void OperatingSystem::run() {
 				throw "Limit on number of queued application IOs exceeded:";
 			}*/
 		}
+
 		finished_experiment = NUM_WRITES_TO_STOP_AFTER != UNDEFINED && NUM_WRITES_TO_STOP_AFTER <= num_writes_completed;
 		still_more_work = currently_executing_ios_counter > 0 || currently_pending_ios_counter > 0;
 		//printf("num_writes   %d\n", num_writes_completed);
 	} while (!finished_experiment && still_more_work);
-	VisualTracer::get_instance()->print_horizontally_with_breaks();
+	//VisualTracer::get_instance()->print_horizontally_with_breaks();
 }
 
 int OperatingSystem::pick_unlocked_event_with_shortest_start_time() {
@@ -136,16 +137,12 @@ void OperatingSystem::dispatch_event(int thread_id) {
 }
 
 void OperatingSystem::register_event_completion(Event* event) {
-
 	bool queue_was_full = currently_executing_ios_counter == MAX_SSD_QUEUE_SIZE;
-	//assert(queue_was_full);
 	currently_executing_ios_counter--;
 	assert(currently_executing_ios_counter >= 0);   // there is currently a bug where this number goes below 0. need to fix it.
 	currently_executing_ios.erase(event->get_application_io_id());
 
-	printf("finished:\t"); event->print();
-
-	//VisualTracer::get_instance()->print_horizontally();
+	//printf("finished:\t"); event->print();
 
 	ulong la = event->get_logical_address();
 	map<long, queue<uint> >& map = get_relevant_LBA_to_thread_map(event->get_event_type());
@@ -163,7 +160,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	}
 
 	if (thread->is_finished() && thread->get_follow_up_threads().size() > 0) {
-		if (PRINT_LEVEL >= 1) printf("Switching to new follow up thread\n");
+		/*if (PRINT_LEVEL >= 1)*/ printf("Switching to new follow up thread\n");
 		vector<Thread*> follow_up_threads = thread->get_follow_up_threads();
 		if (follow_up_threads.size() > 0) {
 			threads[thread_id] = follow_up_threads[0];
@@ -184,10 +181,13 @@ void OperatingSystem::register_event_completion(Event* event) {
 
 	if (queue_was_full) {
 		for (uint i = 0; i < threads.size(); i++) {
-			Thread* t = threads[thread_id];
+			Thread* t = threads[i];
 			if (!t->is_finished()) {
-				t->set_time(event->get_current_time() + 1);
-				Event* e = events[thread_id];
+				double thread_time = t->get_time();
+				if (thread_time < event->get_current_time() + 1) {
+					t->set_time(event->get_current_time() + 1);
+				}
+				Event* e = events[i];
 				if (e != NULL) {
 					double diff = event->get_current_time() - e->get_start_time() ;
 					e->incr_os_wait_time(diff);
@@ -205,6 +205,11 @@ void OperatingSystem::register_event_completion(Event* event) {
 	}
 
 	time_of_last_event_completed = max(time_of_last_event_completed, event->get_current_time());
+
+	int thread_with_soonest_event = pick_unlocked_event_with_shortest_start_time();
+	if (thread_with_soonest_event != UNDEFINED) {
+		dispatch_event(thread_with_soonest_event);
+	}
 
 	delete event;
 }

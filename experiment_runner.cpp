@@ -263,7 +263,7 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
 		// Calibrate IO submission rate
-		double IO_submission_rate = calibrate_IO_submission_rate_queue_based(highest_lba, IO_limit, experiment);
+		double IO_submission_rate = 10; //calibrate_IO_submission_rate_queue_based(highest_lba, IO_limit, experiment);
 		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
 
 		// Run experiment

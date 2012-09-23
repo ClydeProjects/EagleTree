@@ -43,7 +43,7 @@ void VisualTracer::register_completed_event(Event const& event) {
 	}
 	Address add = event.get_address();
 
-	int i = event.get_start_time() + event.get_bus_wait_time() - trace[add.package][add.die].size();
+	int i = event.get_current_time() - trace[add.package][add.die].size();
 	write(add.package, add.die, ' ', i);
 
 	event_type type = event.get_event_type();

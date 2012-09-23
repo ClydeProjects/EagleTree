@@ -163,7 +163,7 @@ Event* Asynchronous_Random_Thread::issue_next_io() {
 	Event* event;
 	if (0 < number_of_times_to_repeat) {
 		event =  new Event(type, min_LBA + random_number_generator() % (max_LBA - min_LBA + 1), 1, time);
-		time += time_breaks;
+		time += 1;
 	} else {
 		event = NULL;
 	}

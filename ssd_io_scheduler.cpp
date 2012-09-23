@@ -80,9 +80,9 @@ IOScheduler *IOScheduler::instance()
 }
 
 
-inline bool bus_wait_time_comparator (const Event* i, const Event* j) {
+/*inline bool bus_wait_time_comparator (const Event* i, const Event* j) {
 	return i->get_bus_wait_time() < j->get_bus_wait_time();
-}
+}*/
 
 // assumption is that all events within an operation have the same LBA
 void IOScheduler::schedule_events_queue(deque<Event*> events) {

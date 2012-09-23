@@ -55,7 +55,8 @@ Event* File_Manager::issue_write() {
 	if (ENABLE_TAGGING) {
 		event->set_tag(current_file->id);
 	}
-	time += time_breaks;
+	//time += time_breaks;
+	time += 1;
 	return event;
 }
 
