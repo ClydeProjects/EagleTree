@@ -199,7 +199,7 @@ extern uint MAX_REPEATED_COPY_BACKS_ALLOWED;
 extern uint MAX_ITEMS_IN_COPY_BACK_MAP;
 
 /* Defines the maximal length of the SSD queue  */
-extern uint MAX_SSD_QUEUE_SIZE;
+extern int MAX_SSD_QUEUE_SIZE;
 
 /* Defines the maximal number of locks that can be held by the OS  */
 extern uint MAX_OS_NUM_LOCKS;
@@ -1705,6 +1705,9 @@ public:
 	void set_time(double current_time) {
 		time = current_time;
 	}
+	double get_time() {
+		return time;
+	}
 	virtual void print_thread_stats();
 	void add_follow_up_thread(Thread* thread) {
 		threads_to_start_when_this_thread_finishes.push_back(thread);
@@ -1953,7 +1956,7 @@ public:
 	void set_num_writes_to_stop_after(long num_writes);
 	double get_total_runtime() const;
 private:
-	int pick_event_with_shortest_start_time();
+	int pick_unlocked_event_with_shortest_start_time();
 	void dispatch_event(int thread_id);
 	double get_event_minimal_completion_time(Event const*const event) const;
 	bool is_LBA_locked(ulong lba);
@@ -1974,7 +1977,7 @@ private:
 	double last_dispatched_event_minimal_finish_time;
 
 	set<uint> currently_executing_ios;
-	long num_writes_to_stop_after;
+	long NUM_WRITES_TO_STOP_AFTER;
 	long num_writes_completed;
 
 	double time_of_last_event_completed;

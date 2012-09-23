@@ -303,11 +303,12 @@ void Event::print(FILE *stream) const
 
 	fprintf(stream, "%d\t", logical_address);
 	address.print(stream);
-	if(type == MERGE)
-		merge_address.print(stream);
-	if(type == WRITE || type == TRIM || type == COPY_BACK)
-		replace_address.print(stream);
-	fprintf(stream, " Time[%d, %d, %d, %d]", (int)start_time, (int)get_ssd_submission_time(), (int)get_current_time(), (int)bus_wait_time);
+	//if(type == MERGE)
+		//merge_address.print(stream);
+	//if(type == WRITE || type == TRIM || type == COPY_BACK)
+		//replace_address.print(stream);
+	//fprintf(stream, " Time[%d, %d, %d, %d]", (int)start_time, (int)get_ssd_submission_time(), (int)get_current_time(), (int)bus_wait_time);
+	fprintf(stream, "\tTime[%d, %d, %d, %d, %d]", (int)start_time, (int)os_wait_time, (int)bus_wait_time,(int) bus_wait_time + (int)os_wait_time, (int) get_current_time());
 	fprintf(stream, " ID: %d ", id);
 	fprintf(stream, " appID: %d", application_io_id);
 

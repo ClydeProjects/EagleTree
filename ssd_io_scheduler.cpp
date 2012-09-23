@@ -346,6 +346,9 @@ void IOScheduler::handle_noop_events(vector<Event*>& events) {
 			dependents.pop_front();
 			ssd.register_event_completion(e);
 		}
+		if (event->is_original_application_io()) {
+			printf("NOOPED APP IO:  "); event->print();
+		}
 		dependencies.erase(dependency_code);
 		dependency_code_to_LBA.erase(dependency_code);
 		dependency_code_to_type.erase(dependency_code);

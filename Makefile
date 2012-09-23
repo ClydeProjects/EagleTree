@@ -56,7 +56,7 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
-all: gc_priorities gc_tuning sequential load_balancing
+all: sequential 
 
 gc_priorities: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o gc_priorities exp_gc_priorities.cpp $(OBJ)

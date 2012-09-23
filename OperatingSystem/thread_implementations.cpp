@@ -94,8 +94,9 @@ Event* Asynchronous_Sequential_Thread::issue_next_io() {
 	if (number_of_times_to_repeat == 0 || finished_round) {
 		return NULL;
 	}
+	//time += 1;
 	Event* e = new Event(type, min_LBA + offset, 1, time);
-	time += time_breaks;
+	time += 1;
 	if (min_LBA + offset++ == max_LBA) {
 		finished_round = true;
 	}
