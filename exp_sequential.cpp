@@ -46,6 +46,8 @@ vector<Thread*> basic_sequential_experiment(int highest_lba, double IO_submissio
 
 	t1->add_follow_up_thread(new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1));
 
+	//t1->add_follow_up_thread(new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 1, 2));
+
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(log_space_per_thread + 1, log_space_per_thread * 2, 50000, 2, WRITE, IO_submission_rate * 2, 1));
 
 
@@ -58,7 +60,7 @@ vector<Thread*> basic_sequential_experiment(int highest_lba, double IO_submissio
 
 vector<Thread*> sequential_tagging(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = false;
+	GREEDY_GC = true;
 	ENABLE_TAGGING = true;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 0;
@@ -139,16 +141,16 @@ int main()
 		BLOCK_ERASE_DELAY = 150;
 	}
 
-	int IO_limit = 50000;
+	int IO_limit = 100000;
 	int space_min = 70;
-	int space_max = 90;
+	int space_max = 95;
 	int space_inc = 5;
 
 	double start_time = Experiment_Runner::wall_clock_time();
 
 
 	PRINT_LEVEL = 0;
-	MAX_SSD_QUEUE_SIZE = 10;
+	MAX_SSD_QUEUE_SIZE = 15;
 
 	vector<ExperimentResult> exp;
 

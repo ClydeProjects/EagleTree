@@ -8,7 +8,7 @@ Wearwolf_Locality::Wearwolf_Locality(Ssd& ssd, FtlParent& ftl)
 	: Wearwolf(ssd, ftl),
 	  seq_write_key_to_pointers_mapping(),
 	  detector(new Sequential_Pattern_Detector(WEARWOLF_LOCALITY_THRESHOLD)),
-	  strat(ROUND_ROBIN),
+	  strat(SHOREST_QUEUE),
 	  random_number_generator(1111)
 {
 	parallel_degree = LOCALITY_PARALLEL_DEGREE == 0 ? ONE : LOCALITY_PARALLEL_DEGREE == 1 ? CHANNEL : LUN;
