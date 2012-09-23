@@ -63,9 +63,11 @@ StatisticsGatherer *StatisticsGatherer::get_instance()
 void StatisticsGatherer::register_completed_event(Event const& event) {
 	uint current_window = floor(event.get_current_time() / io_counter_window_size);
 	while (application_io_history.size() < current_window+1) application_io_history.push_back(0);
-	while (non_application_io_history.size() < current_window+1) non_application_io_history.push_back(0);
-	if (event.is_original_application_io()) application_io_history[current_window]++;
-	else non_application_io_history[current_window]++;
+	while (non_application_io_history.size() < current_window+1)non_application_io_history.push_back(0);
+	if (event.get_event_type() != READ_COMMAND) {
+		if (event.is_original_application_io()) application_io_history[current_window]++;
+		else non_application_io_history[current_window]++;
+	}
 
 	Address a = event.get_address();
 	if (event.get_event_type() == WRITE) {

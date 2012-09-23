@@ -1670,11 +1670,11 @@ private:
 	vector<vector<uint> > num_executed_gc_ops;
 	vector<vector<uint> > num_live_pages_in_gc_exec;
 
-	static const double wait_time_histogram_bin_size = 250;
+	static const double wait_time_histogram_bin_size = 100;
 	static const double age_histogram_bin_size = 1;
 	map<double, uint> wait_time_histogram;
 
-	static const double io_counter_window_size = 100;
+	static const double io_counter_window_size = 1000;
 	vector<uint> application_io_history;
 	vector<uint> non_application_io_history;
 
