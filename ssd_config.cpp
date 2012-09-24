@@ -174,6 +174,8 @@ uint RAID_NUMBER_OF_PHYSICAL_SSDS = 0;
 
 bool PRIORITISE_GC = true;
 
+bool USE_ERASE_QUEUE = false;
+
 /*
  * Block manager
  * 0 -> Shortest Queues

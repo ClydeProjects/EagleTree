@@ -209,6 +209,8 @@ extern uint LOCALITY_PARALLEL_DEGREE;
 
 extern bool PRIORITISE_GC;
 
+extern bool USE_ERASE_QUEUE;
+
 /* Enumerations to clarify status integers in simulation
  * Do not use typedefs on enums for reader clarity */
 
@@ -301,7 +303,6 @@ class Ssd;
 
 class IOScheduler;
 
-class Block_manager;
 class Block_manager_parent;
 class Block_manager_parallel;
 class Shortest_Queue_Hot_Cold_BM;
@@ -979,11 +980,12 @@ private:
 	void issue_erase(Address a, double time);
 	void remove_as_gc_candidate(Address const& phys_address);
 	void Wear_Level(Event const& event);
-
+	int get_num_free_blocks(int package, int die);
 	bool copy_back_allowed_on(long logical_address);
 	Address reserve_page_on(uint package, uint die, double time);
 	void register_copy_back_operation_on(uint logical_address);
 	void register_ECC_check_on(uint logical_address);
+	bool schedule_queued_erase(Address location);
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 	bool greedy_gc;
@@ -1001,6 +1003,9 @@ private:
 
 	pair<bool, pair<int, int> > last_get_free_block_pointer_with_shortest_IO_queue_result;
 	bool IO_has_completed_since_last_shortest_queue_search;
+
+	vector<vector<queue<Event*> > > erase_queue;
+	vector<vector<int> > num_erases_scheduled;
 };
 
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation
@@ -2032,7 +2037,6 @@ public:
 	static void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command, vector<string> histogram_commands);
 	static double calibrate_IO_submission_rate_queue_based(int highest_lba, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
 	static double measure_throughput(int highest_lba, double IO_submission_rate, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
-	static double calibrate_IO_submission_rate_throughput_based(int highest_lba, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
 	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments);
 	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, ExperimentResult experiment);
 	static void waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
