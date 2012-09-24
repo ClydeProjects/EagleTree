@@ -1689,8 +1689,6 @@ private:
 	long num_gc_targeting_package;
 	long num_gc_targeting_class;
 	long num_gc_targeting_anything;
-
-
 };
 
 class Thread
@@ -2045,6 +2043,7 @@ public:
 
 	static ExperimentResult overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
 	static ExperimentResult copyback_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
+	static ExperimentResult copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);
 
 private:
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
