@@ -100,7 +100,7 @@ int main()
 	string exp_folder  = "exp_copyback_map/";
 	mkdir(exp_folder.c_str(), 0755);
 
-	bool debug = true;
+	bool debug = false;
 
 	load_config();
 
@@ -129,8 +129,8 @@ int main()
 		SSD_SIZE = 4;
 		PACKAGE_SIZE = 2;
 		DIE_SIZE = 1;
-		PLANE_SIZE = 128;
-		BLOCK_SIZE = 32;
+		PLANE_SIZE = 128 * 8;
+		BLOCK_SIZE = 32 * 2;
 
 		PAGE_READ_DELAY = 5;
 		PAGE_WRITE_DELAY = 20;
@@ -143,7 +143,7 @@ int main()
 
 	printf("Number of addressable blocks: %d\n", NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE);
 
-	int IO_limit = 100000;//NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 3;
+	int IO_limit = 100000 * 16;//NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 3;
 	int used_space = 85;
 	int cb_map_min = 0;
 	int cb_map_max = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;

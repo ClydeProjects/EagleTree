@@ -69,7 +69,8 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	uint current_window = floor(event.get_current_time() / io_counter_window_size);
 	while (application_io_history.size() < current_window+1) application_io_history.push_back(0);
 	while (non_application_io_history.size() < current_window+1)non_application_io_history.push_back(0);
-	if (event.get_event_type() != READ_COMMAND) {
+	if (event.get_event_type() != READ_COMMAND && event.get_event_type() != TRIM) {
+		//if (event.is_original_application_io()) { printf("W:%d: ", current_window); event.print(); }
 		if (event.is_original_application_io()) application_io_history[current_window]++;
 		else non_application_io_history[current_window]++;
 	}
@@ -77,9 +78,9 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	Address a = event.get_address();
 	if (event.get_event_type() == WRITE) {
 		sum_bus_wait_time_for_writes_per_LUN[a.package][a.die] += event.get_latency();
-		bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_latency());
 		if (event.is_original_application_io()) {
 			num_writes_per_LUN[a.package][a.die]++;
+			bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_latency());
 		} else if (event.is_garbage_collection_op()) {
 			Address replace_add = event.get_replace_address();
 			num_gc_writes_per_LUN_origin[replace_add.package][replace_add.die]++;
@@ -105,7 +106,8 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	}
 
 	map<double, uint>& wait_time_histogram = (event.is_original_application_io() ? wait_time_histogram_appIOs : wait_time_histogram_non_appIOs);
-	wait_time_histogram[ceil((max(0.0, event.get_latency() - wait_time_histogram_bin_size / 2)) / wait_time_histogram_bin_size)*wait_time_histogram_bin_size]++;
+	double bucket = ceil(max(0.0, event.get_latency() - wait_time_histogram_bin_size / 2) / wait_time_histogram_bin_size)*wait_time_histogram_bin_size;
+	wait_time_histogram[bucket]++;
 }
 
 void StatisticsGatherer::register_scheduled_gc(Event const& gc) {
@@ -491,8 +493,8 @@ string StatisticsGatherer::totals_csv_line() {
 			gc_wait_time_population += gc_wait_time_per_LUN[i][j].size();
 		}
 	}
-	stddev_overall_write_wait_time = sqrt(stddev_overall_write_wait_time / read_wait_time_population);
-	stddev_overall_read_wait_time = sqrt(stddev_overall_read_wait_time / write_wait_time_population);
+	stddev_overall_write_wait_time = sqrt(stddev_overall_write_wait_time / write_wait_time_population);
+	stddev_overall_read_wait_time = sqrt(stddev_overall_read_wait_time / read_wait_time_population);
 	stddev_overall_gc_wait_time = sqrt(stddev_overall_gc_wait_time / gc_wait_time_population);
 
 	stringstream ss;
