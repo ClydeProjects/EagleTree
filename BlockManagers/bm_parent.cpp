@@ -33,8 +33,8 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
    num_blocks_being_garbaged_collected_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
    order_randomiser(),
    IO_has_completed_since_last_shortest_queue_search(true),
-   erase_queue(SSD_SIZE, vector<queue< Event*> >(PACKAGE_SIZE, queue<Event*>())),
-   num_erases_scheduled(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0))
+   erase_queue(SSD_SIZE, queue< Event*>()),
+   num_erases_scheduled_per_package(SSD_SIZE, 0)
 {
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		Package& package = ssd.getPackages()[i];
@@ -91,8 +91,19 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	a.valid = PAGE;
 	a.page = 0;
 
-	assert(num_erases_scheduled[a.package][a.die] > 0);
-	num_erases_scheduled[a.package][a.die]--;
+	if (USE_ERASE_QUEUE) {
+		assert(num_erases_scheduled_per_package[a.package] == 1);
+		num_erases_scheduled_per_package[a.package]--;
+		assert(num_erases_scheduled_per_package[a.package] == 0);
+
+		if (erase_queue[a.package].size() > 0) {
+			Event* new_erase = erase_queue[a.package].front();
+			new_erase->set_start_time(event.get_current_time());
+			erase_queue[a.package].pop();
+			num_erases_scheduled_per_package[a.package]++;
+			IOScheduler::instance()->schedule_event(new_erase);
+		}
+	}
 
 	uint age_class = sort_into_age_class(a);
 	free_blocks[a.package][a.die][age_class].push_back(a);
@@ -183,12 +194,12 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 			if (has_free_pages(free_pointer)) {
 				free_block_pointers[ba.package][ba.die] = free_pointer;
 			}
-			else if (erase_queue[ba.package][ba.die].size() > 0) {
-				Event* erase = erase_queue[ba.package][ba.die].front();
-				erase_queue[ba.package][ba.die].pop();
-				num_erases_scheduled[ba.package][ba.die]++;
+			/*else if (erase_queue[ba.package].size() > 0) {
+				Event* erase = erase_queue[ba.package].front();
+				erase_queue[ba.package].pop();
+				num_erases_scheduled_per_package[ba.package]++;
 				IOScheduler::instance()->schedule_event(erase);
-			}
+			}*/
 			else { // If no free pointer could be found, schedule GC
 				//schedule_gc(event.get_current_time(), ba.package, ba.die);
 
@@ -281,14 +292,15 @@ void Block_manager_parent::issue_erase(Address ra, double time) {
 		printf("\n");
 	}
 
+	//int num_free_blocks = get_num_free_blocks(ra.package, ra.die);
+	//assert(num_erases_scheduled_per_package[ra.package] <= 1 && num_erases_scheduled_per_package[ra.package] >= 0);
+	bool there_is_already_at_least_one_erase_scheduled_on_this_channel = num_erases_scheduled_per_package[ra.package] > 0;
 
-	int num_free_blocks = get_num_free_blocks(ra.package, ra.die);
-	bool there_is_already_at_least_one_erase_scheduled_on_this_LUN = num_erases_scheduled[ra.package][ra.die] > 0;
-	if (USE_ERASE_QUEUE && there_is_already_at_least_one_erase_scheduled_on_this_LUN && num_free_blocks > 0 /*&&  has_free_pages(free_block_pointers[ra.package][ra.die]) */) {
-		erase_queue[ra.package][ra.die].push(erase);
+	if (USE_ERASE_QUEUE && there_is_already_at_least_one_erase_scheduled_on_this_channel /* && num_free_blocks > 0 &&  has_free_pages(free_block_pointers[ra.package][ra.die]) */) {
+		erase_queue[ra.package].push(erase);
 	}
 	else {
-		num_erases_scheduled[ra.package][ra.die]++;
+		num_erases_scheduled_per_package[ra.package]++;
 		IOScheduler::instance()->schedule_event(erase);
 	}
 }
@@ -474,7 +486,7 @@ struct block_valid_pages_comparator_wearwolf {
 	}
 };
 
-bool Block_manager_parent::schedule_queued_erase(Address location) {
+/*bool Block_manager_parent::schedule_queued_erase(Address location) {
 	int package = location.package;
 	int die = location.die;
 	if (location.valid == DIE && erase_queue[package][die].size() > 0) {
@@ -506,7 +518,7 @@ bool Block_manager_parent::schedule_queued_erase(Address location) {
 		}
 	}
 	return false;
-}
+}*/
 
 // schedules a garbage collection operation to occur at a given time, and optionally for a given channel, LUN or age class
 // the block to be reclaimed is chosen when the gc operation is initialised
@@ -520,11 +532,6 @@ void Block_manager_parent::schedule_gc(double time, int package_id, int die_id, 
 		address.valid = PACKAGE;
 	} else {
 		address.valid = DIE;
-	}
-
-	bool scheduled_erase_successfully = schedule_queued_erase(address);
-	if (scheduled_erase_successfully) {
-		return;
 	}
 
 	Event *gc = new Event(GARBAGE_COLLECTION, 0, BLOCK_SIZE, time);
@@ -655,13 +662,20 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	Address a = gc_event->get_address();
 
+	vector<deque<Event*> > migrations;
+
+	/*bool scheduled_erase_successfully = schedule_queued_erase(a);
+	if (scheduled_erase_successfully) {
+		return migrations;
+	}*/
+
 	int die_id = a.valid >= DIE ? a.die : -1;
 	int package_id = a.valid >= PACKAGE ? a.package : -1;
 
 	vector<long> candidates = get_relevant_gc_candidates(package_id, die_id, gc_event->get_age_class());
 	Block * victim = choose_gc_victim(candidates);
 
-	vector<deque<Event*> > migrations;
+
 
 	StatisticsGatherer::get_instance()->register_scheduled_gc(*gc_event);
 

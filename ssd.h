@@ -1004,8 +1004,8 @@ private:
 	pair<bool, pair<int, int> > last_get_free_block_pointer_with_shortest_IO_queue_result;
 	bool IO_has_completed_since_last_shortest_queue_search;
 
-	vector<vector<queue<Event*> > > erase_queue;
-	vector<vector<int> > num_erases_scheduled;
+	vector<queue<Event*> > erase_queue;
+	vector<int> num_erases_scheduled_per_package;
 };
 
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation

@@ -62,6 +62,11 @@ StatisticsGatherer *StatisticsGatherer::get_instance()
 }
 
 void StatisticsGatherer::register_completed_event(Event const& event) {
+
+	/*if (event.get_latency() > 2568) {
+		event.print();
+	}*/
+
 	uint current_window = floor(event.get_current_time() / io_counter_window_size);
 	while (application_io_history.size() < current_window+1) application_io_history.push_back(0);
 	while (non_application_io_history.size() < current_window+1)non_application_io_history.push_back(0);
@@ -500,6 +505,8 @@ string StatisticsGatherer::totals_csv_line() {
 	ss << avg_overall_gc_wait_time << ", ";
 	ss << total_copy_backs << ", ";
 	ss << total_erases << ", ";
+
+	printf("max latency:  %f\n", all_write_wait_times.back());
 
 	ss << avg_overall_write_wait_time << ", ";  // mean
 	ss << all_write_wait_times.front() << ", "; // min
