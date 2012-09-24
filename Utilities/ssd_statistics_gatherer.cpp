@@ -13,6 +13,10 @@ using namespace ssd;
 
 StatisticsGatherer *StatisticsGatherer::inst = NULL;
 
+const double StatisticsGatherer::wait_time_histogram_bin_size = 100;
+const double StatisticsGatherer::age_histogram_bin_size = 1;
+const double StatisticsGatherer::io_counter_window_size = 1000;
+
 StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
 	:  num_gc_cancelled_no_candidate(0),
 	   num_gc_cancelled_not_enough_free_space(0),

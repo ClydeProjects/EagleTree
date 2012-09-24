@@ -179,6 +179,8 @@ int main()
 
 	Experiment_Runner::graph(sx, sy,   "Latency standard dev", "latency", 15, exp);
 
+    Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram", exp, 90, true);
+
 	for (uint i = 0; i < exp.size(); i++) {
 		printf("%s\n", exp[i].data_folder.c_str());
 		chdir(exp[i].data_folder.c_str());

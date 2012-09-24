@@ -238,7 +238,7 @@ long IOScheduler::get_current_events_size() {
 	long size = 0;
 	map<long, vector<Event*> >::iterator k = current_events.begin();
 	for (; k != current_events.end(); k++) {
-		vector<Event*> events = (*k).second;
+		vector<Event*>& events = (*k).second;
 		size += events.size();
 	}
 	return size;
