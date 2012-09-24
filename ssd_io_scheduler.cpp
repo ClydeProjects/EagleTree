@@ -278,9 +278,22 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
+
+		if (event->get_id() == 140006) {
+			int i = 0;
+			i++;
+			//VisualTracer::get_instance()->print_horizontally_with_breaks();
+		}
+
 		Address result = bm->choose_address(*event);
 		double wait_time = bm->in_how_long_can_this_event_be_scheduled(result, event->get_current_time());
 		if (wait_time == 0 && bm->Copy_backs_in_progress(result)) wait_time = 1; // If copy backs are in progress, keep waiting until they are done
+		bool can_schedule = can_schedule_on_die(event);
+		if (can_schedule == false && wait_time == 0) {
+			int i = 0;
+			i++;
+		}
+		if (!can_schedule) wait_time = 1;
 		if (wait_time == 0) {
 			event->set_address(result);
 			ftl.set_replace_address(*event); // 05-09-2012: Moved to here from init_event (else if (type == WRITE) { ...)
@@ -289,7 +302,6 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 		}
 		else {
 			event->incr_bus_wait_time(wait_time);
-			event->incr_time_taken(wait_time);
 			push_into_current_events(event);
 		}
 	}
@@ -383,15 +395,19 @@ void IOScheduler::handle_next_batch(vector<Event*>& events) {
 		else {
 			double bus_wait_time = can_schedule ? time : 1;
 			event->incr_bus_wait_time(bus_wait_time);
-			event->incr_time_taken(bus_wait_time);
 			push_into_current_events(event);
 		}
-
 	}
 }
 
 enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd.controller.issue(event);
+
+	if (event->get_latency() > 1675 && event->is_original_application_io()) {
+		event->print();
+		VisualTracer::get_instance()->print_horizontally_with_breaks();
+
+	}
 
 	if (PRINT_LEVEL > 0) {
 		event->print();
@@ -405,7 +421,8 @@ enum status IOScheduler::execute_next(Event* event) {
 			LBA_currently_executing.erase(event->get_logical_address());
 			//LBA_currently_executing[dependent->get_logical_address()] = dependent->get_application_io_id();
 			dependent->set_application_io_id(dependency_code);
-			dependent->set_start_time(event->get_current_time());
+			double diff = event->get_current_time() - dependent->get_current_time();
+			dependent->incr_bus_wait_time(diff);
 			dependent->set_noop(event->get_noop());
 			dependencies[dependency_code].pop_front();
 			// The dependent event might have a different LBA and type - record this in bookkeeping maps
@@ -451,7 +468,6 @@ void IOScheduler::manage_operation_completion(Event* event) {
 
 		double diff = event->get_current_time() - dependant_event->get_current_time();
 		dependant_event->incr_bus_wait_time(diff);
-		dependant_event->incr_time_taken(diff);
 		dependencies[dependent_code].pop_front();
 		init_event(dependant_event);
 		//future_events.push_back(dependant_event);
@@ -478,6 +494,14 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	}
 
 	VisualTracer::get_instance()->register_completed_event(*event);
+
+	if (event->get_id() == 140006) {
+			VisualTracer::get_instance()->print_horizontally_with_breaks();
+			event->print();
+			int i = 0;
+			i++;
+		}
+
 	if (event->get_event_type() == WRITE || event->get_event_type() == COPY_BACK) {
 		ftl.register_write_completion(*event, outcome);
 		bm->register_write_outcome(*event, outcome);

@@ -87,14 +87,14 @@ enum status Controller::issue(Event *event)
 	if(event -> get_event_type() == READ_COMMAND)
 	{
 		assert(event -> get_address().valid > NONE);
-		if(ssd.bus.lock(event -> get_address().package, event -> get_start_time(), BUS_CTRL_DELAY, *event) == FAILURE
+		if(ssd.bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY, *event) == FAILURE
 			|| ssd.read(*event) == FAILURE)
 			return FAILURE;
 	}
 	else if(event -> get_event_type() == READ_TRANSFER)
 	{
 		assert(event -> get_address().valid > NONE);
-		if(ssd.bus.lock(event -> get_address().package, event -> get_start_time(), BUS_CTRL_DELAY + BUS_DATA_DELAY, *event) == FAILURE
+		if(ssd.bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY + BUS_DATA_DELAY, *event) == FAILURE
 			|| ssd.ram.write(*event) == FAILURE
 			|| ssd.ram.read(*event) == FAILURE)
 			return FAILURE;
@@ -102,18 +102,18 @@ enum status Controller::issue(Event *event)
 	else if(event -> get_event_type() == WRITE)
 	{
 		assert(event -> get_address().valid > NONE);
-		if(ssd.bus.lock(event -> get_address().package, event -> get_start_time(), 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY, *event) == FAILURE
-			|| ssd.ram.write(*event) == FAILURE
-			|| ssd.ram.read(*event) == FAILURE
-			|| ssd.write(*event) == FAILURE
-			/*|| ssd.replace(*cur) == FAILURE*/)
-			return FAILURE;
+		ssd.bus.lock(event -> get_address().package, event -> get_current_time(), 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY, *event);
+		ssd.ram.write(*event);
+		ssd.ram.read(*event);
+		ssd.write(*event);
+			/*|| ssd.replace(*cur) == FAILURE*/
+		return SUCCESS;
 	}
 	else if(event -> get_event_type() == COPY_BACK)
 	{
 		assert(event -> get_address().valid > NONE);
 		assert(event -> get_replace_address().valid > NONE);
-		if(ssd.bus.lock(event -> get_address().package, event -> get_start_time(), 2 * BUS_CTRL_DELAY + PAGE_READ_DELAY, *event) == FAILURE
+		if(ssd.bus.lock(event -> get_address().package, event -> get_current_time(), 2 * BUS_CTRL_DELAY + PAGE_READ_DELAY, *event) == FAILURE
 			|| ssd.read(*event) == FAILURE
 			|| ssd.write(*event) == FAILURE)
 			return FAILURE;
@@ -121,9 +121,8 @@ enum status Controller::issue(Event *event)
 	else if(event -> get_event_type() == ERASE)
 	{
 		assert(event -> get_address().valid > NONE);
-		if(ssd.bus.lock(event -> get_address().package, event -> get_start_time(), BUS_CTRL_DELAY, *event) == FAILURE
-			|| ssd.erase(*event) == FAILURE)
-			return FAILURE;
+		ssd.bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY, *event);
+		ssd.erase(*event);
 	}
 	else if(event -> get_event_type() == TRIM)
 	{

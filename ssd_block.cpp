@@ -51,7 +51,6 @@ Block::Block(const Plane &parent, uint block_size, ulong erases_remaining, doubl
 
 	/* assume hardware created at time 0 and had an implied free erasure */
 	last_erase_time(0.0),
-	erase_delay(erase_delay),
 
 	modification_time(-1)
 
@@ -122,7 +121,7 @@ enum status Block::write(Event &event)
 		} else {
 			state = ACTIVE;
 		}
-		modification_time = event.get_start_time();
+		modification_time = event.get_current_time();
 
 		//Block_manager::instance()->update_block(this);
 	}
@@ -142,7 +141,7 @@ enum status Block::replace(Event &event)
  * returns 1 for success, 0 for failure */
 enum status Block::_erase(Event &event)
 {
-	assert(data != NULL && erase_delay >= 0.0);
+	assert(data != NULL);
 	uint i;
 
 	if (!event.get_noop())
@@ -160,8 +159,8 @@ enum status Block::_erase(Event &event)
 		}
 
 
-		event.incr_time_taken(erase_delay);
-		last_erase_time = event.get_start_time() + event.get_time_taken();
+		event.incr_execution_time(BLOCK_ERASE_DELAY);
+		last_erase_time = event.get_current_time();
 		erases_remaining--;
 		pages_valid = 0;
 		pages_invalid = 0;

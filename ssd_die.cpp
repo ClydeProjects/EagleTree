@@ -69,8 +69,6 @@ Die::Die(const Package &parent, Channel &channel, uint die_size, long physical_a
 		exit(MEM_ERR);
 	}
 
-
-
 	for(i = 0; i < size; i++)
 		(void) new (&data[i]) Plane(*this, PLANE_SIZE, PLANE_REG_READ_DELAY, PLANE_REG_WRITE_DELAY, physical_address+(PLANE_SIZE*BLOCK_SIZE*i));
 
@@ -94,15 +92,13 @@ enum status Die::read(Event &event)
 {
 	assert(data != NULL);
 	assert(event.get_address().plane < size && event.get_address().valid > DIE);
-	if (event.get_start_time() + event.get_time_taken() < currently_executing_io_finish_time) {
-		return FAILURE;
-	}
+	assert(currently_executing_io_finish_time <= event.get_current_time());
 	if (event.get_event_type() == READ_COMMAND) {
 		last_read_io = event.get_application_io_id();
 	}
 
 	enum status result = data[event.get_address().plane].read(event);
-	currently_executing_io_finish_time = event.get_start_time() + event.get_time_taken();
+	currently_executing_io_finish_time = event.get_current_time();
 	return result;
 }
 
@@ -110,9 +106,7 @@ enum status Die::write(Event &event)
 {
 	assert(data != NULL);
 	assert(event.get_address().plane < size && event.get_address().valid > DIE);
-	if (event.get_start_time() + event.get_time_taken() < currently_executing_io_finish_time) {
-		return FAILURE;
-	}
+	assert(currently_executing_io_finish_time <= event.get_current_time());
 	//last_read_io = event.get_application_io_id();
 	enum status result = data[event.get_address().plane].write(event);
 	currently_executing_io_finish_time = event.get_current_time();
@@ -135,9 +129,8 @@ enum status Die::erase(Event &event)
 	assert(data != NULL);
 	assert(event.get_address().plane < size && event.get_address().valid > DIE);
 
-	if (event.get_start_time() + event.get_time_taken() < currently_executing_io_finish_time) {
-		return FAILURE;
-	}
+	assert(currently_executing_io_finish_time <= event.get_current_time());
+
 	//last_read_io = event.get_application_io_id();
 	enum status status = data[event.get_address().plane].erase(event);
 	currently_executing_io_finish_time = event.get_current_time();

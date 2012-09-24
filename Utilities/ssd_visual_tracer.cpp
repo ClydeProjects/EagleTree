@@ -43,14 +43,14 @@ void VisualTracer::register_completed_event(Event const& event) {
 	}
 	Address add = event.get_address();
 
-	int i = event.get_current_time() - trace[add.package][add.die].size();
+	int i = event.get_current_time() - event.get_execution_time() - trace[add.package][add.die].size();
 	write(add.package, add.die, ' ', i);
 
 	event_type type = event.get_event_type();
 	if (type == WRITE) {
 		write(add.package, add.die, 't', 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY);
 		vector<vector<char> > symbols;
-		vector<char> logical_address = get_int_as_char_vector(event.get_logical_address());
+		vector<char> logical_address = get_int_as_char_vector(event.get_id());
 		symbols.push_back(logical_address);
 		if (event.is_garbage_collection_op()) {
 			vector<char> gc_symbol(2);

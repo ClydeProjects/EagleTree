@@ -120,7 +120,7 @@ bool FtlImpl_DftlParent::lookup_CMT(long dlpn, Event *event)
 	if (!trans_map[dlpn].cached)
 		return false;
 
-	event->incr_time_taken(RAM_READ_DELAY);
+	event->incr_execution_time(RAM_READ_DELAY);
 	controller.stats.numMemoryRead++;
 
 	return true;

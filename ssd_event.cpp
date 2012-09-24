@@ -37,7 +37,7 @@ uint Event::application_io_id_generator = 0;
 /* see "enum event_type" in ssd.h for details on event types */
 Event::Event(enum event_type type, ulong logical_address, uint size, double start_time):
 	start_time(start_time),
-	time_taken(0.0),
+	execution_time(0.0),
 	bus_wait_time(0.0),
 	os_wait_time(0.0),
 	type(type),
@@ -63,7 +63,7 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 
 Event::Event(Event& event) :
 	start_time(event.start_time),
-	time_taken(event.time_taken),
+	execution_time(event.execution_time),
 	bus_wait_time(event.bus_wait_time),
 	os_wait_time(0.0),
 	type(event.type),
@@ -308,7 +308,7 @@ void Event::print(FILE *stream) const
 		//merge_address.print(stream);
 	//if(type == WRITE || type == TRIM || type == COPY_BACK)
 		//replace_address.print(stream);
-	fprintf(stream, " Time[%d, %d, %d, %d]", (int)start_time, (int)os_wait_time, (int)bus_wait_time, (int)get_current_time());
+	fprintf(stream, " Time[%d, %d, %d, %d, %d]", (int)start_time, (int)os_wait_time, (int)bus_wait_time, (int)execution_time, (int)get_current_time());
 	//fprintf(stream, "\tTime[%d, %d, %d, %d]", (int)start_time, (int) (start_time + os_wait_time),(int) bus_wait_time + (int)os_wait_time, (int) get_current_time());
 	fprintf(stream, " ID: %d ", id);
 	fprintf(stream, " appID: %d", application_io_id);

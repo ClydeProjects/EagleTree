@@ -139,7 +139,7 @@ enum status Channel::lock(double start_time, double duration, Event& event) {
 		}
 	}
 
-	event.incr_time_taken(duration);
+	event.incr_execution_time(duration);
 
 	return SUCCESS;
 }

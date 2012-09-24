@@ -93,6 +93,8 @@ void OperatingSystem::run() {
 		//printf("num_writes   %d\n", num_writes_completed);
 	} while (!finished_experiment && still_more_work);
 	//VisualTracer::get_instance()->print_horizontally_with_breaks();
+	int i = 0;
+	i++;
 }
 
 int OperatingSystem::pick_unlocked_event_with_shortest_start_time() {
@@ -198,7 +200,6 @@ void OperatingSystem::register_event_completion(Event* event) {
 				if (e != NULL) {
 					double diff = event->get_current_time() - e->get_start_time() ;
 					e->incr_os_wait_time(diff);
-					e->incr_time_taken(diff);
 				}
 			}
 		}

@@ -109,7 +109,7 @@ Address Simple_Page_Hotness_Measurer::get_die_with_least_WC(enum read_hotness rh
 void Simple_Page_Hotness_Measurer::register_event(Event const& event) {
 	enum event_type type = event.get_event_type();
 	assert(type == WRITE || type == READ_COMMAND);
-	double time = event.get_start_time() + event.get_time_taken();
+	double time = event.get_current_time();
 	ulong page_address = event.get_logical_address();
 	if (type == WRITE) {
 		write_current_count[page_address]++;

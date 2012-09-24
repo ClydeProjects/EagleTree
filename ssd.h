@@ -455,8 +455,8 @@ public:
 	inline double get_start_time() const { assert(start_time >= 0.0); return start_time; }
 	inline bool is_original_application_io() const { return original_application_io; }
 	inline void set_original_application_io(bool val) { original_application_io = val; }
-	inline double get_time_taken() const { assert(time_taken >= 0.0); return time_taken; }
-	inline double get_current_time() const { return start_time + time_taken; }
+	inline double get_execution_time() const { assert(execution_time >= 0.0); return execution_time; }
+	inline double get_current_time() const { return start_time + os_wait_time + bus_wait_time + execution_time; }
 	inline double get_ssd_submission_time() const { return start_time + os_wait_time; }
 	inline uint get_application_io_id() const { return application_io_id; }
 	inline double get_bus_wait_time() const { assert(bus_wait_time >= 0.0); return bus_wait_time; }
@@ -475,7 +475,6 @@ public:
 	inline void set_merge_address(const Address &address) { merge_address = address; }
 	inline void set_log_address(const Address &address) { log_address = address; }
 	inline void set_replace_address(const Address &address) { replace_address = address; }
-	inline void set_start_time(double value) { assert(value > 0); start_time = value; }
 	inline void set_payload(void *payload) { this->payload = payload; }
 	inline void set_event_type(const enum event_type &type) { this->type = type; }
 	inline void set_noop(bool value) { noop = value; }
@@ -489,13 +488,13 @@ public:
 	inline void *get_payload() const { return payload; }
 	inline double incr_bus_wait_time(double time_incr) { if(time_incr > 0.0) bus_wait_time += time_incr; return bus_wait_time; }
 	inline double incr_os_wait_time(double time_incr) { if(time_incr > 0.0) os_wait_time += time_incr; return os_wait_time; }
-	inline double incr_time_taken(double time_incr) { if(time_incr > 0.0) time_taken += time_incr; return time_taken; }
+	inline double incr_execution_time(double time_incr) { if(time_incr > 0.0) execution_time += time_incr; return execution_time; }
 	double get_best_case_finish_time();
 	void print(FILE *stream = stdout) const;
 	static void reset_id_generators();
 private:
 	double start_time;
-	double time_taken;
+	double execution_time;
 	double bus_wait_time;
 	double os_wait_time;
 	enum event_type type;
@@ -610,8 +609,6 @@ public:
 private:
 	enum page_state state;
 	const Block &parent;
-	double read_delay;
-	double write_delay;
 };
 
 /* The block is the data storage hardware unit where erases are implemented.
@@ -653,7 +650,7 @@ private:
 	enum block_state state;
 	ulong erases_remaining;
 	double last_erase_time;
-	double erase_delay;
+	//double erase_delay;
 	double modification_time;
 
 	block_type btype;
@@ -936,7 +933,7 @@ public:
 	virtual Address choose_address(Event const& write);
 	virtual void register_write_arrival(Event const& write);
 	virtual void trim(Event const& write);
-	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double time_taken) const;
+	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double current_time) const;
 	vector<deque<Event*> > migrate(Event * gc_event);
 	bool Copy_backs_in_progress(Address const& address);
 

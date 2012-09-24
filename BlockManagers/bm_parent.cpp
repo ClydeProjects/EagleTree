@@ -98,7 +98,8 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 
 		if (erase_queue[a.package].size() > 0) {
 			Event* new_erase = erase_queue[a.package].front();
-			new_erase->set_start_time(event.get_current_time());
+			double diff = event.get_current_time() - new_erase->get_current_time();
+			new_erase->incr_bus_wait_time(diff);
 			erase_queue[a.package].pop();
 			num_erases_scheduled_per_package[a.package]++;
 			IOScheduler::instance()->schedule_event(new_erase);
@@ -464,7 +465,7 @@ bool Block_manager_parent::Copy_backs_in_progress(Address const& addr) {
 }
 
 // gives time until both the channel and die are clear
-double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& address, double time_taken) const {
+double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& address, double event_time) const {
 	if (address.valid == NONE) {
 		return 1;
 	}
@@ -474,7 +475,8 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 	double channel_finish_time = ssd.bus.get_channel(package_id).get_currently_executing_operation_finish_time();
 	double die_finish_time = ssd.getPackages()[package_id].getDies()[die_id].get_currently_executing_io_finish_time();
 	double max = std::max(channel_finish_time, die_finish_time);
-	double time = max - time_taken;
+
+	double time = max - event_time;
 	return time < 0 ? 0 : time;
 }
 

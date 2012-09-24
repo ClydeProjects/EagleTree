@@ -58,13 +58,13 @@ Ram::~Ram(void)
 enum status Ram::read(Event &event)
 {
 	assert(read_delay >= 0.0);
-	(void) event.incr_time_taken(read_delay /* * event.get_size() */);
+	(void) event.incr_execution_time(read_delay /* * event.get_size() */);
 	return SUCCESS;
 }
 
 enum status Ram::write(Event &event)
 {
 	assert(write_delay >= 0.0);
-	(void) event.incr_time_taken(write_delay /* * event.get_size()*/);
+	(void) event.incr_execution_time(write_delay /* * event.get_size()*/);
 	return SUCCESS;
 }

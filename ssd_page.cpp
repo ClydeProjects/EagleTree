@@ -42,32 +42,14 @@ using namespace ssd;
 
 Page::Page(const Block &parent, double read_delay, double write_delay):
 	state(EMPTY),
-	parent(parent),
-	read_delay(read_delay),
-	write_delay(write_delay)
-{
-	if(read_delay < 0.0){
-		fprintf(stderr, "Page warning: %s: constructor received negative read delay value\n\tsetting read delay to 0.0\n", __func__);
-		this -> read_delay = 0.0;
-	}
+	parent(parent)
+{}
 
-	if(write_delay < 0.0){
-		fprintf(stderr, "Page warning: %s: constructor received negative write delay value\n\tsetting write delay to 0.0\n", __func__);
-		this -> write_delay = 0.0;
-	}
-	return;
-}
-
-Page::~Page(void)
-{
-	return;
-}
+Page::~Page() {}
 
 enum status Page::_read(Event &event)
 {
-	assert(read_delay >= 0.0);
-
-	event.incr_time_taken(read_delay);
+	event.incr_execution_time(PAGE_READ_DELAY);
 
 	if (!event.get_noop() && PAGE_ENABLE_DATA)
 		global_buffer = (char*)page_data + event.get_address().get_linear_address() * PAGE_SIZE;
@@ -77,9 +59,7 @@ enum status Page::_read(Event &event)
 
 enum status Page::_write(Event &event)
 {
-	assert(write_delay >= 0.0);
-
-	event.incr_time_taken(write_delay);
+	event.incr_execution_time(PAGE_WRITE_DELAY);
 
 	if (PAGE_ENABLE_DATA && event.get_payload() != NULL && event.get_noop() == false)
 	{
