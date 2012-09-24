@@ -32,7 +32,7 @@
 # classes.  It is suggested to test with the "test" make target first.
 
 CC = /usr/bin/gcc
-CFLAGS = -Wall -Wextra -g
+CFLAGS = -Wall -Wextra -g -O2
 CXX = /usr/bin/g++
 CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
@@ -56,7 +56,12 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
-all: sequential 
+all: erase_queues 
+
+erase_queues: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o erase_queues exp_erase_queues.cpp $(OBJ)
+	-chmod $(PERMS) $(OBJ)
+	-chmod $(EPERMS) erase_queues
 
 gc_priorities: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o gc_priorities exp_gc_priorities.cpp $(OBJ)
@@ -95,7 +100,7 @@ trace: $(HDR) $(OBJ)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 clean:
-	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2)
+	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) erase_queues
 
 files:
 	echo $(SRC) $(HDR)
