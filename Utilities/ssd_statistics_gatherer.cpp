@@ -533,9 +533,6 @@ string StatisticsGatherer::histogram_csv(map<double, uint> histogram) {
 
 string StatisticsGatherer::stacked_histogram_csv(vector<map<double, uint> > histograms, vector<string> names) {
 	stringstream ss;
-	for (map<double, uint>::iterator it = histograms[0].begin(); it != histograms[0].end(); it++) {
-		printf("REAL %f : %d\n", it->first, it->second);
-	}
 	ss << "\"Interval\"";
 	for (uint i = 0; i < names.size(); i++) ss << ", \"" << names[i] << "\"";
 	ss << "\n";
@@ -554,11 +551,9 @@ string StatisticsGatherer::stacked_histogram_csv(vector<map<double, uint> > hist
 		}
 		if (minimum == numeric_limits<double>::max()) the_end = true;
 		else {
-			printf("MIN:%f\n",minimum);
 			ss << minimum;
 			for (uint i = 0; i < its.size(); i++) {
 				ss << ", " << histograms[i][minimum];
-				printf("%d: %f-%d\n", i, minimum, histograms[i][minimum]);
 				if (its[i]->first == minimum && its[i] != histograms[i].end()) {
 					its[i]++;
 				}
