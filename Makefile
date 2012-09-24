@@ -56,7 +56,7 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
-all: sequential copyback_map
+all: sequential copyback_map gc_tuning
 
 copyback_map: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o copyback_map exp_copyback_map.cpp $(OBJ)

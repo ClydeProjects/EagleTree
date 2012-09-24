@@ -37,7 +37,7 @@
 
 using namespace ssd;
 
-static const bool GRAPH_TITLES = false;
+static const bool GRAPH_TITLES = true;
 
 const string Experiment_Runner::markers[] = {"circle", "square", "triangle", "diamond", "cross", "plus", "star", "star2", "star3", "star4", "flower"};
 
