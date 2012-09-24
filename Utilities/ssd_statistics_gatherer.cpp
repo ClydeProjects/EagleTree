@@ -72,9 +72,9 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	Address a = event.get_address();
 	if (event.get_event_type() == WRITE) {
 		sum_bus_wait_time_for_writes_per_LUN[a.package][a.die] += event.get_latency();
-		bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_latency());
 		if (event.is_original_application_io()) {
 			num_writes_per_LUN[a.package][a.die]++;
+			bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_latency());
 		} else if (event.is_garbage_collection_op()) {
 			Address replace_add = event.get_replace_address();
 			num_gc_writes_per_LUN_origin[replace_add.package][replace_add.die]++;
@@ -484,8 +484,8 @@ string StatisticsGatherer::totals_csv_line() {
 			gc_wait_time_population += gc_wait_time_per_LUN[i][j].size();
 		}
 	}
-	stddev_overall_write_wait_time = sqrt(stddev_overall_write_wait_time / read_wait_time_population);
-	stddev_overall_read_wait_time = sqrt(stddev_overall_read_wait_time / write_wait_time_population);
+	stddev_overall_write_wait_time = sqrt(stddev_overall_write_wait_time / write_wait_time_population);
+	stddev_overall_read_wait_time = sqrt(stddev_overall_read_wait_time / read_wait_time_population);
 	stddev_overall_gc_wait_time = sqrt(stddev_overall_gc_wait_time / gc_wait_time_population);
 
 	stringstream ss;
