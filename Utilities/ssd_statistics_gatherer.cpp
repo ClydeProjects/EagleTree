@@ -9,6 +9,7 @@
 using namespace ssd;
 #include <stdio.h>
 #include <sstream>
+#include <algorithm>
 
 StatisticsGatherer *StatisticsGatherer::inst = NULL;
 
@@ -98,6 +99,8 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	} else if (event.get_event_type() == COPY_BACK) {
 		num_copy_backs_per_LUN[a.package][a.die]++;
 	}
+
+	map<double, uint>& wait_time_histogram = (event.is_original_application_io() ? wait_time_histogram_appIOs : wait_time_histogram_non_appIOs);
 	wait_time_histogram[ceil((max(0.0, event.get_latency() - wait_time_histogram_bin_size / 2)) / wait_time_histogram_bin_size)*wait_time_histogram_bin_size]++;
 }
 
@@ -528,6 +531,45 @@ string StatisticsGatherer::histogram_csv(map<double, uint> histogram) {
 	return ss.str();
 }
 
+string StatisticsGatherer::stacked_histogram_csv(vector<map<double, uint> > histograms, vector<string> names) {
+	stringstream ss;
+	for (map<double, uint>::iterator it = histograms[0].begin(); it != histograms[0].end(); it++) {
+		printf("REAL %f : %d\n", it->first, it->second);
+	}
+	ss << "\"Interval\"";
+	for (uint i = 0; i < names.size(); i++) ss << ", \"" << names[i] << "\"";
+	ss << "\n";
+	vector< map<double,uint>::iterator > its;
+	for (vector<map<double,uint> >::iterator it = histograms.begin(); it != histograms.end(); ++it) {
+		its.push_back((*it).begin());
+	}
+	double minimum;
+	bool the_end = false;
+	while (!the_end) {
+		minimum = numeric_limits<double>::max();
+		for (uint i = 0; i < its.size(); i++) {
+			if (its[i] != histograms[i].end()) {
+				minimum = min(minimum, its[i]->first);
+			}
+		}
+		if (minimum == numeric_limits<double>::max()) the_end = true;
+		else {
+			printf("MIN:%f\n",minimum);
+			ss << minimum;
+			for (uint i = 0; i < its.size(); i++) {
+				ss << ", " << histograms[i][minimum];
+				printf("%d: %f-%d\n", i, minimum, histograms[i][minimum]);
+				if (its[i]->first == minimum && its[i] != histograms[i].end()) {
+					its[i]++;
+				}
+			}
+			ss << "\n";
+		}
+	}
+
+	return ss.str();
+}
+
 uint StatisticsGatherer::max_age() {
 	uint max_age = 0;
 	map<double, uint> age_histogram;
@@ -567,6 +609,11 @@ uint StatisticsGatherer::max_age_freq() {
 	return max_age_freq;
 }
 
+double StatisticsGatherer::max_waittime() {
+	return max(wait_time_histogram_appIOs.size()     > 0 ? wait_time_histogram_appIOs.rbegin()->first     : 0,
+               wait_time_histogram_non_appIOs.size() > 0 ? wait_time_histogram_non_appIOs.rbegin()->first : 0);
+}
+
 string StatisticsGatherer::age_histogram_csv() {
 	map<double, uint> age_histogram;
 	for (uint i = 0; i < SSD_SIZE; i++) {
@@ -583,8 +630,18 @@ string StatisticsGatherer::age_histogram_csv() {
 	return histogram_csv(age_histogram);
 }
 
-string StatisticsGatherer::wait_time_histogram_csv() {
-	return histogram_csv(wait_time_histogram);
+string StatisticsGatherer::wait_time_histogram_appIOs_csv() {
+	return histogram_csv(wait_time_histogram_appIOs);
+}
+
+string StatisticsGatherer::wait_time_histogram_all_IOs_csv() {
+	vector<map<double, uint> > histograms;
+	vector<string> names;
+	names.push_back("Application IOs");
+	histograms.push_back(wait_time_histogram_appIOs);
+	names.push_back("Internal operations");
+	histograms.push_back(wait_time_histogram_non_appIOs);
+	return stacked_histogram_csv(histograms, names);
 }
 
 string StatisticsGatherer::queue_length_csv() {
@@ -598,7 +655,7 @@ string StatisticsGatherer::queue_length_csv() {
 
 string StatisticsGatherer::app_and_gc_throughput_csv() {
 	stringstream ss;
-	ss << "\"Time (µs)\", \"Application IOs/s\", \"Non-application IOs/s\"" << "\n";
+	ss << "\"Time (µs)\", \"Application IOs/s\", \"Internal operations/s\"" << "\n";
 	for (uint i = 0; i < application_io_history.size(); i++) {
 		ss << io_counter_window_size * i << ", " << (double) application_io_history[i]/io_counter_window_size*1000 << ", " << (double) non_application_io_history[i]/io_counter_window_size*1000 << "\n";
 	}
