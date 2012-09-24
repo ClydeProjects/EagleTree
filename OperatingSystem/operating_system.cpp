@@ -18,7 +18,8 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	  NUM_WRITES_TO_STOP_AFTER(UNDEFINED),
 	  num_writes_completed(0),
 	  time_of_last_event_completed(1),
-	  counter_for_user(1)
+	  counter_for_user(1),
+	  currently_executing_trims_counter(0)
 {
 	assert(threads.size() > 0);
 	for (uint i = 0; i < threads.size(); i++) {
@@ -59,7 +60,7 @@ void OperatingSystem::run() {
 
 		bool no_pending_event = thread_id == UNDEFINED;
 		//bool pending_event_starts_much_later = thread_id != UNDEFINED && currently_executing_ios_counter > 0 && last_dispatched_event_minimal_finish_time < events[thread_id]->get_start_time();
-		bool queue_is_full = currently_executing_ios_counter >= MAX_SSD_QUEUE_SIZE;
+		bool queue_is_full = (currently_executing_ios_counter - currently_executing_trims_counter >= MAX_SSD_QUEUE_SIZE);
 
 		if (no_pending_event /* || pending_event_starts_much_later */|| queue_is_full) {
 			if (idle_time >= idle_limit) {
@@ -120,6 +121,7 @@ int OperatingSystem::pick_unlocked_event_with_shortest_start_time() {
 void OperatingSystem::dispatch_event(int thread_id) {
 	Event* event = events[thread_id];
 
+	if (event->get_event_type() == TRIM) currently_executing_trims_counter++;
 	currently_executing_ios_counter++;
 	currently_executing_ios.insert(event->get_application_io_id());
 	currently_pending_ios_counter--;
@@ -144,7 +146,8 @@ void OperatingSystem::dispatch_event(int thread_id) {
 }
 
 void OperatingSystem::register_event_completion(Event* event) {
-	bool queue_was_full = currently_executing_ios_counter == MAX_SSD_QUEUE_SIZE;
+	bool queue_was_full = (currently_executing_ios_counter - currently_executing_trims_counter == MAX_SSD_QUEUE_SIZE);
+	if (event->get_event_type() == TRIM) currently_executing_trims_counter--;
 	currently_executing_ios_counter--;
 	assert(currently_executing_ios_counter >= 0);   // there is currently a bug where this number goes below 0. need to fix it.
 	currently_executing_ios.erase(event->get_application_io_id());

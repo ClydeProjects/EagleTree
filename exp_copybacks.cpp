@@ -99,8 +99,6 @@ int main()
 	string exp_folder  = "exp_copybacks/";
 	mkdir(exp_folder.c_str(), 0755);
 
-	bool debug = true;
-
 	load_config();
 
 	/*
@@ -112,35 +110,21 @@ int main()
 
 	MAX_SSD_QUEUE_SIZE = 16;
 
-	if (debug) {
-		SSD_SIZE = 4;
-		PACKAGE_SIZE = 2;
-		DIE_SIZE = 1;
-		PLANE_SIZE = 64;
-		BLOCK_SIZE = 32;
+	SSD_SIZE = 4;
+	PACKAGE_SIZE = 2;
+	DIE_SIZE = 1;
+	PLANE_SIZE = 512;
+	BLOCK_SIZE = 32;
 
-		PAGE_READ_DELAY = 5;
-		PAGE_WRITE_DELAY = 20;
-		BUS_CTRL_DELAY = 1;
-		BUS_DATA_DELAY = 9;
-		BLOCK_ERASE_DELAY = 150;
-	} else { // Real size
-		SSD_SIZE = 4;
-		PACKAGE_SIZE = 2;
-		DIE_SIZE = 1;
-		PLANE_SIZE = 128;
-		BLOCK_SIZE = 32;
-
-		PAGE_READ_DELAY = 5;
-		PAGE_WRITE_DELAY = 20;
-		BUS_CTRL_DELAY = 1;
-		BUS_DATA_DELAY = 8;
-		BLOCK_ERASE_DELAY = 150;
-	}
+	PAGE_READ_DELAY = 5;
+	PAGE_WRITE_DELAY = 20;
+	BUS_CTRL_DELAY = 1;
+	BUS_DATA_DELAY = 9;
+	BLOCK_ERASE_DELAY = 150;
 
 	MAX_ITEMS_IN_COPY_BACK_MAP = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 
-	int IO_limit = 100000;//NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 3;
+	int IO_limit = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 3;
 	int used_space = 80;
 	int max_copybacks = 4;
 
@@ -148,7 +132,7 @@ int main()
 
 	vector<ExperimentResult> exp;
 
-	exp.push_back( Experiment_Runner::copyback_experiment(random_writes_lazy_gc,   used_space, max_copybacks, exp_folder + "rand_lazy/",  "rand lazy", IO_limit) );
+	//exp.push_back( Experiment_Runner::copyback_experiment(random_writes_lazy_gc,   used_space, max_copybacks, exp_folder + "rand_lazy/",  "rand lazy", IO_limit) );
 	exp.push_back( Experiment_Runner::copyback_experiment(random_writes_greedy_gc, used_space, max_copybacks, exp_folder + "rand_greed/", "rand greed", IO_limit) );
 
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
@@ -165,8 +149,17 @@ int main()
 	int sy = 8;
 
 	chdir(exp_folder.c_str());
-	Experiment_Runner::graph(sx, sy,   "Maximum sustainable throughput", "throughput", 24, exp);
+	Experiment_Runner::graph(sx, sy,   "Average throughput", "throughput", 24, exp);
 	Experiment_Runner::graph(sx, sy,   "# Copyback operations", "copybacks", gc_pos_in_datafile, exp);
+
+	Experiment_Runner::graph(sx, sy,   "Latency standard dev", "latency std", 15, exp);
+	Experiment_Runner::graph(sx, sy,   "Latency standard dev", "num_migrations", 3, exp);
+
+	Experiment_Runner::graph(sx, sy,   "Write wait, Q25", "Write wait, Q25 (µs)", 11, exp);
+	Experiment_Runner::graph(sx, sy,   "Write wait, Q50", "Write wait, Q50 (µs)", 12, exp);
+	Experiment_Runner::graph(sx, sy,   "Write wait, Q75", "Write wait, Q75 (µs)", 13, exp);
+	Experiment_Runner::graph(sx, sy,   "Write wait, max", "Write wait, max (µs)", 14, exp);
+
 
 	for (uint i = 0; i < exp.size(); i++) {
 		chdir(exp[i].data_folder.c_str());

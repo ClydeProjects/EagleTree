@@ -230,7 +230,7 @@ double IOScheduler::get_current_time() const {
 }
 
 // Generates a number between 0 and limit-1, used by the random_shuffle in update_current_events()
-ptrdiff_t random_range(ptrdiff_t limit) {
+inline ptrdiff_t random_range(ptrdiff_t limit) {
 	return IOScheduler::instance()->random_number_generator() % limit;
 }
 
@@ -247,18 +247,22 @@ long IOScheduler::get_current_events_size() {
 // goes through all the events that has just been submitted (i.e. bus_wait_time = 0)
 // in light of these new events, see if any other existing pending events are now redundant
 void IOScheduler::update_current_events() {
-
 	StatisticsGatherer::get_instance()->register_events_queue_length(get_current_events_size(), get_current_time());
 
+	vector<Event*> new_future_events;
+	new_future_events.reserve(future_events.size());
 	double current_time = get_current_time();
 	random_shuffle(future_events.begin(), future_events.end(), random_range); // Process events with same timestamp in random order to prevent imbalances
 	for (uint i = 0; i < future_events.size(); i++) {
 		Event* e = future_events[i];
 	    if (e->get_current_time() < current_time + 1) {
 	    	init_event(e);
-	    	future_events.erase(future_events.begin() + i--);
+	    	//future_events.erase(future_events.begin() + i--);
+	    } else {
+	    	new_future_events.push_back(e);
 	    }
 	}
+	future_events = new_future_events;
 }
 
 void IOScheduler::push_into_current_events(Event* event) {

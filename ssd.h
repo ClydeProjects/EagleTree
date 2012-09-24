@@ -1987,6 +1987,8 @@ private:
 	int currently_pending_ios_counter;
 	double last_dispatched_event_minimal_finish_time;
 
+	int currently_executing_trims_counter;
+
 	set<uint> currently_executing_ios;
 	long NUM_WRITES_TO_STOP_AFTER;
 	long num_writes_completed;
