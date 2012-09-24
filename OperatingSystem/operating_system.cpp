@@ -18,7 +18,7 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	  NUM_WRITES_TO_STOP_AFTER(UNDEFINED),
 	  num_writes_completed(0),
 	  time_of_last_event_completed(1),
-	  counter_for_user(0)
+	  counter_for_user(1)
 {
 	assert(threads.size() > 0);
 	for (uint i = 0; i < threads.size(); i++) {
@@ -83,8 +83,8 @@ void OperatingSystem::run() {
 			}*/
 		}
 
-		if (counter_for_user * 10000 < num_writes_completed) {
-			printf("finished app writes:  %d\n", counter_for_user * 10000);
+		if ((double)num_writes_completed / NUM_WRITES_TO_STOP_AFTER > (double)counter_for_user / 10.0) {
+			printf("finished %d%%.\t\tNum writes completed:  %d \n", counter_for_user * 10, num_writes_completed);
 			counter_for_user++;
 		}
 

@@ -272,7 +272,7 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
     for (int used_space = space_min; used_space <= space_max; used_space += space_inc) {
 		int highest_lba = (int) ((double) num_pages * used_space / 100);
 		printf("----------------------------------------------------------------------------------------------------------\n");
-		printf("Experiment with max %d pct used space: Writing to no LBA higher than %d (out of %d total available)\n", used_space, highest_lba, num_pages);
+		printf("%s : Experiment with max %d pct used space: Writing to no LBA higher than %d (out of %d total available)\n", name.c_str(), used_space, highest_lba, num_pages);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
 		// Calibrate IO submission rate
@@ -283,14 +283,19 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 		vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
-		os->run();
+		try {
+			os->run();
 
-		// Compute throughput
-		int total_IOs_issued = StatisticsGatherer::get_instance()->total_reads() + StatisticsGatherer::get_instance()->total_writes();
-		long double throughput = (double) total_IOs_issued / os->get_total_runtime() * 1000; // IOs/sec
+			// Compute throughput
+			int total_IOs_issued = StatisticsGatherer::get_instance()->total_reads() + StatisticsGatherer::get_instance()->total_writes();
+			long double throughput = (double) total_IOs_issued / os->get_total_runtime() * 1000; // IOs/sec
 
-		// Collect statistics from this experiment iteration (save in csv files)
-		experiment_result.collect_stats(used_space, throughput);
+			// Collect statistics from this experiment iteration (save in csv files)
+			experiment_result.collect_stats(used_space, throughput);
+		} catch(...) {
+			printf("An exception was thrown, but we continue for now\n");
+		}
+
 
 		// Print shit
 		StatisticsGatherer::get_instance()->print();
