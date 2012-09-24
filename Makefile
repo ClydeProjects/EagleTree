@@ -32,7 +32,7 @@
 # classes.  It is suggested to test with the "test" make target first.
 
 CC = /usr/bin/gcc
-CFLAGS = -Wall -Wextra -g
+CFLAGS = -Wall -Wextra -g -O2
 CXX = /usr/bin/g++
 CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
@@ -56,7 +56,12 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
-all: sequential 
+all: sequential copyback_map
+
+copyback_map: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o copyback_map exp_copyback_map.cpp $(OBJ)
+	-chmod $(PERMS) $(OBJ)
+	-chmod $(EPERMS) copyback_map
 
 gc_priorities: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o gc_priorities exp_gc_priorities.cpp $(OBJ)
