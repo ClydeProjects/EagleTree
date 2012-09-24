@@ -41,6 +41,8 @@ Simple_Page_Hotness_Measurer::Simple_Page_Hotness_Measurer()
 
 Simple_Page_Hotness_Measurer::~Simple_Page_Hotness_Measurer(void) {}
 
+// Inlined for speed
+/*
 enum write_hotness Simple_Page_Hotness_Measurer::get_write_hotness(ulong page_address) const {
 	return write_moving_average[page_address] >= average_write_hotness ? WRITE_HOT : WRITE_COLD;
 }
@@ -48,7 +50,7 @@ enum write_hotness Simple_Page_Hotness_Measurer::get_write_hotness(ulong page_ad
 enum read_hotness Simple_Page_Hotness_Measurer::get_read_hotness(ulong page_address) const {
 	return read_moving_average[page_address] >= average_read_hotness ? READ_HOT : READ_COLD;
 }
-
+*/
 /*Address Simple_Page_Hotness_Measurer::get_die_with_least_wcrh() const {
 	uint package;
 	uint die;
@@ -219,14 +221,6 @@ BloomFilter_Page_Hotness_Measurer::BloomFilter_Page_Hotness_Measurer(uint num_bl
 }
 
 BloomFilter_Page_Hotness_Measurer::~BloomFilter_Page_Hotness_Measurer(void) {}
-
-enum write_hotness BloomFilter_Page_Hotness_Measurer::get_write_hotness(ulong page_address) const {
-	return (get_hot_data_index(WRITE, page_address) >= hotness_threshold) ? WRITE_HOT : WRITE_COLD;
-}
-
-enum read_hotness BloomFilter_Page_Hotness_Measurer::get_read_hotness(ulong page_address) const {
-	return (get_hot_data_index(READ, page_address) >= hotness_threshold) ? READ_HOT : READ_COLD;
-}
 
 void BloomFilter_Page_Hotness_Measurer::print_die_stats() const {
 	for (uint package = 0; package < SSD_SIZE; package++) {

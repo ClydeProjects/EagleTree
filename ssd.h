@@ -44,6 +44,7 @@
 #include <sys/types.h>
 #include "MTRand/mtrand.h" // Marsenne Twister random number generator
 #include <fstream>
+#include <unordered_map>
 
 
 #ifndef _SSD_H
@@ -789,8 +790,8 @@ public:
 	Simple_Page_Hotness_Measurer();
 	~Simple_Page_Hotness_Measurer(void);
 	void register_event(Event const& event);
-	enum write_hotness get_write_hotness(unsigned long page_address) const;
-	enum read_hotness get_read_hotness(unsigned long page_address) const;
+	inline enum write_hotness get_write_hotness(unsigned long page_address) const { return write_moving_average[page_address] >= average_write_hotness ? WRITE_HOT : WRITE_COLD; }
+	inline enum read_hotness get_read_hotness(unsigned long page_address) const { return read_moving_average[page_address] >= average_read_hotness ? READ_HOT : READ_COLD; }
 	// Address get_die_with_least_wcrh() const;
 	// Address get_die_with_least_wcrc() const;
 	Address get_die_with_least_WC(enum read_hotness rh) const;
@@ -887,8 +888,8 @@ public:
 	BloomFilter_Page_Hotness_Measurer(uint num_bloom_filters = 4, uint bloom_filter_size = 2048, uint IOs_before_decay = 512, bool preheat = true);
 	~BloomFilter_Page_Hotness_Measurer(void);
 	void register_event(Event const& event);
-	enum write_hotness get_write_hotness(unsigned long page_address) const;
-	enum read_hotness get_read_hotness(unsigned long page_address) const;
+	inline enum write_hotness get_write_hotness(unsigned long page_address) const { /*DEBUG*/ return WRITE_HOT; return (get_hot_data_index(WRITE, page_address) >= hotness_threshold) ? WRITE_HOT : WRITE_COLD; }
+	inline enum read_hotness get_read_hotness(unsigned long page_address) const { /*DEBUG*/ return READ_HOT; return (get_hot_data_index(READ, page_address) >= hotness_threshold) ? READ_HOT : READ_COLD; }
 	Address get_best_target_die_for_WC(enum read_hotness rh) const;
 	void heat_all_addresses();
 
@@ -1048,6 +1049,7 @@ protected:
 	void check_if_should_trigger_more_GC(double start_time);
 private:
 	void handle_cold_pointer_out_of_space(double start_time);
+	//BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
 	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
 	Address cold_pointer;
 };
@@ -1064,6 +1066,7 @@ protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	virtual Address choose_best_address(Event const& write);
 	virtual Address choose_any_address();
+	//BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
 	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
 private:
 	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
@@ -1095,7 +1098,7 @@ public:
 	void set_listener(Sequential_Pattern_Detector_Listener * listener);
 	void remove_old_sequential_writes_metadata(double time);
 private:
-	map<logical_address, logical_address> sequential_writes_key_lookup;  // a map from the next expected LBA in a seqeuntial pattern to the first LBA, which is the key
+	unordered_map<logical_address, logical_address> sequential_writes_key_lookup;  // a map from the next expected LBA in a seqeuntial pattern to the first LBA, which is the key
 	map<logical_address, sequential_writes_tracking*> sequential_writes_identification_and_data;	// a map from the first logical write of a sequential pattern to metadata about the pattern
 	sequential_writes_tracking* restart_pattern(int key, double time);
 	sequential_writes_tracking* process_next_write(int lb, double time);
@@ -1678,12 +1681,12 @@ private:
 	vector<vector<uint> > num_executed_gc_ops;
 	vector<vector<uint> > num_live_pages_in_gc_exec;
 
-	static const double wait_time_histogram_bin_size = 100;
-	static const double age_histogram_bin_size = 1;
+	static const double wait_time_histogram_bin_size;
+	static const double age_histogram_bin_size;
 	map<double, uint> wait_time_histogram_appIOs;
 	map<double, uint> wait_time_histogram_non_appIOs;
 
-	static const double io_counter_window_size = 1000;
+	static const double io_counter_window_size;
 	vector<uint> application_io_history;
 	vector<uint> non_application_io_history;
 
@@ -1989,6 +1992,8 @@ private:
 	int currently_pending_ios_counter;
 	double last_dispatched_event_minimal_finish_time;
 
+	int currently_executing_trims_counter;
+
 	set<uint> currently_executing_ios;
 	long NUM_WRITES_TO_STOP_AFTER;
 	long num_writes_completed;
@@ -2046,6 +2051,7 @@ public:
 	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, ExperimentResult experiment);
 	static void waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static void waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points, bool all_IOs);
+    static void cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<ExperimentResult> experiments, int point, bool all_IOs);
 	static void age_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static void queue_length_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static void throughput_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);

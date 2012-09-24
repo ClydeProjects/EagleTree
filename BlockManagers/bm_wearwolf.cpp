@@ -77,11 +77,12 @@ void Wearwolf::reset_any_filled_pointers(Event const& event) {
 
 Address Wearwolf::choose_best_address(Event const& write) {
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
-	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(write.get_logical_address());
-
 	if (w_hotness == WRITE_HOT) {
 		return get_free_block_pointer_with_shortest_IO_queue();
-	} else if (w_hotness == WRITE_COLD && r_hotness == READ_COLD) {
+	}
+
+	enum read_hotness r_hotness = page_hotness_measurer.get_read_hotness(write.get_logical_address());
+	if (w_hotness == WRITE_COLD && r_hotness == READ_COLD) {
 		return wcrc_pointer;
 	} else /* if (w_hotness == WRITE_COLD && r_hotness == READ_HOT) */ {
 		return wcrh_pointer;

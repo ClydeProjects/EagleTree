@@ -32,7 +32,11 @@
 # classes.  It is suggested to test with the "test" make target first.
 
 CC = /usr/bin/gcc
+<<<<<<< HEAD
 CFLAGS = -Wall -Wextra -g -O2
+=======
+CFLAGS = -Wall -Wextra -g -std=gnu++0x -O2
+>>>>>>> 330b34958339057e1d0c4c3061066bf6484c9cfd
 CXX = /usr/bin/g++
 CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
@@ -56,12 +60,12 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
-all: erase_queues 
+all: sequential copyback_map gc_tuning
 
-erase_queues: $(HDR) $(OBJ)
-	$(CXX) $(CXXFLAGS) -o erase_queues exp_erase_queues.cpp $(OBJ)
+copyback_map: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o copyback_map exp_copyback_map.cpp $(OBJ)
 	-chmod $(PERMS) $(OBJ)
-	-chmod $(EPERMS) erase_queues
+	-chmod $(EPERMS) copyback_map
 
 gc_priorities: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o gc_priorities exp_gc_priorities.cpp $(OBJ)

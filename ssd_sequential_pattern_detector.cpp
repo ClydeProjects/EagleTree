@@ -99,9 +99,9 @@ void Sequential_Pattern_Detector::remove_old_sequential_writes_metadata(double t
 				printf("deleting seq write with key %d:\n", key);
 			}
 			uint next_expected_lba = (*iter).second->counter + key;
-			sequential_writes_key_lookup.erase(next_expected_lba);
-			delete (*iter).second;;
-			sequential_writes_identification_and_data.erase(iter++);
+			sequential_writes_key_lookup.erase(next_expected_lba);  // Erasing by key, logatritmic in container size if using normal map (changed to unordered_map = constant time!)
+			delete (*iter).second;
+			sequential_writes_identification_and_data.erase(iter++); // Erasing by iterator, amortized constant time
 			if (listener != NULL) {
 				listener->sequential_event_metadata_removed(key);
 			}
