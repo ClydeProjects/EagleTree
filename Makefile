@@ -56,7 +56,22 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
-all: sequential 
+all: erase_queues
+
+erase_queues: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o erase_queues exp_erase_queues.cpp $(OBJ)
+	-chmod $(PERMS) $(OBJ)
+	-chmod $(EPERMS) erase_queues
+
+copybacks: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o copybacks exp_copybacks.cpp $(OBJ)
+	-chmod $(PERMS) $(OBJ)
+	-chmod $(EPERMS) copybacks
+
+copyback_map: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o copyback_map exp_copyback_map.cpp $(OBJ)
+	-chmod $(PERMS) $(OBJ)
+	-chmod $(EPERMS) copyback_map
 
 gc_priorities: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o gc_priorities exp_gc_priorities.cpp $(OBJ)
@@ -95,7 +110,7 @@ trace: $(HDR) $(OBJ)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 clean:
-	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) sequential
+	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) sequential erase_queues
 
 files:
 	echo $(SRC) $(HDR)

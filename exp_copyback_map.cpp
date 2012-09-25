@@ -100,8 +100,6 @@ int main()
 	string exp_folder  = "exp_copyback_map/";
 	mkdir(exp_folder.c_str(), 0755);
 
-	bool debug = true;
-
 	load_config();
 
 	/*
@@ -113,41 +111,27 @@ int main()
 
 	MAX_SSD_QUEUE_SIZE = 16;
 
-	if (debug) {
-		SSD_SIZE = 4;
-		PACKAGE_SIZE = 2;
-		DIE_SIZE = 1;
-		PLANE_SIZE = 64;
-		BLOCK_SIZE = 32;
+	SSD_SIZE = 4;
+	PACKAGE_SIZE = 2;
+	DIE_SIZE = 1;
+	PLANE_SIZE = 512;
+	BLOCK_SIZE = 32;
 
-		PAGE_READ_DELAY = 5;
-		PAGE_WRITE_DELAY = 20;
-		BUS_CTRL_DELAY = 1;
-		BUS_DATA_DELAY = 9;
-		BLOCK_ERASE_DELAY = 150;
-	} else { // Real size
-		SSD_SIZE = 4;
-		PACKAGE_SIZE = 2;
-		DIE_SIZE = 1;
-		PLANE_SIZE = 128;
-		BLOCK_SIZE = 32;
-
-		PAGE_READ_DELAY = 5;
-		PAGE_WRITE_DELAY = 20;
-		BUS_CTRL_DELAY = 1;
-		BUS_DATA_DELAY = 8;
-		BLOCK_ERASE_DELAY = 150;
-	}
+	PAGE_READ_DELAY = 5;
+	PAGE_WRITE_DELAY = 20;
+	BUS_CTRL_DELAY = 1;
+	BUS_DATA_DELAY = 8;
+	BLOCK_ERASE_DELAY = 150;
 
 	MAX_ITEMS_IN_COPY_BACK_MAP = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 
 	printf("Number of addressable blocks: %d\n", NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE);
 
-	int IO_limit = 100000;//NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 3;
+	int IO_limit = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 3;
 	int used_space = 85;
 	int cb_map_min = 0;
 	int cb_map_max = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
-	int cb_map_inc = 1000;
+	int cb_map_inc = 2000;
 	int max_copybacks = 5;
 
 	stringstream space_usage_string;
@@ -183,6 +167,9 @@ int main()
 	chdir(exp_folder.c_str());
 	Experiment_Runner::graph(sx, sy,   "Average throughput for random writes with different copyback parameters (" + space_usage_string.str() + ")", "throughput", 24, exp);
 	Experiment_Runner::graph(sx, sy,   "Copybacks operations performed (" + space_usage_string.str() + ")", "copybacks", gc_pos_in_datafile, exp);
+
+    Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram_allIOs", exp, 16000, true);
+    Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram", exp, 16000, false);
 
 	for (uint i = 0; i < exp.size(); i++) {
 		chdir(exp[i].data_folder.c_str());

@@ -1676,12 +1676,12 @@ private:
 	vector<vector<uint> > num_executed_gc_ops;
 	vector<vector<uint> > num_live_pages_in_gc_exec;
 
-	static const double wait_time_histogram_bin_size = 100;
-	static const double age_histogram_bin_size = 1;
+	static const double wait_time_histogram_bin_size;
+	static const double age_histogram_bin_size;
 	map<double, uint> wait_time_histogram_appIOs;
 	map<double, uint> wait_time_histogram_non_appIOs;
 
-	static const double io_counter_window_size = 1000;
+	static const double io_counter_window_size;
 	vector<uint> application_io_history;
 	vector<uint> non_application_io_history;
 
@@ -1987,6 +1987,8 @@ private:
 	int currently_pending_ios_counter;
 	double last_dispatched_event_minimal_finish_time;
 
+	int currently_executing_trims_counter;
+
 	set<uint> currently_executing_ios;
 	long NUM_WRITES_TO_STOP_AFTER;
 	long num_writes_completed;
@@ -2044,6 +2046,7 @@ public:
 	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, ExperimentResult experiment);
 	static void waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static void waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points, bool all_IOs);
+    static void cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<ExperimentResult> experiments, int point, bool all_IOs);
 	static void age_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static void queue_length_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static void throughput_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
