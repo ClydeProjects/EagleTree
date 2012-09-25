@@ -125,8 +125,8 @@ int main()
 	BLOCK_ERASE_DELAY = 150;
 
 	int IO_limit = 100000 * 2;
-	int space_min = 90;
-	int space_max = 92;
+	int space_min = 70;
+	int space_max = 90;
 	int space_inc = 2;
 
 	double start_time = Experiment_Runner::wall_clock_time();
@@ -169,18 +169,7 @@ int main()
 
 	Experiment_Runner::graph(sx, sy,   "Total number of erases", "num_erases", 8, exp);
 
-	Experiment_Runner::graph(sx, sy,   "Latency standard dev", "latency std", 15, exp);
-	Experiment_Runner::graph(sx, sy,   "Latency standard dev", "num_migrations", 3, exp);
-
-	Experiment_Runner::graph(sx, sy,   "Latency standard dev", "num_migrations", 3, exp);
-
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q25", "Write wait, Q25 (µs)", 11, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q50", "Write wait, Q50 (µs)", 12, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q75", "Write wait, Q75 (µs)", 13, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, max", "Write wait, max (µs)", 14, exp);
-
-
-    Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram", exp, 90, true);
+	Experiment_Runner::graph(sx, sy,   "Latency standard dev", "latency", 15, exp);
 
 	Experiment_Runner::graph(sx, sy,   "Write wait, Q25", "Write wait, Q25 (µs)", 11, exp);
 	Experiment_Runner::graph(sx, sy,   "Write wait, Q50", "Write wait, Q50 (µs)", 12, exp);
@@ -192,7 +181,6 @@ int main()
 		chdir(exp[i].data_folder.c_str());
 		Experiment_Runner::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
 		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms", exp[i], used_space_values_to_show);
-		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], used_space_values_to_show, true);
 		Experiment_Runner::age_histogram			(sx, sy/2, "age-histograms", exp[i], used_space_values_to_show);
 		Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);
 		Experiment_Runner::throughput_history		(sx, sy/2, "throughput_history", exp[i], used_space_values_to_show);
@@ -203,4 +191,3 @@ int main()
 
 	return 0;
 }
-

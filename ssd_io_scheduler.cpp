@@ -493,13 +493,13 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 
 	if (event->get_latency() > 1691) {
 			//VisualTracer::get_instance()->print_horizontally_with_breaks();
-			event->print();
+			//event->print();
 			//StateVisualiser::print_page_status();
 		}
 
 	if (event->get_latency() > 1691 && event->is_original_application_io()) {
 		//VisualTracer::get_instance()->print_horizontally_with_breaks();
-		event->print();
+		//event->print();
 		//StateVisualiser::print_page_status();
 	}
 

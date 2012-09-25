@@ -37,7 +37,7 @@
 
 using namespace ssd;
 
-static const bool GRAPH_TITLES = false;
+static const bool GRAPH_TITLES = true;
 
 const string Experiment_Runner::markers[] = {"circle", "square", "triangle", "diamond", "cross", "plus", "star", "star2", "star3", "star4", "flower"};
 
@@ -518,6 +518,21 @@ void Experiment_Runner::waittime_histogram(int sizeX, int sizeY, string outputFi
 
 	multigraph(sizeX, sizeY, outputFile, commands);
 }
+
+void Experiment_Runner::cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<ExperimentResult> experiments, int point, bool all_IOs) {
+	vector<string> commands;
+	double cross_experiment_max_waittime = 0;
+	for (uint i = 0; i < experiments.size(); i++) cross_experiment_max_waittime = max(cross_experiment_max_waittime, experiments[i].max_waittime);
+	for (uint i = 0; i < experiments.size(); i++) {
+		ExperimentResult& e = experiments[i];
+		stringstream command;
+		command << "hist 0 " << i << " \"" << e.data_folder << ExperimentResult::waittime_filename_prefix << point << ExperimentResult::datafile_postfix << "\" \"Wait time histogram (" << e.experiment_name << ", " << e.variable_parameter_name << " = " << point << ")\" \"log min 1\" \"Event wait time (µs)\" " << cross_experiment_max_waittime << " " << StatisticsGatherer::get_instance()->get_wait_time_histogram_bin_size() << " " << (all_IOs ? 2 : 1);
+		commands.push_back(command.str());
+	}
+
+	multigraph(sizeX, sizeY, outputFile, commands);
+}
+
 
 void Experiment_Runner::age_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points) {
 	vector<string> settings;
