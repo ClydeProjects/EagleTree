@@ -125,9 +125,9 @@ int main()
 	BLOCK_ERASE_DELAY = 150;
 
 	int IO_limit = 100000 * 2;
-	int space_min = 75;
-	int space_max = 85;
-	int space_inc = 5;
+	int space_min = 90;
+	int space_max = 92;
+	int space_inc = 2;
 
 	double start_time = Experiment_Runner::wall_clock_time();
 
@@ -136,6 +136,7 @@ int main()
 
 	vector<ExperimentResult> exp;
 
+	PRIORITISE_GC = false;
 	USE_ERASE_QUEUE = true;
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(tagging, 			space_min, space_max, space_inc, exp_folder + "oracle_erase/",			"Oracle Erase Queue", IO_limit) );
 

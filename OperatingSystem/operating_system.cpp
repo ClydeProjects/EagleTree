@@ -92,9 +92,6 @@ void OperatingSystem::run() {
 		still_more_work = currently_executing_ios_counter > 0 || currently_pending_ios_counter > 0;
 		//printf("num_writes   %d\n", num_writes_completed);
 	} while (!finished_experiment && still_more_work);
-	//VisualTracer::get_instance()->print_horizontally_with_breaks();
-	int i = 0;
-	i++;
 }
 
 int OperatingSystem::pick_unlocked_event_with_shortest_start_time() {

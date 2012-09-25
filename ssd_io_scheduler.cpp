@@ -465,7 +465,7 @@ void IOScheduler::manage_operation_completion(Event* event) {
 void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	if (outcome == FAILURE) {
 		event->print();
-		StateVisualiser::print_page_status();
+		//StateVisualiser::print_page_status();
 		assert(false); // events should not fail at this point. Any failure indicates application error
 	}
 
@@ -491,10 +491,16 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	}
 	StatisticsGatherer::get_instance()->register_completed_event(*event);
 
-	if (event->get_latency() > 3000 && event->is_original_application_io()) {
-		//event->print();
+	if (event->get_latency() > 1691) {
+			//VisualTracer::get_instance()->print_horizontally_with_breaks();
+			event->print();
+			//StateVisualiser::print_page_status();
+		}
+
+	if (event->get_latency() > 1691 && event->is_original_application_io()) {
 		//VisualTracer::get_instance()->print_horizontally_with_breaks();
-		//event->print();
+		event->print();
+		//StateVisualiser::print_page_status();
 	}
 
 	if (event->get_id() == 57680) {
