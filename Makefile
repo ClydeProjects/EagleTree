@@ -32,11 +32,7 @@
 # classes.  It is suggested to test with the "test" make target first.
 
 CC = /usr/bin/gcc
-<<<<<<< HEAD
-CFLAGS = -Wall -Wextra -g -O2
-=======
 CFLAGS = -Wall -Wextra -g -std=gnu++0x -O2
->>>>>>> 330b34958339057e1d0c4c3061066bf6484c9cfd
 CXX = /usr/bin/g++
 CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
@@ -60,7 +56,12 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
-all: sequential copyback_map gc_tuning
+all: sequential copyback_map gc_tuning copybacks
+
+copybacks: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o copybacks exp_copybacks.cpp $(OBJ)
+	-chmod $(PERMS) $(OBJ)
+	-chmod $(EPERMS) copybacks
 
 copyback_map: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o copyback_map exp_copyback_map.cpp $(OBJ)
