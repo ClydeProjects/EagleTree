@@ -100,7 +100,7 @@ vector<Thread*> detection_BLOCK(int highest_lba, double IO_submission_rate) {
 
 int main()
 {
-	string exp_folder  = "exp_sequential/";
+	string exp_folder  = "exp_erase_queues/";
 	mkdir(exp_folder.c_str(), 0755);
 
 	load_config();
@@ -115,7 +115,7 @@ int main()
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 128;
+	PLANE_SIZE = 256;
 	BLOCK_SIZE = 32;
 
 	PAGE_READ_DELAY = 5;
@@ -124,9 +124,9 @@ int main()
 	BUS_DATA_DELAY = 8;
 	BLOCK_ERASE_DELAY = 150;
 
-	int IO_limit = 100000 * 2;
+	int IO_limit = 100000 * 4;
 	int space_min = 70;
-	int space_max = 90;
+	int space_max = 94;
 	int space_inc = 2;
 
 	double start_time = Experiment_Runner::wall_clock_time();
