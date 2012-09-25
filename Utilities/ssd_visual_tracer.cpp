@@ -66,7 +66,10 @@ void VisualTracer::register_completed_event(Event const& event) {
 		write(add.package, add.die, 't', BUS_CTRL_DELAY + BUS_DATA_DELAY - 1);
 	} else if (type == ERASE) {
 		write(add.package, add.die, 't', BUS_CTRL_DELAY);
-		write(add.package, add.die, 'e', BLOCK_ERASE_DELAY - 1);
+		vector<vector<char> > symbols;
+		vector<char> logical_address = get_int_as_char_vector(event.get_id());
+		symbols.push_back(logical_address);
+		write_with_id(add.package, add.die, 'e', BLOCK_ERASE_DELAY - 1, symbols);
 	} else if (type == COPY_BACK) {
 		vector<vector<char> > symbols;
 		vector<char> logical_address = get_int_as_char_vector(event.get_logical_address());

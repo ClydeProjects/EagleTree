@@ -45,7 +45,7 @@ IOScheduler::~IOScheduler(){
 
 	map<long, vector<Event*> >::iterator k = current_events.begin();
 	for (; k != current_events.end(); k++) {
-		vector<Event*> events = (*k).second;
+		vector<Event*>& events = (*k).second;
 		for (uint j = 0; j < events.size(); j++) {
 			delete events[j];
 		}
@@ -54,7 +54,7 @@ IOScheduler::~IOScheduler(){
 	map<uint, deque<Event*> >::iterator i = dependencies.begin();
 
 	for (; i != dependencies.end(); i++) {
-		deque<Event*> d = (*i).second;
+		deque<Event*>& d = (*i).second;
 		for (uint j = 0; j < d.size(); j++) {
 			delete d[j];
 		}
@@ -80,9 +80,9 @@ IOScheduler *IOScheduler::instance()
 }
 
 
-/*inline bool bus_wait_time_comparator (const Event* i, const Event* j) {
+inline bool bus_wait_time_comparator (const Event* i, const Event* j) {
 	return i->get_bus_wait_time() < j->get_bus_wait_time();
-}*/
+}
 
 // assumption is that all events within an operation have the same LBA
 void IOScheduler::schedule_events_queue(deque<Event*> events) {
@@ -194,11 +194,10 @@ void IOScheduler::execute_current_waiting_ios() {
 	handle_next_batch(copy_backs); // Copy backs should be prioritized first to avoid conflict, since they have a reserved page waiting to be written
 	handle_next_batch(erases);
 	handle_next_batch(read_commands);
-	handle_next_batch(read_transfers);
 	handle_writes(gc_writes);
+	handle_next_batch(read_transfers);
 	handle_writes(writes);
-
-	long size = get_current_events_size();
+	//long size = get_current_events_size();
 /*
 	if (size >= MAX_SSD_QUEUE_SIZE) {
 		//StateVisualiser::print_page_status();
@@ -208,7 +207,7 @@ void IOScheduler::execute_current_waiting_ios() {
 */
 }
 
-double get_soonest_event_time(vector<Event*> events) {
+double IOScheduler::get_soonest_event_time(vector<Event*> const& events) const {
 	double earliest_time = events.front()->get_current_time();
 	for (uint i = 1; i < events.size(); i++) {
 		if (events[i]->get_current_time() < earliest_time) {
@@ -219,14 +218,12 @@ double get_soonest_event_time(vector<Event*> events) {
 }
 
 double IOScheduler::get_current_time() const {
-	if (current_events.size() > 0) {
-		double soonest_time = (*current_events.begin()).first;
-		return soonest_time;
-	}
-	if (future_events.size() == 0) {
+	if (current_events.size() > 0)
+		return (*current_events.begin()).first;
+	else if (future_events.size() == 0)
 		return 0;
-	}
-	return floor(get_soonest_event_time(future_events));
+	else
+		return floor(get_soonest_event_time(future_events));
 }
 
 // Generates a number between 0 and limit-1, used by the random_shuffle in update_current_events()
@@ -238,7 +235,7 @@ long IOScheduler::get_current_events_size() {
 	long size = 0;
 	map<long, vector<Event*> >::iterator k = current_events.begin();
 	for (; k != current_events.end(); k++) {
-		vector<Event*> events = (*k).second;
+		vector<Event*>& events = (*k).second;
 		size += events.size();
 	}
 	return size;
@@ -274,30 +271,26 @@ void IOScheduler::push_into_current_events(Event* event) {
 
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_writes(vector<Event*>& events) {
-	//sort(events.begin(), events.end(), bus_wait_time_comparator);
+	sort(events.begin(), events.end(), bus_wait_time_comparator);
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
 
-		if (event->get_id() == 140006) {
+		if (event->get_id() == 57680 && event->get_bus_wait_time() > 2068) {
 			int i = 0;
 			i++;
 			//VisualTracer::get_instance()->print_horizontally_with_breaks();
 		}
 
-		Address result = bm->choose_address(*event);
-		double wait_time = bm->in_how_long_can_this_event_be_scheduled(result, event->get_current_time());
-		if (wait_time == 0 && bm->Copy_backs_in_progress(result)) wait_time = 1; // If copy backs are in progress, keep waiting until they are done
-		bool can_schedule = can_schedule_on_die(event);
-		if (can_schedule == false && wait_time == 0) {
-			int i = 0;
-			i++;
+		Address addr = bm->choose_address(*event);
+		double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time());
+		if (wait_time == 0 && (bm->Copy_backs_in_progress(addr) || !bm->can_schedule_on_die(event)))  {
+			wait_time = 1;
 		}
-		if (!can_schedule) wait_time = 1;
 		if (wait_time == 0) {
-			event->set_address(result);
-			ftl.set_replace_address(*event); // 05-09-2012: Moved to here from init_event (else if (type == WRITE) { ...)
-			assert(result.page < BLOCK_SIZE);
+			event->set_address(addr);
+			ftl.set_replace_address(*event);
+			assert(addr.page < BLOCK_SIZE);
 			execute_next(event);
 		}
 		else {
@@ -357,9 +350,9 @@ void IOScheduler::handle_noop_events(vector<Event*>& events) {
 			dependents.pop_front();
 			ssd.register_event_completion(e);
 		}
-		if (event->is_original_application_io()) {
+		/*if (event->is_original_application_io()) {
 			printf("NOOPED APP IO:  "); event->print();
-		}
+		}*/
 		dependencies.erase(dependency_code);
 		dependency_code_to_LBA.erase(dependency_code);
 		dependency_code_to_type.erase(dependency_code);
@@ -384,11 +377,11 @@ void IOScheduler::make_dependent(Event* dependent_event, uint independent_code/*
 
 // executes read_commands, read_transfers and erases
 void IOScheduler::handle_next_batch(vector<Event*>& events) {
-	//sort(events.begin(), events.end(), bus_wait_time_comparator);
+	sort(events.begin(), events.end(), bus_wait_time_comparator);
 	for(uint i = 0; i < events.size(); i++) {
 		Event* event = events[i];
 		double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
-		bool can_schedule = can_schedule_on_die(event);
+		bool can_schedule = bm->can_schedule_on_die(event);
 		if (can_schedule && time == 0) {
 			execute_next(event);
 		}
@@ -402,12 +395,6 @@ void IOScheduler::handle_next_batch(vector<Event*>& events) {
 
 enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd.controller.issue(event);
-
-	if (event->get_latency() > 1675 && event->is_original_application_io()) {
-		event->print();
-		VisualTracer::get_instance()->print_horizontally_with_breaks();
-
-	}
 
 	if (PRINT_LEVEL > 0) {
 		event->print();
@@ -475,17 +462,6 @@ void IOScheduler::manage_operation_completion(Event* event) {
 	op_code_to_dependent_op_codes.erase(dependency_code);
 }
 
-bool IOScheduler::can_schedule_on_die(Event const* event) const {
-	uint package_id = event->get_address().package;
-	uint die_id = event->get_address().die;
-	bool busy = ssd.getPackages()[package_id].getDies()[die_id].register_is_busy();
-	if (!busy) {
-		return true;
-	}
-	uint application_io = ssd.getPackages()[package_id].getDies()[die_id].get_last_read_application_io();
-	return event->get_event_type() == READ_TRANSFER && application_io == event->get_application_io_id();
-}
-
 void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	if (outcome == FAILURE) {
 		event->print();
@@ -494,13 +470,6 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	}
 
 	VisualTracer::get_instance()->register_completed_event(*event);
-
-	if (event->get_id() == 140006) {
-			VisualTracer::get_instance()->print_horizontally_with_breaks();
-			event->print();
-			int i = 0;
-			i++;
-		}
 
 	if (event->get_event_type() == WRITE || event->get_event_type() == COPY_BACK) {
 		ftl.register_write_completion(*event, outcome);
@@ -521,6 +490,18 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		event->print();
 	}
 	StatisticsGatherer::get_instance()->register_completed_event(*event);
+
+	if (event->get_latency() > 3000 && event->is_original_application_io()) {
+		//event->print();
+		//VisualTracer::get_instance()->print_horizontally_with_breaks();
+		//event->print();
+	}
+
+	if (event->get_id() == 57680) {
+		//VisualTracer::get_instance()->print_horizontally_with_breaks();
+		//event->print();
+		//StateVisualiser::print_page_status();
+	}
 
 
 }
@@ -662,10 +643,10 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	// if two writes are scheduled, the one before is irrelevant and may as well be cancelled
 	else if (new_op_code == WRITE && scheduled_op_code == WRITE) {
-		//remove_current_operation(existing_event);
-		//LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
-		//stats.num_write_cancellations++;
-		make_dependent(new_event, dependency_code_of_other_event);
+		remove_current_operation(existing_event);
+		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
+		stats.num_write_cancellations++;
+		//make_dependent(new_event, dependency_code_of_other_event);
 	}
 	else if (new_op_code == WRITE && scheduled_op_code == READ && existing_event->is_mapping_op()) {
 		remove_current_operation(existing_event);

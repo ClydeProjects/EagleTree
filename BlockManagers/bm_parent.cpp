@@ -71,18 +71,13 @@ Address Block_manager_parent::choose_address(Event const& write) {
 		schedule_gc(write.get_current_time());
 	}
 	if (write.is_garbage_collection_op() || how_many_gc_operations_are_scheduled() == 0) {
-		a = choose_any_address();
+		a = choose_any_address(write);
 		if (has_free_pages(a)) {
 			return a;
 		}
 	}
 	return Address();
 }
-
-Address Block_manager_parent::choose_any_address() {
-	return get_free_block_pointer_with_shortest_IO_queue();
-}
-
 
 void Block_manager_parent::register_erase_outcome(Event const& event, enum status status) {
 	IO_has_completed_since_last_shortest_queue_search = true;
@@ -478,6 +473,30 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 
 	double time = max - event_time;
 	return time < 0 ? 0 : time;
+}
+
+bool Block_manager_parent::can_schedule_on_die(Event const* event) const {
+	uint package_id = event->get_address().package;
+	uint die_id = event->get_address().die;
+	bool busy = ssd.getPackages()[package_id].getDies()[die_id].register_is_busy();
+	if (!busy) {
+		return true;
+	}
+	uint application_io = ssd.getPackages()[package_id].getDies()[die_id].get_last_read_application_io();
+	return event->get_event_type() == READ_TRANSFER && application_io == event->get_application_io_id();
+}
+
+bool Block_manager_parent::is_die_register_busy(Address const& addr) const {
+	uint package_id = addr.package;
+	uint die_id = addr.die;
+	return ssd.getPackages()[package_id].getDies()[die_id].register_is_busy();
+}
+
+bool Block_manager_parent::can_schedule_write_immediately(Address const& prospective_dest, double current_time) {
+	return 	has_free_pages(prospective_dest) &&
+			!is_die_register_busy(prospective_dest) &&
+			!Copy_backs_in_progress(prospective_dest) &&
+			in_how_long_can_this_event_be_scheduled(prospective_dest, current_time);
 }
 
 // puts free blocks at the very end of the queue

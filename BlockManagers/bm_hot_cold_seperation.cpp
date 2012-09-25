@@ -56,7 +56,7 @@ Address Shortest_Queue_Hot_Cold_BM::choose_best_address(Event const& write) {
 	return w_hotness == WRITE_HOT ? get_free_block_pointer_with_shortest_IO_queue() : cold_pointer;
 }
 
-Address Shortest_Queue_Hot_Cold_BM::choose_any_address() {
+Address Shortest_Queue_Hot_Cold_BM::choose_any_address(Event const& write) {
 	Address a = get_free_block_pointer_with_shortest_IO_queue();
 	return has_free_pages(a) ? a : cold_pointer;
 }

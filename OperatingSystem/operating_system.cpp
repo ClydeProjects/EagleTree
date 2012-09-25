@@ -152,6 +152,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	currently_executing_ios.erase(event->get_application_io_id());
 
 	//printf("finished:\t"); event->print();
+	//printf("queue size:\t%d\n", currently_executing_ios_counter);
 
 	ulong la = event->get_logical_address();
 	map<long, queue<uint> >& map = get_relevant_LBA_to_thread_map(event->get_event_type());
@@ -164,7 +165,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	Thread* thread = threads[thread_id];
 	thread->register_event_completion(event);
 
-	if (event->get_event_type() == WRITE) {
+	if (event->get_event_type() == WRITE && !event->get_noop()) {
 		num_writes_completed++;
 	}
 

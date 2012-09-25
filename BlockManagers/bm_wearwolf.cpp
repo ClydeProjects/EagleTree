@@ -88,9 +88,15 @@ Address Wearwolf::choose_best_address(Event const& write) {
 	}
 }
 
-Address Wearwolf::choose_any_address() {
+Address Wearwolf::choose_any_address(Event const& write) {
 	Address a = get_free_block_pointer_with_shortest_IO_queue();
-	return has_free_pages(a) ? a : has_free_pages(wcrh_pointer) ? wcrh_pointer : wcrc_pointer;
+	if (can_schedule_write_immediately(a, write.get_current_time())) {
+		return a;
+	} else if (can_schedule_write_immediately(wcrh_pointer, write.get_current_time())) {
+		return wcrh_pointer;
+	} else {
+		return wcrc_pointer;
+	}
 }
 
 void Wearwolf::register_read_command_outcome(Event const& event, enum status status){

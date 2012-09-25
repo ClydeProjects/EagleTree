@@ -35,7 +35,7 @@ using namespace ssd;
 vector<Thread*> sequential_experiment(int highest_lba, double IO_submission_rate) {
 	long log_space_per_thread = highest_lba / 2;
 	long max_file_size = log_space_per_thread / 4;
-	long num_files = 200;
+	long num_files = 200000;
 
 	//Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1);
 	//Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 2, 2);
@@ -46,7 +46,7 @@ vector<Thread*> sequential_experiment(int highest_lba, double IO_submission_rate
 
 	//t1->add_follow_up_thread(new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 1, 2));
 
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(log_space_per_thread + 1, log_space_per_thread * 2, 50000, 2, WRITE, IO_submission_rate * 2, 1));
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(log_space_per_thread + 1, log_space_per_thread * 2, 50000000, 2, WRITE, IO_submission_rate * 2, 1));
 
 
 	vector<Thread*> threads;
@@ -103,8 +103,6 @@ int main()
 	string exp_folder  = "exp_sequential/";
 	mkdir(exp_folder.c_str(), 0755);
 
-	bool debug = false;
-
 	load_config();
 
 	/*sequential_tagging
@@ -113,43 +111,28 @@ int main()
 		sequential_detection_CHANNEL
 		sequential_detection_BLOCK*/
 
-	if (debug) {
-		SSD_SIZE = 4;
-		PACKAGE_SIZE = 2;
-		DIE_SIZE = 1;
-		PLANE_SIZE = 128;
-		BLOCK_SIZE = 32;
 
-		PAGE_READ_DELAY = 5;
-		PAGE_WRITE_DELAY = 20;
-		BUS_CTRL_DELAY = 1;
-		BUS_DATA_DELAY = 8;
-		BLOCK_ERASE_DELAY = 150;
-	} else { // Real size
-		SSD_SIZE = 4;
-		PACKAGE_SIZE = 2;
-		DIE_SIZE = 1;
-		PLANE_SIZE = 128;
-		BLOCK_SIZE = 32;
+	SSD_SIZE = 4;
+	PACKAGE_SIZE = 2;
+	DIE_SIZE = 1;
+	PLANE_SIZE = 128;
+	BLOCK_SIZE = 32;
 
-		PAGE_READ_DELAY = 5;
-		PAGE_WRITE_DELAY = 20;
-		BUS_CTRL_DELAY = 1;
-		BUS_DATA_DELAY = 8;
-		BLOCK_ERASE_DELAY = 150;
-	}
+	PAGE_READ_DELAY = 5;
+	PAGE_WRITE_DELAY = 20;
+	BUS_CTRL_DELAY = 1;
+	BUS_DATA_DELAY = 8;
+	BLOCK_ERASE_DELAY = 150;
 
 	int IO_limit = 100000 * 2;
-	int space_min = 70;
-	int space_max = 90;
+	int space_min = 75;
+	int space_max = 85;
 	int space_inc = 5;
 
 	double start_time = Experiment_Runner::wall_clock_time();
 
-
 	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 15;
-
 
 	vector<ExperimentResult> exp;
 

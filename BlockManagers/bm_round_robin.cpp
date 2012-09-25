@@ -51,6 +51,10 @@ Address Block_manager_roundrobin::choose_best_address(Event const& write) { // c
 	return free_block_pointers[address_cursor.package][address_cursor.die];
 }
 
+Address Block_manager_roundrobin::choose_any_address(Event const& write) {
+	return get_free_block_pointer_with_shortest_IO_queue();
+}
+
 // Moves the address cursor to next position in a round-robin fashion
 void Block_manager_roundrobin::move_address_cursor() {
 	if (channel_alternation) {

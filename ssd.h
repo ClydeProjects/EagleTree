@@ -460,7 +460,7 @@ public:
 	inline double get_ssd_submission_time() const { return start_time + os_wait_time; }
 	inline uint get_application_io_id() const { return application_io_id; }
 	inline double get_bus_wait_time() const { assert(bus_wait_time >= 0.0); return bus_wait_time; }
-	inline double get_latency() const { return os_wait_time + bus_wait_time; }
+	inline double get_latency() const { return bus_wait_time; }
 	inline double get_os_wait_time() const { return os_wait_time; }
 	inline bool get_noop() const { return noop; }
 	inline uint get_id() const { return id; }
@@ -936,15 +936,16 @@ public:
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double current_time) const;
 	vector<deque<Event*> > migrate(Event * gc_event);
 	bool Copy_backs_in_progress(Address const& address);
-
+	bool can_schedule_on_die(Event const* event) const;
+	bool is_die_register_busy(Address const& addr) const;
 	void register_trim_making_gc_redundant();
 protected:
 	virtual Address choose_best_address(Event const& write) = 0;
-	virtual Address choose_any_address();
+	virtual Address choose_any_address(Event const& write) = 0;
 
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	void increment_pointer(Address& pointer);
-
+	bool can_schedule_write_immediately(Address const& prospective_dest, double current_time);
 	bool can_write(Event const& write) const;
 
 	void schedule_gc(double time, int package_id = -1, int die_id = -1, int klass = -1);
@@ -983,6 +984,7 @@ private:
 	void register_copy_back_operation_on(uint logical_address);
 	void register_ECC_check_on(uint logical_address);
 	bool schedule_queued_erase(Address location);
+
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 	bool greedy_gc;
@@ -1014,6 +1016,7 @@ public:
 	void register_erase_outcome(Event const& event, enum status status);
 protected:
 	Address choose_best_address(Event const& write);
+	Address choose_any_address(Event const& write);
 };
 
 // A simple BM that assigns writes sequentially to dies in a round-robin fashion. No hot-cold separation or anything else intelligent
@@ -1025,6 +1028,7 @@ public:
 	void register_erase_outcome(Event const& event, enum status status);
 protected:
 	Address choose_best_address(Event const& write);
+	Address choose_any_address(Event const& write);
 private:
 	void move_address_cursor();
 	Address address_cursor;
@@ -1041,7 +1045,7 @@ public:
 	void register_erase_outcome(Event const& event, enum status status);
 protected:
 	Address choose_best_address(Event const& write);
-	virtual Address choose_any_address();
+	virtual Address choose_any_address(Event const& write);
 	void check_if_should_trigger_more_GC(double start_time);
 private:
 	void handle_cold_pointer_out_of_space(double start_time);
@@ -1060,7 +1064,7 @@ public:
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	virtual Address choose_best_address(Event const& write);
-	virtual Address choose_any_address();
+	virtual Address choose_any_address(Event const& write);
 	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
 private:
 	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
@@ -1112,7 +1116,7 @@ public:
 	void sequential_event_metadata_removed(long key);
 protected:
 	Address choose_best_address(Event const& write);
-	Address choose_any_address();
+	Address choose_any_address(Event const& write);
 private:
 	enum parallel_degree_for_sequential_files { ONE, LUN, CHANNEL };
 	parallel_degree_for_sequential_files parallel_degree;
@@ -1176,7 +1180,6 @@ private:
 	void handle_next_batch(vector<Event*>& events);
 	void handle_writes(vector<Event*>& events);
 
-	bool can_schedule_on_die(Event const* event) const;
 	void handle_finished_event(Event *event, enum status outcome);
 	void remove_redundant_events(Event* new_event);
 	bool should_event_be_scheduled(Event* event);
@@ -1188,6 +1191,8 @@ private:
 	void manage_operation_completion(Event* event);
 
 	void push_into_current_events(Event* event);
+
+	double get_soonest_event_time(vector<Event*> const& events) const;
 
 	vector<Event*> future_events;
 	//vector<Event*> current_events;
@@ -1233,9 +1238,6 @@ public:
 	virtual void trim(Event *event) = 0;
 
 	virtual void print_ftl_statistics();
-
-	friend class Block_manager;
-	friend class Block_manager_parallel;
 
 	ulong get_erases_remaining(const Address &address) const;
 	enum page_state get_state(const Address &address) const;
@@ -1487,7 +1489,6 @@ public:
 	friend class FtlImpl_DftlParent;
 	friend class FtlImpl_Dftl;
 	friend class FtlImpl_BDftl;
-	friend class Block_manager;
 	friend class Block_manager_parallel;
 	friend class IOScheduler;
 

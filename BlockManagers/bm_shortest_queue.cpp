@@ -34,3 +34,11 @@ void Block_manager_parallel::register_erase_outcome(Event const& event, enum sta
 Address Block_manager_parallel::choose_best_address(Event const& write) {
 	return get_free_block_pointer_with_shortest_IO_queue();
 }
+
+Address Block_manager_parallel::choose_any_address(Event const& write) {
+	Address a = get_free_block_pointer_with_shortest_IO_queue();
+	if (can_schedule_write_immediately(a, write.get_current_time())) {
+		return a;
+	}
+	return a;
+}

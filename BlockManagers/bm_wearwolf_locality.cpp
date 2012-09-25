@@ -89,9 +89,9 @@ Address Wearwolf_Locality::choose_best_address(Event const& event) {
 	return perform_sequential_write(event, key);
 }
 
-Address Wearwolf_Locality::choose_any_address() {
-	Address a = Wearwolf::choose_any_address();
-	if (has_free_pages(a)) {
+Address Wearwolf_Locality::choose_any_address(Event const& write) {
+	Address a = Wearwolf::choose_any_address(write);
+	if (can_schedule_write_immediately(a, write.get_current_time())) {
 		return a;
 	}
 	map<long, sequential_writes_pointers >::iterator iter = seq_write_key_to_pointers_mapping.begin();
@@ -99,8 +99,9 @@ Address Wearwolf_Locality::choose_any_address() {
 		vector<vector<Address> >& pointers = (*iter).second.pointers;
 		for (uint i = 0; i < pointers.size(); i++) {
 			for (uint j = 0; j < pointers[i].size(); j++) {
-				if (has_free_pages(pointers[i][j])) {
-					return pointers[i][j];
+				Address pointer = pointers[i][j];
+				if (can_schedule_write_immediately(pointer, write.get_current_time())) {
+					return pointer;
 				}
 			}
 		}
