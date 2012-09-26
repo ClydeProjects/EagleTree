@@ -27,15 +27,27 @@ vector<Thread*>  naive_greedy(int highest_lba, double IO_submission_rate) {
 	return random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<Thread*>  intelligent_lazy(int highest_lba, double IO_submission_rate) {
+vector<Thread*>  intelligent_lazy_gc_priorty(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = false;
 	SCHEDULING_SCHEME = 1;
 	return random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<Thread*>  intelligent_greedy(int highest_lba, double IO_submission_rate) {
+vector<Thread*>  intelligent_greedy_gc_priorty(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = true;
 	SCHEDULING_SCHEME = 1;
+	return random_writes_experiment(highest_lba, IO_submission_rate);
+}
+
+vector<Thread*>  intelligent_greedy_equal_priority(int highest_lba, double IO_submission_rate) {
+	GREEDY_GC = true;
+	SCHEDULING_SCHEME = 2;
+	return random_writes_experiment(highest_lba, IO_submission_rate);
+}
+
+vector<Thread*>  intelligent_greedy_equal_priority_interleaved(int highest_lba, double IO_submission_rate) {
+	GREEDY_GC = true;
+	SCHEDULING_SCHEME = 3;
 	return random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
@@ -68,10 +80,13 @@ int main()
 	double start_time = Experiment_Runner::wall_clock_time();
 
 	vector<ExperimentResult> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_lazy,				space_min, space_max, space_inc, exp_folder + "naive_lazy/", "naive_lazy", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_greedy,				space_min, space_max, space_inc, exp_folder + "naive_greedy/", "naive_greedy", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_lazy,			space_min, space_max, space_inc, exp_folder + "intelligent_lazy/", "intelligent_lazy", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_greedy,		space_min, space_max, space_inc, exp_folder + "intelligent_greedy/", "intelligent_greedy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_lazy,					space_min, space_max, space_inc, exp_folder + "naive_lazy/", "naive lazy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_greedy,					space_min, space_max, space_inc, exp_folder + "naive_greedy/", "naive greedy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_lazy_gc_priorty,	space_min, space_max, space_inc, exp_folder + "intelligent_lazy_gc_priorty/", "intelligent, lazy, GC Prio", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_lazy_gc_priorty,	space_min, space_max, space_inc, exp_folder + "intelligent_lazy_gc_priorty/", "intelligent, greedy, GC Prio", IO_limit) );
+
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_greedy_equal_priority,				space_min, space_max, space_inc, exp_folder + "intelligent_greedy_equal_priority/", "intelligent, lazy, Eq Prio", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_greedy_equal_priority_interleaved,	space_min, space_max, space_inc, exp_folder + "intelligent_greedy_equal_priority_interleaved/", "intelligent, greedy, Eq Prio, Inter", IO_limit) );
 
 	// Print column names for info
 	for (uint i = 0; i < exp[0].column_names.size(); i++)
