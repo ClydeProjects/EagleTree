@@ -1655,7 +1655,6 @@ private:
 	vector<vector<vector<double> > > bus_wait_time_for_reads_per_LUN;
 	vector<vector<uint> > num_reads_per_LUN;
 
-	vector<vector<double> > sum_bus_wait_time_for_writes_per_LUN;
 	vector<vector<vector<double> > > bus_wait_time_for_writes_per_LUN;
 	vector<vector<uint> > num_writes_per_LUN;
 

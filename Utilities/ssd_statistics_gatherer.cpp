@@ -25,7 +25,6 @@ StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
 	  sum_bus_wait_time_for_reads_per_LUN(SSD_SIZE, vector<double>(PACKAGE_SIZE, 0)),
 	  bus_wait_time_for_reads_per_LUN(SSD_SIZE, vector<vector<double> >(PACKAGE_SIZE, vector<double>())),
 	  num_reads_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
-	  sum_bus_wait_time_for_writes_per_LUN(SSD_SIZE, vector<double>(PACKAGE_SIZE, 0)),
 	  bus_wait_time_for_writes_per_LUN(SSD_SIZE, vector<vector<double> >(PACKAGE_SIZE, vector<double>())),
 	  num_writes_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_gc_reads_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
@@ -82,7 +81,6 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 
 	Address a = event.get_address();
 	if (event.get_event_type() == WRITE) {
-		sum_bus_wait_time_for_writes_per_LUN[a.package][a.die] += event.get_latency();
 		if (event.is_original_application_io()) {
 			num_writes_per_LUN[a.package][a.die]++;
 			bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_latency());
@@ -263,7 +261,7 @@ void StatisticsGatherer::print() {
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 
-			double avg_write_wait_time = get_average(bus_wait_time_for_reads_per_LUN[i][j]);
+			double avg_write_wait_time = get_average(bus_wait_time_for_writes_per_LUN[i][j]);
 
 			avg_overall_write_wait_time += avg_write_wait_time;
 
@@ -664,11 +662,8 @@ void StatisticsGatherer::print_csv() {
 	printf("\n");
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			double average_write_wait_time = sum_bus_wait_time_for_writes_per_LUN[i][j] / num_writes_per_LUN[i][j];
+			double average_write_wait_time = get_average(bus_wait_time_for_writes_per_LUN[i][j]);
 			double average_read_wait_time = sum_bus_wait_time_for_reads_per_LUN[i][j] / num_reads_per_LUN[i][j];
-			if (num_writes_per_LUN[i][j] == 0) {
-				average_write_wait_time = 0;
-			}
 			if (num_reads_per_LUN[i][j] == 0) {
 				average_read_wait_time = 0;
 			}
