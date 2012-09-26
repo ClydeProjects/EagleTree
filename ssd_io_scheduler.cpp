@@ -180,7 +180,7 @@ void IOScheduler::execute_current_waiting_ios() {
 		else if (type == WRITE) {
 			if (is_GC) {
 				gc_writes.push_back(event);
-			} else if (is_GC) {
+			} else {
 				writes.push_back(event);
 			}
 		}
