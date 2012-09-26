@@ -146,21 +146,27 @@ vector<Event*> IOScheduler::collect_soonest_events() {
 
 // tries to execute all current events. Some events may be put back in the queue if they cannot be executed.
 void IOScheduler::execute_current_waiting_ios() {
-	//printf("current_events   %d\n", current_events.size());
-	//printf("future_events   %d\n", future_events.size());
 	vector<Event*> events = collect_soonest_events();
+
 	vector<Event*> read_commands;
+	//vector<Event*> gc_read_commands;
+
 	vector<Event*> read_transfers;
+
 	vector<Event*> gc_writes;
 	vector<Event*> writes;
+
 	vector<Event*> erases;
+
 	vector<Event*> copy_backs;
+
 	vector<Event*> noop_events;
 
 	while (events.size() > 0) {
 		Event * event = events.back();
 		events.pop_back();
 		event_type type = event->get_event_type();
+		bool is_GC = event->is_garbage_collection_op();
 
 		if (event->get_noop()) {
 			noop_events.push_back(event);
@@ -171,14 +177,12 @@ void IOScheduler::execute_current_waiting_ios() {
 		else if (type == READ_TRANSFER) {
 			read_transfers.push_back(event);
 		}
-		else if (!PRIORITISE_GC && type == WRITE) {
-			writes.push_back(event);
-		}
-		else if (type == WRITE && !event->is_garbage_collection_op()) {
-			writes.push_back(event);
-		}
-		else if (type == WRITE && event->is_garbage_collection_op()) {
-			gc_writes.push_back(event);
+		else if (type == WRITE) {
+			if (is_GC) {
+				gc_writes.push_back(event);
+			} else if (is_GC) {
+				writes.push_back(event);
+			}
 		}
 		else if (type == ERASE) {
 			erases.push_back(event);
@@ -190,21 +194,36 @@ void IOScheduler::execute_current_waiting_ios() {
 			execute_next(event);
 		}
 	}
+
 	handle_noop_events(noop_events);
 	handle_next_batch(copy_backs); // Copy backs should be prioritized first to avoid conflict, since they have a reserved page waiting to be written
-	handle_next_batch(erases);
-	handle_next_batch(read_commands);
-	handle_writes(gc_writes);
-	handle_next_batch(read_transfers);
-	handle_writes(writes);
-	//long size = get_current_events_size();
-/*
-	if (size >= MAX_SSD_QUEUE_SIZE) {
-		//StateVisualiser::print_page_status();
-		printf("Events queue maximum size exceeded:  %d\n", size);
-		throw "Events queue maximum size exceeded.";
+
+	//read_commands.insert(read_commands.end(), gc_read_commands.begin(), gc_read_commands.end());
+
+	// Intuitive scheme. Prioritize Application IOs
+	if (SCHEDULING_SCHEME == 0) {
+		handle_next_batch(read_commands);
+		handle_next_batch(read_transfers);
+		handle_writes(writes);
+		handle_writes(gc_writes);
+		handle_next_batch(erases);
 	}
-*/
+	// Traditional - GC PRIORITY
+	else if (SCHEDULING_SCHEME == 1) {
+		handle_next_batch(erases);
+		handle_next_batch(read_commands);
+		handle_writes(gc_writes);
+		handle_next_batch(read_transfers);
+		handle_writes(writes);
+	}
+	// Traditional - EQUAL PRIORITY
+	else if (SCHEDULING_SCHEME == 2) {
+		writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
+		handle_next_batch(erases);
+		handle_next_batch(read_commands);
+		handle_next_batch(read_transfers);
+		handle_writes(writes);
+	}
 }
 
 double IOScheduler::get_soonest_event_time(vector<Event*> const& events) const {
@@ -350,9 +369,6 @@ void IOScheduler::handle_noop_events(vector<Event*>& events) {
 			dependents.pop_front();
 			ssd.register_event_completion(e);
 		}
-		/*if (event->is_original_application_io()) {
-			printf("NOOPED APP IO:  "); event->print();
-		}*/
 		dependencies.erase(dependency_code);
 		dependency_code_to_LBA.erase(dependency_code);
 		dependency_code_to_type.erase(dependency_code);
@@ -444,20 +460,16 @@ enum status IOScheduler::execute_next(Event* event) {
 
 void IOScheduler::manage_operation_completion(Event* event) {
 	int dependency_code = event->get_application_io_id();
-	uint lba = dependency_code_to_LBA[dependency_code];
-
 	dependency_code_to_LBA.erase(dependency_code);
 	dependency_code_to_type.erase(dependency_code);
 	while (op_code_to_dependent_op_codes.count(dependency_code) == 1 && op_code_to_dependent_op_codes[dependency_code].size() > 0) {
 		uint dependent_code = op_code_to_dependent_op_codes[dependency_code].front();
 		op_code_to_dependent_op_codes[dependency_code].pop();
 		Event* dependant_event = dependencies[dependent_code].front();
-
 		double diff = event->get_current_time() - dependant_event->get_current_time();
 		dependant_event->incr_bus_wait_time(diff);
 		dependencies[dependent_code].pop_front();
 		init_event(dependant_event);
-		//future_events.push_back(dependant_event);
 	}
 	op_code_to_dependent_op_codes.erase(dependency_code);
 }
@@ -465,8 +477,7 @@ void IOScheduler::manage_operation_completion(Event* event) {
 void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	if (outcome == FAILURE) {
 		event->print();
-		//StateVisualiser::print_page_status();
-		assert(false); // events should not fail at this point. Any failure indicates application error
+		assert(false);
 	}
 
 	VisualTracer::get_instance()->register_completed_event(*event);
@@ -490,26 +501,6 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		event->print();
 	}
 	StatisticsGatherer::get_instance()->register_completed_event(*event);
-
-	if (event->get_latency() > 1691) {
-			//VisualTracer::get_instance()->print_horizontally_with_breaks();
-			//event->print();
-			//StateVisualiser::print_page_status();
-		}
-
-	if (event->get_latency() > 1691 && event->is_original_application_io()) {
-		//VisualTracer::get_instance()->print_horizontally_with_breaks();
-		//event->print();
-		//StateVisualiser::print_page_status();
-	}
-
-	if (event->get_id() == 57680) {
-		//VisualTracer::get_instance()->print_horizontally_with_breaks();
-		//event->print();
-		//StateVisualiser::print_page_status();
-	}
-
-
 }
 
 void IOScheduler::print_stats() {

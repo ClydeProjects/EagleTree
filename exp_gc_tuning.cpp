@@ -1,27 +1,4 @@
 
-/* Copyright 2009, 2010 Brendan Tauras */
-/* run_test.cpp is part of FlashSim. */
-
-/* FlashSim is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * any later version. */
-
-/* FlashSim is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details. */
-
-/* You should have received a copy of the GNU General Public License
- * along with FlashSim.  If not, see <http://www.gnu.org/licenses/>. */
-
-/****************************************************************************/
-
-/* Basic test driver
- * Brendan Tauras 2009-11-02
- *
- * driver to create and run a very basic test of writes then reads */
-
 #include "ssd.h"
 #include <unistd.h>   // chdir
 #include <sys/stat.h> // mkdir
@@ -53,23 +30,6 @@ vector<Thread*>  sequential_writes_lazy_gc(int highest_lba, double IO_submission
 	return basic_sequential_experiment(highest_lba, IO_submission_rate);
 }
 
-/*vector<Thread*>  synch_random_writes_experiment(int highest_lba, double IO_submission_rate) {
-	long num_IOs = 2000;
-	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
-	double num_threads = SSD_SIZE * PACKAGE_SIZE;
-	long space_per_thread = highest_lba / num_threads;
-
-	for (uint i = 0; i < num_threads; i++) {
-		long min_lba = space_per_thread * i;
-		long max_lba = space_per_thread * (i + 1) - 1;
-		t1->add_follow_up_thread(new Synchronous_Random_Thread(min_lba, max_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
-	}
-
-	vector<Thread*> threads;
-	threads.push_back(t1);
-	return threads;
-}*/
-
 vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 0;
 	long num_IOs = numeric_limits<int>::max();
@@ -80,28 +40,27 @@ vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_
 	return threads;
 }
 
-
 vector<Thread*>  greedy_gc_priority(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = true;
-	PRIORITISE_GC = true;
+	SCHEDULING_SCHEME = 1;
 	return random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*>  greedy_equal_priority(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = true;
-	PRIORITISE_GC = false;
+	SCHEDULING_SCHEME = 2;
 	return random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*>  lazy_gc_priority(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = false;
-	PRIORITISE_GC = true;
+	SCHEDULING_SCHEME = 1;
 	return random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*>  lazy_equal_priority(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = false;
-	PRIORITISE_GC = false;
+	SCHEDULING_SCHEME = 2;
 	return random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
