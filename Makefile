@@ -32,7 +32,7 @@
 # classes.  It is suggested to test with the "test" make target first.
 
 CC = /usr/bin/gcc
-CFLAGS = -Wall -Wextra -g
+CFLAGS = -Wall -Wextra -g -O2
 CXX = /usr/bin/g++
 CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
@@ -56,7 +56,12 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
-all: gc_tuning
+all: scheduling
+
+scheduling: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o scheduling exp_scheduling_policies.cpp $(OBJ)
+	-chmod $(PERMS) $(OBJ)
+	-chmod $(EPERMS) scheduling
 
 erase_queues: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o erase_queues exp_erase_queues.cpp $(OBJ)
@@ -89,7 +94,7 @@ load_balancing: $(HDR) $(OBJ)
 	-chmod $(EPERMS) load_balancing
 
 clean:
-	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) sequential erase_queues gc_tuning
+	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) sequential erase_queues gc_tuning scheduling
 
 files:
 	echo $(SRC) $(HDR)

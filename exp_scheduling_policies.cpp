@@ -94,6 +94,7 @@ int main()
 	Experiment_Runner::graph(sx, sy,   "Latency std", 						"latency std", 			15, 	exp);
 	Experiment_Runner::graph(sx, sy,   "Num Migrations", 					"num_migrations", 		3, 		exp);
 	Experiment_Runner::graph(sx, sy,   "Write wait, max", 					"Write wait, max (µs)", 14, 	exp);
+	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram", exp, 90, true);
 	//Experiment_Runner::graph(sx, sy,   "Write wait, Q25", "Write wait, Q25 (µs)", 11, exp);
 	//Experiment_Runner::graph(sx, sy,   "Write wait, Q50", "Write wait, Q50 (µs)", 12, exp);
 	//Experiment_Runner::graph(sx, sy,   "Write wait, Q75", "Write wait, Q75 (µs)", 13, exp);

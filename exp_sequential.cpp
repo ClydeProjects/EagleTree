@@ -125,9 +125,9 @@ int main()
 	BLOCK_ERASE_DELAY = 150;
 
 	int IO_limit = 100000 * 2;
-	int space_min = 90;
-	int space_max = 92;
-	int space_inc = 2;
+	int space_min = 75;
+	int space_max = 90;
+	int space_inc = 5;
 
 	double start_time = Experiment_Runner::wall_clock_time();
 
@@ -138,17 +138,9 @@ int main()
 
 	PRIORITISE_GC = false;
 	USE_ERASE_QUEUE = true;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(tagging, 			space_min, space_max, space_inc, exp_folder + "oracle_erase/",			"Oracle Erase Queue", IO_limit) );
-
-	USE_ERASE_QUEUE = false;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(tagging, 			space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );
-
-
-
-
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
-	//space_max = 90;
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(tagging, 			space_min, space_max, space_inc, exp_folder + "oracle_erase/",			"Oracle", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
 	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_CHANNEL, space_min, space_max, space_inc, exp_folder + "seq_detect_channel/","Seq Detect: CHANNEL", IO_limit) );
 	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_BLOCK, 	space_min, space_max, space_inc, exp_folder + "seq_detect_block/",	"Seq Detect: SSD", IO_limit) );
 

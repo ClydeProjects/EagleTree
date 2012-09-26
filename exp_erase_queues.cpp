@@ -126,7 +126,7 @@ int main()
 
 	int IO_limit = 100000 * 4;
 	int space_min = 70;
-	int space_max = 94;
+	int space_max = 90;
 	int space_inc = 2;
 
 	double start_time = Experiment_Runner::wall_clock_time();
