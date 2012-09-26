@@ -13,3 +13,5 @@
 *.csv
 *.prefs
 *.gle
+*.eps
+callgrind.*
