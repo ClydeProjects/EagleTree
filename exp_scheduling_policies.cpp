@@ -5,31 +5,6 @@
 
 using namespace ssd;
 
-vector<Thread*> basic_sequential_experiment(int highest_lba, double IO_submission_rate) {
-	BLOCK_MANAGER_ID = 3;
-	WEARWOLF_LOCALITY_THRESHOLD = 10;
-	LOCALITY_PARALLEL_DEGREE = 2;
-
-	long max_file_size = highest_lba / 4;
-	long num_files = 100000;
-
-	Thread* fm1 = new File_Manager(0, highest_lba, num_files, max_file_size, IO_submission_rate, 1, 1);
-
-	vector<Thread*> threads;
-	threads.push_back(fm1);
-	return threads;
-}
-
-vector<Thread*>  sequential_writes_greedy_gc(int highest_lba, double IO_submission_rate) {
-	GREEDY_GC = true;
-	return basic_sequential_experiment(highest_lba, IO_submission_rate);
-}
-
-vector<Thread*>  sequential_writes_lazy_gc(int highest_lba, double IO_submission_rate) {
-	GREEDY_GC = false;
-	return basic_sequential_experiment(highest_lba, IO_submission_rate);
-}
-
 vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 0;
 	long num_IOs = numeric_limits<int>::max();
@@ -40,33 +15,33 @@ vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_
 	return threads;
 }
 
-vector<Thread*>  greedy_gc_priority(int highest_lba, double IO_submission_rate) {
-	GREEDY_GC = true;
-	SCHEDULING_SCHEME = 1;
+vector<Thread*>  naive_lazy(int highest_lba, double IO_submission_rate) {
+	GREEDY_GC = false;
+	SCHEDULING_SCHEME = 0;
 	return random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<Thread*>  greedy_equal_priority(int highest_lba, double IO_submission_rate) {
+vector<Thread*>  naive_greedy(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = true;
-	SCHEDULING_SCHEME = 2;
+	SCHEDULING_SCHEME = 0;
 	return random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<Thread*>  lazy_gc_priority(int highest_lba, double IO_submission_rate) {
+vector<Thread*>  intelligent_lazy(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = false;
 	SCHEDULING_SCHEME = 1;
 	return random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<Thread*>  lazy_equal_priority(int highest_lba, double IO_submission_rate) {
-	GREEDY_GC = false;
-	SCHEDULING_SCHEME = 2;
+vector<Thread*>  intelligent_greedy(int highest_lba, double IO_submission_rate) {
+	GREEDY_GC = true;
+	SCHEDULING_SCHEME = 1;
 	return random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
 int main()
 {
-	string exp_folder  = "exp_gc_tuning/";
+	string exp_folder  = "exp_scheduling/";
 	mkdir(exp_folder.c_str(), 0755);
 
 	load_config();
@@ -93,10 +68,10 @@ int main()
 	double start_time = Experiment_Runner::wall_clock_time();
 
 	vector<ExperimentResult> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(greedy_gc_priority,		space_min, space_max, space_inc, exp_folder + "greedy_gc_priority/", "greedy, gc prio", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(greedy_equal_priority,	space_min, space_max, space_inc, exp_folder + "greedy_equal_priority/", "greedy, equal prio", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(lazy_gc_priority,			space_min, space_max, space_inc, exp_folder + "lazy_gc_priority/", "lazy, gc prio", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(lazy_equal_priority,		space_min, space_max, space_inc, exp_folder + "lazy_equal_priority/", "lazy, equal prio", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_lazy,				space_min, space_max, space_inc, exp_folder + "naive_lazy/", "naive_lazy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_greedy,				space_min, space_max, space_inc, exp_folder + "naive_greedy/", "naive_greedy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_lazy,			space_min, space_max, space_inc, exp_folder + "intelligent_lazy/", "intelligent_lazy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_greedy,		space_min, space_max, space_inc, exp_folder + "intelligent_greedy/", "intelligent_greedy", IO_limit) );
 
 	// Print column names for info
 	for (uint i = 0; i < exp[0].column_names.size(); i++)

@@ -172,9 +172,16 @@ uint NUMBER_OF_ADDRESSABLE_BLOCKS = 0;
 /* RAISSDs: Number of physical SSDs */
 uint RAID_NUMBER_OF_PHYSICAL_SSDS = 0;
 
-bool PRIORITISE_GC = true;
-
 bool USE_ERASE_QUEUE = false;
+
+
+/*
+ * Scheduling scheme
+ * 0 ->  Naive: Read Command, Read Transfer, Write, GC, Erase
+ * 1 ->  GC PRIORITY
+ * 2 ->  Equal Priority
+ */
+extern int SCHEDULING_SCHEME = 2;
 
 /*
  * Block manager
