@@ -72,11 +72,6 @@ copyback_map: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o copyback_map exp_copyback_map.cpp $(OBJ)
 	-chmod $(PERMS) $(OBJ)
 	-chmod $(EPERMS) copyback_map
-
-gc_priorities: $(HDR) $(OBJ)
-	$(CXX) $(CXXFLAGS) -o gc_priorities exp_gc_priorities.cpp $(OBJ)
-	-chmod $(PERMS) $(OBJ)
-	-chmod $(EPERMS) gc_priorities
 	
 gc_tuning: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o gc_tuning exp_gc_tuning.cpp $(OBJ)
