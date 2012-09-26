@@ -71,7 +71,8 @@ vector<Thread*>  sequential_writes_lazy_gc(int highest_lba, double IO_submission
 }*/
 
 vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
-	long num_IOs = 100000000;
+	BLOCK_MANAGER_ID = 0;
+	long num_IOs = numeric_limits<int>::max();
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
 	vector<Thread*> threads;
@@ -80,15 +81,27 @@ vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_
 }
 
 
-vector<Thread*>  random_writes_greedy_gc(int highest_lba, double IO_submission_rate) {
-	BLOCK_MANAGER_ID = 0;
+vector<Thread*>  greedy_gc_priority(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = true;
+	PRIORITISE_GC = true;
 	return random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<Thread*>  random_writes_lazy_gc(int highest_lba, double IO_submission_rate) {
-	BLOCK_MANAGER_ID = 0;
+vector<Thread*>  greedy_equal_priority(int highest_lba, double IO_submission_rate) {
+	GREEDY_GC = true;
+	PRIORITISE_GC = false;
+	return random_writes_experiment(highest_lba, IO_submission_rate);
+}
+
+vector<Thread*>  lazy_gc_priority(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = false;
+	PRIORITISE_GC = true;
+	return random_writes_experiment(highest_lba, IO_submission_rate);
+}
+
+vector<Thread*>  lazy_equal_priority(int highest_lba, double IO_submission_rate) {
+	GREEDY_GC = false;
+	PRIORITISE_GC = false;
 	return random_writes_experiment(highest_lba, IO_submission_rate);
 }
 
@@ -97,45 +110,23 @@ int main()
 	string exp_folder  = "exp_gc_tuning/";
 	mkdir(exp_folder.c_str(), 0755);
 
-	bool debug = true;
-
 	load_config();
 
-	/*
-	 * sequential_writes_lazy_gc
-	 * sequential_writes_greedy_gc
-	 * random_writes_greedy_gc
-	 * random_writes_lazy_gc
-	 */
+	SSD_SIZE = 4;
+	PACKAGE_SIZE = 2;
+	DIE_SIZE = 1;
+	PLANE_SIZE = 128;
+	BLOCK_SIZE = 32;
 
-	if (debug) {
-		SSD_SIZE = 4;
-		PACKAGE_SIZE = 2;
-		DIE_SIZE = 1;
-		PLANE_SIZE = 128;
-		BLOCK_SIZE = 32;
+	PAGE_READ_DELAY = 5;
+	PAGE_WRITE_DELAY = 20;
+	BUS_CTRL_DELAY = 1;
+	BUS_DATA_DELAY = 8;
+	BLOCK_ERASE_DELAY = 150;
 
-		PAGE_READ_DELAY = 5;
-		PAGE_WRITE_DELAY = 20;
-		BUS_CTRL_DELAY = 1;
-		BUS_DATA_DELAY = 8;
-		BLOCK_ERASE_DELAY = 150;
-	} else { // Real size
-		SSD_SIZE = 4;
-		PACKAGE_SIZE = 2;
-		DIE_SIZE = 1;
-		PLANE_SIZE = 128;
-		BLOCK_SIZE = 32;
-
-		PAGE_READ_DELAY = 5;
-		PAGE_WRITE_DELAY = 20;
-		BUS_CTRL_DELAY = 1;
-		BUS_DATA_DELAY = 8;
-		BLOCK_ERASE_DELAY = 150;
-	}
 	MAX_SSD_QUEUE_SIZE = 15;
 
-	int IO_limit = 300000;
+	int IO_limit = 200000;
 	int space_min = 75;
 	int space_max = 90;
 	int space_inc = 5;
@@ -143,10 +134,10 @@ int main()
 	double start_time = Experiment_Runner::wall_clock_time();
 
 	vector<ExperimentResult> exp;
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_greedy_gc,		space_min, space_max, space_inc, exp_folder + "rand_greed/", "rand greed", IO_limit) );
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(random_writes_lazy_gc,		space_min, space_max, space_inc, exp_folder + "rand_lazy/", "rand lazy", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_greedy_gc,	space_min, space_max, space_inc, exp_folder + "seq_greed/", "seq greed", IO_limit) );
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(sequential_writes_lazy_gc,	space_min, space_max, space_inc, exp_folder + "seq_lazy/", "seq lazy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(greedy_gc_priority,		space_min, space_max, space_inc, exp_folder + "greedy_gc_priority/", "greedy, gc prio", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(greedy_equal_priority,	space_min, space_max, space_inc, exp_folder + "greedy_equal_priority/", "greedy, equal prio", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(lazy_gc_priority,			space_min, space_max, space_inc, exp_folder + "lazy_gc_priority/", "lazy, gc prio", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(lazy_equal_priority,		space_min, space_max, space_inc, exp_folder + "lazy_equal_priority/", "lazy, equal prio", IO_limit) );
 
 	// Print column names for info
 	for (uint i = 0; i < exp[0].column_names.size(); i++)
@@ -163,19 +154,15 @@ int main()
 	int sy = 8;
 
 	chdir(exp_folder.c_str());
-	Experiment_Runner::graph(sx, sy,   "Maximum sustainable throughput", "throughput", 24, exp);
 
-	Experiment_Runner::graph(sx, sy,   "Total number of erases", "num_erases", 8, exp);
-
-	Experiment_Runner::graph(sx, sy,   "Latency standard dev", "latency std", 15, exp);
-	Experiment_Runner::graph(sx, sy,   "Latency standard dev", "num_migrations", 3, exp);
-
-	Experiment_Runner::graph(sx, sy,   "Latency standard dev", "num_migrations", 3, exp);
-
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q25", "Write wait, Q25 (µs)", 11, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q50", "Write wait, Q50 (µs)", 12, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q75", "Write wait, Q75 (µs)", 13, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, max", "Write wait, max (µs)", 14, exp);
+	Experiment_Runner::graph(sx, sy,   "Maximum sustainable throughput", 	"throughput", 			24, 	exp);
+	Experiment_Runner::graph(sx, sy,   "Num Erases", 						"num_erases", 			8, 		exp);
+	Experiment_Runner::graph(sx, sy,   "Latency std", 						"latency std", 			15, 	exp);
+	Experiment_Runner::graph(sx, sy,   "Num Migrations", 					"num_migrations", 		3, 		exp);
+	Experiment_Runner::graph(sx, sy,   "Write wait, max", 					"Write wait, max (µs)", 14, 	exp);
+	//Experiment_Runner::graph(sx, sy,   "Write wait, Q25", "Write wait, Q25 (µs)", 11, exp);
+	//Experiment_Runner::graph(sx, sy,   "Write wait, Q50", "Write wait, Q50 (µs)", 12, exp);
+	//Experiment_Runner::graph(sx, sy,   "Write wait, Q75", "Write wait, Q75 (µs)", 13, exp);
 
 	for (uint i = 0; i < exp.size(); i++) {
 		chdir(exp[i].data_folder.c_str());

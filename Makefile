@@ -56,7 +56,7 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
-all: erase_queues
+all: gc_tuning
 
 erase_queues: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o erase_queues exp_erase_queues.cpp $(OBJ)
@@ -93,24 +93,8 @@ load_balancing: $(HDR) $(OBJ)
 	-chmod $(PERMS) $(OBJ)
 	-chmod $(EPERMS) load_balancing
 
-
-exp1: $(HDR) $(OBJ)
-	#$(CXX) $(CXXFLAGS) -I/home/niv/install/boost_1_47_0 -L/home/niv/install/boost_1_47_0/libs -o $(ELF2) run_exp1.cpp $(OBJ)
-	$(CXX) $(CXXFLAGS) -o $(ELF2) run_exp1.cpp $(OBJ)
-	-chmod $(PERMS) $(OBJ)
-	-chmod $(EPERMS) $(ELF2)
-#script -c "$(CXX) $(CXXFLAGS) -o $(ELF2) run_exp1.cpp $(OBJ)" $(LOG)
-#-chmod $(PERMS) $(LOG) $(OBJ)
-
-trace: $(HDR) $(OBJ)
-	$(CXX) $(CXXFLAGS) -o $(ELF1) run_trace.cpp $(OBJ)
-	-chmod $(PERMS) $(OBJ)
-	-chmod $(EPERMS) $(ELF1)
-#script -c "$(CXX) $(CXXFLAGS) -o $(ELF1) run_trace.cpp $(OBJ)" $(LOG)
-#-chmod $(PERMS) $(LOG) $(OBJ)
-
 clean:
-	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) sequential erase_queues
+	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) sequential erase_queues gc_tuning
 
 files:
 	echo $(SRC) $(HDR)
