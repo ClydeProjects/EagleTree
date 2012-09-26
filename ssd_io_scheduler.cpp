@@ -213,19 +213,11 @@ void IOScheduler::execute_current_waiting_ios() {
 		handle_next_batch(erases);
 		handle_next_batch(read_commands);
 		handle_writes(gc_writes);
-		handle_next_batch(read_transfers);
 		handle_writes(writes);
-	}
-	// Traditional - EQUAL PRIORITY
-	else if (SCHEDULING_SCHEME == 2) {
-		writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
-		handle_next_batch(erases);
-		handle_next_batch(read_commands);
 		handle_next_batch(read_transfers);
-		handle_writes(writes);
 	}
 	// EQUAL PRIORITY - INTERLEAVED
-	else if (SCHEDULING_SCHEME == 3) {
+	else if (SCHEDULING_SCHEME == 2) {
 		writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
 		handle_next_batch(erases);
 		handle_next_batch(read_commands);
