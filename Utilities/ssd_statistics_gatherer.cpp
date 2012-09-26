@@ -115,6 +115,8 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	wait_time_histogram[bucket]++;
 }
 
+
+
 void StatisticsGatherer::register_scheduled_gc(Event const& gc) {
 	num_gc_scheduled++;
 
@@ -172,6 +174,77 @@ void StatisticsGatherer::register_events_queue_length(uint queue_size, double ti
 	}
 }
 
+template <class T>
+double get_sum(vector<T> const& vector)
+{
+	double sum = 0;
+	for (uint i = 0; i < vector.size(); i++) {
+		sum += vector[i];
+	}
+    return sum;
+}
+
+template <class T>
+double get_average(vector<T> const& vector)
+{
+	double sum = get_sum(vector);
+    double avg = sum / vector.size();
+    return avg;
+}
+
+template <class T>
+double get_std(vector<T> const& vector)
+{
+	double avg = get_average(vector);
+	double std = 0;
+	for (uint i = 0; i < vector.size(); i++) {
+		double diff = (vector[i] - avg);
+		diff *= diff;
+		std += diff;
+	}
+	std /= vector.size();
+	std = sqrt (std);
+    return std;
+}
+
+template <class T>
+double get_sum(vector<vector<T> > const& vector)
+{
+	double sum = 0;
+	for (uint i = 0; i < vector.size(); i++) {
+		sum += get_sum(vector[i]);
+	}
+    return sum;
+}
+
+template <class T>
+double get_average(vector<vector<T> > const& vector)
+{
+	double sum = get_sum(vector);
+    double avg = sum / (vector.size() * vector[0].size());
+    return avg;
+}
+
+template <class T>
+double get_std(vector<vector<T> > const& vector)
+{
+	double avg = get_average(vector);
+	double std = 0;
+	for (uint i = 0; i < vector.size(); i++) {
+		for (uint j = 0; j < vector[i].size(); j++) {
+			double diff = (vector[i][j] - avg);
+			diff *= diff;
+			std += diff;
+		}
+	}
+	std /= vector.size() * vector[0].size();
+	std = sqrt (std);
+    return std;
+}
+
+
+
+
 void StatisticsGatherer::print() {
 	printf("\n\t");
 	printf("num writes\t");
@@ -182,47 +255,25 @@ void StatisticsGatherer::print() {
 	printf("erases\t\t");
 	printf("avg write wait\t");
 	printf("avg read wait\t");
-	//printf("age\t");
 
 	printf("\n");
-
-
-	uint total_writes = 0;
-	uint total_reads = 0;
-	uint total_gc_writes = 0;
-	uint total_gc_reads = 0;
-	uint total_gc_scheduled = 0;
-	uint total_copy_backs = 0;
-	uint total_erases = 0;
 	double avg_overall_write_wait_time = 0;
 	double avg_overall_read_wait_time = 0;
-	double avg_overall_gc_wait_time = 0;
 
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			total_writes += num_writes_per_LUN[i][j];
-			total_reads += num_reads_per_LUN[i][j];
-			total_gc_writes += num_gc_writes_per_LUN_origin[i][j];
-			total_gc_reads += num_gc_reads_per_LUN[i][j];
-			total_gc_scheduled += num_gc_scheduled_per_LUN[i][j];
-			total_copy_backs += num_copy_backs_per_LUN[i][j];
-			total_erases += num_erases_per_LUN[i][j];
 
-			double average_write_wait_time = sum_bus_wait_time_for_writes_per_LUN[i][j] / num_writes_per_LUN[i][j];
+			double avg_write_wait_time = get_average(bus_wait_time_for_reads_per_LUN[i][j]);
 
-			avg_overall_write_wait_time += average_write_wait_time;
+			avg_overall_write_wait_time += avg_write_wait_time;
 
 			double average_read_wait_time = sum_bus_wait_time_for_reads_per_LUN[i][j] / num_reads_per_LUN[i][j];
 
 			avg_overall_read_wait_time += average_read_wait_time;
 
-			if (num_writes_per_LUN[i][j] == 0) {
-				average_write_wait_time = 0;
-			}
 			if (num_reads_per_LUN[i][j] == 0) {
 				average_read_wait_time = 0;
 			}
-			double avg_age = compute_average_age(i, j);
 
 			printf("C%d D%d\t", i, j);
 
@@ -236,7 +287,7 @@ void StatisticsGatherer::print() {
 
 			printf("%d\t\t", num_erases_per_LUN[i][j]);
 
-			printf("%f\t", average_write_wait_time);
+			printf("%f\t", avg_write_wait_time);
 			printf("%f\t", average_read_wait_time);
 
 			//printf("%f\t", avg_age);
@@ -246,12 +297,12 @@ void StatisticsGatherer::print() {
 	avg_overall_write_wait_time /= SSD_SIZE * PACKAGE_SIZE;
 	avg_overall_read_wait_time /= SSD_SIZE * PACKAGE_SIZE;
 	printf("\nTotals:\t");
-	printf("%d\t\t", total_writes);
-	printf("%d\t\t", total_reads);
-	printf("%d\t\t", total_gc_writes);
-	printf("%d\t\t", total_gc_reads);
-	printf("%d\t\t", total_copy_backs);
-	printf("%d\t\t", total_erases);
+	printf("%d\t\t", (int) get_sum(num_writes_per_LUN));
+	printf("%d\t\t", (int) get_sum(num_reads_per_LUN));
+	printf("%d\t\t", (int) get_sum(num_gc_writes_per_LUN_origin));
+	printf("%d\t\t", (int) get_sum(num_gc_reads_per_LUN));
+	printf("%d\t\t", (int) get_sum(num_copy_backs_per_LUN));
+	printf("%d\t\t", (int) get_sum(num_erases_per_LUN));
 	printf("%f\t\t", avg_overall_write_wait_time);
 	printf("%f\t\t", avg_overall_read_wait_time);
 	printf("\n\n");
@@ -267,36 +318,18 @@ void StatisticsGatherer::print_gc_info() {
 	printf("GC wait \t\t");
 	printf("copy backs\t");
 	printf("erases\t\t");
-	//printf("age\t");
-
 	printf("\n");
 
-	uint total_gc_writes_origin = 0;
-	uint total_gc_writes_destination = 0;
-	uint total_gc_reads = 0;
-	uint total_gc_scheduled = 0;
-	uint total_gc_exec = 0;
-	uint total_copy_backs = 0;
-	uint total_erases = 0;
 	double avg_overall_gc_wait_time = 0;
 
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			total_gc_writes_origin += num_gc_writes_per_LUN_origin[i][j];
-			total_gc_writes_destination += num_gc_writes_per_LUN_destination[i][j];
-			total_gc_reads += num_gc_reads_per_LUN[i][j];
-			total_gc_scheduled += num_gc_scheduled_per_LUN[i][j];
-			total_gc_exec += num_executed_gc_ops[i][j];
-			total_copy_backs += num_copy_backs_per_LUN[i][j];
-			total_erases += num_erases_per_LUN[i][j];
 
 			double average_gc_wait_per_LUN = sum_gc_wait_time_per_LUN[i][j] / num_gc_writes_per_LUN_destination[i][j];
 
 			double average_migrations_per_gc = (double) num_live_pages_in_gc_exec[i][j] / num_executed_gc_ops[i][j];
 
 			avg_overall_gc_wait_time += average_gc_wait_per_LUN;
-
-			double avg_age = compute_average_age(i, j);
 
 			printf("C%d D%d\t", i, j);
 
@@ -309,23 +342,20 @@ void StatisticsGatherer::print_gc_info() {
 			printf("%d\t\t", num_copy_backs_per_LUN[i][j]);
 			printf("%d\t\t", num_erases_per_LUN[i][j]);
 			printf("%f\t\t", average_migrations_per_gc);
-			//printf("%f\t", average_write_wait_time);
-			//printf("%f\t", average_read_wait_time);
-
-			//printf("%f\t", avg_age);
 			printf("\n");
 		}
 	}
+
 	avg_overall_gc_wait_time /= SSD_SIZE * PACKAGE_SIZE;
 	printf("\nTotals:\t");
-	printf("%d\t\t", total_gc_writes_origin);
-	printf("%d\t\t", total_gc_writes_destination);
-	printf("%d\t\t", total_gc_reads);
-	printf("%d\t\t", total_gc_scheduled);
-	printf("%d\t\t", total_gc_exec);
+	printf("%d\t\t", (int) get_sum(num_gc_writes_per_LUN_origin));
+	printf("%d\t\t", (int) get_sum(num_gc_writes_per_LUN_destination));
+	printf("%d\t\t", (int) get_sum(num_gc_reads_per_LUN));
+	printf("%d\t\t", (int) get_sum(num_gc_scheduled_per_LUN));
+	printf("%d\t\t", (int) get_sum(num_executed_gc_ops));
 	printf("%f\t\t", avg_overall_gc_wait_time);
-	printf("%d\t\t", total_copy_backs);
-	printf("%d\t\t", total_erases);
+	printf("%d\t\t", (int) get_sum(num_copy_backs_per_LUN));
+	printf("%d\t\t", (int) get_sum(num_erases_per_LUN));
 	printf("\n\n");
 	printf("num scheduled gc: %d \n", num_gc_scheduled);
 	printf("num executed gc: %d \n", num_gc_executed);
@@ -395,81 +425,35 @@ vector<string> StatisticsGatherer::totals_vector_header() {
 }
 
 uint StatisticsGatherer::total_reads() {
-	uint total_reads = 0;
-	for (uint i = 0; i < SSD_SIZE; i++) {
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			total_reads += num_reads_per_LUN[i][j];
-		}
-	}
-	return total_reads;
+	return get_sum(num_reads_per_LUN);
 }
 
 uint StatisticsGatherer::total_writes() {
-	uint total_writes = 0;
-	for (uint i = 0; i < SSD_SIZE; i++) {
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			total_writes += num_writes_per_LUN[i][j];
-		}
-	}
-	return total_writes;
+	return get_sum(num_writes_per_LUN);
 }
 
 string StatisticsGatherer::totals_csv_line() {
-	uint total_writes = 0;
-	uint total_reads = 0;
-	uint total_gc_writes = 0;
-	uint total_gc_reads = 0;
-	uint total_gc_scheduled = 0;
-	uint total_copy_backs = 0;
-	uint total_erases = 0;
-	double avg_overall_write_wait_time = 0;
-	double avg_overall_read_wait_time = 0;
+	uint total_writes = get_sum(num_writes_per_LUN);
+	uint total_reads = get_sum(num_reads_per_LUN);
+	uint total_gc_writes = get_sum(num_gc_writes_per_LUN_origin);
+	uint total_gc_reads = get_sum(num_gc_reads_per_LUN);
+	uint total_gc_scheduled = get_sum(num_gc_scheduled_per_LUN);
+	uint total_copy_backs = get_sum(num_copy_backs_per_LUN);
+	uint total_erases = get_sum(num_erases_per_LUN);
+
 	double avg_overall_gc_wait_time = 0;
 
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			total_writes += num_writes_per_LUN[i][j];
-			total_reads += num_reads_per_LUN[i][j];
-			total_gc_writes += num_gc_writes_per_LUN_origin[i][j];
-			total_gc_reads += num_gc_reads_per_LUN[i][j];
-			total_gc_scheduled += num_gc_scheduled_per_LUN[i][j];
-			total_copy_backs += num_copy_backs_per_LUN[i][j];
-			total_erases += num_erases_per_LUN[i][j];
-
-			double average_write_wait_time = sum_bus_wait_time_for_writes_per_LUN[i][j] / num_writes_per_LUN[i][j];
-
-			avg_overall_write_wait_time += average_write_wait_time;
-
-			double average_read_wait_time = sum_bus_wait_time_for_reads_per_LUN[i][j] / num_reads_per_LUN[i][j];
-
-			avg_overall_read_wait_time += average_read_wait_time;
-
 			double average_gc_wait_per_LUN = sum_gc_wait_time_per_LUN[i][j] / num_gc_writes_per_LUN_origin[i][j];
-
 			avg_overall_gc_wait_time += average_gc_wait_per_LUN;
-
-			if (num_writes_per_LUN[i][j] == 0) {
-				average_write_wait_time = 0;
-			}
-			if (num_reads_per_LUN[i][j] == 0) {
-				average_read_wait_time = 0;
-			}
-			double avg_age = compute_average_age(i, j);
 		}
 	}
-	avg_overall_write_wait_time /= SSD_SIZE * PACKAGE_SIZE;
-	avg_overall_read_wait_time /= SSD_SIZE * PACKAGE_SIZE;
 	avg_overall_gc_wait_time /= SSD_SIZE * PACKAGE_SIZE;
 
 	// Compute standard deviation of read, write and GC wait
-	double max_write_wait_time = 0;
-	double max_read_wait_time = 0;
-	double max_gc_wait_time = 0;
-	double stddev_overall_write_wait_time = 0;
-	double stddev_overall_read_wait_time = 0;
+
 	double stddev_overall_gc_wait_time = 0;
-	uint write_wait_time_population = 0;
-	uint read_wait_time_population = 0;
 	uint gc_wait_time_population = 0;
 
 	vector<double> all_write_wait_times;
@@ -487,19 +471,12 @@ string StatisticsGatherer::totals_csv_line() {
 
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			for (uint k = 0; k < bus_wait_time_for_writes_per_LUN[i][j].size(); k++)
-				stddev_overall_write_wait_time += pow(bus_wait_time_for_writes_per_LUN[i][j][k] - avg_overall_write_wait_time, 2);
-			write_wait_time_population += bus_wait_time_for_writes_per_LUN[i][j].size();
-			for (uint k = 0; k < bus_wait_time_for_reads_per_LUN[i][j].size(); k++)
-				stddev_overall_read_wait_time += pow(bus_wait_time_for_reads_per_LUN[i][j][k] - avg_overall_read_wait_time, 2);
-			read_wait_time_population += bus_wait_time_for_reads_per_LUN[i][j].size();
-			for (uint k = 0; k < gc_wait_time_per_LUN[i][j].size(); k++)
+			for (uint k = 0; k < gc_wait_time_per_LUN[i][j].size(); k++) {
 				stddev_overall_gc_wait_time += pow(gc_wait_time_per_LUN[i][j][k] - avg_overall_gc_wait_time, 2);
+			}
 			gc_wait_time_population += gc_wait_time_per_LUN[i][j].size();
 		}
 	}
-	stddev_overall_write_wait_time = sqrt(stddev_overall_write_wait_time / write_wait_time_population);
-	stddev_overall_read_wait_time = sqrt(stddev_overall_read_wait_time / read_wait_time_population);
 	stddev_overall_gc_wait_time = sqrt(stddev_overall_gc_wait_time / gc_wait_time_population);
 
 	stringstream ss;
@@ -514,21 +491,21 @@ string StatisticsGatherer::totals_csv_line() {
 
 	printf("max latency:  %f\n", all_write_wait_times.back());
 
-	ss << avg_overall_write_wait_time << ", ";  // mean
+	ss << get_average(all_write_wait_times) << ", ";  // mean
 	ss << all_write_wait_times.front() << ", "; // min
 	ss << all_write_wait_times[all_write_wait_times.size() * .25] << ", "; // Q25
 	ss << all_write_wait_times[all_write_wait_times.size() * .5]  << ", "; // Q50
 	ss << all_write_wait_times[all_write_wait_times.size() * .75] << ", "; // Q75
 	ss << all_write_wait_times.back() << ", ";  // max
-	ss << stddev_overall_write_wait_time << ", ";
+	ss << get_std(all_write_wait_times) << ", ";
 
-	ss << avg_overall_read_wait_time << ", ";  // mean
+	ss << get_average(all_read_wait_times) << ", ";  // mean
 	ss << all_read_wait_times.front() << ", "; // min
 	ss << all_read_wait_times[all_read_wait_times.size() * .25] << ", "; // Q25
 	ss << all_read_wait_times[all_read_wait_times.size() * .5]  << ", "; // Q50
 	ss << all_read_wait_times[all_read_wait_times.size() * .75] << ", "; // Q75
 	ss << all_read_wait_times.back() << ", ";  // max
-	ss << stddev_overall_read_wait_time << ", ";
+	ss << get_std(all_read_wait_times) << ", ";
 
 	ss << stddev_overall_gc_wait_time;
 
@@ -695,8 +672,6 @@ void StatisticsGatherer::print_csv() {
 			if (num_reads_per_LUN[i][j] == 0) {
 				average_read_wait_time = 0;
 			}
-			double avg_age = compute_average_age(i, j);
-
 			printf("%d,%d,", i, j);
 
 			printf("%d,", num_writes_per_LUN[i][j]);
@@ -715,18 +690,6 @@ void StatisticsGatherer::print_csv() {
 			printf("\n");
 		}
 	}
-}
-
-double StatisticsGatherer::compute_average_age(uint package_id, uint die_id) {
-	double sum_age = 0;
-	for (uint i = 0; i < DIE_SIZE; i++) {
-		for (uint j = 0; j < PLANE_SIZE; j++) {
-			 Block& b = ssd.getPackages()[package_id].getDies()[die_id].getPlanes()[i].getBlocks()[j];
-			 uint age = BLOCK_ERASES - b.get_erases_remaining();
-			 sum_age += age;
-		}
-	}
-	return sum_age / (DIE_SIZE * PLANE_SIZE);
 }
 
 
