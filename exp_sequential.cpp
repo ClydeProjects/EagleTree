@@ -33,22 +33,12 @@ using namespace ssd;
 // solution: have a method in bm_parent that returns a free block from the LUN with the shortest queue.
 
 vector<Thread*> sequential_experiment(int highest_lba, double IO_submission_rate) {
+	SCHEDULING_SCHEME = 2;
 	long log_space_per_thread = highest_lba / 2;
 	long max_file_size = log_space_per_thread / 4;
-	long num_files = 200000;
-
-	//Thread* fm1 = new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1);
-	//Thread* fm2 = new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 2, 2);
-
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, log_space_per_thread * 2, 1, WRITE, 100, 0);
-
-	t1->add_follow_up_thread(new File_Manager(0, log_space_per_thread, num_files, max_file_size, IO_submission_rate, 1, 1));
-
-	//t1->add_follow_up_thread(new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, num_files, max_file_size, IO_submission_rate, 1, 2));
-
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(log_space_per_thread + 1, log_space_per_thread * 2, 50000000, 2, WRITE, IO_submission_rate * 2, 1));
-
-
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, log_space_per_thread, 500000000, 2, WRITE, IO_submission_rate, 1));
+	t1->add_follow_up_thread(new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, 1000000, max_file_size, IO_submission_rate, 1, 1));
 	vector<Thread*> threads;
 	//threads.push_back(fm1);
 	//threads.push_back(fm2);
@@ -61,7 +51,6 @@ vector<Thread*> tagging(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = true;
 	ENABLE_TAGGING = true;
 	WEARWOLF_LOCALITY_THRESHOLD = 10;
-	LOCALITY_PARALLEL_DEGREE = 0;
 	return sequential_experiment(highest_lba, IO_submission_rate);
 }
 
@@ -124,8 +113,8 @@ int main()
 	BUS_DATA_DELAY = 8;
 	BLOCK_ERASE_DELAY = 150;
 
-	int IO_limit = 100000 * 2;
-	int space_min = 75;
+	int IO_limit = 200000;
+	int space_min = 70;
 	int space_max = 90;
 	int space_inc = 5;
 
@@ -136,13 +125,12 @@ int main()
 
 	vector<ExperimentResult> exp;
 
-	PRIORITISE_GC = false;
-	USE_ERASE_QUEUE = true;
+	USE_ERASE_QUEUE = false;
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_LUN, 	 space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",		"Seq Detect: LUN", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_CHANNEL, space_min, space_max, space_inc, exp_folder + "seq_detect_channel/",	"Seq Detect: CHA", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_BLOCK, 	 space_min, space_max, space_inc, exp_folder + "seq_detect_block/",		"Seq Detect: SSD", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(tagging, 			space_min, space_max, space_inc, exp_folder + "oracle_erase/",			"Oracle", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_CHANNEL, space_min, space_max, space_inc, exp_folder + "seq_detect_channel/","Seq Detect: CHANNEL", IO_limit) );
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_BLOCK, 	space_min, space_max, space_inc, exp_folder + "seq_detect_block/",	"Seq Detect: SSD", IO_limit) );
 
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
@@ -157,33 +145,26 @@ int main()
 	//for (int i = 0; i < exp[0].column_names.size(); i++) printf("%d: %s\n", i, exp[0].column_names[i].c_str());
 
 	chdir(exp_folder.c_str());
-	Experiment_Runner::graph(sx, sy,   "Block Manager Effect on Average Throughput, for mixed SW and RW", "throughput", 24, exp);
 
-	Experiment_Runner::graph(sx, sy,   "Total number of erases", "num_erases", 8, exp);
+	Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 				24, exp);
+	Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 		25, exp);
+	Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 			26, exp);
+	Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 				8, 	exp);
+	Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 			3, 	exp);
 
-	Experiment_Runner::graph(sx, sy,   "Latency standard dev", "latency std", 15, exp);
-	Experiment_Runner::graph(sx, sy,   "Latency standard dev", "num_migrations", 3, exp);
+	Experiment_Runner::graph(sx, sy,   "Write wait, mean", 			"Write wait, mean", 		9, 	exp);
+	Experiment_Runner::graph(sx, sy,   "Write wait, max", 			"Write wait, max", 			14, exp);
+	Experiment_Runner::graph(sx, sy,   "Write wait, std", 			"Write wait, std", 			15, exp);
 
-	Experiment_Runner::graph(sx, sy,   "Latency standard dev", "num_migrations", 3, exp);
-
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q25", "Write wait, Q25 (µs)", 11, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q50", "Write wait, Q50 (µs)", 12, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q75", "Write wait, Q75 (µs)", 13, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, max", "Write wait, max (µs)", 14, exp);
-
-
-    Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram", exp, 90, true);
-
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q25", "Write wait, Q25 (µs)", 11, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q50", "Write wait, Q50 (µs)", 12, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q75", "Write wait, Q75 (µs)", 13, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, max", "Write wait, max (µs)", 14, exp);
+	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
+	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, 1, 4);
+	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 70, 1, 4);
 
 	for (uint i = 0; i < exp.size(); i++) {
 		printf("%s\n", exp[i].data_folder.c_str());
 		chdir(exp[i].data_folder.c_str());
 		Experiment_Runner::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
-		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms", exp[i], used_space_values_to_show);
+		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], used_space_values_to_show, 1, 4);
 		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], used_space_values_to_show, true);
 		Experiment_Runner::age_histogram			(sx, sy/2, "age-histograms", exp[i], used_space_values_to_show);
 		Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);

@@ -107,7 +107,7 @@ double File_Manager::generate_death_probability() {
 
 void File_Manager::write_next_file(double current_time) {
 	assert(num_free_pages > 0); // deal with this problem later
-	double death_probability = double_generator() / 4;
+	double death_probability = double_generator() / 2;
 	//double death_probability = generate_death_probability();
 	uint size = 1 + random_number_generator() % max_file_size;
 	if (size > num_free_pages) {
@@ -209,7 +209,7 @@ void File_Manager::reclaim_file_space(File* file) {
 	free_ranges = new_list;
 }
 
-void File_Manager::print_thread_stats() {
+/*void File_Manager::print_thread_stats() {
 	int total_pages_written = 0;
 	for (uint i = 0; i < files_history.size(); i++) {
 		File* f = files_history[i];
@@ -224,7 +224,7 @@ void File_Manager::print_thread_stats() {
 	}
 	printf("total pages written: %d \n", total_pages_written);
 	printf("\n");
-}
+}*/
 
 // ----------------- Address_Range ---------------------------
 

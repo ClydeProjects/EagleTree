@@ -24,22 +24,15 @@ Thread::~Thread() {
 void Thread::register_event_completion(Event* event) {
 	Address phys = event->get_address();
 	Address ra = event->get_replace_address();
-	num_pages_in_each_LUN[phys.package][phys.die]++;
-	num_writes_to_each_LUN[phys.package][phys.die]++;
-	if (ra.valid != NONE) {
-		num_pages_in_each_LUN[ra.package][ra.die]--;
-	}
 	handle_event_completion(event);
+	num_ios_finished++;
 }
 
 void Thread::print_thread_stats() {
-	printf("printing thread:\n");
-	for (uint i = 0; i < SSD_SIZE; i++) {
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			printf("  %d  %d   %d\n", i, j, num_pages_in_each_LUN[i][j] );
-		}
-	}
+	printf("IOs finished by thread:  %d\n", num_ios_finished);
 }
+
+
 
 // =================  Synchronous_Sequential_Thread  =============================
 
@@ -197,6 +190,7 @@ Event* Asynchronous_Random_Thread_Reader_Writer::issue_next_io() {
 		event_type type = random_number_generator() % 2 == 0 ? WRITE : READ;
 		long lba = min_LBA + random_number_generator() % (max_LBA - min_LBA + 1);
 		event =  new Event(type, lba, 1, time);
+		//printf("Creating:  %d,  %s   ", numeric_limits<int>::max() - number_of_times_to_repeat, event->get_event_type() == WRITE ? "W" : "R"); event->print();
 		time += 1;
 	} else {
 		event = NULL;

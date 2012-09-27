@@ -17,7 +17,8 @@ Sequential_Pattern_Detector::Sequential_Pattern_Detector(uint threshold)
   registration_counter(0),
   listener(NULL),
   sequential_writes_identification_and_data(),
-  threshold(threshold) {}
+  threshold(threshold),
+  io_num(0) {}
 
 Sequential_Pattern_Detector::~Sequential_Pattern_Detector() {
 	map<logical_address, sequential_writes_tracking*>::iterator i = sequential_writes_identification_and_data.begin();
@@ -45,6 +46,7 @@ sequential_writes_tracking const& Sequential_Pattern_Detector::register_event(lo
 	if (++registration_counter % 50 == 0) {
 		remove_old_sequential_writes_metadata(time);
 	}
+	io_num++;
 	return *swt;
 }
 
@@ -54,6 +56,7 @@ sequential_writes_tracking* Sequential_Pattern_Detector::init_pattern(int key, d
 	}
 	sequential_writes_key_lookup[key + 1] = key;
 	sequential_writes_tracking* swt = new sequential_writes_tracking(time, key);
+	swt->last_io_num = io_num;
 	sequential_writes_identification_and_data[key] = swt;
 	return swt;
 }
@@ -63,6 +66,7 @@ sequential_writes_tracking* Sequential_Pattern_Detector::process_next_write(int 
 	sequential_writes_tracking* swm = sequential_writes_identification_and_data[key];
 	swm->counter++;
 	swm->last_arrival_timestamp = time;
+	swm->last_io_num = io_num;
 	sequential_writes_key_lookup.erase(lb);
 	sequential_writes_key_lookup[lb + 1] = key;
 	return swm;
@@ -78,6 +82,7 @@ sequential_writes_tracking * Sequential_Pattern_Detector::restart_pattern(int ke
 	sequential_writes_key_lookup[key + 1] = key;
 	swm->counter = 1;
 	swm->last_arrival_timestamp = time;
+	swm->last_io_num = io_num;
 	if (PRINT_LEVEL > 0) {
 		printf("SEQUENTIAL PATTERN RESTARTED!  key: %d\n", key);
 	}
@@ -94,7 +99,7 @@ void Sequential_Pattern_Detector::remove_old_sequential_writes_metadata(double t
 	while(iter != sequential_writes_identification_and_data.end())
 	{
 		logical_address key = (*iter).first;
-		if ((*iter).second->last_arrival_timestamp + 400 < time) {
+		if ((*iter).second->last_io_num + 200 < io_num) {
 			if (PRINT_LEVEL > 1) {
 				printf("deleting seq write with key %d:\n", key);
 			}
@@ -116,5 +121,6 @@ sequential_writes_tracking::sequential_writes_tracking(double time, long key)
 	  num_times_pattern_has_repeated(0),
 	  key(key),
 	  last_arrival_timestamp(time),
-	  init_timestamp(time)
+	  init_timestamp(time),
+	  last_io_num(0)
 {}

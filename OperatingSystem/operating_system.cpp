@@ -35,6 +35,7 @@ OperatingSystem::~OperatingSystem() {
 	for (uint i = 0; i < threads.size(); i++) {
 		Thread* t = threads[i];
 		if (t != NULL) {
+			t->print_thread_stats();
 			delete t;
 		}
 	}
@@ -50,24 +51,25 @@ OperatingSystem::~OperatingSystem() {
 }
 
 void OperatingSystem::run() {
-	const int idle_limit = 100000000; // 10 minutes
+	const int idle_limit = 3000000;
 	int idle_time = 0;
 	bool finished_experiment, still_more_work;
 	do {
 
 		int thread_id = pick_unlocked_event_with_shortest_start_time();
-
 		bool no_pending_event = thread_id == UNDEFINED;
-		//bool pending_event_starts_much_later = thread_id != UNDEFINED && currently_executing_ios_counter > 0 && last_dispatched_event_minimal_finish_time < events[thread_id]->get_start_time();
 		bool queue_is_full = currently_executing_ios_counter >= MAX_SSD_QUEUE_SIZE;
 
-		if (no_pending_event /* || pending_event_starts_much_later */|| queue_is_full) {
+		if (no_pending_event || queue_is_full) {
 			if (idle_time >= idle_limit) {
 				printf("Idle time limit reached\n");
 				printf("Running IOs:\n");
 				for (set<uint>::iterator it = currently_executing_ios.begin(); it != currently_executing_ios.end(); it++) {
 					printf("%d ", *it);
 				}
+				printf("\n");
+				//VisualTracer::get_instance()->print_horizontally_with_breaks();
+				//StateVisualiser::print_page_status();
 				throw;
 			}
 
@@ -77,14 +79,13 @@ void OperatingSystem::run() {
 		else {
 			idle_time = 0;
 			dispatch_event(thread_id);
-			/*if (currently_executing_ios_counter < MAX_SSD_QUEUE_SIZE) {
-				printf("Limit on number of queued application IOs exceeded:  %d\n", currently_executing_ios_counter);
-				throw "Limit on number of queued application IOs exceeded:";
-			}*/
 		}
 
 		if ((double)num_writes_completed / NUM_WRITES_TO_STOP_AFTER > (double)counter_for_user / 10.0) {
 			printf("finished %d%%.\t\tNum writes completed:  %d \n", counter_for_user * 10, num_writes_completed);
+			if (counter_for_user == 4) {
+				//PRINT_LEVEL = 1;
+			}
 			counter_for_user++;
 		}
 
@@ -162,7 +163,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	Thread* thread = threads[thread_id];
 	thread->register_event_completion(event);
 
-	if (event->get_event_type() == WRITE && !event->get_noop()) {
+	if ((event->get_event_type() == WRITE || event->get_event_type() == READ_TRANSFER)  /*&& !event->get_noop()*/) {
 		num_writes_completed++;
 	}
 

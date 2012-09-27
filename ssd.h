@@ -1083,6 +1083,7 @@ struct sequential_writes_tracking {
 	long key;
 	double last_arrival_timestamp;
 	double const init_timestamp;
+	ulong last_io_num;
 	sequential_writes_tracking(double time, long key);
 };
 
@@ -1103,6 +1104,7 @@ private:
 	uint registration_counter;
 	Sequential_Pattern_Detector_Listener* listener;
 	uint threshold;
+	ulong io_num;
 };
 
 class Wearwolf_Locality : public Wearwolf, public Sequential_Pattern_Detector_Listener {
@@ -1702,39 +1704,23 @@ private:
 class Thread
 {
 public:
-	Thread(double time) : finished(false), time(time),
-	num_pages_in_each_LUN(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
-	num_writes_to_each_LUN(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
-	threads_to_start_when_this_thread_finishes() {}
+	Thread(double time) : finished(false), time(time), threads_to_start_when_this_thread_finishes(), num_ios_finished(0) {}
 	virtual ~Thread();
-	Event* run() {
-		return finished ? NULL : issue_next_io();
-	}
-	void register_event_completion(Event* event);
-	bool is_finished() {
-		return finished;
-	}
-	void set_time(double current_time) {
-		time = current_time;
-	}
-	double get_time() {
-		return time;
-	}
+	Event* run() { return finished ? NULL : issue_next_io(); }
+	inline bool is_finished() { return finished; }
+	inline void set_time(double current_time) { time = current_time; }
+	inline double get_time() { return time; }
+	inline void add_follow_up_thread(Thread* thread) { threads_to_start_when_this_thread_finishes.push_back(thread); }
+	inline vector<Thread*>& get_follow_up_threads() { return threads_to_start_when_this_thread_finishes; }
 	virtual void print_thread_stats();
-	void add_follow_up_thread(Thread* thread) {
-		threads_to_start_when_this_thread_finishes.push_back(thread);
-	}
-	vector<Thread*>& get_follow_up_threads() {
-		return threads_to_start_when_this_thread_finishes;
-	}
+	void register_event_completion(Event* event);
 protected:
 	virtual Event* issue_next_io() = 0;
 	virtual void handle_event_completion(Event* event) = 0;
 	bool finished;
 	double time;
-	vector<vector<int> > num_pages_in_each_LUN;
-	vector<vector<int> > num_writes_to_each_LUN;
 	vector<Thread*> threads_to_start_when_this_thread_finishes;
+	ulong num_ios_finished;
 };
 
 class Synchronous_Sequential_Thread : public Thread
@@ -1890,7 +1876,7 @@ public:
 	~File_Manager();
 	Event* issue_next_io();
 	void handle_event_completion(Event* event);
-	virtual void print_thread_stats();
+	//virtual void print_thread_stats();
 	static void reset_id_generator();
 private:
 
