@@ -5,11 +5,21 @@
 
 using namespace ssd;
 
-vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
+/*vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 0;
 	long num_IOs = numeric_limits<int>::max();
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 2, WRITE, IO_submission_rate, 1));
+	vector<Thread*> threads;
+	threads.push_back(t1);
+	return threads;
+}*/
+
+vector<Thread*>  random_writes_reads_experiment(int highest_lba, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 0;
+	long num_IOs = numeric_limits<int>::max();
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread_Reader_Writer(0, highest_lba, num_IOs, 2, 1));
 	vector<Thread*> threads;
 	threads.push_back(t1);
 	return threads;
@@ -18,26 +28,27 @@ vector<Thread*>  random_writes_experiment(int highest_lba, double IO_submission_
 vector<Thread*>  naive_lazy(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = false;
 	SCHEDULING_SCHEME = 0;
-	return random_writes_experiment(highest_lba, IO_submission_rate);
+	return random_writes_reads_experiment(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*>  naive_greedy(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = true;
 	SCHEDULING_SCHEME = 0;
-	return random_writes_experiment(highest_lba, IO_submission_rate);
+	return random_writes_reads_experiment(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*>  intelligent_lazy_eq_priorty(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = false;
 	SCHEDULING_SCHEME = 2;
-	return random_writes_experiment(highest_lba, IO_submission_rate);
+	return random_writes_reads_experiment(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*>  intelligent_greedy_eq_priorty(int highest_lba, double IO_submission_rate) {
 	GREEDY_GC = true;
 	SCHEDULING_SCHEME = 2;
-	return random_writes_experiment(highest_lba, IO_submission_rate);
+	return random_writes_reads_experiment(highest_lba, IO_submission_rate);
 }
+
 
 
 int main()
@@ -63,16 +74,21 @@ int main()
 
 	int IO_limit = 200000;
 	int space_min = 70;
-	int space_max = 92;
-	int space_inc = 2;
+	int space_max = 90;
+	int space_inc = 5;
 
 	double start_time = Experiment_Runner::wall_clock_time();
 
+	PRINT_LEVEL = 0;
+
 	vector<ExperimentResult> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_lazy,						space_min, space_max, space_inc, exp_folder + "naive_lazy/", "naive lazy", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_greedy,						space_min, space_max, space_inc, exp_folder + "naive_greedy/", "naive greedy", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_lazy_eq_priorty,		space_min, space_max, space_inc, exp_folder + "intelligent_lazy_eq_priorty/", "Smart, lazy", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_greedy_eq_priorty,	space_min, space_max, space_inc, exp_folder + "intelligent_greedy_eq_priorty/", "Smart, greedy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_lazy,						space_min, space_max, space_inc, exp_folder + 		"naive_lazy/", "naive lazy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_greedy,						space_min, space_max, space_inc, exp_folder + 		"naive_greedy/", "naive greedy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_lazy_eq_priorty,		space_min, space_max, space_inc, exp_folder + 		"intelligent_lazy_eq_priorty/", "Smart, lazy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_greedy_eq_priorty,	space_min, space_max, space_inc, exp_folder + 		"intelligent_greedy_eq_priorty/", "Smart, greedy", IO_limit) );
+	//exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_greedy_eq_priorty_reads,	space_min, space_max, space_inc, exp_folder + 	"intelligent_greedy_eq_priorty_with_reads/", "Smart, greedy with reads", IO_limit) );
+
+
 
 	// Print column names for info
 	for (uint i = 0; i < exp[0].column_names.size(); i++)
@@ -90,20 +106,23 @@ int main()
 
 	chdir(exp_folder.c_str());
 
-	Experiment_Runner::graph(sx, sy,   "Maximum sustainable throughput", 		"throughput", 			24, 	exp);
-	Experiment_Runner::graph(sx, sy,   "Num Erases", 							"num_erases", 			8, 		exp);
+	Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 				24, exp);
+	Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 		25, exp);
+	Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 			26, exp);
+	Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 				8, 	exp);
+	Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 			3, 	exp);
 
-	Experiment_Runner::graph(sx, sy,   "Num Migrations", 						"num_migrations", 		3, 		exp);
+	Experiment_Runner::graph(sx, sy,   "Write wait, mean", 			"Write wait, mean", 	9, 	exp);
+	Experiment_Runner::graph(sx, sy,   "Write wait, max", 			"Write wait, max", 	14, exp);
+	Experiment_Runner::graph(sx, sy,   "Write wait, std", 			"Write wait, std", 				15, exp);
 
-	Experiment_Runner::graph(sx, sy,   "Write latency, max", 					"Write wait, max (µs)", 14, 	exp);
-	Experiment_Runner::graph(sx, sy,   "Write latency, mean", 					"Average wait, mean (µs)", 9, 	exp);
-	Experiment_Runner::graph(sx, sy,   "Write Latency, std", 					"latency std", 			15, 	exp);
+	Experiment_Runner::graph(sx, sy,   "Read wait, mean", 			"Read wait, mean", 	16,	exp);
+	Experiment_Runner::graph(sx, sy,   "Read wait, max", 			"Read wait, max",	21,	exp);
+	Experiment_Runner::graph(sx, sy,   "Read wait, stdev", 			"Read wait, stdev", 		22,	exp);
 
-	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram", exp, 90, true);
-
-	//Experiment_Runner::graph(sx, sy,   "Write wait, Q25", "Write wait, Q25 (µs)", 11, exp);
-	//Experiment_Runner::graph(sx, sy,   "Write wait, Q50", "Write wait, Q50 (µs)", 12, exp);
-	//Experiment_Runner::graph(sx, sy,   "Write wait, Q75", "Write wait, Q75 (µs)", 13, exp);
+	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, true);
+	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, true);
+	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 70, true);
 
 	for (uint i = 0; i < exp.size(); i++) {
 		chdir(exp[i].data_folder.c_str());
