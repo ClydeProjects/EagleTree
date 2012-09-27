@@ -196,8 +196,10 @@ void OperatingSystem::register_event_completion(Event* event) {
 				}
 				Event* e = events[i];
 				if (e != NULL) {
-					double diff = event->get_current_time() - e->get_start_time() ;
-					e->incr_os_wait_time(diff);
+					double diff = event->get_current_time() - e->get_current_time() ;
+					if (diff > 0) {
+						e->incr_os_wait_time(diff);
+					}
 				}
 			}
 		}
