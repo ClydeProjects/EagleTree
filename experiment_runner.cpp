@@ -49,6 +49,9 @@ const double Experiment_Runner::K = 1000.0;    // One thousand
 double Experiment_Runner::calibration_precision      = 1.0; // microseconds
 double Experiment_Runner::calibration_starting_point = 15.00; // microseconds
 
+const string ExperimentResult::throughput_column_name		= "Average throughput (IOs/s)"; // e.g. "Average throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
+const string ExperimentResult::write_throughput_column_name = "Average write throughput (IOs/s)";
+const string ExperimentResult::read_throughput_column_name  = "Average read throughput (IOs/s)";
 const string ExperimentResult::datafile_postfix 			= ".csv";
 const string ExperimentResult::stats_filename 				= "stats";
 const string ExperimentResult::waittime_filename_prefix 	= "waittime-";
@@ -58,13 +61,12 @@ const string ExperimentResult::throughput_filename_prefix   = "throughput-";
 const double ExperimentResult::M 							= 1000000.0; // One million
 const double ExperimentResult::K 							= 1000.0;    // One thousand
 
-ExperimentResult::ExperimentResult(string experiment_name, string data_folder_, string variable_parameter_name, string throughput_column_name)
+ExperimentResult::ExperimentResult(string experiment_name, string data_folder_, string variable_parameter_name)
 :	experiment_name(experiment_name),
  	variable_parameter_name(variable_parameter_name),
  	max_age(0),
  	max_age_freq(0),
  	max_waittime(0),
- 	throughput_column_name(throughput_column_name),
  	experiment_started(false),
  	experiment_finished(false)
 {
@@ -94,13 +96,20 @@ void ExperimentResult::start_experiment() {
 	// Write header of stat csv file
     stats_file = new std::ofstream();
     stats_file->open((stats_filename + datafile_postfix).c_str());
-    (*stats_file) << "\"" << variable_parameter_name << "\", " << StatisticsGatherer::get_instance()->totals_csv_header() << ", \"" << throughput_column_name << "\"" << "\n";
+    (*stats_file) << "\"" << variable_parameter_name << "\", " << StatisticsGatherer::get_instance()->totals_csv_header() << ", \"" << throughput_column_name << "\", \"" << write_throughput_column_name << "\", \"" << read_throughput_column_name << "\"" << "\n";
 }
 
-void ExperimentResult::collect_stats(uint variable_parameter_value, long double throughput) {
+void ExperimentResult::collect_stats(uint variable_parameter_value, double os_runtime) {
 	assert(experiment_started && !experiment_finished);
 
-	(*stats_file) << variable_parameter_value << ", " << StatisticsGatherer::get_instance()->totals_csv_line() << ", " << throughput << "\n";
+	// Compute throughput
+	int total_read_IOs_issued  = StatisticsGatherer::get_instance()->total_reads();
+	int total_write_IOs_issued = StatisticsGatherer::get_instance()->total_writes();
+	long double read_throughput = (long double) (total_read_IOs_issued / os_runtime) * 1000; // IOs/sec
+	long double write_throughput = (long double) (total_write_IOs_issued / os_runtime) * 1000; // IOs/sec
+	long double total_throughput = write_throughput + read_throughput;
+
+	(*stats_file) << variable_parameter_value << ", " << StatisticsGatherer::get_instance()->totals_csv_line() << ", " << total_throughput << ", " << write_throughput << ", " << read_throughput << "\n";
 
 	stringstream hist_filename;
 	stringstream age_filename;
@@ -152,6 +161,8 @@ void ExperimentResult::end_experiment() {
 	column_names.push_back(variable_parameter_name);
 	column_names.insert(column_names.end(), original_column_names.begin(), original_column_names.end());
 	column_names.push_back(throughput_column_name);
+	column_names.push_back(write_throughput_column_name);
+	column_names.push_back(read_throughput_column_name);
 
     //boost::filesystem::current_path(boost::filesystem::path(working_dir));
 
@@ -265,7 +276,7 @@ double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_l
 }
 
 ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit) {
-    ExperimentResult experiment_result(name, data_folder, "Used space (%)", "Max sustainable throughput (IOs/s)");
+    ExperimentResult experiment_result(name, data_folder, "Used space (%)");
     experiment_result.start_experiment();
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
@@ -286,12 +297,8 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 		try {
 			os->run();
 
-			// Compute throughput
-			int total_IOs_issued = StatisticsGatherer::get_instance()->total_reads() + StatisticsGatherer::get_instance()->total_writes();
-			long double throughput = (double) total_IOs_issued / os->get_total_runtime() * 1000; // IOs/sec
-
 			// Collect statistics from this experiment iteration (save in csv files)
-			experiment_result.collect_stats(used_space, throughput);
+			experiment_result.collect_stats(used_space, os->get_total_runtime());
 		} catch(...) {
 			printf("An exception was thrown, but we continue for now\n");
 		}
@@ -312,7 +319,7 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 }
 
 ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int used_space, int max_copybacks, string data_folder, string name, int IO_limit) {
-    ExperimentResult experiment_result(name, data_folder, "CopyBacks allowed before ECC check", "Max sustainable throughput (IOs/s)");
+    ExperimentResult experiment_result(name, data_folder, "CopyBacks allowed before ECC check");
     experiment_result.start_experiment();
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
@@ -334,12 +341,8 @@ ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experi
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
 
-		// Compute throughput
-		int total_IOs_issued = StatisticsGatherer::get_instance()->total_reads() + StatisticsGatherer::get_instance()->total_writes();
-		long double throughput = (double) total_IOs_issued / os->get_total_runtime() * 1000; // IOs/sec
-
 		// Collect statistics from this experiment iteration (save in csv files)
-		experiment_result.collect_stats(copybacks_allowed, throughput);
+		experiment_result.collect_stats(copybacks_allowed, os->get_total_runtime());
 
 		// Print shit
 		StatisticsGatherer::get_instance()->print();
@@ -356,7 +359,7 @@ ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experi
 }
 
 ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit) {
-    ExperimentResult experiment_result(name, data_folder, "Max copyback map size", "Average throughput (IOs/s)");
+    ExperimentResult experiment_result(name, data_folder, "Max copyback map size");
     experiment_result.start_experiment();
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
@@ -378,12 +381,8 @@ ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*ex
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
 
-		// Compute throughput
-		int total_IOs_issued = StatisticsGatherer::get_instance()->total_reads() + StatisticsGatherer::get_instance()->total_writes();
-		long double throughput = (double) total_IOs_issued / os->get_total_runtime() * 1000; // IOs/sec
-
 		// Collect statistics from this experiment iteration (save in csv files)
-		experiment_result.collect_stats(copyback_map_size, throughput);
+		experiment_result.collect_stats(copyback_map_size, os->get_total_runtime());
 
 		// Print shit
 		StatisticsGatherer::get_instance()->print();

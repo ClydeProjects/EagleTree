@@ -181,6 +181,35 @@ void Asynchronous_Random_Thread::handle_event_completion(Event* event) {
 	//time += event->get_bus_wait_time();
 }
 
+// =================  Asynchronous_Random_Thread_Reader_Writer  =============================
+
+Asynchronous_Random_Thread_Reader_Writer::Asynchronous_Random_Thread_Reader_Writer(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed, double start_time)
+	: Thread(start_time),
+	  min_LBA(min_LBA),
+	  max_LBA(max_LBA),
+	  number_of_times_to_repeat(num_ios_to_issue),
+	  random_number_generator(randseed)
+{}
+
+Event* Asynchronous_Random_Thread_Reader_Writer::issue_next_io() {
+	Event* event;
+	if (0 < number_of_times_to_repeat) {
+		event_type type = random_number_generator() % 2 == 0 ? WRITE : READ;
+		long lba = min_LBA + random_number_generator() % (max_LBA - min_LBA + 1);
+		event =  new Event(type, lba, 1, time);
+		time += 1;
+	} else {
+		event = NULL;
+	}
+	number_of_times_to_repeat--;
+	if (number_of_times_to_repeat == 0) {
+		finished = true;
+	}
+	return event;
+}
+
+void Asynchronous_Random_Thread_Reader_Writer::handle_event_completion(Event* event) {}
+
 // =================  Collision_Free_Asynchronous_Random_Writer  =============================
 
 Collision_Free_Asynchronous_Random_Thread::Collision_Free_Asynchronous_Random_Thread(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed, event_type type, double time_breaks, double start_time)

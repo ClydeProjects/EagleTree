@@ -1790,6 +1790,18 @@ private:
 	double time_breaks;
 };
 
+class Asynchronous_Random_Thread_Reader_Writer : public Thread
+{
+public:
+	Asynchronous_Random_Thread_Reader_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed = 0, double start_time = 1);
+	Event* issue_next_io();
+	void handle_event_completion(Event* event);
+private:
+	long min_LBA, max_LBA;
+	int number_of_times_to_repeat;
+	MTRand_int32 random_number_generator;
+};
+
 class Collision_Free_Asynchronous_Random_Thread : public Thread
 {
 public:
@@ -1997,10 +2009,10 @@ private:
 
 class ExperimentResult {
 public:
-	ExperimentResult(string experiment_name, string data_folder, string variable_parameter_name, string throughput_column_name);
+	ExperimentResult(string experiment_name, string data_folder, string variable_parameter_name);
 	~ExperimentResult();
 	void start_experiment();
-	void collect_stats(uint variable_parameter_value, long double throughput);
+	void collect_stats(uint variable_parameter_value, double os_runtime);
 	void end_experiment();
 	double time_elapsed() { return end_time - start_time; }
 
@@ -2013,7 +2025,9 @@ public:
 	uint max_age;
 	uint max_age_freq;
 	double max_waittime;
-    string throughput_column_name; // e.g. "Max sustainable throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
+    static const string throughput_column_name; // e.g. "Average throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
+    static const string write_throughput_column_name;
+    static const string read_throughput_column_name;
     std::ofstream* stats_file;
     string working_dir;
     double start_time;
