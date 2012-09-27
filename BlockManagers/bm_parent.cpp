@@ -493,10 +493,11 @@ bool Block_manager_parent::is_die_register_busy(Address const& addr) const {
 }
 
 bool Block_manager_parent::can_schedule_write_immediately(Address const& prospective_dest, double current_time) {
-	return 	has_free_pages(prospective_dest) &&
-			!is_die_register_busy(prospective_dest) &&
-			!Copy_backs_in_progress(prospective_dest) &&
-			in_how_long_can_this_event_be_scheduled(prospective_dest, current_time);
+	bool free_pages = has_free_pages(prospective_dest);
+	bool die_not_busy =		!is_die_register_busy(prospective_dest);
+	bool no_copy_back =		!Copy_backs_in_progress(prospective_dest);
+	bool can_be_scheduled_now =	in_how_long_can_this_event_be_scheduled(prospective_dest, current_time) == 0;
+	return free_pages && die_not_busy && no_copy_back && can_be_scheduled_now;
 }
 
 // puts free blocks at the very end of the queue
