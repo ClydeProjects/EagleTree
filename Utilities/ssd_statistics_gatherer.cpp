@@ -68,7 +68,6 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	while (application_io_history.size() < current_window+1) application_io_history.push_back(0);
 	while (non_application_io_history.size() < current_window+1)non_application_io_history.push_back(0);
 	if (event.get_event_type() != READ_COMMAND && event.get_event_type() != TRIM) {
-		//if (event.is_original_application_io()) { printf("W:%d: ", current_window); event.print(); }
 		if (event.is_original_application_io()) application_io_history[current_window]++;
 		else non_application_io_history[current_window]++;
 	}
@@ -99,9 +98,12 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 		num_copy_backs_per_LUN[a.package][a.die]++;
 	}
 
-	map<double, uint>& wait_time_histogram = (event.is_original_application_io() ? wait_time_histogram_appIOs : wait_time_histogram_non_appIOs);
 	double bucket = ceil(max(0.0, event.get_bus_wait_time() - wait_time_histogram_bin_size / 2) / wait_time_histogram_bin_size)*wait_time_histogram_bin_size;
-	wait_time_histogram[bucket]++;
+	if      (event.is_original_application_io() && event.get_event_type() == WRITE) { wait_time_histogram_appIOs_write[bucket]++; wait_time_histogram_appIOs_write_and_read[bucket]++; }
+	else if (event.is_original_application_io() && event.get_event_type() == READ_TRANSFER)  { wait_time_histogram_appIOs_read[bucket]++; wait_time_histogram_appIOs_write_and_read[bucket]++; }
+	else if (!event.is_original_application_io() && event.get_event_type() == WRITE) { wait_time_histogram_non_appIOs_write[bucket]++;  }
+	else if (!event.is_original_application_io() && event.get_event_type() == READ_TRANSFER) { wait_time_histogram_non_appIOs_read[bucket]++; }
+	if      (!event.is_original_application_io()) { wait_time_histogram_non_appIOs_all[bucket]++; }
 }
 
 
@@ -583,9 +585,15 @@ uint StatisticsGatherer::max_age_freq() {
 	return max_age_freq;
 }
 
-double StatisticsGatherer::max_waittime() {
-	return max(wait_time_histogram_appIOs.size()     > 0 ? wait_time_histogram_appIOs.rbegin()->first     : 0,
-               wait_time_histogram_non_appIOs.size() > 0 ? wait_time_histogram_non_appIOs.rbegin()->first : 0);
+vector<double> StatisticsGatherer::max_waittimes() {
+	vector<double> result;
+	result.push_back(wait_time_histogram_appIOs_write_and_read.size() > 0 ? wait_time_histogram_appIOs_write_and_read.rbegin()->first : 0);
+	result.push_back(wait_time_histogram_appIOs_write.size()          > 0 ? wait_time_histogram_appIOs_write.rbegin()->first          : 0);
+	result.push_back(wait_time_histogram_appIOs_read.size()           > 0 ? wait_time_histogram_appIOs_read.rbegin()->first           : 0);
+	result.push_back(wait_time_histogram_non_appIOs_all.size()        > 0 ? wait_time_histogram_non_appIOs_all.rbegin()->first        : 0);
+	result.push_back(wait_time_histogram_non_appIOs_write.size()      > 0 ? wait_time_histogram_non_appIOs_write.rbegin()->first      : 0);
+	result.push_back(wait_time_histogram_non_appIOs_read.size()       > 0 ? wait_time_histogram_non_appIOs_read.rbegin()->first       : 0);
+	return result;
 }
 
 string StatisticsGatherer::age_histogram_csv() {
@@ -605,16 +613,24 @@ string StatisticsGatherer::age_histogram_csv() {
 }
 
 string StatisticsGatherer::wait_time_histogram_appIOs_csv() {
-	return histogram_csv(wait_time_histogram_appIOs);
+	return histogram_csv(wait_time_histogram_appIOs_write_and_read);
 }
 
 string StatisticsGatherer::wait_time_histogram_all_IOs_csv() {
 	vector<map<double, uint> > histograms;
 	vector<string> names;
-	names.push_back("Application IOs");
-	histograms.push_back(wait_time_histogram_appIOs);
-	names.push_back("Internal operations");
-	histograms.push_back(wait_time_histogram_non_appIOs);
+	names.push_back("Application IOs, Reads+writes");
+	histograms.push_back(wait_time_histogram_appIOs_write_and_read);
+	names.push_back("Application IOs, Writes");
+	histograms.push_back(wait_time_histogram_appIOs_write);
+	names.push_back("Application IOs, Reads");
+	histograms.push_back(wait_time_histogram_appIOs_read);
+	names.push_back("Internal operations, All");
+	histograms.push_back(wait_time_histogram_non_appIOs_all);
+	names.push_back("Internal operations, Writes");
+	histograms.push_back(wait_time_histogram_non_appIOs_write);
+	names.push_back("Internal operations, Reads");
+	histograms.push_back(wait_time_histogram_non_appIOs_read);
 	return stacked_histogram_csv(histograms, names);
 }
 

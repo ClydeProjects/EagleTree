@@ -66,14 +66,13 @@ ExperimentResult::ExperimentResult(string experiment_name, string data_folder_, 
  	variable_parameter_name(variable_parameter_name),
  	max_age(0),
  	max_age_freq(0),
- 	max_waittime(0),
  	experiment_started(false),
  	experiment_finished(false)
 {
 	working_dir = Experiment_Runner::get_working_dir();
 	data_folder = working_dir + "/" + data_folder_;
  	stats_file = NULL;
-
+ 	max_waittimes = vector<double>(6,0);
 	//boost::filesystem::path working_dir = boost::filesystem::current_path();
     //boost::filesystem::create_directories(boost::filesystem::path(data_folder));
     //boost::filesystem::current_path(boost::filesystem::path(data_folder));
@@ -125,7 +124,10 @@ void ExperimentResult::collect_stats(uint variable_parameter_value, double os_ru
 	hist_file.open(hist_filename.str().c_str());
 	hist_file << StatisticsGatherer::get_instance()->wait_time_histogram_all_IOs_csv();
 	hist_file.close();
-	max_waittime = max(max_waittime, StatisticsGatherer::get_instance()->max_waittime());
+	waittimes[variable_parameter_value] = StatisticsGatherer::get_instance()->max_waittimes();
+	for (uint i = 0; i < waittimes[variable_parameter_value].size(); i++) {
+		max_waittimes[i] = max(max_waittimes[i], waittimes[variable_parameter_value][i]);
+	}
 
 	std::ofstream age_file;
 	age_file.open(age_filename.str().c_str());
@@ -503,29 +505,28 @@ void Experiment_Runner::draw_graph(int sizeX, int sizeY, string outputFile, stri
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
-void Experiment_Runner::waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points) {
-	waittime_histogram(sizeX, sizeY, outputFile, experiment, points, false);
-}
-
-void Experiment_Runner::waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points, bool all_IOs) {
+void Experiment_Runner::waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points, int black_column, int red_column) {
 	vector<string> commands;
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "hist 0 " << i << " \"" << ExperimentResult::waittime_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Wait time histogram (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"log min 1\" \"Event wait time (µs)\" " << experiment.max_waittime << " " << StatisticsGatherer::get_instance()->get_wait_time_histogram_bin_size() << " " << (all_IOs ? 2 : 1);
+		command << "hist 0 " << i << " \"" << ExperimentResult::waittime_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Wait time histogram (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"log min 1\" \"Event wait time (µs)\" " << max(experiment.max_waittimes[black_column], (red_column == -1 ? 0 : experiment.max_waittimes[red_column])) << " " << StatisticsGatherer::get_instance()->get_wait_time_histogram_bin_size() << " " << black_column << " " << red_column;
 		commands.push_back(command.str());
 	}
 
 	multigraph(sizeX, sizeY, outputFile, commands);
 }
 
-void Experiment_Runner::cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<ExperimentResult> experiments, int point, bool all_IOs) {
+void Experiment_Runner::cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<ExperimentResult> experiments, int point, int black_column, int red_column) {
 	vector<string> commands;
 	double cross_experiment_max_waittime = 0;
-	for (uint i = 0; i < experiments.size(); i++) cross_experiment_max_waittime = max(cross_experiment_max_waittime, experiments[i].max_waittime);
+	for (uint i = 0; i < experiments.size(); i++) {
+		cross_experiment_max_waittime = max(cross_experiment_max_waittime, experiments[i].waittimes[point][black_column]);
+		if (red_column != -1) cross_experiment_max_waittime = max(cross_experiment_max_waittime, experiments[i].waittimes[point][red_column]);
+	}
 	for (uint i = 0; i < experiments.size(); i++) {
 		ExperimentResult& e = experiments[i];
 		stringstream command;
-		command << "hist 0 " << i << " \"" << e.data_folder << ExperimentResult::waittime_filename_prefix << point << ExperimentResult::datafile_postfix << "\" \"Wait time histogram (" << e.experiment_name << ", " << e.variable_parameter_name << " = " << point << ")\" \"log min 1\" \"Event wait time (µs)\" " << cross_experiment_max_waittime << " " << StatisticsGatherer::get_instance()->get_wait_time_histogram_bin_size() << " " << (all_IOs ? 2 : 1);
+		command << "hist 0 " << i << " \"" << e.data_folder << ExperimentResult::waittime_filename_prefix << point << ExperimentResult::datafile_postfix << "\" \"Wait time histogram (" << e.experiment_name << ", " << e.variable_parameter_name << " = " << point << ")\" \"log min 1\" \"Event wait time (µs)\" " << cross_experiment_max_waittime << " " << StatisticsGatherer::get_instance()->get_wait_time_histogram_bin_size() << " " << black_column << " " << red_column;
 		commands.push_back(command.str());
 	}
 
@@ -589,13 +590,14 @@ void Experiment_Runner::multigraph(int sizeX, int sizeY, string outputFile, vect
 	"size std_sx+pad std_sy*hist_graphs+pad" << endl <<
 	"set font texcmr" << endl <<
 	endl <<
-	"sub hist xp yp data$ title$ yaxis$ xaxistitle$ xmax binsize num_stacks" << endl <<
-	"   default num_stacks 1" << endl <<
+	"sub hist xp yp data$ title$ yaxis$ xaxistitle$ xmax binsize black_column red_column" << endl <<
+	"   default black_column 1" << endl <<
+	"   default red_column -1" << endl <<
 	"   amove xp*(std_sx/2)+pad yp*std_sy+pad" << endl <<
 	"   begin graph" << endl <<
 	"      fullsize" << endl <<
 	"      size std_sx-pad std_sy-pad" << endl <<
-	"      if num_stacks <= 1 then" << endl <<
+	"      if red_column = -1 then" << endl <<
 	"         key off" << endl <<
 	"      end if" << endl <<
 	"      data  data$" << endl <<
@@ -612,9 +614,9 @@ void Experiment_Runner::multigraph(int sizeX, int sizeY, string outputFile, vect
 	"      end if" << endl <<
 	"      xtitle xaxistitle$" << endl <<
 	"      ytitle \"Frequency\"" << endl <<
-	"      bar d1 width binsize dist binsize fill gray" << endl <<
-	"      if num_stacks >= 2 then" << endl <<
-    "         bar d2 width binsize/2 dist binsize fill red" << endl <<
+	"      bar d\\expr{black_column} width binsize dist binsize fill gray" << endl <<
+	"      if red_column <> -1 then" << endl <<
+    "         bar d\\expr{red_column} width binsize/2 dist binsize fill red" << endl <<
     "      end if" << endl <<
 	"   end graph" << endl <<
 	"end sub" << endl <<

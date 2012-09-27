@@ -1633,7 +1633,7 @@ public:
 	string app_and_gc_throughput_csv();
 	uint max_age();
 	uint max_age_freq();
-	double max_waittime();
+	vector<double> max_waittimes();
 	uint total_reads();
 	uint total_writes();
 
@@ -1675,8 +1675,12 @@ private:
 
 	static const double wait_time_histogram_bin_size;
 	static const double age_histogram_bin_size;
-	map<double, uint> wait_time_histogram_appIOs;
-	map<double, uint> wait_time_histogram_non_appIOs;
+	map<double, uint> wait_time_histogram_appIOs_write;
+	map<double, uint> wait_time_histogram_appIOs_read;
+	map<double, uint> wait_time_histogram_appIOs_write_and_read;
+	map<double, uint> wait_time_histogram_non_appIOs_write;
+	map<double, uint> wait_time_histogram_non_appIOs_read;
+	map<double, uint> wait_time_histogram_non_appIOs_all;
 
 	static const double io_counter_window_size;
 	vector<uint> application_io_history;
@@ -2024,7 +2028,8 @@ public:
 	vector<string> column_names;
 	uint max_age;
 	uint max_age_freq;
-	double max_waittime;
+	vector<double> max_waittimes;
+	map<uint, vector<double> > waittimes; // Varable parameter --> max waittimes for each waittime measurement type
     static const string throughput_column_name; // e.g. "Average throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
     static const string write_throughput_column_name;
     static const string read_throughput_column_name;
@@ -2055,9 +2060,8 @@ public:
 	static double measure_throughput(int highest_lba, double IO_submission_rate, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
 	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments);
 	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, ExperimentResult experiment);
-	static void waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
-	static void waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points, bool all_IOs);
-    static void cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<ExperimentResult> experiments, int point, bool all_IOs);
+	static void waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points, int black_column, int red_column = -1);
+    static void cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<ExperimentResult> experiments, int point, int black_column, int red_column = -1);
 	static void age_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static void queue_length_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static void throughput_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
