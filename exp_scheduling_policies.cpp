@@ -73,7 +73,7 @@ int main()
 	MAX_SSD_QUEUE_SIZE = 15;
 
 	int IO_limit = 200000;
-	int space_min = 70;
+	int space_min = 60;
 	int space_max = 90;
 	int space_inc = 5;
 
@@ -86,9 +86,6 @@ int main()
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_greedy,						space_min, space_max, space_inc, exp_folder + 		"naive_greedy/", "naive greedy", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_lazy_eq_priorty,		space_min, space_max, space_inc, exp_folder + 		"intelligent_lazy_eq_priorty/", "Smart, lazy", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_greedy_eq_priorty,	space_min, space_max, space_inc, exp_folder + 		"intelligent_greedy_eq_priorty/", "Smart, greedy", IO_limit) );
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_greedy_eq_priorty_reads,	space_min, space_max, space_inc, exp_folder + 	"intelligent_greedy_eq_priorty_with_reads/", "Smart, greedy with reads", IO_limit) );
-
-
 
 	// Print column names for info
 	for (uint i = 0; i < exp[0].column_names.size(); i++)
@@ -120,15 +117,29 @@ int main()
 	Experiment_Runner::graph(sx, sy,   "Read wait, max", 			"Read wait, max",	21,	exp);
 	Experiment_Runner::graph(sx, sy,   "Read wait, stdev", 			"Read wait, stdev", 		22,	exp);
 
-	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, true);
-	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, true);
-	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 70, true);
+	// VALUES FOR THE TWO LAST PARAMETERS IN cross_experiment_waittime_histogram() and waittime_histogram():
+	// 1. Application IOs, Reads+writes
+	// 2. Application IOs, Writes
+	// 3. Application IOs, Reads
+	// 4. Internal operations, All
+	// 5. Internal operations, Writes
+	// 6. Internal operations, Reads
+
+	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
+	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, 1, 4);
+	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 70, 1, 4);
+
+
+	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram RW 90", exp, 90, 1, 4);
+	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram RW 80", exp, 80, 1, 4);
+	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram RW 70", exp, 70, 1, 4);
 
 	for (uint i = 0; i < exp.size(); i++) {
 		chdir(exp[i].data_folder.c_str());
 		Experiment_Runner::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
-		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms", exp[i], used_space_values_to_show);
-		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], used_space_values_to_show, true);
+		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], used_space_values_to_show, 1, 4);
+		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms-appIOs", exp[i], used_space_values_to_show, 1);
+		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms-rw-appIOs", exp[i], used_space_values_to_show, 2, 3);
 		Experiment_Runner::age_histogram			(sx, sy/2, "age_histograms", exp[i], used_space_values_to_show);
 		Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);
 		Experiment_Runner::throughput_history		(sx, sy/2, "throughput_history", exp[i], used_space_values_to_show);
