@@ -22,7 +22,6 @@ StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
 	   num_gc_cancelled_not_enough_free_space(0),
 	   num_gc_cancelled_gc_already_happening(0),
 	   ssd(ssd),
-	  sum_bus_wait_time_for_reads_per_LUN(SSD_SIZE, vector<double>(PACKAGE_SIZE, 0)),
 	  bus_wait_time_for_reads_per_LUN(SSD_SIZE, vector<vector<double> >(PACKAGE_SIZE, vector<double>())),
 	  num_reads_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  bus_wait_time_for_writes_per_LUN(SSD_SIZE, vector<vector<double> >(PACKAGE_SIZE, vector<double>())),
@@ -65,11 +64,6 @@ StatisticsGatherer *StatisticsGatherer::get_instance()
 }
 
 void StatisticsGatherer::register_completed_event(Event const& event) {
-
-	/*if (event.get_latency() > 2568) {
-		event.print();
-	}*/
-
 	uint current_window = floor(event.get_current_time() / io_counter_window_size);
 	while (application_io_history.size() < current_window+1) application_io_history.push_back(0);
 	while (non_application_io_history.size() < current_window+1)non_application_io_history.push_back(0);
@@ -93,7 +87,6 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 			gc_wait_time_per_LUN[a.package][a.die].push_back(event.get_latency());
 		}
 	} else if (event.get_event_type() == READ_COMMAND || event.get_event_type() == READ_TRANSFER) {
-		sum_bus_wait_time_for_reads_per_LUN[a.package][a.die] += event.get_latency();
 		bus_wait_time_for_reads_per_LUN[a.package][a.die].push_back(event.get_latency());
 		if (event.get_event_type() == READ_TRANSFER) {
 			if (event.is_original_application_io()) {
@@ -265,7 +258,7 @@ void StatisticsGatherer::print() {
 
 			avg_overall_write_wait_time += avg_write_wait_time;
 
-			double average_read_wait_time = sum_bus_wait_time_for_reads_per_LUN[i][j] / num_reads_per_LUN[i][j];
+			double average_read_wait_time = get_average(bus_wait_time_for_reads_per_LUN[i][j]);
 
 			avg_overall_read_wait_time += average_read_wait_time;
 
@@ -663,7 +656,7 @@ void StatisticsGatherer::print_csv() {
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			double average_write_wait_time = get_average(bus_wait_time_for_writes_per_LUN[i][j]);
-			double average_read_wait_time = sum_bus_wait_time_for_reads_per_LUN[i][j] / num_reads_per_LUN[i][j];
+			double average_read_wait_time = get_average(bus_wait_time_for_reads_per_LUN[i][j]);
 			if (num_reads_per_LUN[i][j] == 0) {
 				average_read_wait_time = 0;
 			}
