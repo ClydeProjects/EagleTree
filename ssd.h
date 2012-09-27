@@ -460,7 +460,6 @@ public:
 	inline double get_ssd_submission_time() const { return start_time + os_wait_time; }
 	inline uint get_application_io_id() const { return application_io_id; }
 	inline double get_bus_wait_time() const { assert(bus_wait_time >= 0.0); return bus_wait_time; }
-	inline double get_latency() const { return bus_wait_time; }
 	inline double get_os_wait_time() const { return os_wait_time; }
 	inline bool get_noop() const { return noop; }
 	inline uint get_id() const { return id; }

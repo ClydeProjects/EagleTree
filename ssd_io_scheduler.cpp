@@ -424,8 +424,18 @@ enum status IOScheduler::execute_next(Event* event) {
 			LBA_currently_executing.erase(event->get_logical_address());
 			//LBA_currently_executing[dependent->get_logical_address()] = dependent->get_application_io_id();
 			dependent->set_application_io_id(dependency_code);
-			double diff = event->get_current_time() - dependent->get_current_time();
-			dependent->incr_bus_wait_time(diff);
+
+			if (event->get_event_type() == READ_COMMAND) {
+				assert(dependent->get_event_type() == READ_TRANSFER);
+				dependent->incr_execution_time(event->get_execution_time());
+				dependent->incr_bus_wait_time(event->get_bus_wait_time());
+				dependent->incr_os_wait_time(event->get_os_wait_time());
+			}
+			else {
+				double diff = event->get_current_time() - dependent->get_current_time();
+				dependent->incr_bus_wait_time(diff);
+			}
+
 			dependent->set_noop(event->get_noop());
 			dependencies[dependency_code].pop_front();
 			// The dependent event might have a different LBA and type - record this in bookkeeping maps
