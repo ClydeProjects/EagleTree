@@ -171,6 +171,8 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	assert(num_free_pages > 0);
 	num_free_pages--;
 
+	//printf("gc going on   %d\n", how_many_gc_operations_are_scheduled());
+
 	if (!event.is_garbage_collection_op()) {
 		assert(num_available_pages_for_new_writes > 0);
 		num_available_pages_for_new_writes--;
@@ -331,11 +333,10 @@ void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
 	if (num_free_pages <= BLOCK_SIZE) {
 		schedule_gc(start_time);
 	}
+
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-	//for (int i = SSD_SIZE - 1; i >= 0; i--) {
-	//	for (int j = PACKAGE_SIZE - 1; j >= 0; j--) {
-			if (!has_free_pages(free_block_pointers[i][j])) {
+			if (!has_free_pages(free_block_pointers[i][j]) || get_num_free_blocks(i, j) < 1) {
 				schedule_gc(start_time, i, j, 0);
 			}
 		}
@@ -690,6 +691,10 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	vector<deque<Event*> > migrations;
 
+	if (how_many_gc_operations_are_scheduled() >= SSD_SIZE * PACKAGE_SIZE * 0.75) {
+		return migrations;
+	}
+
 	/*bool scheduled_erase_successfully = schedule_queued_erase(a);
 	if (scheduled_erase_successfully) {
 		return migrations;
@@ -841,8 +846,7 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 		num_free_blocks_left--;
 		assert(has_free_pages(to_return));
 	}
-	uint num_free_blocks_before_gc = GREED_SCALE;
-	if (num_free_blocks_left < num_free_blocks_before_gc) {
+	if (num_free_blocks_left < GREED_SCALE) {
 		schedule_gc(time, package_id, die_id, klass);
 	}
 	return to_return;
