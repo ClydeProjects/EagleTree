@@ -21,7 +21,6 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
    free_block_pointers(SSD_SIZE, vector<Address>(PACKAGE_SIZE)),
    free_blocks(SSD_SIZE, vector<vector<vector<Address> > >(PACKAGE_SIZE, vector<vector<Address> >(num_age_classes, vector<Address>(0)) )),
    all_blocks(0),
-   greedy_gc(GREEDY_GC),
    max_age(1),
    min_age(0),
    num_age_classes(num_age_classes),
@@ -67,6 +66,11 @@ Address Block_manager_parent::choose_address(Event const& write) {
 	if (has_free_pages(a)) {
 		return a;
 	}
+
+	/*if (write.is_garbage_collection_op() && has_free_pages(a) && can_schedule_write_immediately(a, write.get_current_time())) {
+		return a;
+	}*/
+
 	if (!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0) {
 		schedule_gc(write.get_current_time());
 	}
@@ -837,7 +841,7 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 		num_free_blocks_left--;
 		assert(has_free_pages(to_return));
 	}
-	uint num_free_blocks_before_gc = GREEDY_GC ? 1 : 0;
+	uint num_free_blocks_before_gc = GREED_SCALE;
 	if (num_free_blocks_left < num_free_blocks_before_gc) {
 		schedule_gc(time, package_id, die_id, klass);
 	}

@@ -192,8 +192,7 @@ void Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, d
 }
 
 void Ssd::progress_since_os_is_waiting() {
-	IOScheduler::instance()->execute_soonest_events();
-}
+	IOScheduler::instance()->execute_soonest_events();}
 
 void Ssd::register_event_completion(Event * event) {
 	if (event->is_original_application_io() && !event->get_noop() && (event->get_event_type() == WRITE || event->get_event_type() == READ_COMMAND)) {

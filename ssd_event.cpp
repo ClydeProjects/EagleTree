@@ -52,7 +52,8 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	mapping_op(false),
 	original_application_io(false),
 	age_class(0),
-	tag(-1)
+	tag(-1),
+	accumulated_wait_time(0)
 {
 	assert(start_time >= 0.0);
 	if (logical_address > NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE) {
@@ -78,7 +79,8 @@ Event::Event(Event& event) :
 	mapping_op(event.mapping_op),
 	original_application_io(event.original_application_io),
 	age_class(event.age_class),
-	tag(event.tag)
+	tag(event.tag),
+	accumulated_wait_time(0)
 {}
 
 Event::Event() : type(NOT_VALID) {}
@@ -114,7 +116,7 @@ void Event::print(FILE *stream) const
 		//merge_address.print(stream);
 	//if(type == WRITE || type == TRIM || type == COPY_BACK)
 		//replace_address.print(stream);
-	fprintf(stream, " Time[%d, %d, %d, %d, %d, %d]", (int)start_time, (int) get_ssd_submission_time(), (int)os_wait_time, (int)bus_wait_time, (int)execution_time, (int)get_current_time());
+	fprintf(stream, " Time[%d, %d, %d, %d, %d, %d]", (int)start_time, (int)os_wait_time, (int)accumulated_wait_time, (int)bus_wait_time, (int)execution_time, (int)get_current_time());
 	//fprintf(stream, "\tTime[%d, %d, %d, %d]", (int)start_time, (int) (start_time + os_wait_time),(int) bus_wait_time + (int)os_wait_time, (int) get_current_time());
 	fprintf(stream, " ID: %d ", id);
 	fprintf(stream, " appID: %d", application_io_id);

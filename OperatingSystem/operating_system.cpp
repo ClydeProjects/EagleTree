@@ -51,7 +51,7 @@ OperatingSystem::~OperatingSystem() {
 }
 
 void OperatingSystem::run() {
-	const int idle_limit = 3000000;
+	const int idle_limit = 50000000;
 	int idle_time = 0;
 	bool finished_experiment, still_more_work;
 	do {

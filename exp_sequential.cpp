@@ -33,56 +33,51 @@ using namespace ssd;
 // solution: have a method in bm_parent that returns a free block from the LUN with the shortest queue.
 
 vector<Thread*> sequential_experiment(int highest_lba, double IO_submission_rate) {
+
 	SCHEDULING_SCHEME = 2;
+	GREED_SCALE = 1;
+	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	USE_ERASE_QUEUE = false;
+
 	long log_space_per_thread = highest_lba / 2;
 	long max_file_size = log_space_per_thread / 4;
+
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, log_space_per_thread * 2, 1, WRITE, 100, 0);
 	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, log_space_per_thread, 500000000, 2, WRITE, IO_submission_rate, 1));
 	t1->add_follow_up_thread(new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, 1000000, max_file_size, IO_submission_rate, 1, 1));
 	vector<Thread*> threads;
-	//threads.push_back(fm1);
-	//threads.push_back(fm2);
 	threads.push_back(t1);
 	return threads;
 }
 
 vector<Thread*> tagging(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = true;
 	ENABLE_TAGGING = true;
-	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	return sequential_experiment(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*> shortest_queues(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 0;
-	GREEDY_GC = true;
 	return sequential_experiment(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*> detection_LUN(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = true;
 	ENABLE_TAGGING = false;
-	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 2;
 	return sequential_experiment(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*> detection_CHANNEL(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = true;
 	ENABLE_TAGGING = false;
-	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 1;
 	return sequential_experiment(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*> detection_BLOCK(int highest_lba, double IO_submission_rate) {
 	BLOCK_MANAGER_ID = 3;
-	GREEDY_GC = true;
 	ENABLE_TAGGING = false;
-	WEARWOLF_LOCALITY_THRESHOLD = 10;
 	LOCALITY_PARALLEL_DEGREE = 0;
 	return sequential_experiment(highest_lba, IO_submission_rate);
 }
@@ -93,13 +88,6 @@ int main()
 	mkdir(exp_folder.c_str(), 0755);
 
 	load_config();
-
-	/*sequential_tagging
-	 * sequential_shortest_queues
-		sequential_detection_LUN
-		sequential_detection_CHANNEL
-		sequential_detection_BLOCK*/
-
 
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
@@ -114,7 +102,7 @@ int main()
 	BLOCK_ERASE_DELAY = 150;
 
 	int IO_limit = 200000;
-	int space_min = 70;
+	int space_min = 75;
 	int space_max = 90;
 	int space_inc = 5;
 
@@ -125,12 +113,18 @@ int main()
 
 	vector<ExperimentResult> exp;
 
-	USE_ERASE_QUEUE = false;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_LUN, 	 space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",		"Seq Detect: LUN", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_CHANNEL, space_min, space_max, space_inc, exp_folder + "seq_detect_channel/",	"Seq Detect: CHA", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_BLOCK, 	 space_min, space_max, space_inc, exp_folder + "seq_detect_block/",		"Seq Detect: SSD", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(tagging, 			space_min, space_max, space_inc, exp_folder + "oracle_erase/",			"Oracle", IO_limit) );
+
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(tagging, 			space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );
+
+	//USE_ERASE_QUEUE = true;
+	//exp.push_back( Experiment_Runner::overprovisioning_experiment(tagging, 			space_min, space_max, space_inc, exp_folder + "oracle_erase_queues/",			"Oracle Queues", IO_limit) );
+	//exp.push_back( Experiment_Runner::overprovisioning_experiment(shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues_queues/",	"Shortest Queues Queues", IO_limit) );
+
+	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_LUN, 	 space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",		"Seq Detect: LUN", IO_limit) );
+	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_CHANNEL, space_min, space_max, space_inc, exp_folder + "seq_detect_channel/",	"Seq Detect: CHA", IO_limit) );
+	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_BLOCK, 	 space_min, space_max, space_inc, exp_folder + "seq_detect_block/",		"Seq Detect: SSD", IO_limit) );
+
 
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());

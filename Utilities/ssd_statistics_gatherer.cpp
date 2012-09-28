@@ -64,6 +64,15 @@ StatisticsGatherer *StatisticsGatherer::get_instance()
 }
 
 void StatisticsGatherer::register_completed_event(Event const& event) {
+
+	/*if (event.get_event_type() == READ_COMMAND) {
+		event.print();
+	}
+
+	if (event.get_event_type() == READ_TRANSFER && event.get_logical_address() == 16468) {
+			event.print();
+		}
+*/
 	uint current_window = floor(event.get_current_time() / io_counter_window_size);
 	while (application_io_history.size() < current_window+1) application_io_history.push_back(0);
 	while (non_application_io_history.size() < current_window+1)non_application_io_history.push_back(0);
@@ -76,18 +85,18 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	if (event.get_event_type() == WRITE) {
 		if (event.is_original_application_io()) {
 			num_writes_per_LUN[a.package][a.die]++;
-			bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_bus_wait_time());
+			bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_overall_wait_time());
 		} else if (event.is_garbage_collection_op()) {
 			Address replace_add = event.get_replace_address();
 			num_gc_writes_per_LUN_origin[replace_add.package][replace_add.die]++;
 			num_gc_writes_per_LUN_destination[a.package][a.die]++;
 
-			sum_gc_wait_time_per_LUN[a.package][a.die] += event.get_bus_wait_time();
-			gc_wait_time_per_LUN[a.package][a.die].push_back(event.get_bus_wait_time());
+			sum_gc_wait_time_per_LUN[a.package][a.die] += event.get_overall_wait_time();
+			gc_wait_time_per_LUN[a.package][a.die].push_back(event.get_overall_wait_time());
 		}
 	} else if (event.get_event_type() == READ_TRANSFER) {
 		if (event.is_original_application_io()) {
-			bus_wait_time_for_reads_per_LUN[a.package][a.die].push_back(event.get_bus_wait_time());
+			bus_wait_time_for_reads_per_LUN[a.package][a.die].push_back(event.get_overall_wait_time());
 			num_reads_per_LUN[a.package][a.die]++;
 		} else if (event.is_garbage_collection_op()) {
 			num_gc_reads_per_LUN[a.package][a.die]++;
@@ -98,7 +107,7 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 		num_copy_backs_per_LUN[a.package][a.die]++;
 	}
 
-	double bucket = ceil(max(0.0, event.get_bus_wait_time() - wait_time_histogram_bin_size / 2) / wait_time_histogram_bin_size)*wait_time_histogram_bin_size;
+	double bucket = ceil(max(0.0, event.get_overall_wait_time() - wait_time_histogram_bin_size / 2) / wait_time_histogram_bin_size)*wait_time_histogram_bin_size;
 	if      (event.is_original_application_io() && event.get_event_type() == WRITE) { wait_time_histogram_appIOs_write[bucket]++; wait_time_histogram_appIOs_write_and_read[bucket]++; }
 	else if (event.is_original_application_io() && event.get_event_type() == READ_TRANSFER)  { wait_time_histogram_appIOs_read[bucket]++; wait_time_histogram_appIOs_write_and_read[bucket]++; }
 	else if (!event.is_original_application_io() && event.get_event_type() == WRITE) { wait_time_histogram_non_appIOs_write[bucket]++;  }

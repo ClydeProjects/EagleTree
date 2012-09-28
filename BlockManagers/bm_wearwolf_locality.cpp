@@ -5,11 +5,13 @@ using namespace ssd;
 using namespace std;
 
 Wearwolf_Locality::Wearwolf_Locality(Ssd& ssd, FtlParent& ftl)
-	: Wearwolf(ssd, ftl),
+	: Block_manager_parallel(ssd, ftl),
 	  seq_write_key_to_pointers_mapping(),
 	  detector(new Sequential_Pattern_Detector(WEARWOLF_LOCALITY_THRESHOLD)),
 	  strat(SHOREST_QUEUE),
-	  random_number_generator(1111)
+	  random_number_generator(1111),
+	  num_hits(0),
+	  num_misses(0)
 {
 	parallel_degree = LOCALITY_PARALLEL_DEGREE == 0 ? ONE : LOCALITY_PARALLEL_DEGREE == 1 ? CHANNEL : LUN;
 
@@ -17,6 +19,8 @@ Wearwolf_Locality::Wearwolf_Locality(Ssd& ssd, FtlParent& ftl)
 }
 
 Wearwolf_Locality::~Wearwolf_Locality() {
+	printf("num hits:  %d\n", num_hits);
+	printf("num misses:  %d\n", num_misses);
 	delete detector;
 }
 
@@ -61,7 +65,8 @@ void Wearwolf_Locality::register_write_arrival(Event const& event) {
 Address Wearwolf_Locality::choose_best_address(Event const& event) {
 
 	if (event.is_garbage_collection_op()) {
-		return Wearwolf::choose_best_address(event);
+		num_misses++;
+		return Block_manager_parallel::choose_best_address(event);
 	}
 
 	int tag = event.get_tag();
@@ -72,25 +77,28 @@ Address Wearwolf_Locality::choose_best_address(Event const& event) {
 	detector->remove_old_sequential_writes_metadata(event.get_start_time());
 
 	if (arrived_writes_to_sequential_key_mapping.count(event.get_id()) == 0) {
-		return Wearwolf::choose_best_address(event);
+		num_misses++;
+		return Block_manager_parallel::choose_best_address(event);
 	}
 
 	int key = arrived_writes_to_sequential_key_mapping[event.get_id()];
 
 	if (seq_write_key_to_pointers_mapping.count(key) == 0) {
+		num_misses++;
 		arrived_writes_to_sequential_key_mapping.erase(event.get_id());
-		return Wearwolf::choose_best_address(event);
+		return Block_manager_parallel::choose_best_address(event);
 	}
 
 	if (seq_write_key_to_pointers_mapping[key].num_pointers == 0) {
-		return Wearwolf::choose_best_address(event);
+		num_misses++;
+		return Block_manager_parallel::choose_best_address(event);
 	}
 
 	return perform_sequential_write(event, key);
 }
 
 Address Wearwolf_Locality::choose_any_address(Event const& write) {
-	Address a = Wearwolf::choose_any_address(write);
+	Address a = Block_manager_parallel::choose_any_address(write);
 	if (can_schedule_write_immediately(a, write.get_current_time())) {
 		return a;
 	}
@@ -125,7 +133,9 @@ Address Wearwolf_Locality::perform_sequential_write(Event const& event, long key
 	}
 	if (!has_free_pages(to_return)) {
 		//schedule_gc(event.get_current_time(), -1, -1, -1);  // TODO only trigger GC if tagged need more space
-		to_return = Wearwolf::choose_best_address(event);
+		to_return = Block_manager_parallel::choose_best_address(event);
+	} else {
+		num_hits++;
 	}
 	return to_return;
 }
@@ -209,7 +219,8 @@ void Wearwolf_Locality::set_pointers_for_tagged_sequential_write(int tag, double
 void Wearwolf_Locality::process_write_completion(Event const& event, long key, pair<long, long> index) {
 
 	Block_manager_parent::register_write_outcome(event, SUCCESS);
-	page_hotness_measurer.register_event(event);
+
+	//page_hotness_measurer.register_event(event);
 
 	sequential_writes_pointers& swp = seq_write_key_to_pointers_mapping[key];
 
@@ -301,7 +312,7 @@ void Wearwolf_Locality::register_write_outcome(Event const& event, enum status s
 	}
 
 	if (!found) {
-		Wearwolf::register_write_outcome(event, status);
+		Block_manager_parallel::register_write_outcome(event, status);
 	}
 }
 
@@ -322,7 +333,7 @@ void Wearwolf_Locality::sequential_event_metadata_removed(long key) {
 }
 
 void Wearwolf_Locality::register_erase_outcome(Event const& event, enum status status) {
-	Wearwolf::register_erase_outcome(event, status);
+	Block_manager_parallel::register_erase_outcome(event, status);
 	int i, j;
 	if (parallel_degree == ONE) {
 		i = j = 0;

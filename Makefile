@@ -56,12 +56,22 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
-all: scheduling
+all: scheduling sequential_tuning sequential greediness
+
+greediness: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o greediness exp_gc_greediness.cpp $(OBJ)
+	-chmod $(PERMS) $(OBJ)
+	-chmod $(EPERMS) greediness
 
 scheduling: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o scheduling exp_scheduling_policies.cpp $(OBJ)
 	-chmod $(PERMS) $(OBJ)
 	-chmod $(EPERMS) scheduling
+	
+sequential_tuning: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o sequential_tuning exp_tuning_for_sequential.cpp $(OBJ)
+	-chmod $(PERMS) $(OBJ)
+	-chmod $(EPERMS) sequential_tuning
 
 erase_queues: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o erase_queues exp_erase_queues.cpp $(OBJ)
@@ -94,7 +104,7 @@ load_balancing: $(HDR) $(OBJ)
 	-chmod $(EPERMS) load_balancing
 
 clean:
-	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) sequential erase_queues gc_tuning scheduling
+	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) sequential erase_queues gc_tuning scheduling sequential_tuning greediness
 
 files:
 	echo $(SRC) $(HDR)

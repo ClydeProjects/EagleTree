@@ -193,7 +193,7 @@ extern int SCHEDULING_SCHEME = 2;
  */
 int BLOCK_MANAGER_ID = 2;
 
-bool GREEDY_GC = true;
+bool GREED_SCALE = 1;
 
 /* Output level of detail:
  * 0 -> Nothing

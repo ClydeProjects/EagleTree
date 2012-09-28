@@ -130,6 +130,7 @@ void IOScheduler::finish_all_events_until_this_time(double time) {
 
 void IOScheduler::execute_soonest_events() {
 	finish_all_events_until_this_time(get_current_time() + 1);
+
 }
 
 // this is used to signal the SSD object when all events have finished executing
@@ -210,9 +211,10 @@ void IOScheduler::execute_current_waiting_ios() {
 	}
 	// Traditional - GC PRIORITY
 	else if (SCHEDULING_SCHEME == 1) {
+		//writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
 		handle_next_batch(erases);
-		handle_next_batch(read_commands);
 		handle_writes(gc_writes);
+		handle_next_batch(read_commands);
 		handle_writes(writes);
 		handle_next_batch(read_transfers);
 	}
@@ -425,16 +427,8 @@ enum status IOScheduler::execute_next(Event* event) {
 			//LBA_currently_executing[dependent->get_logical_address()] = dependent->get_application_io_id();
 			dependent->set_application_io_id(dependency_code);
 
-			if (event->get_event_type() == READ_COMMAND) {
-				assert(dependent->get_event_type() == READ_TRANSFER);
-				dependent->incr_execution_time(event->get_execution_time());
-				dependent->incr_bus_wait_time(event->get_bus_wait_time());
-				dependent->incr_os_wait_time(event->get_os_wait_time());
-			}
-			else {
-				double diff = event->get_current_time() - dependent->get_current_time();
-				dependent->incr_bus_wait_time(diff);
-			}
+			double diff = event->get_current_time() - dependent->get_current_time();
+			dependent->incr_accumulated_wait_time(diff);
 
 			dependent->set_noop(event->get_noop());
 			dependencies[dependency_code].pop_front();
@@ -511,6 +505,14 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		event->print();
 	}
 	StatisticsGatherer::get_instance()->register_completed_event(*event);
+
+	/*if (event->is_original_application_io() && event->get_bus_wait_time() > 1509) {
+		event->print();
+		VisualTracer::get_instance()->print_horizontally_with_breaks();
+		event->print();
+		StateVisualiser::print_page_status();
+	}*/
+
 }
 
 void IOScheduler::print_stats() {

@@ -29,25 +29,25 @@ vector<Thread*>  two_file_managers(int highest_lba, double IO_submission_rate) {
 }
 
 vector<Thread*> greedy_eq_prio(int highest_lba, double IO_submission_rate) {
-	GREEDY_GC = true;
+	GREED_SCALE = 1;
 	SCHEDULING_SCHEME = 2;
 	return two_file_managers(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*>  greedy_gc_prio(int highest_lba, double IO_submission_rate) {
-	GREEDY_GC = true;
+	GREED_SCALE = 1;
 	SCHEDULING_SCHEME = 1;
 	return two_file_managers(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*>  lazy_eq_prio(int highest_lba, double IO_submission_rate) {
-	GREEDY_GC = false;
+	GREED_SCALE = 0;
 	SCHEDULING_SCHEME = 2;
 	return two_file_managers(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*> lazy_gc_priorty(int highest_lba, double IO_submission_rate) {
-	GREEDY_GC = false;
+	GREED_SCALE = 0;
 	SCHEDULING_SCHEME = 1;
 	return two_file_managers(highest_lba, IO_submission_rate);
 }

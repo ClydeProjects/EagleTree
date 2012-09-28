@@ -177,7 +177,7 @@ extern void *global_buffer;
  * Controls the block manager to be used
  */
 extern int BLOCK_MANAGER_ID;
-extern bool GREEDY_GC;
+extern int GREED_SCALE;
 extern int WEARWOLF_LOCALITY_THRESHOLD;
 extern bool ENABLE_TAGGING;
 
@@ -445,50 +445,52 @@ public:
 	Event();
 	Event(Event& event);
 	~Event() {}
-	inline ulong get_logical_address() const { return logical_address; }
-	inline const Address &get_address() const { return address; }
-	inline const Address &get_merge_address() const { return merge_address; }
-	inline const Address &get_log_address() const { return log_address; }
-	inline const Address &get_replace_address() const { return replace_address; }
-	inline uint get_size() const { return size; }
-	inline enum event_type get_event_type() const { return type; }
-	inline double get_start_time() const { assert(start_time >= 0.0); return start_time; }
-	inline bool is_original_application_io() const { return original_application_io; }
-	inline void set_original_application_io(bool val) { original_application_io = val; }
-	inline double get_execution_time() const { assert(execution_time >= 0.0); return execution_time; }
-	inline double get_current_time() const { return start_time + os_wait_time + bus_wait_time + execution_time; }
-	inline double get_ssd_submission_time() const { return start_time + os_wait_time; }
-	inline uint get_application_io_id() const { return application_io_id; }
-	inline double get_bus_wait_time() const { assert(bus_wait_time >= 0.0); return bus_wait_time; }
-	inline double get_os_wait_time() const { return os_wait_time; }
-	inline bool get_noop() const { return noop; }
-	inline uint get_id() const { return id; }
-	inline int get_tag() const { return tag; }
-	inline void set_tag(int new_tag) { tag = new_tag; }
+	inline ulong get_logical_address() const 			{ return logical_address; }
+	inline const Address &get_address() const 			{ return address; }
+	inline const Address &get_merge_address() const 	{ return merge_address; }
+	inline const Address &get_log_address() const 		{ return log_address; }
+	inline const Address &get_replace_address() const 	{ return replace_address; }
+	inline uint get_size() const 						{ return size; }
+	inline enum event_type get_event_type() const 		{ return type; }
+	inline double get_start_time() const 				{ assert(start_time >= 0.0); return start_time; }
+	inline bool is_original_application_io() const 		{ return original_application_io; }
+	inline void set_original_application_io(bool val) 	{ original_application_io = val; }
+	inline double get_execution_time() const 			{ assert(execution_time >= 0.0); return execution_time; }
+	inline double get_accumulated_wait_time() const 	{ assert(accumulated_wait_time >= 0.0); return accumulated_wait_time; }
+	inline double get_current_time() const 				{ return start_time + os_wait_time + accumulated_wait_time + bus_wait_time + execution_time; }
+	inline double get_ssd_submission_time() const 		{ return start_time + os_wait_time; }
+	inline uint get_application_io_id() const 			{ return application_io_id; }
+	inline double get_bus_wait_time() const 			{ assert(bus_wait_time >= 0.0); return bus_wait_time; }
+	inline double get_os_wait_time() const 				{ return os_wait_time; }
+	inline bool get_noop() const 						{ return noop; }
+	inline uint get_id() const 							{ return id; }
+	inline int get_tag() const 							{ return tag; }
+	inline void set_tag(int new_tag) 					{ tag = new_tag; }
 	inline void set_address(const Address &address) {
 		if (type == WRITE || type == READ || type == READ_COMMAND || type == READ_TRANSFER) {
 			assert(address.valid == PAGE);
 		}
 		this -> address = address;
 	}
-	inline void set_merge_address(const Address &address) { merge_address = address; }
-	inline void set_log_address(const Address &address) { log_address = address; }
+	inline void set_merge_address(const Address &address) 	{ merge_address = address; }
+	inline void set_log_address(const Address &address) 	{ log_address = address; }
 	inline void set_replace_address(const Address &address) { replace_address = address; }
-	inline void set_payload(void *payload) { this->payload = payload; }
+	inline void set_payload(void *payload) 					{ this->payload = payload; }
 	inline void set_event_type(const enum event_type &type) { this->type = type; }
-	inline void set_noop(bool value) { noop = value; }
-	inline void set_application_io_id(uint value) { application_io_id = value; }
-	inline void set_garbage_collection_op(bool value) { garbage_collection_op = value; }
-	inline void set_mapping_op(bool value) { mapping_op = value; }
-	inline void set_age_class(int value) { age_class = value; }
-	inline int get_age_class() const { return age_class; }
-	inline bool is_garbage_collection_op() const { return garbage_collection_op; }
-	inline bool is_mapping_op() const { return mapping_op; }
-	inline void *get_payload() const { return payload; }
-	inline double incr_bus_wait_time(double time_incr) { if(time_incr > 0.0) bus_wait_time += time_incr; return bus_wait_time; }
-	inline double incr_os_wait_time(double time_incr) { if(time_incr > 0.0) os_wait_time += time_incr; return os_wait_time; }
-	inline double incr_execution_time(double time_incr) { if(time_incr > 0.0) execution_time += time_incr; return execution_time; }
-	double get_best_case_finish_time();
+	inline void set_noop(bool value) 						{ noop = value; }
+	inline void set_application_io_id(uint value)			{ application_io_id = value; }
+	inline void set_garbage_collection_op(bool value) 		{ garbage_collection_op = value; }
+	inline void set_mapping_op(bool value) 					{ mapping_op = value; }
+	inline void set_age_class(int value) 					{ age_class = value; }
+	inline int get_age_class() const 						{ return age_class; }
+	inline bool is_garbage_collection_op() const 			{ return garbage_collection_op; }
+	inline bool is_mapping_op() const 						{ return mapping_op; }
+	inline void *get_payload() const 						{ return payload; }
+	inline double incr_bus_wait_time(double time_incr) 		{ if(time_incr > 0.0) bus_wait_time += time_incr; return bus_wait_time; }
+	inline double incr_os_wait_time(double time_incr) 		{ if(time_incr > 0.0) os_wait_time += time_incr; return os_wait_time; }
+	inline double incr_execution_time(double time_incr) 	{ if(time_incr > 0.0) execution_time += time_incr; return execution_time; }
+	inline double incr_accumulated_wait_time(double time_incr) 	{ if(time_incr > 0.0) accumulated_wait_time += time_incr; return accumulated_wait_time; }
+	inline double get_overall_wait_time() const 				{ return accumulated_wait_time + bus_wait_time; }
 	void print(FILE *stream = stdout) const;
 	static void reset_id_generators();
 private:
@@ -497,6 +499,7 @@ private:
 	double bus_wait_time;
 	double os_wait_time;
 	enum event_type type;
+	double accumulated_wait_time;
 
 	ulong logical_address;
 	Address address;
@@ -986,7 +989,6 @@ private:
 
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
-	bool greedy_gc;
 	// WL structures
 	uint max_age;
 	uint min_age;
@@ -1107,7 +1109,7 @@ private:
 	ulong io_num;
 };
 
-class Wearwolf_Locality : public Wearwolf, public Sequential_Pattern_Detector_Listener {
+class Wearwolf_Locality : public Block_manager_parallel, public Sequential_Pattern_Detector_Listener {
 public:
 	Wearwolf_Locality(Ssd& ssd, FtlParent& ftl);
 	~Wearwolf_Locality();
@@ -1157,6 +1159,8 @@ private:
 
 	void print_tags(); // to be removed
 	MTRand_int32 random_number_generator;
+	int num_hits;
+	int num_misses;
 };
 
 class IOScheduler {

@@ -87,17 +87,15 @@ enum status Controller::issue(Event *event)
 	if(event -> get_event_type() == READ_COMMAND)
 	{
 		assert(event -> get_address().valid > NONE);
-		if(ssd.bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY, *event) == FAILURE
-			|| ssd.read(*event) == FAILURE)
-			return FAILURE;
+		ssd.bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY, *event);
+		ssd.read(*event);
 	}
 	else if(event -> get_event_type() == READ_TRANSFER)
 	{
 		assert(event -> get_address().valid > NONE);
-		if(ssd.bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY + BUS_DATA_DELAY, *event) == FAILURE
-			|| ssd.ram.write(*event) == FAILURE
-			|| ssd.ram.read(*event) == FAILURE)
-			return FAILURE;
+		ssd.bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY + BUS_DATA_DELAY, *event);
+		ssd.ram.write(*event);
+		ssd.ram.read(*event);
 	}
 	else if(event -> get_event_type() == WRITE)
 	{

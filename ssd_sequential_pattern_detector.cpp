@@ -99,7 +99,7 @@ void Sequential_Pattern_Detector::remove_old_sequential_writes_metadata(double t
 	while(iter != sequential_writes_identification_and_data.end())
 	{
 		logical_address key = (*iter).first;
-		if ((*iter).second->last_io_num + 200 < io_num) {
+		if ((*iter).second->last_io_num + 100 < io_num) {
 			if (PRINT_LEVEL > 1) {
 				printf("deleting seq write with key %d:\n", key);
 			}

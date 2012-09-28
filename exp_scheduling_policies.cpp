@@ -26,25 +26,25 @@ vector<Thread*>  random_writes_reads_experiment(int highest_lba, double IO_submi
 }
 
 vector<Thread*>  naive_lazy(int highest_lba, double IO_submission_rate) {
-	GREEDY_GC = false;
+	GREED_SCALE = 1;
 	SCHEDULING_SCHEME = 0;
 	return random_writes_reads_experiment(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*>  naive_greedy(int highest_lba, double IO_submission_rate) {
-	GREEDY_GC = true;
+	GREED_SCALE = 1;
 	SCHEDULING_SCHEME = 0;
 	return random_writes_reads_experiment(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*>  intelligent_lazy_eq_priorty(int highest_lba, double IO_submission_rate) {
-	GREEDY_GC = false;
+	GREED_SCALE = 1;
 	SCHEDULING_SCHEME = 2;
 	return random_writes_reads_experiment(highest_lba, IO_submission_rate);
 }
 
 vector<Thread*>  intelligent_greedy_eq_priorty(int highest_lba, double IO_submission_rate) {
-	GREEDY_GC = true;
+	GREED_SCALE = 1;
 	SCHEDULING_SCHEME = 2;
 	return random_writes_reads_experiment(highest_lba, IO_submission_rate);
 }
