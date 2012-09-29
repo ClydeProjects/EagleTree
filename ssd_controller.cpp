@@ -94,27 +94,24 @@ enum status Controller::issue(Event *event)
 	{
 		assert(event -> get_address().valid > NONE);
 		ssd.bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY + BUS_DATA_DELAY, *event);
-		ssd.ram.write(*event);
-		ssd.ram.read(*event);
+		//ssd.ram.write(*event);
+		//ssd.ram.read(*event);
 	}
 	else if(event -> get_event_type() == WRITE)
 	{
 		assert(event -> get_address().valid > NONE);
 		ssd.bus.lock(event -> get_address().package, event -> get_current_time(), 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY, *event);
-		ssd.ram.write(*event);
-		ssd.ram.read(*event);
+		//ssd.ram.write(*event);
+		//ssd.ram.read(*event);
 		ssd.write(*event);
-			/*|| ssd.replace(*cur) == FAILURE*/
 		return SUCCESS;
 	}
 	else if(event -> get_event_type() == COPY_BACK)
 	{
 		assert(event -> get_address().valid > NONE);
 		assert(event -> get_replace_address().valid > NONE);
-		if(ssd.bus.lock(event -> get_address().package, event -> get_current_time(), 2 * BUS_CTRL_DELAY + PAGE_READ_DELAY, *event) == FAILURE
-			|| ssd.read(*event) == FAILURE
-			|| ssd.write(*event) == FAILURE)
-			return FAILURE;
+		ssd.bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY, *event);
+		ssd.write(*event);
 	}
 	else if(event -> get_event_type() == ERASE)
 	{

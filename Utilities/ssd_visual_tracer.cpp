@@ -72,7 +72,7 @@ void VisualTracer::register_completed_event(Event const& event) {
 		write_with_id(add.package, add.die, 'e', BLOCK_ERASE_DELAY - 1, symbols);
 	} else if (type == COPY_BACK) {
 		vector<vector<char> > symbols;
-		vector<char> logical_address = get_int_as_char_vector(event.get_logical_address());
+		vector<char> logical_address = get_int_as_char_vector(event.get_id());
 		symbols.push_back(logical_address);
 		if (event.is_garbage_collection_op()) {
 			vector<char> gc_symbol(2);

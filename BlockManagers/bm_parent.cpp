@@ -56,12 +56,27 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
 
 Block_manager_parent::~Block_manager_parent() {}
 
+Address Block_manager_parent::choose_copbyback_address(Event const& write) {
+	Address ra = write.get_replace_address();
+	if (!has_free_pages(free_block_pointers[ra.package][ra.die])) {
+		Address new_block = find_free_unused_block(ra.package, ra.die, write.get_current_time());
+		if (has_free_pages(new_block)) {
+			free_block_pointers[ra.package][ra.die] = new_block;
+		}
+	}
+	return has_free_pages(free_block_pointers[ra.package][ra.die]) ? free_block_pointers[ra.package][ra.die] : Address();
+}
 
 Address Block_manager_parent::choose_address(Event const& write) {
-	if (!can_write(write)) {
-		//StateVisualiser::print_page_status();
+	bool can_write = num_available_pages_for_new_writes > 0 || write.is_garbage_collection_op();
+	if (!can_write) {
 		return Address();
 	}
+
+	if (write.get_event_type() == COPY_BACK) {
+		return choose_copbyback_address(write);
+	}
+
 	Address a = choose_best_address(write);
 	if (has_free_pages(a)) {
 		return a;
@@ -184,7 +199,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	trim(event);
 
 	Address ba = event.get_address();
-	if (ba.compare(free_block_pointers[ba.package][ba.die]) >= BLOCK && event.get_event_type() == WRITE) {
+	if (ba.compare(free_block_pointers[ba.package][ba.die]) >= BLOCK) {
 		increment_pointer(free_block_pointers[ba.package][ba.die]);
 		if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
 			if (PRINT_LEVEL > 1) {
@@ -322,6 +337,7 @@ void Block_manager_parent::register_read_command_outcome(Event const& event, enu
 
 void Block_manager_parent::register_read_transfer_outcome(Event const& event, enum status status) {
 	IO_has_completed_since_last_shortest_queue_search = true;
+	register_ECC_check_on(event.get_logical_address()); // An ECC check happens in a normal read-write GC operation
 	assert(event.get_event_type() == READ_TRANSFER);
 }
 
@@ -451,16 +467,12 @@ uint Block_manager_parent::how_many_gc_operations_are_scheduled() const {
 	return blocks_being_garbage_collected.size();
 }
 
-bool Block_manager_parent::has_free_pages(Address const& address) const {
-	return address.valid == PAGE && address.page < BLOCK_SIZE;
-}
-
 bool Block_manager_parent::Copy_backs_in_progress(Address const& addr) {
-	if (addr.page > 0) {
+	/*if (addr.page > 0) {
 		Block& block = ssd.getPackages()[addr.package].getDies()[addr.die].getPlanes()[addr.plane].getBlocks()[addr.block];
 		Page const& page_before = block.getPages()[addr.page - 1];
 		return page_before.get_state() == EMPTY;
-	}
+	}*/
 	return false;
 }
 
@@ -488,7 +500,8 @@ bool Block_manager_parent::can_schedule_on_die(Event const* event) const {
 		return true;
 	}
 	uint application_io = ssd.getPackages()[package_id].getDies()[die_id].get_last_read_application_io();
-	return event->get_event_type() == READ_TRANSFER && application_io == event->get_application_io_id();
+	event_type type = event->get_event_type();
+	return (type == READ_TRANSFER || type == COPY_BACK ) && application_io == event->get_application_io_id();
 }
 
 bool Block_manager_parent::is_die_register_busy(Address const& addr) const {
@@ -685,8 +698,6 @@ void Block_manager_parent::register_trim_making_gc_redundant() {
 // page from this block has been migrated
 vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
-	//StateTracer::print();
-
 	Address a = gc_event->get_address();
 
 	vector<deque<Event*> > migrations;
@@ -746,7 +757,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	num_available_pages_for_new_writes -= victim->get_pages_valid();
 
-	deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
+	//deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
 	StatisticsGatherer::get_instance()->register_executed_gc(*gc_event, *victim);
 
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
@@ -760,15 +771,21 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 			deque<Event*> migration;
 
 			// If a copy back is allowed, try to reserve a page on the same die
-			Address copy_back_target = copy_back_allowed_on(logical_address) ? reserve_page_on(addr.package, addr.die, gc_event->get_current_time()) : Address();
+			//Address copy_back_target = copy_back_allowed_on(logical_address) ? reserve_page_on(addr.package, addr.die, gc_event->get_current_time()) : Address();
 
 			// If a copy back is allowed, and a target page could be reserved, do it. Otherwise, just do a traditional and more expensive READ - WRITE garbage collection
-			if (copy_back_target.valid == PAGE) {
+			if (copy_back_allowed_on(logical_address)) {
+
+				Event* read_command = new Event(READ_COMMAND, logical_address, 1, gc_event->get_start_time());
+				read_command->set_address(addr);
+				read_command->set_garbage_collection_op(true);
+
 				Event* copy_back = new Event(COPY_BACK, logical_address, 1, gc_event->get_start_time());
-				copy_back->set_address(copy_back_target);
 				copy_back->set_replace_address(addr);
 				copy_back->set_garbage_collection_op(true);
-				cb_migrations.push_back(copy_back);
+
+				migration.push_back(read_command);
+				migration.push_back(copy_back);
 				register_copy_back_operation_on(logical_address);
 				//printf("COPY_BACK MAP (Size: %d):\n", page_copy_back_count.size()); for (map<long, uint>::iterator it = page_copy_back_count.begin(); it != page_copy_back_count.end(); it++) printf(" lba %d\t: %d\n", it->first, it->second);
 			} else {
@@ -783,12 +800,12 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 				migration.push_back(read);
 				migration.push_back(write);
 
-				register_ECC_check_on(logical_address); // An ECC check happens in a normal read-write GC operation
+				//register_ECC_check_on(logical_address); // An ECC check happens in a normal read-write GC operation
 			}
-			if (migration.size() > 0) migrations.push_back(migration);
+			migrations.push_back(migration);
 		}
 	}
-	if (cb_migrations.size() > 0) migrations.push_back(cb_migrations);
+	//if (cb_migrations.size() > 0) migrations.push_back(cb_migrations);
 
 	return migrations;
 }

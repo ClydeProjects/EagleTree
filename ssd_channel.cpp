@@ -128,7 +128,7 @@ enum status Channel::lock(double start_time, double duration, Event& event) {
 	}
 	currently_executing_operation_finish_time = event.get_current_time() + duration;
 
-	if (event.get_event_type() == READ_TRANSFER) {
+	if (event.get_event_type() == READ_TRANSFER || event.get_event_type() == COPY_BACK) {
 		Address adr = event.get_address();
 		uint last_read_application_io = ssd->getPackages()[adr.package].getDies()[adr.die].get_last_read_application_io();
 		if (last_read_application_io != event.get_application_io_id()) {

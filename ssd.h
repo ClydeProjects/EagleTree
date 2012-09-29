@@ -941,9 +941,11 @@ public:
 	bool can_schedule_on_die(Event const* event) const;
 	bool is_die_register_busy(Address const& addr) const;
 	void register_trim_making_gc_redundant();
+	Address choose_copbyback_address(Event const& write);
 protected:
 	virtual Address choose_best_address(Event const& write) = 0;
 	virtual Address choose_any_address(Event const& write) = 0;
+
 
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	void increment_pointer(Address& pointer);
@@ -966,7 +968,7 @@ protected:
 
 	uint how_many_gc_operations_are_scheduled() const;
 
-	bool has_free_pages(Address const& address) const;
+	inline bool has_free_pages(Address const& address) const { return address.valid == PAGE && address.page < BLOCK_SIZE; }
 
 	Ssd& ssd;
 	FtlParent& ftl;
@@ -1184,7 +1186,7 @@ private:
 	vector<Event*> collect_soonest_events();
 	void handle_next_batch(vector<Event*>& events);
 	void handle_writes(vector<Event*>& events);
-
+	void transform_copyback(Event* event);
 	void handle_finished_event(Event *event, enum status outcome);
 	void remove_redundant_events(Event* new_event);
 	bool should_event_be_scheduled(Event* event);

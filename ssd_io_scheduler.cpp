@@ -81,7 +81,7 @@ IOScheduler *IOScheduler::instance()
 
 
 inline bool bus_wait_time_comparator (const Event* i, const Event* j) {
-	return i->get_bus_wait_time() < j->get_bus_wait_time();
+	return i->get_accumulated_wait_time() < j->get_accumulated_wait_time();
 }
 
 // assumption is that all events within an operation have the same LBA
@@ -197,7 +197,7 @@ void IOScheduler::execute_current_waiting_ios() {
 	}
 
 	handle_noop_events(noop_events);
-	handle_next_batch(copy_backs); // Copy backs should be prioritized first to avoid conflict, since they have a reserved page waiting to be written
+	//handle_writes(copy_backs); // Copy backs should be prioritized first to avoid conflict, since they have a reserved page waiting to be written
 
 	//read_commands.insert(read_commands.end(), gc_read_commands.begin(), gc_read_commands.end());
 
@@ -221,6 +221,7 @@ void IOScheduler::execute_current_waiting_ios() {
 	// EQUAL PRIORITY - INTERLEAVED
 	else if (SCHEDULING_SCHEME == 2) {
 		writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
+		writes.insert(writes.end(), copy_backs.begin(), copy_backs.end());
 		handle_next_batch(erases);
 		handle_next_batch(read_commands);
 		handle_writes(writes);
@@ -297,8 +298,9 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 		Event* event = events.back();
 		events.pop_back();
 		Address addr = bm->choose_address(*event);
+
 		double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time());
-		if (wait_time == 0 && (bm->Copy_backs_in_progress(addr) || !bm->can_schedule_on_die(event)))  {
+		if ( wait_time == 0 && !bm->can_schedule_on_die(event) )  {
 			wait_time = 10;
 		}
 		if (wait_time == 0) {
@@ -309,9 +311,20 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 		}
 		else {
 			event->incr_bus_wait_time(wait_time);
+			if (event->get_event_type() == COPY_BACK && addr.valid == NONE) {
+				transform_copyback(event);
+			}
 			push_into_current_events(event);
 		}
 	}
+}
+
+void IOScheduler::transform_copyback(Event* event) {
+	event->set_event_type(READ_TRANSFER);
+	event->set_address(event->get_replace_address());
+	Event* write = new Event(WRITE, event->get_logical_address(), 1, event->get_current_time());
+	write->set_garbage_collection_op(true);
+	dependencies[event->get_application_io_id()].push_back(write);
 }
 
 bool IOScheduler::should_event_be_scheduled(Event* event) {
@@ -499,6 +512,14 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	}
 	StatisticsGatherer::get_instance()->register_completed_event(*event);
 
+
+	/*if (event->get_event_type() == COPY_BACK) {
+			event->print();
+			VisualTracer::get_instance()->print_horizontally_with_breaks();
+			event->print();
+			StateVisualiser::print_page_status();
+		}*/
+
 	/*if (event->is_original_application_io() && event->get_bus_wait_time() > 1509) {
 		event->print();
 		VisualTracer::get_instance()->print_horizontally_with_breaks();
@@ -528,11 +549,9 @@ void IOScheduler::init_event(Event* event) {
 	if (type == TRIM || type == READ_COMMAND || type == READ_TRANSFER || type == WRITE || type == COPY_BACK) {
 		if (should_event_be_scheduled(event)) {
 			push_into_current_events(event);
-		} else {
-			if (PRINT_LEVEL >= 1) {
-				printf("Event not scheduled: ");
-				event->print();
-			}
+		} else if (PRINT_LEVEL >= 1) {
+			printf("Event not scheduled: ");
+			event->print();
 		}
 	}
 
@@ -561,8 +580,7 @@ void IOScheduler::init_event(Event* event) {
 			migrations.pop_back();
 			// Pick first event from migration
 			Event* first = migration.front();
-
-			if (first->get_event_type() == COPY_BACK) {
+			/*if (first->get_event_type() == COPY_BACK) {
 				// Make a chain of dependencies, to enforce an order of execution: first -> second -> third, etc.
 				for (deque<Event*>::iterator e = migration.begin(); e != migration.end(); e++) {
 					Event* current = *(e);
@@ -575,12 +593,13 @@ void IOScheduler::init_event(Event* event) {
 					remove_redundant_events(current);
 					if (!last) make_dependent(next, current->get_application_io_id());
 				}
-			} else {
-				migration.pop_front();
-				dependencies[first->get_application_io_id()] = migration;
-				dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
-				dependency_code_to_type[first->get_application_io_id()] = first->get_event_type(); // = WRITE for normal GC, COPY_BACK for copy backs
-			}
+			} else {*/
+			migration.pop_front();
+			dependencies[first->get_application_io_id()] = migration;
+			dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
+			//dependency_code_to_type[first->get_application_io_id()] = first->get_event_type(); // = WRITE for normal GC, COPY_BACK for copy backs
+			//}
+			dependency_code_to_type[first->get_application_io_id()] = WRITE;
 			init_event(first);
 		}
 		delete event;
@@ -700,6 +719,6 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		}
 		//new_event->set_noop(true);
 	} else {
-		printf(" ");
+		assert(false);
 	}
 }

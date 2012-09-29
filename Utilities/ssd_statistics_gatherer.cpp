@@ -73,7 +73,7 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	}
 
 	Address a = event.get_address();
-	if (event.get_event_type() == WRITE) {
+	if (event.get_event_type() == WRITE || event.get_event_type() == COPY_BACK) {
 		if (event.is_original_application_io()) {
 			num_writes_per_LUN[a.package][a.die]++;
 			bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_overall_wait_time());

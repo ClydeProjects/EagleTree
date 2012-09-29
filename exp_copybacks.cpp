@@ -34,7 +34,7 @@ vector<Thread*>  random_writes_reads_experiment(int highest_lba, double IO_submi
 	GREED_SCALE = 2;
 	long num_IOs = numeric_limits<int>::max();
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, highest_lba, num_IOs, 624621, WRITE, 2, 2));
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread_Reader_Writer(0, highest_lba, num_IOs, 624621));
 	vector<Thread*> threads;
 	threads.push_back(t1);
 	return threads;
@@ -95,7 +95,7 @@ int main()
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(copybacks0, 	space_min, space_max, space_inc, exp_folder + "copybacks0/",	"copybacks allowed 0", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(copybacks1, 	space_min, space_max, space_inc, exp_folder + "copybacks1/",	"copybacks allowed 1", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(copybacks2,	space_min, space_max, space_inc, exp_folder + "copybacks2/",	"copybacks allowed 2", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(copybacks2,	space_min, space_max, space_inc, exp_folder + "copybacks3/",	"copybacks allowed 3", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(copybacks3,	space_min, space_max, space_inc, exp_folder + "copybacks3/",	"copybacks allowed 3", IO_limit) );
 
 	// Print column names for info
 		for (uint i = 0; i < exp[0].column_names.size(); i++)

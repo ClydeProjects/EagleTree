@@ -77,7 +77,7 @@ int main()
 	int cb_map_min = 0;
 	int cb_map_max = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 	int cb_map_inc = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE / 10;
-	int max_copybacks = 5;
+	int max_copybacks = 3;
 
 	stringstream space_usage_string;
 	space_usage_string << used_space << "% used space";
