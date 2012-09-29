@@ -48,7 +48,7 @@ vector<Thread*>  greed3(int highest_lba, double IO_submission_rate) {
 	return random_writes_reads_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<ExperimentResult> random_writes(int space_min, int space_max, int space_inc, string exp_folder, int IO_limit) {
+vector<ExperimentResult> random_writes_reads(int space_min, int space_max, int space_inc, string exp_folder, int IO_limit) {
 	vector<ExperimentResult> exp;
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(greed0,	space_min, space_max, space_inc, exp_folder + 		"rand_greed0/", "rand greed0", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(greed1,	space_min, space_max, space_inc, exp_folder + 		"rand_greed1/", "rand greed1", IO_limit) );
@@ -62,17 +62,20 @@ vector<ExperimentResult> random_writes(int space_min, int space_max, int space_i
 
 vector<Thread*> sequential_experiment(int highest_lba, double IO_submission_rate) {
 	SCHEDULING_SCHEME = 2;
-	BLOCK_MANAGER_ID = 3;
-	ENABLE_TAGGING = true;
-	long log_space_per_thread = highest_lba / 2;
-	long max_file_size = log_space_per_thread / 4;
-	Thread* t1 = new Asynchronous_Sequential_Thread(0, log_space_per_thread * 2, 1, WRITE, 100, 0);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, log_space_per_thread, 500000000, 2, WRITE, IO_submission_rate, 1));
-	t1->add_follow_up_thread(new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, 1000000, max_file_size, IO_submission_rate, 1, 1));
+	USE_ERASE_QUEUE = false;
+
+	long log_space_per_thread = highest_lba / 4;
+	long max_file_size = log_space_per_thread / 6;
+
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, log_space_per_thread * 4, 1, WRITE, 100, 0);
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, log_space_per_thread * 2, 500000000, 2462, WRITE, IO_submission_rate, 1));
+	t1->add_follow_up_thread(new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 1000000, max_file_size, IO_submission_rate, 1, 795));
+	t1->add_follow_up_thread(new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, max_file_size, IO_submission_rate, 2, 46));
 	vector<Thread*> threads;
 	threads.push_back(t1);
 	return threads;
 }
+
 
 vector<Thread*> tagging0(int highest_lba, double IO_submission_rate) {
 	GREED_SCALE = 0;
@@ -116,25 +119,23 @@ int main()
 	PLANE_SIZE = 128;
 	BLOCK_SIZE = 32;
 
-	PAGE_READ_DELAY = 5;
-	PAGE_WRITE_DELAY = 20;
-	BUS_CTRL_DELAY = 1;
-	BUS_DATA_DELAY = 8;
-	BLOCK_ERASE_DELAY = 150;
-
-	MAX_SSD_QUEUE_SIZE = 15;
+	PAGE_READ_DELAY = 50;
+	PAGE_WRITE_DELAY = 200;
+	BUS_CTRL_DELAY = 5;
+	BUS_DATA_DELAY = 90;
+	BLOCK_ERASE_DELAY = 1500;
 
 	int IO_limit = 200000;
-	int space_min = 80;
-	int space_max = 95;
+	int space_min = 60;
+	int space_max = 90;
 	int space_inc = 5;
+
+	PRINT_LEVEL = 0;
+	MAX_SSD_QUEUE_SIZE = 15;
 
 	double start_time = Experiment_Runner::wall_clock_time();
 
-	PRINT_LEVEL = 0;
-
-	//vector<ExperimentResult> exp = random_writes(space_min, space_max, space_inc, exp_folder, IO_limit);
-	vector<ExperimentResult> exp = tagging(space_min, space_max, space_inc, exp_folder, IO_limit);
+	vector<ExperimentResult> exp = random_writes_reads(space_min, space_max, space_inc, exp_folder, IO_limit);
 
 
 	// Print column names for info
@@ -162,6 +163,10 @@ int main()
 	Experiment_Runner::graph(sx, sy,   "Write wait, mean", 			"Write wait, mean", 	9, 	exp);
 	Experiment_Runner::graph(sx, sy,   "Write wait, max", 			"Write wait, max", 		14, exp);
 	Experiment_Runner::graph(sx, sy,   "Write wait, std", 			"Write wait, std", 		15, exp);
+
+	Experiment_Runner::graph(sx, sy,   "Read wait, mean", 			"Read wait, mean", 		16,	exp);
+	Experiment_Runner::graph(sx, sy,   "Read wait, max", 			"Read wait, max",		21,	exp);
+	Experiment_Runner::graph(sx, sy,   "Read wait, stdev", 			"Read wait, stdev", 	22,	exp);
 
 	// VALUES FOR THE TWO LAST PARAMETERS IN cross_experiment_waittime_histogram() and waittime_histogram():
 	// 1. Application IOs, Reads+writes

@@ -13,9 +13,9 @@ using namespace ssd;
 
 StatisticsGatherer *StatisticsGatherer::inst = NULL;
 
-const double StatisticsGatherer::wait_time_histogram_bin_size = 100;
+const double StatisticsGatherer::wait_time_histogram_bin_size = 1000;
 const double StatisticsGatherer::age_histogram_bin_size = 1;
-const double StatisticsGatherer::io_counter_window_size = 1000;
+const double StatisticsGatherer::io_counter_window_size = 1000000; // second
 
 StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
 	:  num_gc_cancelled_no_candidate(0),
@@ -64,18 +64,9 @@ StatisticsGatherer *StatisticsGatherer::get_instance()
 }
 
 void StatisticsGatherer::register_completed_event(Event const& event) {
-
-	/*if (event.get_event_type() == READ_COMMAND) {
-		event.print();
-	}
-
-	if (event.get_event_type() == READ_TRANSFER && event.get_logical_address() == 16468) {
-			event.print();
-		}
-*/
 	uint current_window = floor(event.get_current_time() / io_counter_window_size);
-	while (application_io_history.size() < current_window+1) application_io_history.push_back(0);
-	while (non_application_io_history.size() < current_window+1)non_application_io_history.push_back(0);
+	while (application_io_history.size() < current_window + 1) application_io_history.push_back(0);
+	while (non_application_io_history.size() < current_window + 1)non_application_io_history.push_back(0);
 	if (event.get_event_type() != READ_COMMAND && event.get_event_type() != TRIM) {
 		if (event.is_original_application_io()) application_io_history[current_window]++;
 		else non_application_io_history[current_window]++;
@@ -243,6 +234,15 @@ double get_std(vector<vector<T> > const& vector)
 }
 
 
+template <class T>
+void flatten(vector<vector<vector<T> > > const& vec, vector<T>& outcome)
+{
+	for (uint i = 0; i < vec.size(); i++) {
+		for (uint j = 0; j < vec[i].size(); j++) {
+			outcome.insert(outcome.end(), vec[i][j].begin(), vec[i][j].end());
+		}
+	}
+}
 
 
 void StatisticsGatherer::print() {
@@ -458,11 +458,10 @@ string StatisticsGatherer::totals_csv_line() {
 
 	vector<double> all_write_wait_times;
 	vector<double> all_read_wait_times;
-	for (uint i = 0; i < SSD_SIZE; i++)
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			all_write_wait_times.insert(all_write_wait_times.end(), bus_wait_time_for_writes_per_LUN[i][j].begin(), bus_wait_time_for_writes_per_LUN[i][j].end());
-			all_read_wait_times.insert(all_read_wait_times.end(), bus_wait_time_for_reads_per_LUN[i][j].begin(), bus_wait_time_for_reads_per_LUN[i][j].end());
-		}
+
+	flatten(bus_wait_time_for_writes_per_LUN, all_write_wait_times);
+	flatten(bus_wait_time_for_reads_per_LUN, all_read_wait_times);
+
 	std::sort(all_write_wait_times.begin(), all_write_wait_times.end());
 	std::sort(all_read_wait_times.begin(), all_read_wait_times.end());
 
@@ -489,8 +488,6 @@ string StatisticsGatherer::totals_csv_line() {
 	ss << total_copy_backs << ", ";
 	ss << total_erases << ", ";
 
-	printf("max latency:  %f\n", all_write_wait_times.back());
-
 	ss << get_average(all_write_wait_times) << ", ";  // mean
 	ss << all_write_wait_times.front() << ", "; // min
 	ss << all_write_wait_times[all_write_wait_times.size() * .25] << ", "; // Q25
@@ -498,6 +495,9 @@ string StatisticsGatherer::totals_csv_line() {
 	ss << all_write_wait_times[all_write_wait_times.size() * .75] << ", "; // Q75
 	ss << all_write_wait_times.back() << ", ";  // max
 	ss << get_std(all_write_wait_times) << ", ";
+
+	printf("max latency:  %f\n", all_write_wait_times.back());
+	printf("latency std:  %f\n", get_std(all_write_wait_times));
 
 	ss << get_average(all_read_wait_times) << ", ";  // mean
 	ss << all_read_wait_times.front() << ", "; // min

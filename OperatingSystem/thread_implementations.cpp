@@ -25,7 +25,7 @@ void Thread::register_event_completion(Event* event) {
 	Address phys = event->get_address();
 	Address ra = event->get_replace_address();
 	handle_event_completion(event);
-	if (!event->get_noop()) {
+	if (!event->get_noop() && event->get_event_type() != TRIM) {
 		num_ios_finished++;
 	}
 }

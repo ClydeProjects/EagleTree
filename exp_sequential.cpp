@@ -35,16 +35,17 @@ using namespace ssd;
 vector<Thread*> sequential_experiment(int highest_lba, double IO_submission_rate) {
 
 	SCHEDULING_SCHEME = 2;
-	GREED_SCALE = 1;
-	WEARWOLF_LOCALITY_THRESHOLD = 10;
+	GREED_SCALE = 2;
+	WEARWOLF_LOCALITY_THRESHOLD = BLOCK_SIZE;
 	USE_ERASE_QUEUE = false;
 
-	long log_space_per_thread = highest_lba / 2;
-	long max_file_size = log_space_per_thread / 4;
+	long log_space_per_thread = highest_lba / 4;
+	long max_file_size = log_space_per_thread / 7;
 
-	Thread* t1 = new Asynchronous_Sequential_Thread(0, log_space_per_thread * 2, 1, WRITE, 100, 0);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, log_space_per_thread, 500000000, 2, WRITE, IO_submission_rate, 1));
-	t1->add_follow_up_thread(new File_Manager(log_space_per_thread + 1, log_space_per_thread * 2, 1000000, max_file_size, IO_submission_rate, 1, 1));
+	Thread* t1 = new Asynchronous_Sequential_Thread(0, log_space_per_thread * 4, 1, WRITE, 100, 0);
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, log_space_per_thread * 2, 500000000, 472, WRITE, IO_submission_rate, 1));
+	t1->add_follow_up_thread(new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 1000000, max_file_size, IO_submission_rate, 1, 713));
+	t1->add_follow_up_thread(new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, max_file_size, IO_submission_rate, 2, 5));
 	vector<Thread*> threads;
 	threads.push_back(t1);
 	return threads;
@@ -95,35 +96,27 @@ int main()
 	PLANE_SIZE = 128;
 	BLOCK_SIZE = 32;
 
-	PAGE_READ_DELAY = 5;
-	PAGE_WRITE_DELAY = 20;
-	BUS_CTRL_DELAY = 1;
-	BUS_DATA_DELAY = 8;
-	BLOCK_ERASE_DELAY = 150;
+	PAGE_READ_DELAY = 50;
+	PAGE_WRITE_DELAY = 200;
+	BUS_CTRL_DELAY = 5;
+	BUS_DATA_DELAY = 90;
+	BLOCK_ERASE_DELAY = 1500;
 
 	int IO_limit = 200000;
-	int space_min = 75;
+	int space_min = 60;
 	int space_max = 90;
 	int space_inc = 5;
-
-	double start_time = Experiment_Runner::wall_clock_time();
 
 	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 15;
 
+	double start_time = Experiment_Runner::wall_clock_time();
+
 	vector<ExperimentResult> exp;
 
-
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(tagging, 			space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );
-
-	//USE_ERASE_QUEUE = true;
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(tagging, 			space_min, space_max, space_inc, exp_folder + "oracle_erase_queues/",			"Oracle Queues", IO_limit) );
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues_queues/",	"Shortest Queues Queues", IO_limit) );
-
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_LUN, 	 space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",		"Seq Detect: LUN", IO_limit) );
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_CHANNEL, space_min, space_max, space_inc, exp_folder + "seq_detect_channel/",	"Seq Detect: CHA", IO_limit) );
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_BLOCK, 	 space_min, space_max, space_inc, exp_folder + "seq_detect_block/",		"Seq Detect: SSD", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
 
 
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
@@ -142,7 +135,7 @@ int main()
 
 	Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 				24, exp);
 	Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 		25, exp);
-	Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 			26, exp);
+	//Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 			26, exp);
 	Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 				8, 	exp);
 	Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 			3, 	exp);
 
@@ -153,6 +146,7 @@ int main()
 	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
 	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, 1, 4);
 	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 70, 1, 4);
+	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 60, 1, 4);
 
 	for (uint i = 0; i < exp.size(); i++) {
 		printf("%s\n", exp[i].data_folder.c_str());

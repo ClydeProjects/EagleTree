@@ -290,7 +290,7 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 
 		// Calibrate IO submission rate
 		double IO_submission_rate = 10; //calibrate_IO_submission_rate_queue_based(highest_lba, IO_limit, experiment);
-		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
+		//printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
 
 		// Run experiment
 		vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
@@ -412,7 +412,7 @@ void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filenam
     "size " << sizeX << " " << sizeY << endl << // 12 8
     "set font texcmr" << endl <<
     "begin graph" << endl <<
-    "   key pos bl offset -0.0 0 compact" << endl <<
+    "   key pos tl offset -0.0 0 compact" << endl <<
     "   scale auto" << endl <<
     (GRAPH_TITLES ? "" : "!") << "   title  \"" << title << "\"" << endl <<
     "   xtitle \"" << experiments[0].variable_parameter_name << "\"" << endl <<

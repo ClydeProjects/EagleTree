@@ -26,7 +26,7 @@ vector<Thread*>  random_writes_reads_experiment(int highest_lba, double IO_submi
 }
 
 vector<Thread*>  naive_lazy(int highest_lba, double IO_submission_rate) {
-	GREED_SCALE = 1;
+	GREED_SCALE = 0;
 	SCHEDULING_SCHEME = 0;
 	return random_writes_reads_experiment(highest_lba, IO_submission_rate);
 }
@@ -37,13 +37,13 @@ vector<Thread*>  naive_greedy(int highest_lba, double IO_submission_rate) {
 	return random_writes_reads_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<Thread*>  intelligent_lazy_eq_priorty(int highest_lba, double IO_submission_rate) {
-	GREED_SCALE = 1;
+vector<Thread*>  smart_lazy(int highest_lba, double IO_submission_rate) {
+	GREED_SCALE = 0;
 	SCHEDULING_SCHEME = 2;
 	return random_writes_reads_experiment(highest_lba, IO_submission_rate);
 }
 
-vector<Thread*>  intelligent_greedy_eq_priorty(int highest_lba, double IO_submission_rate) {
+vector<Thread*>  smart_greedy(int highest_lba, double IO_submission_rate) {
 	GREED_SCALE = 1;
 	SCHEDULING_SCHEME = 2;
 	return random_writes_reads_experiment(highest_lba, IO_submission_rate);
@@ -64,18 +64,19 @@ int main()
 	PLANE_SIZE = 128;
 	BLOCK_SIZE = 32;
 
-	PAGE_READ_DELAY = 5;
-	PAGE_WRITE_DELAY = 20;
-	BUS_CTRL_DELAY = 1;
-	BUS_DATA_DELAY = 8;
-	BLOCK_ERASE_DELAY = 150;
-
-	MAX_SSD_QUEUE_SIZE = 15;
+	PAGE_READ_DELAY = 50;
+	PAGE_WRITE_DELAY = 200;
+	BUS_CTRL_DELAY = 5;
+	BUS_DATA_DELAY = 90;
+	BLOCK_ERASE_DELAY = 1500;
 
 	int IO_limit = 200000;
 	int space_min = 60;
 	int space_max = 90;
 	int space_inc = 5;
+
+	PRINT_LEVEL = 0;
+	MAX_SSD_QUEUE_SIZE = 15;
 
 	double start_time = Experiment_Runner::wall_clock_time();
 
@@ -84,8 +85,8 @@ int main()
 	vector<ExperimentResult> exp;
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_lazy,						space_min, space_max, space_inc, exp_folder + 		"naive_lazy/", "naive lazy", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_greedy,						space_min, space_max, space_inc, exp_folder + 		"naive_greedy/", "naive greedy", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_lazy_eq_priorty,		space_min, space_max, space_inc, exp_folder + 		"intelligent_lazy_eq_priorty/", "Smart, lazy", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(intelligent_greedy_eq_priorty,	space_min, space_max, space_inc, exp_folder + 		"intelligent_greedy_eq_priorty/", "Smart, greedy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(smart_lazy,		space_min, space_max, space_inc, exp_folder + 		"smart_lazy/", "smart lazy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(smart_greedy,	space_min, space_max, space_inc, exp_folder + 		"smart_greedy/", "smart greedy", IO_limit) );
 
 	// Print column names for info
 	for (uint i = 0; i < exp[0].column_names.size(); i++)

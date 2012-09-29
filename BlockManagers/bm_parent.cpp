@@ -467,7 +467,7 @@ bool Block_manager_parent::Copy_backs_in_progress(Address const& addr) {
 // gives time until both the channel and die are clear
 double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& address, double event_time) const {
 	if (address.valid == NONE) {
-		return 1;
+		return 10;
 	}
 
 	uint package_id = address.package;

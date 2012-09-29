@@ -296,17 +296,10 @@ void IOScheduler::handle_writes(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
-
-		if (event->get_id() == 57680 && event->get_bus_wait_time() > 2068) {
-			int i = 0;
-			i++;
-			//VisualTracer::get_instance()->print_horizontally_with_breaks();
-		}
-
 		Address addr = bm->choose_address(*event);
 		double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time());
 		if (wait_time == 0 && (bm->Copy_backs_in_progress(addr) || !bm->can_schedule_on_die(event)))  {
-			wait_time = 1;
+			wait_time = 10;
 		}
 		if (wait_time == 0) {
 			event->set_address(addr);
@@ -404,7 +397,7 @@ void IOScheduler::handle_next_batch(vector<Event*>& events) {
 			execute_next(event);
 		}
 		else {
-			double bus_wait_time = can_schedule ? time : 1;
+			double bus_wait_time = can_schedule ? time : 10;
 			event->incr_bus_wait_time(bus_wait_time);
 			push_into_current_events(event);
 		}
