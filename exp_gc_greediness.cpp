@@ -22,7 +22,7 @@ vector<Thread*>  random_writes_reads_experiment(int highest_lba, double IO_submi
 	SCHEDULING_SCHEME = 2;
 	long num_IOs = numeric_limits<int>::max();
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread_Reader_Writer(0, highest_lba, num_IOs, 2, 1));
+	t1->add_follow_up_thread(new Asynchronous_Random_Thread_Reader_Writer(0, highest_lba, num_IOs, 624621));
 	vector<Thread*> threads;
 	threads.push_back(t1);
 	return threads;
@@ -50,10 +50,10 @@ vector<Thread*>  greed3(int highest_lba, double IO_submission_rate) {
 
 vector<ExperimentResult> random_writes_reads(int space_min, int space_max, int space_inc, string exp_folder, int IO_limit) {
 	vector<ExperimentResult> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(greed0,	space_min, space_max, space_inc, exp_folder + 		"rand_greed0/", "rand greed0", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(greed1,	space_min, space_max, space_inc, exp_folder + 		"rand_greed1/", "rand greed1", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(greed2,	space_min, space_max, space_inc, exp_folder + 		"rand_greed2/", "rand greed2", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(greed3,	space_min, space_max, space_inc, exp_folder + 		"rand_greed3/", "rand greed3", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(greed0,	space_min, space_max, space_inc, exp_folder + 		"rand_greed0/", "greed 0", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(greed1,	space_min, space_max, space_inc, exp_folder + 		"rand_greed1/", "greed 1", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(greed2,	space_min, space_max, space_inc, exp_folder + 		"rand_greed2/", "greed 2", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(greed3,	space_min, space_max, space_inc, exp_folder + 		"rand_greed3/", "greed 3", IO_limit) );
 	return exp;
 }
 
@@ -154,19 +154,19 @@ int main()
 
 	chdir(exp_folder.c_str());
 
-	Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			24, exp);
-	Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	25, exp);
-	Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 		26, exp);
-	Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp);
-	Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp);
+	Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			24, exp, 30);
+	Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	25, exp, 30);
+	Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 		26, exp, 30);
+	Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp, 16000);
+	Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp, 500000);
 
-	Experiment_Runner::graph(sx, sy,   "Write wait, mean", 			"Write wait, mean", 	9, 	exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, max", 			"Write wait, max", 		14, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, std", 			"Write wait, std", 		15, exp);
+	Experiment_Runner::graph(sx, sy,   "Write wait, mean", 			"Write wait, mean", 	9, 	exp, 14000);
+	Experiment_Runner::graph(sx, sy,   "Write wait, max", 			"Write wait, max", 		14, exp, 300000);
+	Experiment_Runner::graph(sx, sy,   "Write wait, std", 			"Write wait, std", 		15, exp, 14000);
 
-	Experiment_Runner::graph(sx, sy,   "Read wait, mean", 			"Read wait, mean", 		16,	exp);
-	Experiment_Runner::graph(sx, sy,   "Read wait, max", 			"Read wait, max",		21,	exp);
-	Experiment_Runner::graph(sx, sy,   "Read wait, stdev", 			"Read wait, stdev", 	22,	exp);
+	Experiment_Runner::graph(sx, sy,   "Read wait, mean", 			"Read wait, mean", 		16,	exp, 2000);
+	Experiment_Runner::graph(sx, sy,   "Read wait, max", 			"Read wait, max",		21,	exp, 70000);
+	Experiment_Runner::graph(sx, sy,   "Read wait, stdev", 			"Read wait, stdev", 	22,	exp, 4000);
 
 	// VALUES FOR THE TWO LAST PARAMETERS IN cross_experiment_waittime_histogram() and waittime_histogram():
 	// 1. Application IOs, Reads+writes

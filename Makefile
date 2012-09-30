@@ -26,13 +26,13 @@
 # Use the "test" make target to run the most basic test of your FTL scheme
 # after adding your content to the FTL, wear-leveler, and garbage-collector
 # classes.
-#
+# 
 # Use the "trace" make target to run a more involved test of your FTL scheme
 # after adding your content to the FTL, wear-leveler, and garbage-collector
 # classes.  It is suggested to test with the "test" make target first.
 
 CC = /usr/bin/gcc
-CFLAGS = -Wall -Wextra -g
+CFLAGS = -Wall -Wextra -g -O2
 CXX = /usr/bin/g++
 CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
@@ -105,6 +105,9 @@ load_balancing: $(HDR) $(OBJ)
 
 clean:
 	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) sequential erase_queues gc_tuning scheduling sequential_tuning greediness copybacks copyback_map
+
+rm_exec:
+	-rm -f sequential erase_queues gc_tuning scheduling sequential_tuning greediness copybacks copyback_map
 
 files:
 	echo $(SRC) $(HDR)

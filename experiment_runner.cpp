@@ -402,11 +402,16 @@ ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*ex
 
 
 // Plotting x number of experiments into one graph
-void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments) {
+void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments, int y_max) {
 	// Write tempoary file containing GLE script
     string scriptFilename = filename + ".gle"; // Name of tempoary script file
-    std::ofstream gleScript;
+    ofstream gleScript;
     gleScript.open(scriptFilename.c_str());
+
+    string y_max_str;
+    stringstream y_max_stream;
+    y_max_stream << " max " << y_max;
+    y_max_str = y_max == UNDEFINED ? "" : y_max_stream.str();
 
     gleScript <<
     "size " << sizeX << " " << sizeY << endl << // 12 8
@@ -417,7 +422,7 @@ void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filenam
     (GRAPH_TITLES ? "" : "!") << "   title  \"" << title << "\"" << endl <<
     "   xtitle \"" << experiments[0].variable_parameter_name << "\"" << endl <<
     "   ytitle \"" << experiments[0].column_names[column] << "\"" << endl <<
-    "   yaxis min 0" << endl;
+    "   yaxis min 0" << y_max_str << endl;
 
     for (uint i = 0; i < experiments.size(); i++) {
     	ExperimentResult e = experiments[i];
