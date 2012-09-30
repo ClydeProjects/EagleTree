@@ -363,6 +363,9 @@ void IOScheduler::remove_current_operation(Event* event) {
 	if (event->get_event_type() == READ_TRANSFER) {
 		ssd.getPackages()[event->get_address().package].getDies()[event->get_address().die].clear_register();
 		bm->register_register_cleared();
+	} else if (event->get_event_type() == COPY_BACK) {
+		ssd.getPackages()[event->get_replace_address().package].getDies()[event->get_replace_address().die].clear_register();
+		bm->register_register_cleared();
 	}
 }
 
@@ -630,6 +633,11 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	event_type new_op_code = dependency_code_to_type[dependency_code_of_new_event];
 	event_type scheduled_op_code = dependency_code_to_type[dependency_code_of_other_event];
 
+	if (new_op_code == COPY_BACK || scheduled_op_code == COPY_BACK) {
+		int i = 0;
+		i++;
+	}
+
 	if (existing_event == NULL) {
 		//new_event->print();
 	}
@@ -637,7 +645,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 
 	// if something is to be trimmed, and a copy back is sent, the copy back is unnecessary to perform;
 	// however, since the copy back destination address is already reserved, we need to use it.
-	if (scheduled_op_code == COPY_BACK) {
+	/*if (scheduled_op_code == COPY_BACK) {
 		make_dependent(new_event, dependency_code_of_other_event);
 		assert(false);
 	}
@@ -647,7 +655,11 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		make_dependent(existing_event, dependency_code_of_new_event);
 		remove_event_from_current_events(existing_event); // Remove old event from current_events; it's added again when independent event (the copy back) finishes
 	}
-	else if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
+	else */
+
+
+
+	if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
 		promote_to_gc(existing_event);
 		remove_current_operation(new_event);
 		push_into_current_events(new_event); // Make sure the old GC READ is run, even though it is now a NOOP command
@@ -670,6 +682,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 		stats.num_write_cancellations++;
 	}
+
 	// if two writes are scheduled, the one before is irrelevant and may as well be cancelled
 	else if (new_op_code == WRITE && scheduled_op_code == WRITE) {
 		remove_current_operation(existing_event);
@@ -688,7 +701,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		make_dependent(new_event, dependency_code_of_other_event);
 	}
 	// if there is a read, and a write is scheduled, then the contents of the write must be buffered, so the read can wait
-	else if (new_op_code == READ && scheduled_op_code == WRITE) {
+	else if (new_op_code == READ && (scheduled_op_code == WRITE || scheduled_op_code == COPY_BACK )) {
 		//remove_current_operation(new_event);
 		//current_events.push_back(new_event);
 		make_dependent(new_event, dependency_code_of_other_event);
