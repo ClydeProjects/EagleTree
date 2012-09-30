@@ -80,9 +80,7 @@ IOScheduler *IOScheduler::instance()
 }
 
 
-inline bool bus_wait_time_comparator (const Event* i, const Event* j) {
-	return i->get_bus_wait_time() < j->get_bus_wait_time();
-}
+
 
 // assumption is that all events within an operation have the same LBA
 void IOScheduler::schedule_events_queue(deque<Event*> events) {
@@ -145,11 +143,20 @@ vector<Event*> IOScheduler::collect_soonest_events() {
 	return soonest_events;
 }
 
+inline bool overall_wait_time_comparator (const Event* i, const Event* j) {
+	return i->get_overall_wait_time() < j->get_overall_wait_time();
+}
+
+inline bool current_wait_time_comparator (const Event* i, const Event* j) {
+	return i->get_bus_wait_time() < j->get_bus_wait_time();
+}
+
 // tries to execute all current events. Some events may be put back in the queue if they cannot be executed.
 void IOScheduler::execute_current_waiting_ios() {
 	vector<Event*> events = collect_soonest_events();
 
 	vector<Event*> read_commands;
+	vector<Event*> read_commands_copybacks;
 	//vector<Event*> gc_read_commands;
 
 	vector<Event*> read_transfers;
@@ -171,6 +178,9 @@ void IOScheduler::execute_current_waiting_ios() {
 
 		if (event->get_noop()) {
 			noop_events.push_back(event);
+		}
+		else if (type == READ_COMMAND && dependency_code_to_type[event->get_application_io_id()] == COPY_BACK) {
+			read_commands_copybacks.push_back(event);
 		}
 		else if (type == READ_COMMAND) {
 			read_commands.push_back(event);
@@ -203,6 +213,13 @@ void IOScheduler::execute_current_waiting_ios() {
 
 	// Intuitive scheme. Prioritize Application IOs
 	if (SCHEDULING_SCHEME == 0) {
+
+		sort(erases.begin(), erases.end(), current_wait_time_comparator);
+		sort(read_commands.begin(), read_commands.end(), current_wait_time_comparator);
+		sort(writes.begin(), writes.end(), current_wait_time_comparator);
+		sort(gc_writes.begin(), gc_writes.end(), overall_wait_time_comparator);
+		sort(read_transfers.begin(), read_transfers.end(), overall_wait_time_comparator);
+
 		handle(read_commands);
 		handle(read_transfers);
 		handle(writes);
@@ -212,6 +229,7 @@ void IOScheduler::execute_current_waiting_ios() {
 	// Traditional - GC PRIORITY
 	else if (SCHEDULING_SCHEME == 1) {
 		//writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
+
 		handle(erases);
 		handle(gc_writes);
 		handle(read_commands);
@@ -220,10 +238,21 @@ void IOScheduler::execute_current_waiting_ios() {
 	}
 	// EQUAL PRIORITY - INTERLEAVED
 	else if (SCHEDULING_SCHEME == 2) {
+
 		writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
 		read_transfers.insert(read_transfers.end(), copy_backs.begin(), copy_backs.end());
+		//read_commands.insert(read_commands.end(), read_commands_copybacks.begin(), read_commands_copybacks.end());
+
+		sort(erases.begin(), erases.end(), current_wait_time_comparator);
+		sort(read_commands.begin(), read_commands.end(), overall_wait_time_comparator);
+		sort(writes.begin(), writes.end(), current_wait_time_comparator);
+		sort(read_transfers.begin(), read_transfers.end(), overall_wait_time_comparator);
+		sort(read_commands_copybacks.begin(), read_commands_copybacks.end(), overall_wait_time_comparator);
+
 		handle(erases);
 		handle(read_commands);
+		handle(read_commands_copybacks);
+		//handle(read_commands_copybacks);
 		handle(writes);
 		handle(read_transfers);
 		//handle(copy_backs);
@@ -296,7 +325,7 @@ void IOScheduler::push_into_current_events(Event* event) {
 }
 
 void IOScheduler::handle(vector<Event*>& events) {
-	sort(events.begin(), events.end(), bus_wait_time_comparator);
+	//sort(events.begin(), events.end(), overall_wait_time_comparator);
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
@@ -337,7 +366,9 @@ void IOScheduler::transform_copyback(Event* event) {
 	event->set_address(event->get_replace_address());
 	Event* write = new Event(WRITE, event->get_logical_address(), 1, event->get_current_time());
 	write->set_garbage_collection_op(true);
+	write->set_replace_address(event->get_replace_address());
 	dependencies[event->get_application_io_id()].push_back(write);
+	dependency_code_to_type[event->get_application_io_id()] = WRITE;
 }
 
 bool IOScheduler::should_event_be_scheduled(Event* event) {
@@ -522,15 +553,17 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		printf("LOOK HERE ");
 		event->print();
 	}
+
+
+
+	/*if (event->get_event_type() == READ_TRANSFER && event->get_overall_wait_time() >= 1778) {
+		event->print();
+		VisualTracer::get_instance()->print_horizontally_with_breaks();
+		event->print();
+		StateVisualiser::print_page_status();
+	}*/
+
 	StatisticsGatherer::get_instance()->register_completed_event(*event);
-
-
-	/*if (event->get_event_type() == COPY_BACK) {
-			event->print();
-			VisualTracer::get_instance()->print_horizontally_with_breaks();
-			event->print();
-			StateVisualiser::print_page_status();
-		}*/
 
 	/*if (event->is_original_application_io() && event->get_bus_wait_time() > 1509) {
 		event->print();
@@ -607,11 +640,12 @@ void IOScheduler::init_event(Event* event) {
 				}
 			} else {*/
 			migration.pop_front();
+			Event* second = migration.front();
 			dependencies[first->get_application_io_id()] = migration;
 			dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
-			//dependency_code_to_type[first->get_application_io_id()] = first->get_event_type(); // = WRITE for normal GC, COPY_BACK for copy backs
+			dependency_code_to_type[first->get_application_io_id()] = second->get_event_type(); // = WRITE for normal GC, COPY_BACK for copy backs
 			//}
-			dependency_code_to_type[first->get_application_io_id()] = WRITE;
+			//dependency_code_to_type[first->get_application_io_id()] = WRITE;
 			init_event(first);
 		}
 		delete event;
@@ -703,6 +737,10 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		remove_current_operation(existing_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 		//make_dependent(new_event, dependency_code_of_new_event, dependency_code_of_other_event);
+	}
+	else if (new_op_code == COPY_BACK && scheduled_op_code == READ && existing_event != NULL) {
+		remove_current_operation(existing_event);
+		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 	}
 	// if there is a write, but before a read was scheduled, we should read first before making the write
 	else if (new_op_code == WRITE && (scheduled_op_code == READ || scheduled_op_code == READ_COMMAND || scheduled_op_code == READ_TRANSFER)) {
