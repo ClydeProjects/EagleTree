@@ -211,6 +211,11 @@ extern bool USE_ERASE_QUEUE;
 
 extern int SCHEDULING_SCHEME;
 
+extern bool ENABLE_WEAR_LEVELING;
+extern int WEAR_LEVEL_THRESHOLD;
+
+extern int PAGE_HOTNESS_MEASURER;
+
 /* Enumerations to clarify status integers in simulation
  * Do not use typedefs on enums for reader clarity */
 
@@ -269,6 +274,8 @@ enum write_hotness {WRITE_HOT, WRITE_COLD};
 enum read_hotness {READ_HOT, READ_COLD};
 
 #define BOOST_MULTI_INDEX_ENABLE_SAFE_MODE 1
+
+enum age {YOUNG, OLD};
 
 /* List classes up front for classes that have references to their "parent"
  * (e.g. a Package's parent is a Ssd).
@@ -491,6 +498,8 @@ public:
 	inline double incr_execution_time(double time_incr) 	{ if(time_incr > 0.0) execution_time += time_incr; return execution_time; }
 	inline double incr_accumulated_wait_time(double time_incr) 	{ if(time_incr > 0.0) accumulated_wait_time += time_incr; return accumulated_wait_time; }
 	inline double get_overall_wait_time() const 				{ return accumulated_wait_time + bus_wait_time; }
+	inline bool is_wear_leveling_op() const { return wear_leveling_op ; }
+	inline void set_wear_leveling_op(bool value) { wear_leveling_op = value; }
 	void print(FILE *stream = stdout) const;
 	static void reset_id_generators();
 private:
@@ -511,6 +520,7 @@ private:
 	bool noop;
 
 	bool garbage_collection_op;
+	bool wear_leveling_op;
 	bool mapping_op;
 	bool original_application_io;
 
@@ -634,6 +644,7 @@ public:
 	enum page_state get_state(uint page) const;
 	enum page_state get_state(const Address &address) const;
 	double get_last_erase_time(void) const;
+	double get_second_last_erase_time(void) const;
 	double get_modification_time(void) const;
 	ulong get_erases_remaining(void) const;
 	uint get_size(void) const;
@@ -644,6 +655,7 @@ public:
 	block_type get_block_type(void) const;
 	void set_block_type(block_type value);
 	const Page *getPages() const { return data; }
+	ulong get_age() const;
 private:
 	uint size;
 	Page * const data;
@@ -652,7 +664,7 @@ private:
 	enum block_state state;
 	ulong erases_remaining;
 	double last_erase_time;
-	//double erase_delay;
+	double erase_before_last_erase_time;
 	double modification_time;
 
 	block_type btype;
@@ -775,24 +787,33 @@ const int UNDEFINED = -1;
 class Page_Hotness_Measurer {
 public:
 //	virtual Page_Hotness_Measurer() = 0;
-	virtual ~Page_Hotness_Measurer(void) {};
+	virtual ~Page_Hotness_Measurer() {};
 	virtual void register_event(Event const& event) = 0; // Inform hotness measurer about a read or write event
 	virtual enum write_hotness get_write_hotness(unsigned long page_address) const = 0; // Return write hotness of a given page address
 	virtual enum read_hotness get_read_hotness(unsigned long page_address) const = 0; // Return read hotness of a given page address
 	virtual Address get_best_target_die_for_WC(enum read_hotness rh) const = 0; // Return address of die with leads WC data (with chosen read hotness)
 };
 
+class Ignorant_Hotness_Measurer : public Page_Hotness_Measurer {
+public:
+//	virtual Page_Hotness_Measurer() = 0;
+	Ignorant_Hotness_Measurer() {};
+	~Ignorant_Hotness_Measurer() {};
+	void register_event(Event const& event) {};
+	enum write_hotness get_write_hotness(unsigned long page_address) const { return WRITE_HOT; }
+	enum read_hotness get_read_hotness(unsigned long page_address) const { return READ_HOT; }
+	Address get_best_target_die_for_WC(enum read_hotness rh) const { return Address(); }
+};
+
 // Simple (naïve page hotness measurer implementation)
 class Simple_Page_Hotness_Measurer : public Page_Hotness_Measurer {
 public:
 	Simple_Page_Hotness_Measurer();
-	~Simple_Page_Hotness_Measurer(void);
+	~Simple_Page_Hotness_Measurer();
 	void register_event(Event const& event);
 	enum write_hotness get_write_hotness(unsigned long page_address) const;
 	enum read_hotness get_read_hotness(unsigned long page_address) const;
-	// Address get_die_with_least_wcrh() const;
-	// Address get_die_with_least_wcrc() const;
-	Address get_die_with_least_WC(enum read_hotness rh) const;
+	Address get_best_target_die_for_WC(enum read_hotness rh) const;
 private:
 	void start_new_interval_writes();
 	void start_new_interval_reads();
@@ -803,12 +824,14 @@ private:
 	uint current_interval;
 	double average_write_hotness;
 	double average_read_hotness;
-	vector<vector<uint> > num_wcrh_pages_per_die;
-	vector<vector<uint> > num_wcrc_pages_per_die;
+	vector<vector<uint> > writes_per_die;
+	vector<vector<uint> > reads_per_die;
 	vector<vector<double> > average_reads_per_die;
 	vector<vector<uint> > current_reads_per_die;
 	uint writes_counter;
 	uint reads_counter;
+	const uint WINDOW_LENGTH;
+	const uint KICK_START;
 };
 
 
@@ -952,14 +975,16 @@ protected:
 	bool can_schedule_write_immediately(Address const& prospective_dest, double current_time);
 	bool can_write(Event const& write) const;
 
-	void schedule_gc(double time, int package_id = -1, int die_id = -1, int klass = -1);
+	void schedule_gc(double time, int package_id, int die_id, int block, int klass);
 	vector<long> get_relevant_gc_candidates(int package_id, int die_id, int klass) const;
 
-	Address find_free_unused_block(uint package_id, uint die_id, uint klass, double time);
+	Address find_free_unused_block(uint package_id, uint die_id, enum age age, double time);
 	Address find_free_unused_block(uint package_id, uint die_id, double time);
 	Address find_free_unused_block(uint package_id, double time);
 	Address find_free_unused_block(double time);
-	Address find_free_unused_block_with_class(uint klass, double time);
+	Address find_free_unused_block(enum age age, double time);
+
+
 
 	void return_unfilled_block(Address block_address);
 
@@ -976,9 +1001,10 @@ protected:
 
 	map<long, uint> page_copy_back_count; // Pages that have experienced a copy-back, mapped to a count of the number of copy-backs
 private:
+	Address find_free_unused_block(uint package_id, uint die_id, uint age_class, double time);
 	Block* choose_gc_victim(vector<long> candidates) const;
 	void update_blocks_with_min_age(uint age);
-	uint sort_into_age_class(Address const& address);
+	uint sort_into_age_class(Address const& address) const;
 	void issue_erase(Address a, double time);
 	void remove_as_gc_candidate(Address const& phys_address);
 	void Wear_Level(Event const& event);
@@ -987,13 +1013,16 @@ private:
 	Address reserve_page_on(uint package, uint die, double time);
 	void register_copy_back_operation_on(uint logical_address);
 	void register_ECC_check_on(uint logical_address);
-	bool schedule_queued_erase(Address location);
 
+	bool schedule_queued_erase(Address location);
+	double get_min_age() const;
+	double get_normalised_age(uint age) const;
+	void find_wl_candidates(double current_time);
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
+	bool greedy_gc;
 	// WL structures
 	uint max_age;
-	uint min_age;
 	int num_age_classes;
 	set<Block*> blocks_with_min_age;
 	uint num_free_pages;
@@ -1002,7 +1031,11 @@ private:
 	vector<vector<vector<set<long> > > > gc_candidates;  // each age class has a vector of candidates for GC
 	vector<vector<uint> > num_blocks_being_garbaged_collected_per_LUN;
 	Random_Order_Iterator order_randomiser;
-
+	set<Block*> blocks_to_wl;
+	double average_erase_cycle_time;
+	MTRand_int32 random_number_generator;
+	set<Block*> blocks_being_wl;
+	uint num_erases_up_to_date;
 	pair<bool, pair<int, int> > last_get_free_block_pointer_with_shortest_IO_queue_result;
 	bool IO_has_completed_since_last_shortest_queue_search;
 
@@ -1060,7 +1093,7 @@ private:
 class Wearwolf : public Block_manager_parent {
 public:
 	Wearwolf(Ssd& ssd, FtlParent& ftl);
-	~Wearwolf() {}
+	~Wearwolf();
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_command_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
@@ -1068,7 +1101,7 @@ protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	virtual Address choose_best_address(Event const& write);
 	virtual Address choose_any_address(Event const& write);
-	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
+	Page_Hotness_Measurer* page_hotness_measurer;
 private:
 	void handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time);
 	void reset_any_filled_pointers(Event const& event);
@@ -1285,71 +1318,6 @@ private:
 	vector<long> logical_to_physical_map;
 	vector<long> physical_to_logical_map;
 };
-
-class FtlImpl_Bast : public FtlParent
-{
-public:
-	FtlImpl_Bast(Controller &controller);
-	~FtlImpl_Bast();
-	enum status read(Event &event);
-	enum status write(Event &event);
-	enum status trim(Event &event);
-private:
-	map<long, LogPageBlock*> log_map;
-
-	long *data_list;
-
-	void dispose_logblock(LogPageBlock *logBlock, long lba);
-	void allocate_new_logblock(LogPageBlock *logBlock, long lba, Event &event);
-
-	bool is_sequential(LogPageBlock* logBlock, long lba, Event &event);
-	bool random_merge(LogPageBlock *logBlock, long lba, Event &event);
-
-	void update_map_block(Event &event);
-
-	void print_ftl_statistics();
-
-	int addressShift;
-	int addressSize;
-};
-
-class FtlImpl_Fast : public FtlParent
-{
-public:
-	FtlImpl_Fast(Controller &controller);
-	~FtlImpl_Fast();
-	enum status read(Event &event);
-	enum status write(Event &event);
-	enum status trim(Event &event);
-private:
-	void initialize_log_pages();
-
-	map<long, LogPageBlock*> log_map;
-
-	long *data_list;
-	bool *pin_list;
-
-	bool write_to_log_block(Event &event, long logicalBlockAddress);
-
-	void switch_sequential(Event &event);
-	void merge_sequential(Event &event);
-	bool random_merge(LogPageBlock *logBlock, Event &event);
-
-	void update_map_block(Event &event);
-
-	void print_ftl_statistics();
-
-	long sequential_logicalblock_address;
-	Address sequential_address;
-	uint sequential_offset;
-
-	uint log_page_next;
-	LogPageBlock *log_pages;
-
-	int addressShift;
-	int addressSize;
-};
-
 
 
 class FtlImpl_DftlParent : public FtlParent
@@ -1707,6 +1675,9 @@ private:
 	long num_gc_targeting_package;
 	long num_gc_targeting_class;
 	long num_gc_targeting_anything;
+
+	vector<vector<uint> > num_wl_writes_per_LUN_origin;
+	vector<vector<uint> > num_wl_writes_per_LUN_destination;
 };
 
 class Thread
@@ -2150,5 +2121,69 @@ private:
 };*/
 
 } /* end namespace ssd */
+
+/*class FtlImpl_Bast : public FtlParent
+{
+public:
+	FtlImpl_Bast(Controller &controller);
+	~FtlImpl_Bast();
+	enum status read(Event &event);
+	enum status write(Event &event);
+	enum status trim(Event &event);
+private:
+	map<long, LogPageBlock*> log_map;
+
+	long *data_list;
+
+	void dispose_logblock(LogPageBlock *logBlock, long lba);
+	void allocate_new_logblock(LogPageBlock *logBlock, long lba, Event &event);
+
+	bool is_sequential(LogPageBlock* logBlock, long lba, Event &event);
+	bool random_merge(LogPageBlock *logBlock, long lba, Event &event);
+
+	void update_map_block(Event &event);
+
+	void print_ftl_statistics();
+
+	int addressShift;
+	int addressSize;
+};
+
+class FtlImpl_Fast : public FtlParent
+{
+public:
+	FtlImpl_Fast(Controller &controller);
+	~FtlImpl_Fast();
+	enum status read(Event &event);
+	enum status write(Event &event);
+	enum status trim(Event &event);
+private:
+	void initialize_log_pages();
+
+	map<long, LogPageBlock*> log_map;
+
+	long *data_list;
+	bool *pin_list;
+
+	bool write_to_log_block(Event &event, long logicalBlockAddress);
+
+	void switch_sequential(Event &event);
+	void merge_sequential(Event &event);
+	bool random_merge(LogPageBlock *logBlock, Event &event);
+
+	void update_map_block(Event &event);
+
+	void print_ftl_statistics();
+
+	long sequential_logicalblock_address;
+	Address sequential_address;
+	uint sequential_offset;
+
+	uint log_page_next;
+	LogPageBlock *log_pages;
+
+	int addressShift;
+	int addressSize;
+};*/
 
 #endif

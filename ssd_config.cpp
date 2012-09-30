@@ -178,10 +178,12 @@ bool USE_ERASE_QUEUE = false;
 /*
  * Scheduling scheme
  * 0 ->  Naive: Read Command, Read Transfer, Write, GC, Erase
- * 1 ->  GC PRIORITY
- * 2 ->  Equal Priority
+ * 1 ->  Experimental
+ * 2 ->  Smart
  */
-extern int SCHEDULING_SCHEME = 2;
+int SCHEDULING_SCHEME = 2;
+bool ENABLE_WEAR_LEVELING = false;
+int WEAR_LEVEL_THRESHOLD = 100;
 
 /*
  * Block manager
@@ -215,13 +217,16 @@ uint MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 uint MAX_ITEMS_IN_COPY_BACK_MAP = 1024;
 
 /* Defines the maximal length of the SSD queue  */
-int MAX_SSD_QUEUE_SIZE = 50;
+int MAX_SSD_QUEUE_SIZE = 15;
+
 
 /* Defines the maximal number of locks that can be held by the OS  */
 uint MAX_OS_NUM_LOCKS = 1000;
 
 /* Defines how the sequential writes detection algorithm spreads a sequential write  */
 uint LOCALITY_PARALLEL_DEGREE = 0;
+
+int PAGE_HOTNESS_MEASURER = 0;
 
 void load_entry(char *name, double value, uint line_number) {
 	/* cheap implementation - go through all possibilities and match entry */

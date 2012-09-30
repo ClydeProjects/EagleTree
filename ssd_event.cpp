@@ -49,6 +49,7 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	id(id_generator++),
 	application_io_id(application_io_id_generator++),
 	garbage_collection_op(false),
+	wear_leveling_op(false),
 	mapping_op(false),
 	original_application_io(false),
 	age_class(0),
@@ -76,6 +77,7 @@ Event::Event(Event& event) :
 	id(id_generator++),
 	application_io_id(event.application_io_id),
 	garbage_collection_op(event.garbage_collection_op),
+	wear_leveling_op(event.wear_leveling_op),
 	mapping_op(event.mapping_op),
 	original_application_io(event.original_application_io),
 	age_class(event.age_class),
@@ -125,6 +127,9 @@ void Event::print(FILE *stream) const
 		fprintf(stream, " GC");
 	} else if (mapping_op)  {
 		fprintf(stream, " MAPPING");
+	}
+	if (wear_leveling_op) {
+		fprintf(stream, " WL");
 	}
 	if (original_application_io) {
 		fprintf(stream, " APP");

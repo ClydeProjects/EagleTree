@@ -56,6 +56,7 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
+
 all: scheduling sequential_tuning sequential greediness copybacks
 
 greediness: $(HDR) $(OBJ)
@@ -108,6 +109,7 @@ clean:
 
 rm_exec:
 	-rm -f sequential erase_queues gc_tuning scheduling sequential_tuning greediness copybacks copyback_map
+
 
 files:
 	echo $(SRC) $(HDR)

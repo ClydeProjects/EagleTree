@@ -22,7 +22,6 @@ using namespace ssd;
  * Naïve implementation
  */
 
-#define INTERVAL_LENGTH 500
 #define WEIGHT 0.5
 
 Simple_Page_Hotness_Measurer::Simple_Page_Hotness_Measurer()
@@ -31,22 +30,26 @@ Simple_Page_Hotness_Measurer::Simple_Page_Hotness_Measurer()
 		read_current_count(),
 		read_moving_average(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE, 0),
 		current_interval(0),
-		num_wcrh_pages_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
-		num_wcrc_pages_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
+		writes_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
+		reads_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
 		average_reads_per_die(SSD_SIZE, std::vector<double>(PACKAGE_SIZE, 0)),
 		current_reads_per_die(SSD_SIZE, std::vector<uint>(PACKAGE_SIZE, 0)),
 		writes_counter(0),
-		reads_counter(0)
+		reads_counter(0),
+		WINDOW_LENGTH(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE),
+		KICK_START(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 2)
 {}
 
 Simple_Page_Hotness_Measurer::~Simple_Page_Hotness_Measurer(void) {}
 
 enum write_hotness Simple_Page_Hotness_Measurer::get_write_hotness(ulong page_address) const {
-	return write_moving_average[page_address] >= average_write_hotness ? WRITE_HOT : WRITE_COLD;
+	return writes_counter < KICK_START && reads_counter < KICK_START ? WRITE_HOT :
+			write_moving_average[page_address] >= average_write_hotness ? WRITE_HOT : WRITE_COLD;
 }
 
 enum read_hotness Simple_Page_Hotness_Measurer::get_read_hotness(ulong page_address) const {
-	return read_moving_average[page_address] >= average_read_hotness ? READ_HOT : READ_COLD;
+	return writes_counter < KICK_START && reads_counter < KICK_START ? READ_HOT :
+			read_moving_average[page_address] >= average_read_hotness ? READ_HOT : READ_COLD;
 }
 
 /*Address Simple_Page_Hotness_Measurer::get_die_with_least_wcrh() const {
@@ -82,48 +85,83 @@ enum read_hotness Simple_Page_Hotness_Measurer::get_read_hotness(ulong page_addr
 	return Address(package, die, 0,0,0, DIE);
 }*/
 
-Address Simple_Page_Hotness_Measurer::get_die_with_least_WC(enum read_hotness rh) const {
-	uint package;
-	uint die;
-	std::vector<std::vector<uint> > num_such_pages_per_die;
-	if (rh == READ_COLD) {
-		num_such_pages_per_die = num_wcrc_pages_per_die;
-	} else if (rh == READ_HOT) {
-		num_such_pages_per_die = num_wcrh_pages_per_die;
-	}
-
-	double min = PLANE_SIZE * BLOCK_SIZE;
+double compute_average(vector<vector<uint> > s) {
+	double average = 0;
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			//printf("%d\n", num_wcrc_pages_per_die[i][j]);
-			if (min >= num_such_pages_per_die[i][j]) {
-				min = num_such_pages_per_die[i][j];
-				package = i;
-				die = j;
+			average += s[i][j];
+		}
+	}
+	average /= s.size() * s[0].size();
+	return average;
+}
+
+Address Simple_Page_Hotness_Measurer::get_best_target_die_for_WC(enum read_hotness rh) const {
+	int package = UNDEFINED;
+	int die = UNDEFINED;
+	/*vector<vector<uint> > num_such_pages_per_die;
+	if (rh == READ_COLD) {
+		num_such_pages_per_die = reads_per_die;
+	} else if (rh == READ_HOT) {
+		num_such_pages_per_die = writes_per_die;
+	}*/
+
+	//double average_reads_per_LUN = compute_average(reads_per_die);
+	double average_writes_per_LUN = compute_average(writes_per_die);
+
+	double min_product = numeric_limits<double>::max();
+	double max_product = numeric_limits<double>::min();
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			double writes = writes_per_die[i][j];
+			if (writes > average_writes_per_LUN) {
+				double reads = reads_per_die[i][j];
+				double product = reads * writes;
+				if (rh == READ_HOT && product < min_product) {
+					min_product = product;
+					package = i;
+					die = j;
+				}
+				else if (rh == READ_COLD && product > max_product) {
+					max_product = product;
+					package = i;
+					die = j;
+				}
 			}
 		}
 	}
+
+
 	return Address(package, die, 0,0,0, DIE);
 }
 
 void Simple_Page_Hotness_Measurer::register_event(Event const& event) {
 	enum event_type type = event.get_event_type();
 	assert(type == WRITE || type == READ_COMMAND);
+
 	double time = event.get_current_time();
+
 	ulong page_address = event.get_logical_address();
+	Address phys_addr = event.get_address();
 	if (type == WRITE) {
 		write_current_count[page_address]++;
-		if (++writes_counter == INTERVAL_LENGTH) {
-			writes_counter = 0;
+		if (++writes_counter % WINDOW_LENGTH == 0) {
 			start_new_interval_writes();
 		}
+		if (writes_counter == KICK_START && PRINT_LEVEL >= 1) {
+			printf("Start read temperature Identification\n");
+		}
+		writes_per_die[phys_addr.package][phys_addr.die]++;
 	} else if (type == READ_COMMAND) {
 		current_reads_per_die[event.get_address().package][event.get_address().die]++;
 		read_current_count[page_address]++;
-		if (++reads_counter == INTERVAL_LENGTH) {
-			reads_counter = 0;
+		if (++reads_counter % WINDOW_LENGTH == 0) {
 			start_new_interval_reads();
 		}
+		if (reads_counter == KICK_START && PRINT_LEVEL >= 1) {
+			printf("Start write temperature Identification\n");
+		}
+		reads_per_die[phys_addr.package][phys_addr.die]++;
 	}
 }
 
@@ -139,12 +177,11 @@ void Simple_Page_Hotness_Measurer::start_new_interval_writes() {
 
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			num_wcrc_pages_per_die[i][j] = 0;
-			num_wcrh_pages_per_die[i][j] = 0;
+			writes_per_die[i][j] = writes_per_die[i][j] * 0.5;
 		}
 	}
 
-	for( uint addr = 0; addr < NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE; addr++  )
+	/*for( uint addr = 0; addr < NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE; addr++  )
 	{
 		if (get_write_hotness(addr) == WRITE_COLD) {
 			Address a = Address(addr, PAGE);
@@ -154,7 +191,7 @@ void Simple_Page_Hotness_Measurer::start_new_interval_writes() {
 				num_wcrh_pages_per_die[a.package][a.die]++;
 			}
 		}
-	}
+	}*/
 }
 
 void Simple_Page_Hotness_Measurer::start_new_interval_reads() {
@@ -167,12 +204,19 @@ void Simple_Page_Hotness_Measurer::start_new_interval_reads() {
 	}
 	average_read_hotness /= NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 
-	for (uint i = 0; i < SSD_SIZE; i++) {
+	/*for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			average_reads_per_die[i][j] = average_reads_per_die[i][j] * WEIGHT + current_reads_per_die[i][j] * (1 - WEIGHT);
 			current_reads_per_die[i][j] = 0;
 		}
+	}*/
+
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			reads_per_die[i][j] = reads_per_die[i][j] * 0.5;
+		}
 	}
+
 }
 
 /* ==================================================================================
