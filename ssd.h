@@ -1180,12 +1180,14 @@ public:
 private:
 	IOScheduler(Ssd& ssd, FtlParent& ftl);
 	~IOScheduler();
+
 	void setup_structures(deque<Event*> events);
 	enum status execute_next(Event* event);
 	void execute_current_waiting_ios();
 	vector<Event*> collect_soonest_events();
-	void handle_next_batch(vector<Event*>& events);
-	void handle_writes(vector<Event*>& events);
+	void handle_event(Event* event);
+	void handle_write(Event* event);
+	void handle(vector<Event*>& events);
 	void transform_copyback(Event* event);
 	void handle_finished_event(Event *event, enum status outcome);
 	void remove_redundant_events(Event* new_event);

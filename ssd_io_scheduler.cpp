@@ -203,31 +203,35 @@ void IOScheduler::execute_current_waiting_ios() {
 
 	// Intuitive scheme. Prioritize Application IOs
 	if (SCHEDULING_SCHEME == 0) {
-		handle_next_batch(read_commands);
-		handle_next_batch(read_transfers);
-		handle_writes(writes);
-		handle_writes(gc_writes);
-		handle_next_batch(erases);
+		handle(read_commands);
+		handle(read_transfers);
+		handle(writes);
+		handle(gc_writes);
+		handle(erases);
 	}
 	// Traditional - GC PRIORITY
 	else if (SCHEDULING_SCHEME == 1) {
 		//writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
-		handle_next_batch(erases);
-		handle_writes(gc_writes);
-		handle_next_batch(read_commands);
-		handle_writes(writes);
-		handle_next_batch(read_transfers);
+		handle(erases);
+		handle(gc_writes);
+		handle(read_commands);
+		handle(writes);
+		handle(read_transfers);
 	}
 	// EQUAL PRIORITY - INTERLEAVED
 	else if (SCHEDULING_SCHEME == 2) {
 		writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
-		writes.insert(writes.end(), copy_backs.begin(), copy_backs.end());
-		handle_next_batch(erases);
-		handle_next_batch(read_commands);
-		handle_writes(writes);
-		handle_next_batch(read_transfers);
+		read_transfers.insert(read_transfers.end(), copy_backs.begin(), copy_backs.end());
+		handle(erases);
+		handle(read_commands);
+		handle(writes);
+		handle(read_transfers);
+		//handle(copy_backs);
 	}
 }
+
+
+
 
 double IOScheduler::get_soonest_event_time(vector<Event*> const& events) const {
 	double earliest_time = events.front()->get_current_time();
@@ -291,31 +295,40 @@ void IOScheduler::push_into_current_events(Event* event) {
 	}
 }
 
-// Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
-void IOScheduler::handle_writes(vector<Event*>& events) {
+void IOScheduler::handle(vector<Event*>& events) {
 	sort(events.begin(), events.end(), bus_wait_time_comparator);
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
-		Address addr = bm->choose_address(*event);
-
-		double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time());
-		if ( wait_time == 0 && !bm->can_schedule_on_die(event) )  {
-			wait_time = 10;
-		}
-		if (wait_time == 0) {
-			event->set_address(addr);
-			ftl.set_replace_address(*event);
-			assert(addr.page < BLOCK_SIZE);
-			execute_next(event);
+		event_type type = event->get_event_type();
+		if (type == WRITE || type == COPY_BACK) {
+			handle_write(event);
 		}
 		else {
-			event->incr_bus_wait_time(wait_time);
-			if (event->get_event_type() == COPY_BACK && addr.valid == NONE) {
-				transform_copyback(event);
-			}
-			push_into_current_events(event);
+			handle_event(event);
 		}
+	}
+}
+
+// Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
+void IOScheduler::handle_write(Event* event) {
+	Address addr = bm->choose_address(*event);
+	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time());
+	if ( wait_time == 0 && !bm->can_schedule_on_die(event) )  {
+		wait_time = 10;
+	}
+	if (wait_time == 0) {
+	event->set_address(addr);
+		ftl.set_replace_address(*event);
+		assert(addr.page < BLOCK_SIZE);
+		execute_next(event);
+	}
+	else {
+		event->incr_bus_wait_time(wait_time);
+		if (event->get_event_type() == COPY_BACK && addr.valid == NONE) {
+			transform_copyback(event);
+		}
+		push_into_current_events(event);
 	}
 }
 
@@ -403,20 +416,16 @@ void IOScheduler::make_dependent(Event* dependent_event, uint independent_code/*
 }
 
 // executes read_commands, read_transfers and erases
-void IOScheduler::handle_next_batch(vector<Event*>& events) {
-	sort(events.begin(), events.end(), bus_wait_time_comparator);
-	for(uint i = 0; i < events.size(); i++) {
-		Event* event = events[i];
-		double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
-		bool can_schedule = bm->can_schedule_on_die(event);
-		if (can_schedule && time == 0) {
-			execute_next(event);
-		}
-		else {
-			double bus_wait_time = can_schedule ? time : 10;
-			event->incr_bus_wait_time(bus_wait_time);
-			push_into_current_events(event);
-		}
+void IOScheduler::handle_event(Event* event) {
+	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
+	bool can_schedule = bm->can_schedule_on_die(event);
+	if (can_schedule && time == 0) {
+		execute_next(event);
+	}
+	else {
+		double bus_wait_time = can_schedule ? time : 10;
+		event->incr_bus_wait_time(bus_wait_time);
+		push_into_current_events(event);
 	}
 }
 
