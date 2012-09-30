@@ -94,7 +94,8 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 		}
 	} else if (event.get_event_type() == ERASE) {
 		num_erases_per_LUN[a.package][a.die]++;
-	} else if (event.get_event_type() == COPY_BACK) {
+	}
+	if (event.get_event_type() == COPY_BACK) {
 		num_copy_backs_per_LUN[a.package][a.die]++;
 	}
 
