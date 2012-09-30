@@ -137,6 +137,10 @@ void OperatingSystem::dispatch_event(int thread_id) {
 
 	//printf("dispatching:\t"); event->print();
 
+	if (time_of_experiment_start == UNDEFINED && event->is_experiment_io()) {
+		time_of_experiment_start = event->get_current_time();
+	}
+
 	ssd->event_arrive(event);
 	events[thread_id] = threads[thread_id]->run();
 	if (events[thread_id] != NULL && event->get_event_type() != NOT_VALID) {
@@ -164,7 +168,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	Thread* thread = threads[thread_id];
 	thread->register_event_completion(event);
 
-	if ((event->get_event_type() == WRITE || event->get_event_type() == READ_TRANSFER)  /*&& !event->get_noop()*/) {
+	if (event->is_experiment_io() && !event->get_noop() && (event->get_event_type() == WRITE || event->get_event_type() == READ_TRANSFER) ) {
 		num_writes_completed++;
 	}
 
@@ -259,7 +263,7 @@ bool OperatingSystem::is_LBA_locked(ulong lba) {
 	}
 }
 
-double OperatingSystem::get_total_runtime() const {
-	return time_of_last_event_completed;
+double OperatingSystem::get_experiment_runtime() const {
+	return time_of_last_event_completed - time_of_experiment_start;
 }
 

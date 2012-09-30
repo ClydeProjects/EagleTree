@@ -472,6 +472,8 @@ public:
 	inline bool get_noop() const 						{ return noop; }
 	inline uint get_id() const 							{ return id; }
 	inline int get_tag() const 							{ return tag; }
+	inline bool is_experiment_io() const 				{ return experiment_io; }
+	inline void set_experiment_io(bool val) 		{ experiment_io = val; }
 	inline void set_tag(int new_tag) 					{ tag = new_tag; }
 	inline void set_address(const Address &address) {
 		if (type == WRITE || type == READ || type == READ_COMMAND || type == READ_TRANSFER) {
@@ -498,6 +500,7 @@ public:
 	inline double incr_execution_time(double time_incr) 	{ if(time_incr > 0.0) execution_time += time_incr; return execution_time; }
 	inline double incr_accumulated_wait_time(double time_incr) 	{ if(time_incr > 0.0) accumulated_wait_time += time_incr; return accumulated_wait_time; }
 	inline double get_overall_wait_time() const 				{ return accumulated_wait_time + bus_wait_time; }
+	inline double get_latency() const 				{ return accumulated_wait_time + bus_wait_time + execution_time; }
 	inline bool is_wear_leveling_op() const { return wear_leveling_op ; }
 	inline void set_wear_leveling_op(bool value) { wear_leveling_op = value; }
 	void print(FILE *stream = stdout) const;
@@ -523,6 +526,8 @@ private:
 	bool wear_leveling_op;
 	bool mapping_op;
 	bool original_application_io;
+
+	bool experiment_io;
 
 	// an ID for a single IO to the chip. This is not actually used for any logical purpose
 	static uint id_generator;
@@ -1678,14 +1683,16 @@ private:
 
 	vector<vector<uint> > num_wl_writes_per_LUN_origin;
 	vector<vector<uint> > num_wl_writes_per_LUN_destination;
+
+	bool expleriment_started;
 };
 
 class Thread
 {
 public:
-	Thread(double time) : finished(false), time(time), threads_to_start_when_this_thread_finishes(), num_ios_finished(0) {}
+	Thread(double time) : finished(false), time(time), threads_to_start_when_this_thread_finishes(), num_ios_finished(0), experiment_thread(false) {}
 	virtual ~Thread();
-	Event* run() { return finished ? NULL : issue_next_io(); }
+	Event* run();
 	inline bool is_finished() { return finished; }
 	inline void set_time(double current_time) { time = current_time; }
 	inline double get_time() { return time; }
@@ -1693,13 +1700,17 @@ public:
 	inline vector<Thread*>& get_follow_up_threads() { return threads_to_start_when_this_thread_finishes; }
 	virtual void print_thread_stats();
 	void register_event_completion(Event* event);
+	inline void set_experiment_thread(bool val) { experiment_thread = val; }
+	inline bool is_experiment_thread() { return experiment_thread; }
 protected:
 	virtual Event* issue_next_io() = 0;
 	virtual void handle_event_completion(Event* event) = 0;
 	bool finished;
 	double time;
 	vector<Thread*> threads_to_start_when_this_thread_finishes;
+private:
 	ulong num_ios_finished;
+	bool experiment_thread;
 };
 
 class Synchronous_Sequential_Thread : public Thread
@@ -1943,7 +1954,7 @@ public:
 	void run();
 	void register_event_completion(Event* event);
 	void set_num_writes_to_stop_after(long num_writes);
-	double get_total_runtime() const;
+	double get_experiment_runtime() const;
 private:
 	int pick_unlocked_event_with_shortest_start_time();
 	void dispatch_event(int thread_id);
@@ -1971,7 +1982,9 @@ private:
 	long NUM_WRITES_TO_STOP_AFTER;
 	long num_writes_completed;
 
+	double time_of_experiment_start;
 	double time_of_last_event_completed;
+
 
 	int counter_for_user;
 };

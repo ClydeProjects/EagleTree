@@ -19,7 +19,14 @@ vector<Thread*>  random_writes_reads_experiment(int highest_lba, double IO_submi
 	BLOCK_MANAGER_ID = 0;
 	long num_IOs = numeric_limits<int>::max();
 	Thread* t1 = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, IO_submission_rate, 1);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread_Reader_Writer(0, highest_lba, num_IOs, 624621));
+
+	Thread* random_formatter = new Asynchronous_Random_Thread_Reader_Writer(0, highest_lba, highest_lba * 3, 4246);
+	t1->add_follow_up_thread(random_formatter);
+
+	Thread* experiment_thread = new Asynchronous_Random_Thread_Reader_Writer(0, highest_lba, num_IOs, 2364);
+	experiment_thread->set_experiment_thread(true);
+	random_formatter->add_follow_up_thread(experiment_thread);
+
 	vector<Thread*> threads;
 	threads.push_back(t1);
 	return threads;
@@ -93,7 +100,7 @@ int main()
 	for (uint i = 0; i < exp[0].column_names.size(); i++)
 		printf("%d: %s\n", i, exp[0].column_names[i].c_str());
 
-	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
+	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write latency, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
 
 	vector<int> used_space_values_to_show;
@@ -111,13 +118,13 @@ int main()
 	Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp, 16000);
 	Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp, 500000);
 
-	Experiment_Runner::graph(sx, sy,   "Write wait, mean", 			"Write wait, mean", 	9, 	exp, 12000);
-	Experiment_Runner::graph(sx, sy,   "Write wait, max", 			"Write wait, max", 		14, exp, 40000);
-	Experiment_Runner::graph(sx, sy,   "Write wait, std", 			"Write wait, std", 		15, exp, 14000);
+	Experiment_Runner::graph(sx, sy,   "Write latency, mean", 			"Write latency, mean", 		9, 	exp, 12000);
+	Experiment_Runner::graph(sx, sy,   "Write latency, max", 			"Write latency, max", 		14, exp, 40000);
+	Experiment_Runner::graph(sx, sy,   "Write latency, std", 			"Write latency, std", 		15, exp, 14000);
 
-	Experiment_Runner::graph(sx, sy,   "Read wait, mean", 			"Read wait, mean", 		16,	exp, 2000);
-	Experiment_Runner::graph(sx, sy,   "Read wait, max", 			"Read wait, max",		21,	exp, 70000);
-	Experiment_Runner::graph(sx, sy,   "Read wait, stdev", 			"Read wait, stdev", 	22,	exp, 4000);
+	Experiment_Runner::graph(sx, sy,   "Read latency, mean", 			"Read latency, mean", 		16,	exp, 2000);
+	Experiment_Runner::graph(sx, sy,   "Read latency, max", 			"Read latency, max",		21,	exp, 70000);
+	Experiment_Runner::graph(sx, sy,   "Read latency, stdev", 			"Read latency, stdev", 		22,	exp, 4000);
 
 	// VALUES FOR THE TWO LAST PARAMETERS IN cross_experiment_waittime_histogram() and waittime_histogram():
 	// 1. Application IOs, Reads+writes

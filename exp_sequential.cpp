@@ -42,12 +42,29 @@ vector<Thread*> sequential_experiment(int highest_lba, double IO_submission_rate
 	long log_space_per_thread = highest_lba / 4;
 	long max_file_size = log_space_per_thread / 7;
 
-	Thread* t1 = new Asynchronous_Sequential_Thread(0, log_space_per_thread * 4, 1, WRITE, 100, 0);
-	t1->add_follow_up_thread(new Asynchronous_Random_Thread(0, log_space_per_thread * 2, 500000000, 472, WRITE, IO_submission_rate, 1));
-	t1->add_follow_up_thread(new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 1000000, max_file_size, IO_submission_rate, 1, 713));
-	t1->add_follow_up_thread(new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, max_file_size, IO_submission_rate, 2, 5));
+	Thread* initial_write = new Asynchronous_Sequential_Thread(0, log_space_per_thread * 4, 1, WRITE, 100, 0);
+
+	Thread* random_formatter = new Asynchronous_Random_Thread_Reader_Writer(0, highest_lba, highest_lba * 3, 4246);
+	initial_write->add_follow_up_thread(random_formatter);
+
+
+	//Thread* random_formatter = new Asynchronous_Random_Thread(0, log_space_per_thread * 4, highest_lba * 3, 269, WRITE, IO_submission_rate, 1);
+	//t1->add_follow_up_thread(random_formatter);
+
+	Thread* experiment_thread1 = new Asynchronous_Random_Thread(0, log_space_per_thread * 2, 500000000, 472, WRITE, IO_submission_rate, 1);
+	Thread* experiment_thread2 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 1000000, max_file_size, IO_submission_rate, 1, 713);
+	Thread* experiment_thread3 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, max_file_size, IO_submission_rate, 2, 5);
+
+	experiment_thread1->set_experiment_thread(true);
+	experiment_thread2->set_experiment_thread(true);
+	experiment_thread3->set_experiment_thread(true);
+
+	random_formatter->add_follow_up_thread(experiment_thread1);
+	random_formatter->add_follow_up_thread(experiment_thread2);
+	random_formatter->add_follow_up_thread(experiment_thread3);
+
 	vector<Thread*> threads;
-	threads.push_back(t1);
+	threads.push_back(initial_write);
 	return threads;
 }
 
@@ -120,7 +137,7 @@ int main()
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
 
 
-	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
+	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write latency, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
 
 	vector<int> used_space_values_to_show;
@@ -139,9 +156,9 @@ int main()
 	Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp, 16000);
 	Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp, 500000);
 
-	Experiment_Runner::graph(sx, sy,   "Write wait, mean", 			"Write wait, mean", 	9, 	exp, 12000);
-	Experiment_Runner::graph(sx, sy,   "Write wait, max", 			"Write wait, max", 		14, exp, 40000);
-	Experiment_Runner::graph(sx, sy,   "Write wait, std", 			"Write wait, std", 		15, exp, 14000);
+	Experiment_Runner::graph(sx, sy,   "Write latency, mean", 			"Write latency, mean", 	9, 	exp, 12000);
+	Experiment_Runner::graph(sx, sy,   "Write latency, max", 			"Write latency, max", 		14, exp, 40000);
+	Experiment_Runner::graph(sx, sy,   "Write latency, std", 			"Write latency, std", 		15, exp, 14000);
 
 	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
 	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, 1, 4);

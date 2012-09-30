@@ -235,7 +235,7 @@ double Experiment_Runner::measure_throughput(int highest_lba, double IO_submissi
 	os->set_num_writes_to_stop_after(IO_limit);
 	os->run();
 	int total_IOs_issued = StatisticsGatherer::get_instance()->total_reads() + StatisticsGatherer::get_instance()->total_writes();
-	return (double) total_IOs_issued / os->get_total_runtime();
+	return (double) total_IOs_issued / os->get_experiment_runtime();
 }
 
 double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_lba, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
@@ -300,7 +300,7 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 			os->run();
 
 			// Collect statistics from this experiment iteration (save in csv files)
-			experiment_result.collect_stats(used_space, os->get_total_runtime());
+			experiment_result.collect_stats(used_space, os->get_experiment_runtime());
 		} catch(...) {
 			printf("An exception was thrown, but we continue for now\n");
 		}
@@ -344,7 +344,7 @@ ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experi
 		os->run();
 
 		// Collect statistics from this experiment iteration (save in csv files)
-		experiment_result.collect_stats(copybacks_allowed, os->get_total_runtime());
+		experiment_result.collect_stats(copybacks_allowed, os->get_experiment_runtime());
 
 		// Print shit
 		StatisticsGatherer::get_instance()->print();
@@ -384,7 +384,7 @@ ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*ex
 		os->run();
 
 		// Collect statistics from this experiment iteration (save in csv files)
-		experiment_result.collect_stats(copyback_map_size, os->get_total_runtime());
+		experiment_result.collect_stats(copyback_map_size, os->get_experiment_runtime());
 
 		// Print shit
 		StatisticsGatherer::get_instance()->print();

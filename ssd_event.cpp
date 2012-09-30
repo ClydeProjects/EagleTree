@@ -54,7 +54,8 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	original_application_io(false),
 	age_class(0),
 	tag(-1),
-	accumulated_wait_time(0)
+	accumulated_wait_time(0),
+	experiment_io(false)
 {
 	assert(start_time >= 0.0);
 	if (logical_address > NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE) {
@@ -82,7 +83,8 @@ Event::Event(Event& event) :
 	original_application_io(event.original_application_io),
 	age_class(event.age_class),
 	tag(event.tag),
-	accumulated_wait_time(0)
+	accumulated_wait_time(0),
+	experiment_io(event.experiment_io)
 {}
 
 Event::Event() : type(NOT_VALID) {}

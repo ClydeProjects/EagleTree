@@ -21,6 +21,15 @@ Thread::~Thread() {
 	}
 }
 
+Event* Thread::run() {
+	if (finished) return NULL;
+	Event* event = issue_next_io();
+	if (event != NULL && is_experiment_thread()) {
+		event->set_experiment_io(true);
+	}
+	return event;
+}
+
 void Thread::register_event_completion(Event* event) {
 	Address phys = event->get_address();
 	Address ra = event->get_replace_address();

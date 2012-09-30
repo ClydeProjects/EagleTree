@@ -18,10 +18,10 @@ const double StatisticsGatherer::age_histogram_bin_size = 1;
 const double StatisticsGatherer::io_counter_window_size = 1000000; // second
 
 StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
-	:  num_gc_cancelled_no_candidate(0),
-	   num_gc_cancelled_not_enough_free_space(0),
-	   num_gc_cancelled_gc_already_happening(0),
-	   ssd(ssd),
+	: num_gc_cancelled_no_candidate(0),
+	  num_gc_cancelled_not_enough_free_space(0),
+	  num_gc_cancelled_gc_already_happening(0),
+	  ssd(ssd),
 	  bus_wait_time_for_reads_per_LUN(SSD_SIZE, vector<vector<double> >(PACKAGE_SIZE, vector<double>())),
 	  num_reads_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  bus_wait_time_for_writes_per_LUN(SSD_SIZE, vector<vector<double> >(PACKAGE_SIZE, vector<double>())),
@@ -46,11 +46,12 @@ StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
 	  num_gc_targeting_class(0),
 	  num_gc_targeting_anything(0),
 	  num_wl_writes_per_LUN_origin(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
-	  num_wl_writes_per_LUN_destination(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0))
+	  num_wl_writes_per_LUN_destination(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
+	  expleriment_started(false)
 {}
 
 vector<vector<double> > num_valid_pages_per_gc_op;
-	vector<vector<int> > num_executed_gc_ops;
+vector<vector<int> > num_executed_gc_ops;
 
 StatisticsGatherer::~StatisticsGatherer() {}
 
@@ -66,6 +67,10 @@ StatisticsGatherer *StatisticsGatherer::get_instance()
 }
 
 void StatisticsGatherer::register_completed_event(Event const& event) {
+	if (!expleriment_started && !event.is_experiment_io()) {
+		return;
+	}
+	expleriment_started = true;
 
 	uint current_window = floor(event.get_current_time() / io_counter_window_size);
 	while (application_io_history.size() < current_window + 1) application_io_history.push_back(0);
@@ -79,7 +84,7 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	if (event.get_event_type() == WRITE || event.get_event_type() == COPY_BACK) {
 		if (event.is_original_application_io()) {
 			num_writes_per_LUN[a.package][a.die]++;
-			bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_overall_wait_time());
+			bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_latency());
 		}
 		else if (event.is_wear_leveling_op()) {
 			Address replace_add = event.get_replace_address();
@@ -91,12 +96,12 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 			num_gc_writes_per_LUN_origin[replace_add.package][replace_add.die]++;
 			num_gc_writes_per_LUN_destination[a.package][a.die]++;
 
-			sum_gc_wait_time_per_LUN[a.package][a.die] += event.get_overall_wait_time();
-			gc_wait_time_per_LUN[a.package][a.die].push_back(event.get_overall_wait_time());
+			sum_gc_wait_time_per_LUN[a.package][a.die] += event.get_latency();
+			gc_wait_time_per_LUN[a.package][a.die].push_back(event.get_latency());
 		}
 	} else if (event.get_event_type() == READ_TRANSFER) {
 		if (event.is_original_application_io()) {
-			bus_wait_time_for_reads_per_LUN[a.package][a.die].push_back(event.get_overall_wait_time());
+			bus_wait_time_for_reads_per_LUN[a.package][a.die].push_back(event.get_latency());
 			num_reads_per_LUN[a.package][a.die]++;
 		} else if (event.is_garbage_collection_op()) {
 			num_gc_reads_per_LUN[a.package][a.die]++;
@@ -108,7 +113,7 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 		num_copy_backs_per_LUN[a.package][a.die]++;
 	}
 
-	double bucket = ceil(max(0.0, event.get_overall_wait_time() - wait_time_histogram_bin_size / 2) / wait_time_histogram_bin_size)*wait_time_histogram_bin_size;
+	double bucket = ceil(max(0.0, event.get_latency() - wait_time_histogram_bin_size / 2) / wait_time_histogram_bin_size)*wait_time_histogram_bin_size;
 	if      (event.is_original_application_io() && event.get_event_type() == WRITE) { wait_time_histogram_appIOs_write[bucket]++; wait_time_histogram_appIOs_write_and_read[bucket]++; }
 	else if (event.is_original_application_io() && event.get_event_type() == READ_TRANSFER)  { wait_time_histogram_appIOs_read[bucket]++; wait_time_histogram_appIOs_write_and_read[bucket]++; }
 	else if (!event.is_original_application_io() && event.get_event_type() == WRITE) { wait_time_histogram_non_appIOs_write[bucket]++;  }
@@ -420,23 +425,23 @@ vector<string> StatisticsGatherer::totals_vector_header() {
 	result.push_back("Copybacks");
 	result.push_back("Erases");
 
-	result.push_back("Write wait, mean (µs)"); // 10
-	result.push_back("Write wait, min (µs)");
-	result.push_back("Write wait, Q25 (µs)");
-	result.push_back("Write wait, Q50 (µs)");
-	result.push_back("Write wait, Q75 (µs)");
-	result.push_back("Write wait, max (µs)");
-	result.push_back("Write wait, stdev (µs)");
+	result.push_back("Write latency, mean (µs)"); // 10
+	result.push_back("Write latency, min (µs)");
+	result.push_back("Write latency, Q25 (µs)");
+	result.push_back("Write latency, Q50 (µs)");
+	result.push_back("Write latency, Q75 (µs)");
+	result.push_back("Write latency, max (µs)");
+	result.push_back("Write latency, stdev (µs)");
 
-	result.push_back("Read wait, mean (µs)");
-	result.push_back("Read wait, min (µs)");
-	result.push_back("Read wait, Q25 (µs)"); // 20
-	result.push_back("Read wait, Q50 (µs)");
-	result.push_back("Read wait, Q75 (µs)");
-	result.push_back("Read wait, max (µs)");
-	result.push_back("Read wait, stdev (µs)");
+	result.push_back("Read latency, mean (µs)");
+	result.push_back("Read latency, min (µs)");
+	result.push_back("Read latency, Q25 (µs)"); // 20
+	result.push_back("Read latency, Q50 (µs)");
+	result.push_back("Read latency, Q75 (µs)");
+	result.push_back("Read latency, max (µs)");
+	result.push_back("Read latency, stdev (µs)");
 
-	result.push_back("GC wait, stdev (µs)"); // 25
+	result.push_back("GC latency, stdev (µs)"); // 25
 
 	//result.push_back("max write wait (µs)"); // 15
 	//result.push_back("max read wait (µs)");

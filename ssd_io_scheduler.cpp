@@ -173,6 +173,11 @@ void IOScheduler::execute_current_waiting_ios() {
 	while (events.size() > 0) {
 		Event * event = events.back();
 		events.pop_back();
+
+		if (event->get_application_io_id() == 152363) {
+				event->print();
+			}
+
 		event_type type = event->get_event_type();
 		bool is_GC = event->is_garbage_collection_op();
 
@@ -206,7 +211,7 @@ void IOScheduler::execute_current_waiting_ios() {
 		}
 	}
 
-	handle_noop_events(noop_events);
+
 	//handle_writes(copy_backs); // Copy backs should be prioritized first to avoid conflict, since they have a reserved page waiting to be written
 
 	//read_commands.insert(read_commands.end(), gc_read_commands.begin(), gc_read_commands.end());
@@ -257,6 +262,8 @@ void IOScheduler::execute_current_waiting_ios() {
 		handle(read_transfers);
 		//handle(copy_backs);
 	}
+
+	handle_noop_events(noop_events);
 }
 
 
@@ -367,6 +374,7 @@ void IOScheduler::transform_copyback(Event* event) {
 	Event* write = new Event(WRITE, event->get_logical_address(), 1, event->get_current_time());
 	write->set_garbage_collection_op(true);
 	write->set_replace_address(event->get_replace_address());
+	write->set_application_io_id(event->get_application_io_id());
 	dependencies[event->get_application_io_id()].push_back(write);
 	dependency_code_to_type[event->get_application_io_id()] = WRITE;
 }
@@ -448,6 +456,9 @@ void IOScheduler::make_dependent(Event* dependent_event, uint independent_code/*
 
 // executes read_commands, read_transfers and erases
 void IOScheduler::handle_event(Event* event) {
+	if (event->get_application_io_id() == 152363) {
+		event->print();
+	}
 	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
 	bool can_schedule = bm->can_schedule_on_die(event);
 	if (can_schedule && time == 0) {
@@ -669,6 +680,10 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	uint common_logical_address = new_event->get_logical_address();
 	uint dependency_code_of_other_event = LBA_currently_executing[common_logical_address];
 	Event * existing_event = find_scheduled_event(dependency_code_of_other_event);
+
+	if (new_event->get_application_io_id() == 152363 || dependency_code_of_other_event == 152363) {
+		new_event->print();
+	}
 
 	//bool both_events_are_gc = new_event->is_garbage_collection_op() && existing_event->is_garbage_collection_op();
 	//assert(!both_events_are_gc);
