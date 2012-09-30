@@ -56,7 +56,7 @@ ssd: $(HDR) $(SRC)
 #-chmod $(PERMS) $(LOG) $(OBJ)
 
 # All Target
-all: scheduling sequential_tuning sequential greediness copybacks copyback_map
+all: scheduling sequential_tuning sequential greediness copybacks
 
 greediness: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o greediness exp_gc_greediness.cpp $(OBJ)
