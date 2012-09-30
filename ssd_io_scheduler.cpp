@@ -81,7 +81,7 @@ IOScheduler *IOScheduler::instance()
 
 
 inline bool bus_wait_time_comparator (const Event* i, const Event* j) {
-	return i->get_accumulated_wait_time() < j->get_accumulated_wait_time();
+	return i->get_bus_wait_time() < j->get_bus_wait_time();
 }
 
 // assumption is that all events within an operation have the same LBA
@@ -639,8 +639,10 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	// however, since the copy back destination address is already reserved, we need to use it.
 	if (scheduled_op_code == COPY_BACK) {
 		make_dependent(new_event, dependency_code_of_other_event);
+		assert(false);
 	}
 	else if (new_op_code == COPY_BACK) {
+		assert(false);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 		make_dependent(existing_event, dependency_code_of_new_event);
 		remove_event_from_current_events(existing_event); // Remove old event from current_events; it's added again when independent event (the copy back) finishes
@@ -651,6 +653,12 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		push_into_current_events(new_event); // Make sure the old GC READ is run, even though it is now a NOOP command
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 		stats.num_write_cancellations++;
+	}
+	else if (new_event->is_garbage_collection_op() && scheduled_op_code == TRIM) {
+		remove_current_operation(new_event);
+		push_into_current_events(new_event);
+		bm->register_trim_making_gc_redundant();
+		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 	}
 	else if (existing_event != NULL && existing_event->is_garbage_collection_op() && (new_op_code == WRITE || new_op_code == TRIM)) {
 		if (new_op_code == TRIM) {
