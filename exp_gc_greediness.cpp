@@ -161,7 +161,7 @@ int main()
 	Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp, 500000);
 
 	Experiment_Runner::graph(sx, sy,   "Write wait, mean", 			"Write wait, mean", 	9, 	exp, 12000);
-	Experiment_Runner::graph(sx, sy,   "Write wait, max", 			"Write wait, max", 		14, exp, 30000);
+	Experiment_Runner::graph(sx, sy,   "Write wait, max", 			"Write wait, max", 		14, exp, 40000);
 	Experiment_Runner::graph(sx, sy,   "Write wait, std", 			"Write wait, std", 		15, exp, 14000);
 
 	Experiment_Runner::graph(sx, sy,   "Read wait, mean", 			"Read wait, mean", 		16,	exp, 2000);

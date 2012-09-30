@@ -64,6 +64,7 @@ StatisticsGatherer *StatisticsGatherer::get_instance()
 }
 
 void StatisticsGatherer::register_completed_event(Event const& event) {
+
 	uint current_window = floor(event.get_current_time() / io_counter_window_size);
 	while (application_io_history.size() < current_window + 1) application_io_history.push_back(0);
 	while (non_application_io_history.size() < current_window + 1)non_application_io_history.push_back(0);
@@ -304,7 +305,7 @@ void StatisticsGatherer::print() {
 	printf("%d\t\t", (int) get_sum(num_gc_reads_per_LUN));
 	printf("%d\t\t", (int) get_sum(num_copy_backs_per_LUN));
 	printf("%d\t\t", (int) get_sum(num_erases_per_LUN));
-	printf("%f\t\t", avg_overall_write_wait_time);
+	printf("%f\t", avg_overall_write_wait_time);
 	printf("%f\t\t", avg_overall_read_wait_time);
 	printf("\n\n");
 }
@@ -463,8 +464,8 @@ string StatisticsGatherer::totals_csv_line() {
 	flatten(bus_wait_time_for_writes_per_LUN, all_write_wait_times);
 	flatten(bus_wait_time_for_reads_per_LUN, all_read_wait_times);
 
-	std::sort(all_write_wait_times.begin(), all_write_wait_times.end());
-	std::sort(all_read_wait_times.begin(), all_read_wait_times.end());
+	sort(all_write_wait_times.begin(), all_write_wait_times.end());
+	sort(all_read_wait_times.begin(), all_read_wait_times.end());
 
 	if (all_write_wait_times.size() == 0) all_write_wait_times.push_back(-1);
 	if (all_read_wait_times.size() == 0) all_read_wait_times.push_back(-1);
@@ -497,8 +498,8 @@ string StatisticsGatherer::totals_csv_line() {
 	ss << all_write_wait_times.back() << ", ";  // max
 	ss << get_std(all_write_wait_times) << ", ";
 
-	printf("max latency:  %f\n", all_write_wait_times.back());
-	printf("latency std:  %f\n", get_std(all_write_wait_times));
+	printf("write max:  %f\n", all_write_wait_times.back());
+	printf("write std:  %f\n", get_std(all_write_wait_times));
 
 	ss << get_average(all_read_wait_times) << ", ";  // mean
 	ss << all_read_wait_times.front() << ", "; // min
@@ -507,6 +508,9 @@ string StatisticsGatherer::totals_csv_line() {
 	ss << all_read_wait_times[all_read_wait_times.size() * .75] << ", "; // Q75
 	ss << all_read_wait_times.back() << ", ";  // max
 	ss << get_std(all_read_wait_times) << ", ";
+
+	printf("read max:  %f\n", all_read_wait_times.back());
+	printf("read std:  %f\n", get_std(all_read_wait_times));
 
 	ss << stddev_overall_gc_wait_time;
 
