@@ -213,6 +213,7 @@ extern int SCHEDULING_SCHEME;
 
 extern bool ENABLE_WEAR_LEVELING;
 extern int WEAR_LEVEL_THRESHOLD;
+extern int MAX_ONGOING_WL_OPS;
 
 extern int PAGE_HOTNESS_MEASURER;
 
@@ -1025,7 +1026,6 @@ private:
 	void find_wl_candidates(double current_time);
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
-	bool greedy_gc;
 	// WL structures
 	uint max_age;
 	int num_age_classes;
@@ -1036,11 +1036,13 @@ private:
 	vector<vector<vector<set<long> > > > gc_candidates;  // each age class has a vector of candidates for GC
 	vector<vector<uint> > num_blocks_being_garbaged_collected_per_LUN;
 	Random_Order_Iterator order_randomiser;
+
 	set<Block*> blocks_to_wl;
 	double average_erase_cycle_time;
 	MTRand_int32 random_number_generator;
 	set<Block*> blocks_being_wl;
 	uint num_erases_up_to_date;
+
 	pair<bool, pair<int, int> > last_get_free_block_pointer_with_shortest_IO_queue_result;
 	bool IO_has_completed_since_last_shortest_queue_search;
 

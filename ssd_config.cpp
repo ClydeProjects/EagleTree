@@ -182,8 +182,10 @@ bool USE_ERASE_QUEUE = false;
  * 2 ->  Smart
  */
 int SCHEDULING_SCHEME = 2;
+
 bool ENABLE_WEAR_LEVELING = false;
 int WEAR_LEVEL_THRESHOLD = 100;
+int MAX_ONGOING_WL_OPS = 1;
 
 /*
  * Block manager
