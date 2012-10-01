@@ -58,6 +58,7 @@ const string ExperimentResult::waittime_filename_prefix 	= "waittime-";
 const string ExperimentResult::age_filename_prefix 			= "age-";
 const string ExperimentResult::queue_filename_prefix 		= "queue-";
 const string ExperimentResult::throughput_filename_prefix   = "throughput-";
+const string ExperimentResult::latency_filename_prefix      = "latency-";
 const double ExperimentResult::M 							= 1000000.0; // One million
 const double ExperimentResult::K 							= 1000.0;    // One thousand
 
@@ -114,19 +115,21 @@ void ExperimentResult::collect_stats(uint variable_parameter_value, double os_ru
 	stringstream age_filename;
 	stringstream queue_filename;
 	stringstream throughput_filename;
+	stringstream latency_filename;
 
 	hist_filename << waittime_filename_prefix << variable_parameter_value << datafile_postfix;
 	age_filename << age_filename_prefix << variable_parameter_value << datafile_postfix;
 	queue_filename << queue_filename_prefix << variable_parameter_value << datafile_postfix;
 	throughput_filename << throughput_filename_prefix << variable_parameter_value << datafile_postfix;
+	latency_filename << latency_filename_prefix << variable_parameter_value << datafile_postfix;
 
 	std::ofstream hist_file;
 	hist_file.open(hist_filename.str().c_str());
 	hist_file << StatisticsGatherer::get_instance()->wait_time_histogram_all_IOs_csv();
 	hist_file.close();
-	waittimes[variable_parameter_value] = StatisticsGatherer::get_instance()->max_waittimes();
-	for (uint i = 0; i < waittimes[variable_parameter_value].size(); i++) {
-		max_waittimes[i] = max(max_waittimes[i], waittimes[variable_parameter_value][i]);
+	vp_max_waittimes[variable_parameter_value] = StatisticsGatherer::get_instance()->max_waittimes();
+	for (uint i = 0; i < vp_max_waittimes[variable_parameter_value].size(); i++) {
+		max_waittimes[i] = max(max_waittimes[i], vp_max_waittimes[variable_parameter_value][i]);
 	}
 
 	std::ofstream age_file;
@@ -146,6 +149,14 @@ void ExperimentResult::collect_stats(uint variable_parameter_value, double os_ru
 	queue_file << StatisticsGatherer::get_instance()->app_and_gc_throughput_csv();
 	queue_file.close();
 
+	std::ofstream latency_file;
+	queue_file.open(latency_filename.str().c_str());
+	queue_file << StatisticsGatherer::get_instance()->latency_csv();
+	queue_file.close();
+
+	vp_num_IOs[variable_parameter_value].push_back(total_write_IOs_issued);
+	vp_num_IOs[variable_parameter_value].push_back(total_read_IOs_issued);
+	vp_num_IOs[variable_parameter_value].push_back(total_write_IOs_issued + total_read_IOs_issued);
 }
 
 void ExperimentResult::end_experiment() {
@@ -443,6 +454,41 @@ void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filenam
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
+void Experiment_Runner::latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, ExperimentResult experiment) {
+	chdir(experiment.data_folder.c_str());
+
+	// Write tempoary file containing GLE script
+    string scriptFilename = filename + ".gle"; // Name of tempoary script file
+    std::ofstream gleScript;
+    gleScript.open(scriptFilename.c_str());
+
+    gleScript <<
+    "size " << sizeX << " " << sizeY << endl << // 12 8
+    "include \"graphutil.gle\"" << endl <<
+    "set font texcmr" << endl <<
+    "begin graph" << endl <<
+    "   key pos tr offset -0.0 0 compact" << endl <<
+    "   scale auto" << endl <<
+    (GRAPH_TITLES ? "" : "!") << "   title  \"" << title << "\"" << endl <<
+    "   xtitle \"" << "IO #" << "\"" << endl <<
+    "   ytitle \"IO Latency (µs)\"" << endl <<
+	"   data \"" << experiment.data_folder << ExperimentResult::latency_filename_prefix << variable_parameter_value << ExperimentResult::datafile_postfix << "\"" << endl <<
+    "   xaxis min 0 max " << experiment.vp_num_IOs[variable_parameter_value][column-1] << endl << // nolast nofirst
+//    "   dticks off" << endl <<
+//    "   yaxis min 0 max dmaxy(d" << column+5 << ")*1.05" << endl << // column+5 = max column
+	"   d" << column << " marker dot msize 0.1" << endl <<
+    "end graph" << endl;
+    gleScript.close();
+
+    // Run gle to draw graph
+    string gleCommand = "gle \"" + scriptFilename + "\" \"" + filename + "\"";
+    cout << gleCommand << "\n";
+    system(gleCommand.c_str());
+
+    if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
+}
+
+
 void Experiment_Runner::waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, ExperimentResult experiment) {
 	chdir(experiment.data_folder.c_str());
 
@@ -525,8 +571,8 @@ void Experiment_Runner::cross_experiment_waittime_histogram(int sizeX, int sizeY
 	vector<string> commands;
 	double cross_experiment_max_waittime = 0;
 	for (uint i = 0; i < experiments.size(); i++) {
-		cross_experiment_max_waittime = max(cross_experiment_max_waittime, experiments[i].waittimes[point][black_column]);
-		if (red_column != -1) cross_experiment_max_waittime = max(cross_experiment_max_waittime, experiments[i].waittimes[point][red_column]);
+		cross_experiment_max_waittime = max(cross_experiment_max_waittime, experiments[i].vp_max_waittimes[point][black_column]);
+		if (red_column != -1) cross_experiment_max_waittime = max(cross_experiment_max_waittime, experiments[i].vp_max_waittimes[point][red_column]);
 	}
 	for (uint i = 0; i < experiments.size(); i++) {
 		ExperimentResult& e = experiments[i];
