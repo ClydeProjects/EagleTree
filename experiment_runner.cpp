@@ -49,6 +49,8 @@ const double Experiment_Runner::K = 1000.0;    // One thousand
 double Experiment_Runner::calibration_precision      = 1.0; // microseconds
 double Experiment_Runner::calibration_starting_point = 15.00; // microseconds
 
+string Experiment_Runner::graph_filename_prefix      = "";
+
 const string ExperimentResult::throughput_column_name		= "Average throughput (IOs/s)"; // e.g. "Average throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
 const string ExperimentResult::write_throughput_column_name = "Average write throughput (IOs/s)";
 const string ExperimentResult::read_throughput_column_name  = "Average read throughput (IOs/s)";
@@ -72,7 +74,9 @@ ExperimentResult::ExperimentResult(string experiment_name, string data_folder_, 
 {
 	working_dir = Experiment_Runner::get_working_dir();
 	data_folder = working_dir + "/" + data_folder_;
- 	stats_file = NULL;
+	replace(data_folder_.begin(), data_folder_.end(), '/', '-');
+	graph_filename_prefix = data_folder_;
+	stats_file = NULL;
  	max_waittimes = vector<double>(6,0);
 	//boost::filesystem::path working_dir = boost::filesystem::current_path();
     //boost::filesystem::create_directories(boost::filesystem::path(data_folder));
@@ -414,8 +418,8 @@ ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*ex
 
 // Plotting x number of experiments into one graph
 void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments, int y_max) {
-	// Write tempoary file containing GLE script
-    string scriptFilename = filename + ".gle"; // Name of tempoary script file
+	// Write temporary file containing GLE script
+    string scriptFilename = Experiment_Runner::graph_filename_prefix + filename + ".gle"; // Name of temporary script file
     ofstream gleScript;
     gleScript.open(scriptFilename.c_str());
 
@@ -451,14 +455,14 @@ void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filenam
     cout << gleCommand << "\n";
     system(gleCommand.c_str());
 
-    if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
+    if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete temporary script file again
 }
 
 void Experiment_Runner::latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, ExperimentResult experiment, int y_max) {
 	chdir(experiment.data_folder.c_str());
 
-	// Write tempoary file containing GLE script
-    string scriptFilename = filename + ".gle"; // Name of tempoary script file
+	// Write temporary file containing GLE script
+    string scriptFilename = experiment.graph_filename_prefix + filename + ".gle"; // Name of temporary script file
     std::ofstream gleScript;
     gleScript.open(scriptFilename.c_str());
 
@@ -491,15 +495,15 @@ void Experiment_Runner::latency_plot(int sizeX, int sizeY, string title, string 
     cout << gleCommand << "\n";
     system(gleCommand.c_str());
 
-    if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
+    if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete temporary script file again
 }
 
 
 void Experiment_Runner::waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, ExperimentResult experiment) {
 	chdir(experiment.data_folder.c_str());
 
-	// Write tempoary file containing GLE script
-    string scriptFilename = filename + ".gle"; // Name of tempoary script file
+	// Write temporary file containing GLE script
+    string scriptFilename = experiment.graph_filename_prefix + filename + ".gle"; // Name of temporary script file
     std::ofstream gleScript;
     gleScript.open(scriptFilename.c_str());
 
@@ -528,12 +532,12 @@ void Experiment_Runner::waittime_boxplot(int sizeX, int sizeY, string title, str
     cout << gleCommand << "\n";
     system(gleCommand.c_str());
 
-    if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
+    if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete temporary script file again
 }
 
 void Experiment_Runner::draw_graph(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command) {
-    // Write tempoary file containing GLE script
-    string scriptFilename = outputFile + ".gle"; // Name of tempoary script file
+    // Write temporary file containing GLE script
+    string scriptFilename = outputFile + ".gle"; // Name of temporary script file
     std::ofstream gleScript;
     gleScript.open(scriptFilename.c_str());
     gleScript <<
@@ -559,7 +563,7 @@ void Experiment_Runner::draw_graph(int sizeX, int sizeY, string outputFile, stri
     cout << gleCommand << "\n";
     system(gleCommand.c_str());
 
-    if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
+    if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete temporary script file again
 }
 
 void Experiment_Runner::waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points, int black_column, int red_column) {
@@ -591,7 +595,7 @@ void Experiment_Runner::cross_experiment_waittime_histogram(int sizeX, int sizeY
 		commands.push_back(command.str());
 	}
 
-	multigraph(sizeX, sizeY, outputFile, commands);
+	multigraph(sizeX, sizeY, Experiment_Runner::graph_filename_prefix + outputFile, commands);
 }
 
 
@@ -608,7 +612,7 @@ void Experiment_Runner::age_histogram(int sizeX, int sizeY, string outputFile, E
 		commands.push_back(command.str());
 	}
 
-	multigraph(sizeX, sizeY, outputFile, commands, settings);
+	multigraph(sizeX, sizeY, experiment.graph_filename_prefix + outputFile, commands, settings);
 }
 
 void Experiment_Runner::queue_length_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points) {
@@ -619,7 +623,7 @@ void Experiment_Runner::queue_length_history(int sizeX, int sizeY, string output
 		commands.push_back(command.str());
 	}
 
-	multigraph(sizeX, sizeY, outputFile, commands);
+	multigraph(sizeX, sizeY, experiment.graph_filename_prefix + outputFile, commands);
 }
 
 void Experiment_Runner::throughput_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points) {
@@ -630,13 +634,13 @@ void Experiment_Runner::throughput_history(int sizeX, int sizeY, string outputFi
 		commands.push_back(command.str());
 	}
 
-	multigraph(sizeX, sizeY, outputFile, commands);
+	multigraph(sizeX, sizeY, experiment.graph_filename_prefix + outputFile, commands);
 }
 
 // Draw multiple smaller graphs in one image
 void Experiment_Runner::multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings) {
-	// Write tempoary file containing GLE script
-    string scriptFilename = outputFile + ".gle"; // Name of tempoary script file
+	// Write temporary file containing GLE script
+    string scriptFilename = outputFile + ".gle"; // Name of temporary script file
     std::ofstream gleScript;
     gleScript.open(scriptFilename.c_str());
 
