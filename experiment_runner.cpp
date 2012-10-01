@@ -454,13 +454,18 @@ void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filenam
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete tempoary script file again
 }
 
-void Experiment_Runner::latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, ExperimentResult experiment) {
+void Experiment_Runner::latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, ExperimentResult experiment, int y_max) {
 	chdir(experiment.data_folder.c_str());
 
 	// Write tempoary file containing GLE script
     string scriptFilename = filename + ".gle"; // Name of tempoary script file
     std::ofstream gleScript;
     gleScript.open(scriptFilename.c_str());
+
+    string y_max_str;
+    stringstream y_max_stream;
+    y_max_stream << " max " << y_max;
+    y_max_str = y_max == UNDEFINED ? "" : y_max_stream.str();
 
     gleScript <<
     "size " << sizeX << " " << sizeY << endl << // 12 8
@@ -474,6 +479,7 @@ void Experiment_Runner::latency_plot(int sizeX, int sizeY, string title, string 
     "   ytitle \"IO Latency (µs)\"" << endl <<
 	"   data \"" << experiment.data_folder << ExperimentResult::latency_filename_prefix << variable_parameter_value << ExperimentResult::datafile_postfix << "\"" << endl <<
     "   xaxis min 0 max " << experiment.vp_num_IOs[variable_parameter_value][column-1] << endl << // nolast nofirst
+    "   yaxis min 0" << y_max_str << endl <<
 //    "   dticks off" << endl <<
 //    "   yaxis min 0 max dmaxy(d" << column+5 << ")*1.05" << endl << // column+5 = max column
 	"   d" << column << " marker dot msize 0.1" << endl <<
@@ -571,6 +577,10 @@ void Experiment_Runner::cross_experiment_waittime_histogram(int sizeX, int sizeY
 	vector<string> commands;
 	double cross_experiment_max_waittime = 0;
 	for (uint i = 0; i < experiments.size(); i++) {
+		if (experiments[i].vp_max_waittimes.find(point) == experiments[i].vp_max_waittimes.end()) {
+			printf("cross_experiment_waittime_histogram: experiment with variable parameter value %d not found. Skipping graph drawing.\n", point);
+			return;
+		}
 		cross_experiment_max_waittime = max(cross_experiment_max_waittime, experiments[i].vp_max_waittimes[point][black_column]);
 		if (red_column != -1) cross_experiment_max_waittime = max(cross_experiment_max_waittime, experiments[i].vp_max_waittimes[point][red_column]);
 	}
