@@ -61,6 +61,7 @@ vector<Thread*>  smart_greedy(int highest_lba, double IO_submission_rate) {
 int main()
 {
 	string exp_folder  = "exp_scheduling/";
+	Experiment_Runner::graph_filename_prefix = "exp_scheduling-";
 	mkdir(exp_folder.c_str(), 0755);
 
 	load_config();
@@ -77,9 +78,9 @@ int main()
 	BUS_DATA_DELAY = 90;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 200000;
-	int space_min = 60;
-	int space_max = 90;
+	int IO_limit = 2000;
+	int space_min = 80;
+	int space_max = 85;
 	int space_inc = 5;
 
 	PRINT_LEVEL = 0;
@@ -91,9 +92,9 @@ int main()
 	PRINT_LEVEL = 0;
 
 	vector<ExperimentResult> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_lazy,						space_min, space_max, space_inc, exp_folder + 		"naive_lazy/", "naive lazy", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_greedy,						space_min, space_max, space_inc, exp_folder + 		"naive_greedy/", "naive greedy", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(smart_lazy,		space_min, space_max, space_inc, exp_folder + 		"smart_lazy/", "smart lazy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_lazy,	space_min, space_max, space_inc, exp_folder + 		"naive_lazy/", "naive lazy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_greedy,	space_min, space_max, space_inc, exp_folder + 		"naive_greedy/", "naive greedy", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(smart_lazy,	space_min, space_max, space_inc, exp_folder + 		"smart_lazy/", "smart lazy", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(smart_greedy,	space_min, space_max, space_inc, exp_folder + 		"smart_greedy/", "smart greedy", IO_limit) );
 
 	// Print column names for info
@@ -154,6 +155,13 @@ int main()
 		Experiment_Runner::age_histogram			(sx, sy/2, "age_histograms", exp[i], used_space_values_to_show);
 		Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);
 		Experiment_Runner::throughput_history		(sx, sy/2, "throughput_history", exp[i], used_space_values_to_show);
+
+		Experiment_Runner::latency_plot(sx, sy, "IO Latency", "latency-write-80",      1, 80, exp[i]);
+		Experiment_Runner::latency_plot(sx, sy, "IO Latency", "latency-read-80",       2, 80, exp[i]);
+		Experiment_Runner::latency_plot(sx, sy, "IO Latency", "latency-read-write-80", 3, 80, exp[i]);
+		Experiment_Runner::latency_plot(sx, sy, "IO Latency", "latency-write-85",      1, 85, exp[i]);
+		Experiment_Runner::latency_plot(sx, sy, "IO Latency", "latency-read-85",       2, 85, exp[i]);
+		Experiment_Runner::latency_plot(sx, sy, "IO Latency", "latency-read-write-85", 3, 85, exp[i]);
 	}
 
 	double end_time = Experiment_Runner::wall_clock_time();

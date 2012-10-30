@@ -1554,6 +1554,7 @@ public:
 	string totals_csv_header();
 	vector<string> totals_vector_header();
 	string totals_csv_line();
+	string latency_csv();
 	string age_histogram_csv();
 	string wait_time_histogram_appIOs_csv();
 	string wait_time_histogram_all_IOs_csv();
@@ -1613,6 +1614,10 @@ private:
 	static const double io_counter_window_size;
 	vector<uint> application_io_history;
 	vector<uint> non_application_io_history;
+
+	vector<double> latency_history_write;
+	vector<double> latency_history_read;
+	vector<double> latency_history_write_and_read;
 
 	// garbage collection stats
 	long num_gc_executed;
@@ -2015,7 +2020,8 @@ public:
 	uint max_age;
 	uint max_age_freq;
 	vector<double> max_waittimes;
-	map<uint, vector<double> > waittimes; // Varable parameter --> max waittimes for each waittime measurement type
+	map<uint, vector<double> > vp_max_waittimes; // Varable parameter --> max waittimes for each waittime measurement type
+	map<uint, vector<uint> > vp_num_IOs; // Varable parameter --> num_ios[write, read, write+read]
     static const string throughput_column_name; // e.g. "Average throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
     static const string write_throughput_column_name;
     static const string read_throughput_column_name;
@@ -2023,6 +2029,7 @@ public:
     string working_dir;
     double start_time;
     double end_time;
+    string graph_filename_prefix;
 
 	static const string datafile_postfix;
 	static const string stats_filename;
@@ -2030,6 +2037,7 @@ public:
 	static const string age_filename_prefix;
 	static const string queue_filename_prefix;
 	static const string throughput_filename_prefix;
+	static const string latency_filename_prefix;
 	static const double M;
 	static const double K;
 };
@@ -2045,6 +2053,7 @@ public:
 	static double calibrate_IO_submission_rate_queue_based(int highest_lba, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
 	static double measure_throughput(int highest_lba, double IO_submission_rate, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
 	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments, int y_max = UNDEFINED);
+	static void latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, ExperimentResult experiment, int y_max = UNDEFINED);
 	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, ExperimentResult experiment);
 	static void waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points, int black_column, int red_column = -1);
     static void cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<ExperimentResult> experiments, int point, int black_column, int red_column = -1);
@@ -2056,6 +2065,8 @@ public:
 	static ExperimentResult overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
 	static ExperimentResult copyback_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
 	static ExperimentResult copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);
+
+	static string graph_filename_prefix;
 
 private:
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());

@@ -119,6 +119,10 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	else if (!event.is_original_application_io() && event.get_event_type() == WRITE) { wait_time_histogram_non_appIOs_write[bucket]++;  }
 	else if (!event.is_original_application_io() && event.get_event_type() == READ_TRANSFER) { wait_time_histogram_non_appIOs_read[bucket]++; }
 	if      (!event.is_original_application_io()) { wait_time_histogram_non_appIOs_all[bucket]++; }
+
+	if      (event.is_original_application_io() && event.get_event_type() == WRITE) { latency_history_write.push_back(event.get_latency()); latency_history_write_and_read.push_back(event.get_latency()); }
+	else if (event.is_original_application_io() && event.get_event_type() == READ_TRANSFER) { latency_history_read.push_back(event.get_latency()); latency_history_write_and_read.push_back(event.get_latency()); }
+
 }
 
 
@@ -537,6 +541,38 @@ string StatisticsGatherer::totals_csv_line() {
 	printf("read std:  %f\n", get_std(all_read_wait_times));
 
 	ss << stddev_overall_gc_wait_time;
+
+	return ss.str();
+}
+
+string StatisticsGatherer::latency_csv() {
+	stringstream ss;
+
+	vector<vector<double> > latency_histories;
+	vector<string> latency_names;
+	latency_names.push_back("Write latency (µs)");
+	latency_histories.push_back(latency_history_write);
+	latency_names.push_back("Read latency (µs)");
+	latency_histories.push_back(latency_history_read);
+	latency_names.push_back("Write+Read latency (µs)");
+	latency_histories.push_back(latency_history_write_and_read);
+
+	ss << "\"IO #\"";
+	for (uint i = 0; i < latency_names.size(); i++)
+		ss << ", " << "\"" << latency_names[i] << "\"";
+	ss << "\n";
+
+	uint max_vector_size = 0;
+	for (uint i = 0; i < latency_histories.size(); i++)
+		max_vector_size = max(max_vector_size, (uint) latency_histories[i].size());
+
+	for (uint pos = 0; pos < max_vector_size; pos++) {
+		ss << pos;
+		for (uint i = 0; i < latency_histories.size(); i++) {
+			ss << ", " << (pos < latency_histories[i].size() ? latency_histories[i][pos] : std::numeric_limits<double>::signaling_NaN());
+		}
+		ss << "\n";
+	}
 
 	return ss.str();
 }
