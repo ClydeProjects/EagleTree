@@ -62,8 +62,8 @@ double FtlImpl_DftlParent::mpage_modified_ts_compare(const FtlImpl_DftlParent::M
 	return mpage.modified_ts;
 }
 
-FtlImpl_DftlParent::FtlImpl_DftlParent(Controller &controller):
-	FtlParent(controller),
+FtlImpl_DftlParent::FtlImpl_DftlParent(Ssd &ssd):
+	FtlParent(ssd),
 	addressSize(log(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE)/log(2)),
 	addressPerPage(PAGE_SIZE / ( (ceil(addressSize / 8.0) * 2) )),
 	num_mapping_pages(ceil((double)(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE) / addressPerPage)),
@@ -101,7 +101,7 @@ void FtlImpl_DftlParent::consult_GTD(long dlpn, Event *event)
 			i++;
 		}
 		//current_dependent_events.push_front(readEvent);
-		controller.stats.numFTLRead++;
+		//controller.stats.numFTLRead++;
 		ongoing_mapping_reads[mapping_address].push_back(event->get_logical_address());
 	}
 	else if (global_translation_directory.count(mapping_address) == 1 && ongoing_mapping_reads.count(mapping_address) == 1) {
@@ -121,7 +121,7 @@ bool FtlImpl_DftlParent::lookup_CMT(long dlpn, Event *event)
 		return false;
 
 	event->incr_execution_time(RAM_READ_DELAY);
-	controller.stats.numMemoryRead++;
+	//controller.stats.numMemoryRead++;
 
 	return true;
 }
@@ -140,10 +140,10 @@ FtlImpl_DftlParent::~FtlImpl_DftlParent(void)
 void FtlImpl_DftlParent::resolve_mapping(Event *event, bool isWrite)
 {
 	if (lookup_CMT(event->get_logical_address(), event)) {
-		controller.stats.numCacheHits++;
+		//controller.stats.numCacheHits++;
 
 	} else {
-		controller.stats.numCacheFaults++;
+		//controller.stats.numCacheFaults++;
 		uint dlpn = event->get_logical_address();
 		consult_GTD(dlpn, event);
 	}
@@ -206,8 +206,8 @@ void FtlImpl_DftlParent::update_mapping_on_flash(long lba, double time) {
 
 	mapping_events.push_back(write_event);
 	//IOScheduler::instance()->schedule_events_queue(mapping_events);
-	controller.stats.numFTLWrite++;
-	controller.stats.numGCWrite++;
+	//controller.stats.numFTLWrite++;
+	//controller.stats.numGCWrite++;
 }
 
 long FtlImpl_DftlParent::get_logical_address(uint physical_address) const {

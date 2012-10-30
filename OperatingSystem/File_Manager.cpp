@@ -228,21 +228,21 @@ void File_Manager::reclaim_file_space(File* file) {
 
 // ----------------- Address_Range ---------------------------
 
-File_Manager::Address_Range::Address_Range(long min, long max)
+Address_Range::Address_Range(long min, long max)
 	: min(min), max(max)
 {
 	assert( min <= max);
 }
 
-bool File_Manager::Address_Range::is_contiguously_followed_by(Address_Range other) const {
+bool Address_Range::is_contiguously_followed_by(Address_Range other) const {
 	return max + 1 == other.min;
 }
 
-bool File_Manager::Address_Range::is_followed_by(Address_Range other) const {
+bool Address_Range::is_followed_by(Address_Range other) const {
 	return max < other.min;
 }
 
-void File_Manager::Address_Range::merge(Address_Range other) {
+void Address_Range::merge(Address_Range other) {
 	if (min - 1 == other.max) {
 		min = other.min;
 	} else if (max + 1 == other.min) {

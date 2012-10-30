@@ -175,8 +175,8 @@ void IOScheduler::execute_current_waiting_ios() {
 		events.pop_back();
 
 		if (event->get_application_io_id() == 152363) {
-				event->print();
-			}
+			event->print();
+		}
 
 		event_type type = event->get_event_type();
 		bool is_GC = event->is_garbage_collection_op();
@@ -322,6 +322,10 @@ void IOScheduler::update_current_events() {
 
 void IOScheduler::push_into_current_events(Event* event) {
 	long current_time = floor(event->get_current_time());
+	if (event->get_logical_address() == 9838 && event->get_event_type() != WRITE) {
+		int i = 0;
+		i++;
+	}
 	if (current_events.count(current_time) == 0) {
 		vector<Event*> events(1, event);
 		current_events[current_time] = events;
@@ -340,9 +344,33 @@ void IOScheduler::handle(vector<Event*>& events) {
 		if (type == WRITE || type == COPY_BACK) {
 			handle_write(event);
 		}
+		else if (type == READ_COMMAND && event->is_flexible_read()) {
+			handle_flexible_read(event);
+		}
 		else {
 			handle_event(event);
 		}
+	}
+}
+
+void IOScheduler::handle_flexible_read(Event* event) {
+	Flexible_Read_Event* fr = dynamic_cast<Flexible_Read_Event*>(event);
+	Address addr = bm->choose_flexible_read_address(fr);
+	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, fr->get_current_time());
+	if ( wait_time == 0 && !bm->can_schedule_on_die(fr) )  {
+		wait_time = 10;
+	}
+	if (wait_time == 0) {
+		fr->set_address(addr);
+		fr->register_read_commencement();
+		dependencies[event->get_application_io_id()].front()->set_logical_address(event->get_logical_address());
+		assert(addr.page < BLOCK_SIZE);
+		execute_next(fr);
+		//VisualTracer::get_instance()->print_horizontally(100);
+	}
+	else {
+		fr->incr_bus_wait_time(wait_time);
+		push_into_current_events(fr);
 	}
 }
 
@@ -354,7 +382,7 @@ void IOScheduler::handle_write(Event* event) {
 		wait_time = 10;
 	}
 	if (wait_time == 0) {
-	event->set_address(addr);
+		event->set_address(addr);
 		ftl.set_replace_address(*event);
 		assert(addr.page < BLOCK_SIZE);
 		execute_next(event);
@@ -472,7 +500,12 @@ void IOScheduler::handle_event(Event* event) {
 }
 
 enum status IOScheduler::execute_next(Event* event) {
-	enum status result = ssd.controller.issue(event);
+	enum status result = ssd.issue(event);
+
+	if (event->get_id() == 34354) {
+		int i =0 ;
+		i++;
+	}
 
 	if (PRINT_LEVEL > 0) {
 		event->print();
@@ -501,7 +534,7 @@ enum status IOScheduler::execute_next(Event* event) {
 			assert(dependencies.count(dependency_code) == 1);
 			dependencies.erase(dependency_code);
 			uint lba = dependency_code_to_LBA[dependency_code];
-			if (event->get_event_type() != ERASE) {
+			if (event->get_event_type() != ERASE && !event->is_flexible_read()) {
 				if (LBA_currently_executing.count(lba) == 0) {
 					printf("Assertion failure LBA_currently_executing.count(lba = %d) = %d, concerning ", lba, LBA_currently_executing.count(lba));
 					event->print();
@@ -602,7 +635,10 @@ void IOScheduler::init_event(Event* event) {
 		return;
 	}
 
-	if (type == TRIM || type == READ_COMMAND || type == READ_TRANSFER || type == WRITE || type == COPY_BACK) {
+	if (event->is_flexible_read() && (type == READ_COMMAND || type == READ_TRANSFER)) {
+		push_into_current_events(event);
+	}
+	else if (type == TRIM || type == READ_COMMAND || type == READ_TRANSFER || type == WRITE || type == COPY_BACK) {
 		if (should_event_be_scheduled(event)) {
 			push_into_current_events(event);
 		} else if (PRINT_LEVEL >= 1) {

@@ -289,6 +289,7 @@ enum age {YOUNG, OLD};
 class Address;
 class Stats;
 class Event;
+class Flexible_Read_Event;
 class Channel;
 class Bus;
 class Page;
@@ -324,6 +325,9 @@ class Random_Order_Iterator;
 class OperatingSystem;
 class Thread;
 class Synchronous_Writer;
+
+struct Address_Range;
+class Flexible_Reader;
 
 /* Class to manage physical addresses for the SSD.  It was designed to have
  * public members like a struct for quick access but also have checking,
@@ -452,8 +456,9 @@ public:
 	Event(enum event_type type, ulong logical_address, uint size, double start_time);
 	Event();
 	Event(Event& event);
-	~Event() {}
+	virtual ~Event() {}
 	inline ulong get_logical_address() const 			{ return logical_address; }
+	inline void set_logical_address(ulong addr) 		{ logical_address = addr; }
 	inline const Address &get_address() const 			{ return address; }
 	inline const Address &get_merge_address() const 	{ return merge_address; }
 	inline const Address &get_log_address() const 		{ return log_address; }
@@ -506,7 +511,8 @@ public:
 	inline void set_wear_leveling_op(bool value) { wear_leveling_op = value; }
 	void print(FILE *stream = stdout) const;
 	static void reset_id_generators();
-private:
+	bool is_flexible_read();
+protected:
 	double start_time;
 	double execution_time;
 	double bus_wait_time;
@@ -962,6 +968,7 @@ public:
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual void register_register_cleared();
 	virtual Address choose_address(Event const& write);
+	Address choose_flexible_read_address(Event* read);
 	virtual void register_write_arrival(Event const& write);
 	virtual void trim(Event const& write);
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double current_time) const;
@@ -1227,6 +1234,7 @@ private:
 	vector<Event*> collect_soonest_events();
 	void handle_event(Event* event);
 	void handle_write(Event* event);
+	void handle_flexible_read(Event* event);
 	void handle(vector<Event*>& events);
 	void transform_copyback(Event* event);
 	void handle_finished_event(Event *event, enum status outcome);
@@ -1279,45 +1287,35 @@ private:
 class FtlParent
 {
 public:
-	FtlParent(Controller &controller);
-
+	FtlParent(Ssd &ssd) : ssd(ssd) {};
 	virtual ~FtlParent () {};
 	virtual void read(Event *event) = 0;
 	virtual void write(Event *event) = 0;
 	virtual void trim(Event *event) = 0;
-
-	virtual void print_ftl_statistics();
-
-	ulong get_erases_remaining(const Address &address) const;
-	enum page_state get_state(const Address &address) const;
-	enum block_state get_block_state(const Address &address) const;
-	Block *get_block_pointer(const Address & address);
-	Address resolve_logical_address(unsigned int logicalAddress);
-	// TODO: this method should be abstract, but I am not making it so because
-	// I dont't want to implement it in BAST and FAST yet
 	virtual void register_write_completion(Event const& event, enum status result) = 0;
 	virtual void register_read_completion(Event const& event, enum status result) = 0;
 	virtual void register_trim_completion(Event & event) = 0;
 	virtual long get_logical_address(uint physical_address) const = 0;
+	virtual Address get_physical_address(uint logical_address) const = 0;
 	virtual void set_replace_address(Event& event) const = 0;
 	virtual void set_read_address(Event& event) = 0;
 protected:
-	Controller &controller;
+	Ssd &ssd;
 };
 
 class FtlImpl_Page : public FtlParent
 {
 public:
-	FtlImpl_Page(Controller &controller);
+	FtlImpl_Page(Ssd &ssd);
 	~FtlImpl_Page();
 	void read(Event *event);
 	void write(Event *event);
 	void trim(Event *event);
-
 	void register_write_completion(Event const& event, enum status result);
 	void register_read_completion(Event const& event, enum status result);
 	void register_trim_completion(Event & event);
 	long get_logical_address(uint physical_address) const;
+	Address get_physical_address(uint logical_address) const;
 	void set_replace_address(Event& event) const;
 	void set_read_address(Event& event);
 private:
@@ -1330,7 +1328,7 @@ private:
 class FtlImpl_DftlParent : public FtlParent
 {
 public:
-	FtlImpl_DftlParent(Controller &controller);
+	FtlImpl_DftlParent(Ssd &ssd);
 	~FtlImpl_DftlParent();
 	virtual void read(Event *event) = 0;
 	virtual void write(Event *event) = 0;
@@ -1393,7 +1391,7 @@ protected:
 class FtlImpl_Dftl : public FtlImpl_DftlParent
 {
 public:
-	FtlImpl_Dftl(Controller &controller);
+	FtlImpl_Dftl(Ssd &ssd);
 	~FtlImpl_Dftl();
 	void read(Event *event);
 	void write(Event *event);
@@ -1452,49 +1450,6 @@ private:
 	double write_delay;
 };
 
-/* The controller accepts read/write requests through its event_arrive method
- * and consults the FTL regarding what to do by calling the FTL's read/write
- * methods.  The FTL returns an event list for the controller through its issue
- * method that the controller buffers in RAM and sends across the bus.  The
- * controller's issue method passes the events from the FTL to the SSD.
- *
- * The controller also provides an interface for the FTL to collect wear
- * information to perform wear-leveling.  */
-class Controller 
-{
-public:
-	Controller(Ssd &parent);
-	~Controller(void);
-	void event_arrive(Event *event);
-	friend class FtlParent;
-	friend class FtlImpl_Page;
-	friend class FtlImpl_Bast;
-	friend class FtlImpl_Fast;
-	friend class FtlImpl_DftlParent;
-	friend class FtlImpl_Dftl;
-	friend class FtlImpl_BDftl;
-	friend class Block_manager_parallel;
-	friend class IOScheduler;
-
-	Stats stats;
-	void print_ftl_statistics();
-	FtlParent &get_ftl(void) const;
-private:
-	enum status issue(Event *event);
-	void translate_address(Address &address);
-	ulong get_erases_remaining(const Address &address) const;
-	double get_last_erase_time(const Address &address) const;
-	enum page_state get_state(const Address &address) const;
-	enum block_state get_block_state(const Address &address) const;
-	void get_free_page(Address &address) const;
-	uint get_num_free(const Address &address) const;
-	uint get_num_valid(const Address &address) const;
-	uint get_num_invalid(const Address &address) const;
-	Block *get_block_pointer(const Address & address);
-	Ssd &ssd;
-	FtlParent *ftl;
-};
-
 /* The SSD is the single main object that will be created to simulate a real
  * SSD.  Creating a SSD causes all other objects in the SSD to be created.  The
  * event_arrive method is where events will arrive from DiskSim. */
@@ -1502,7 +1457,7 @@ class Ssd
 {
 public:
 	Ssd (uint ssd_size = SSD_SIZE);
-	~Ssd(void);
+	~Ssd();
 	void event_arrive(Event* event);
 	void event_arrive(enum event_type type, ulong logical_address, uint size, double start_time);
 	void event_arrive(enum event_type type, ulong logical_address, uint size, double start_time, void *buffer);
@@ -1512,36 +1467,24 @@ public:
 	friend class Controller;
 	friend class IOScheduler;
 	friend class Block_manager_parent;
-	const Controller &get_controller(void);
 	inline Package* getPackages() { return data; }
 	void set_operating_system(OperatingSystem* os);
+	FtlParent& get_ftl() const;
+	enum status issue(Event *event);
 private:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	enum status replace(Event &event);
-	ulong get_erases_remaining(const Address &address) const;
-	void update_wear_stats(const Address &address);
-	double get_last_erase_time(const Address &address) const;	
 	Package &get_data(void);
-	enum page_state get_state(const Address &address) const;
-	enum block_state get_block_state(const Address &address) const;
-	void get_free_page(Address &address) const;
-	uint get_num_free(const Address &address) const;
-	uint get_num_valid(const Address &address) const;
-	uint get_num_invalid(const Address &address) const;
-	Block *get_block_pointer(const Address & address);
 
 	uint size;
-	Controller controller;
 	Ram ram;
 	Bus bus;
 	Package * const data;
-	ulong erases_remaining;
-	ulong least_worn;
-	double last_erase_time;
 	double last_io_submission_time;
 	OperatingSystem* os;
+	FtlParent *ftl;
 };
 
 class RaidSsd
@@ -1572,7 +1515,7 @@ public:
 	static VisualTracer *get_instance();
 	static void init();
 	void register_completed_event(Event const& event);
-	void print_horizontally();
+	void print_horizontally(int last_how_many_characters = UNDEFINED);
 	void print_horizontally_with_breaks();
 	void print_vertically();
 private:
@@ -1692,7 +1635,7 @@ private:
 class Thread
 {
 public:
-	Thread(double time) : finished(false), time(time), threads_to_start_when_this_thread_finishes(), num_ios_finished(0), experiment_thread(false) {}
+	Thread(double time) : finished(false), time(time), threads_to_start_when_this_thread_finishes(), num_ios_finished(0), experiment_thread(false), os(NULL) {}
 	virtual ~Thread();
 	Event* run();
 	inline bool is_finished() { return finished; }
@@ -1704,12 +1647,14 @@ public:
 	void register_event_completion(Event* event);
 	inline void set_experiment_thread(bool val) { experiment_thread = val; }
 	inline bool is_experiment_thread() { return experiment_thread; }
+	void set_os(OperatingSystem*  op_sys);
 protected:
 	virtual Event* issue_next_io() = 0;
 	virtual void handle_event_completion(Event* event) = 0;
 	bool finished;
 	double time;
 	vector<Thread*> threads_to_start_when_this_thread_finishes;
+	OperatingSystem* os;
 private:
 	ulong num_ios_finished;
 	bool experiment_thread;
@@ -1742,6 +1687,7 @@ private:
 	int number_finished;
 	double time_breaks;
 };
+
 
 class Synchronous_Random_Thread : public Thread
 {
@@ -1857,6 +1803,21 @@ private:
 };*/
 
 
+struct Address_Range {
+	long min;
+	long max;
+	Address_Range(long min, long max);
+	long get_size() { return max - min + 1; }
+	Address_Range split(long num_pages_in_new_part) {
+		Address_Range new_range(min, min + num_pages_in_new_part - 1);
+		min += num_pages_in_new_part;
+		return new_range;
+	}
+	bool is_contiguously_followed_by(Address_Range other) const;
+	bool is_followed_by(Address_Range other) const;
+	void merge(Address_Range other);
+};
+
 // This is a file manager that writes one file at a time sequentially
 // files might be fragmented across logical space
 // files have a random size determined by the file manager
@@ -1871,22 +1832,6 @@ public:
 	//virtual void print_thread_stats();
 	static void reset_id_generator();
 private:
-
-	struct Address_Range {
-		long min;
-		long max;
-		Address_Range(long min, long max);
-		long get_size() { return max - min + 1; }
-		Address_Range split(long num_pages_in_new_part) {
-			Address_Range new_range(min, min + num_pages_in_new_part - 1);
-			min += num_pages_in_new_part;
-			return new_range;
-		}
-		bool is_contiguously_followed_by(Address_Range other) const;
-		bool is_followed_by(Address_Range other) const;
-		void merge(Address_Range other);
-	};
-
 	struct File {
 		const double death_probability;
 		double time_created, time_finished_writing, time_deleted;
@@ -1941,11 +1886,69 @@ private:
 	//Throughput_Moderator throughout_moderator;
 };
 
-struct os_event {
+/*struct os_event {
 	int thread_id;
 	Event* pending_event;
 	os_event(int thread_id, Event* event) : thread_id(thread_id), pending_event(event) {}
 	os_event() : thread_id(UNDEFINED), pending_event(NULL) {}
+};*/
+
+class Flexible_Reader {
+public:
+	Flexible_Reader(FtlParent const& ftl, vector<Address_Range>);
+	Event* read_next(double start_time);
+	void register_read_commencement(Event*);
+	inline bool is_finished() { return finished_counter == 0; }
+	inline vector<vector<Address> > const& get_immediate_candidates() { return immediate_candidates_physical_addresses; }
+	//inline vector<vector<long> > const& get_immediate_candidates_logical_addresses() { return immediate_candidates_logical_addresses; }
+private:
+	void set_new_candidate();
+	struct progress_tracker {
+		vector<Address_Range> ranges;
+		uint current_range;
+		uint offset_in_range;
+		vector<vector<bool> > completion_bitmap;
+		inline bool finished() const { return current_range >= ranges.size(); }
+		inline long get_next_lba();
+		progress_tracker(vector<Address_Range> ranges);
+	};
+	progress_tracker pt;
+
+	struct candidate {
+		long logical_address;
+		Address physical_address;
+		candidate(Address phys, long log) : logical_address(log), physical_address(phys) {}
+	};
+	vector<vector<vector<candidate> > > candidate_list;		// current physcial addresses, ready to be read.
+
+	vector<vector<Address> > immediate_candidates_physical_addresses;
+	vector<vector<long> > immediate_candidates_logical_addresses;
+
+	uint finished_counter;
+	FtlParent const& ftl;
+};
+
+class Flexible_Read_Event : public Event {
+private:
+	Flexible_Reader* reader;
+public:
+	Flexible_Read_Event(Flexible_Reader* fr, double time) : Event(READ, 0, 1, time), reader(fr) {};
+	~Flexible_Read_Event() {}
+	inline vector<vector<Address> > const& get_candidates() { return reader->get_immediate_candidates(); }
+	inline void register_read_commencement() { reader->register_read_commencement(this); }
+};
+
+class Flexible_Reader_Thread : public Thread
+{
+public:
+	Flexible_Reader_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, double start_time = 1);
+	Event* issue_next_io();
+	void handle_event_completion(Event* event);
+private:
+	long min_LBA, max_LBA;
+	bool ready_to_issue_next_write;
+	int number_of_times_to_repeat;
+	Flexible_Reader* flex_reader;
 };
 
 class OperatingSystem
@@ -1957,6 +1960,7 @@ public:
 	void register_event_completion(Event* event);
 	void set_num_writes_to_stop_after(long num_writes);
 	double get_experiment_runtime() const;
+	Flexible_Reader* create_flexible_reader(vector<Address_Range>);
 private:
 	int pick_unlocked_event_with_shortest_start_time();
 	void dispatch_event(int thread_id);
@@ -1971,8 +1975,10 @@ private:
 	map<long, queue<uint> > write_LBA_to_thread_id;
 	map<long, queue<uint> > read_LBA_to_thread_id;
 	map<long, queue<uint> > trim_LBA_to_thread_id;
+	void lock(Event* event, int thread_id);
+	void release_lock(Event*);
 
-	map<long, queue<uint> >& get_relevant_LBA_to_thread_map(event_type);
+	map<long, long> app_id_to_thread_id_mapping;
 
 	int currently_executing_ios_counter;
 	int currently_pending_ios_counter;
@@ -2064,141 +2070,5 @@ private:
 	static double calibration_starting_point; // microseconds
 };
 
-/*class Block_manager
-{
-public:
-	Block_manager(FtlParent *ftl);
-	~Block_manager(void);
-
-	// Usual suspects
-	Address get_free_block(Event &event);
-	Address get_free_block(block_type btype, Event &event);
-	void invalidate(Address address, block_type btype);
-	void print_statistics();
-	void insert_events(Event &event);
-	void promote_block(block_type to_type);
-	bool is_log_full();
-	void erase_and_invalidate(Event &event, Address &address, block_type btype);
-	int get_num_free_blocks();
-
-	// Used to update GC on used pages in blocks.
-	void update_block(Block * b);
-
-	// Singleton
-	static Block_manager *instance();
-	static void instance_initialize(FtlParent *ftl);
-	static Block_manager *inst;
-
-	void cost_insert(Block *b);
-	void print_cost_status();
-private:
-	void get_page_block(Address &address, Event &event);
-	static bool block_comparitor_simple (Block const *x,Block const *y);
-
-	FtlParent *ftl;
-
-	ulong data_active;
-	ulong log_active;
-	ulong logseq_active;
-
-	ulong max_log_blocks;
-	ulong max_blocks;
-
-	ulong max_map_pages;
-	ulong map_space_capacity;
-
-	// Cost/Benefit priority queue.
-	typedef boost::multi_index_container<
-			Block*,
-			boost::multi_index::indexed_by<
-				boost::multi_index::random_access<>,
-				boost::multi_index::ordered_non_unique<BOOST_MULTI_INDEX_MEMBER(Block,uint,pages_invalid) >
-		  >
-		> active_set;
-
-	typedef active_set::nth_index<0>::type ActiveBySeq;
-	typedef active_set::nth_index<1>::type ActiveByCost;
-	active_set active_cost;
-	// Usual block lists
-	vector<Block*> active_list;
-	vector<Block*> free_list;
-	vector<Block*> invalid_list;
-	// Counter for returning the next free page.
-	ulong directoryCurrentPage;
-	// Address on the current cached page in SRAM.
-	ulong directoryCachedPage;
-	ulong simpleCurrentFree;
-	// Counter for handling periodic sort of active_list
-	uint num_insert_events;
-	uint current_writing_block;
-	bool inited;
-	bool out_of_blocks;
-};*/
-
-} /* end namespace ssd */
-
-/*class FtlImpl_Bast : public FtlParent
-{
-public:
-	FtlImpl_Bast(Controller &controller);
-	~FtlImpl_Bast();
-	enum status read(Event &event);
-	enum status write(Event &event);
-	enum status trim(Event &event);
-private:
-	map<long, LogPageBlock*> log_map;
-
-	long *data_list;
-
-	void dispose_logblock(LogPageBlock *logBlock, long lba);
-	void allocate_new_logblock(LogPageBlock *logBlock, long lba, Event &event);
-
-	bool is_sequential(LogPageBlock* logBlock, long lba, Event &event);
-	bool random_merge(LogPageBlock *logBlock, long lba, Event &event);
-
-	void update_map_block(Event &event);
-
-	void print_ftl_statistics();
-
-	int addressShift;
-	int addressSize;
 };
-
-class FtlImpl_Fast : public FtlParent
-{
-public:
-	FtlImpl_Fast(Controller &controller);
-	~FtlImpl_Fast();
-	enum status read(Event &event);
-	enum status write(Event &event);
-	enum status trim(Event &event);
-private:
-	void initialize_log_pages();
-
-	map<long, LogPageBlock*> log_map;
-
-	long *data_list;
-	bool *pin_list;
-
-	bool write_to_log_block(Event &event, long logicalBlockAddress);
-
-	void switch_sequential(Event &event);
-	void merge_sequential(Event &event);
-	bool random_merge(LogPageBlock *logBlock, Event &event);
-
-	void update_map_block(Event &event);
-
-	void print_ftl_statistics();
-
-	long sequential_logicalblock_address;
-	Address sequential_address;
-	uint sequential_offset;
-
-	uint log_page_next;
-	LogPageBlock *log_pages;
-
-	int addressShift;
-	int addressSize;
-};*/
-
 #endif

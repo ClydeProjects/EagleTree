@@ -27,8 +27,8 @@
 
 using namespace ssd;
 
-FtlImpl_Page::FtlImpl_Page(Controller &controller):
-	FtlParent(controller),
+FtlImpl_Page::FtlImpl_Page(Ssd &ssd):
+	FtlParent(ssd),
 	logical_to_physical_map(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE, UNDEFINED),
 	physical_to_logical_map(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE, UNDEFINED)
 {}
@@ -83,6 +83,11 @@ void FtlImpl_Page::register_trim_completion(Event & event) {
 
 long FtlImpl_Page::get_logical_address(uint physical_address) const {
 	return physical_to_logical_map[physical_address];
+}
+
+Address FtlImpl_Page::get_physical_address(uint logical_address) const {
+	long phys_addr = logical_to_physical_map[logical_address];
+	return phys_addr == UNDEFINED ? Address() : Address(phys_addr, PAGE);
 }
 
 void FtlImpl_Page::set_replace_address(Event& event) const {

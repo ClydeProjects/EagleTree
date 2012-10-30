@@ -117,18 +117,25 @@ void VisualTracer::write_with_id(int package, int die, char symbol, int length, 
 	}
 }
 
-void VisualTracer::print_horizontally() {
+void VisualTracer::print_horizontally(int last_how_many_characters) {
+	int starting_point;
+	if (last_how_many_characters == UNDEFINED) {
+		starting_point = 0;
+	} else {
+		starting_point = trace[0][0].size() - last_how_many_characters;
+	}
 	printf("\n");
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			printf("p%d d%d :", i, j);
-			for (uint c = 0; c < trace[i][j].size(); c++) {
+			for (uint c = starting_point; c < trace[i][j].size(); c++) {
 				printf("%c", trace[i][j][c]);
 			}
 			printf("\n");
 		}
 	}
 }
+
 
 void VisualTracer::print_horizontally_with_breaks() {
 	printf("\n");

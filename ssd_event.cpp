@@ -87,6 +87,8 @@ Event::Event(Event& event) :
 	experiment_io(event.experiment_io)
 {}
 
+bool Event::is_flexible_read() { return dynamic_cast<Flexible_Read_Event*>(this) != NULL; }
+
 Event::Event() : type(NOT_VALID) {}
 
 void Event::print(FILE *stream) const

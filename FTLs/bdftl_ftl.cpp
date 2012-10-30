@@ -98,10 +98,10 @@ enum status FtlImpl_BDftl::read(Event &event)
 	}
 
 	event.incr_time_taken(RAM_READ_DELAY*2);
-	controller.stats.numMemoryRead += 2; // Block-level lookup + range check
-	controller.stats.numFTLRead++; // Page read
+	//controller.stats.numMemoryRead += 2; // Block-level lookup + range check
+	//controller.stats.numFTLRead++; // Page read
 
-	return controller.issue(event);
+	return ssd.issue(event);
 }
 
 

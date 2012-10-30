@@ -43,7 +43,10 @@ void Thread::print_thread_stats() {
 	printf("IOs finished by thread:  %d\n", num_ios_finished);
 }
 
-
+void Thread::set_os(OperatingSystem*  op_sys) {
+	os = op_sys;
+	op_sys->get_experiment_runtime();
+}
 
 // =================  Synchronous_Sequential_Thread  =============================
 
@@ -76,6 +79,46 @@ void Synchronous_Sequential_Thread::handle_event_completion(Event* event) {
 		if (--number_of_times_to_repeat == 0) {
 			finished = true;
 			StateVisualiser::print_page_status();
+		}
+	}
+}
+
+// =================  Flexible_Reader_Thread  =============================
+
+Flexible_Reader_Thread::Flexible_Reader_Thread(long min_LBA, long max_LBA, int repetitions_num, double start_time)
+	: Thread(start_time),
+	  min_LBA(min_LBA),
+	  max_LBA(max_LBA),
+	  ready_to_issue_next_write(true),
+	  number_of_times_to_repeat(repetitions_num),
+	  flex_reader(NULL)
+{}
+
+Event* Flexible_Reader_Thread::issue_next_io() {
+	if (flex_reader == NULL) {
+		vector<Address_Range> ranges;
+		ranges.push_back(Address_Range(min_LBA, max_LBA));
+		assert(os != NULL);
+		os->get_experiment_runtime();
+		flex_reader = os->create_flexible_reader(ranges);
+	}
+	if (ready_to_issue_next_write && number_of_times_to_repeat > 0) {
+		ready_to_issue_next_write = false;
+		return flex_reader->read_next(time);
+	} else {
+		return NULL;
+	}
+}
+
+void Flexible_Reader_Thread::handle_event_completion(Event* event) {
+	assert(!ready_to_issue_next_write);
+	ready_to_issue_next_write = true;
+	time = event->get_current_time();
+	if (flex_reader->is_finished()) {
+		delete flex_reader;
+		if (--number_of_times_to_repeat == 0) {
+			finished = true;
+			//StateVisualiser::print_page_status();
 		}
 	}
 }

@@ -40,8 +40,8 @@
 
 using namespace ssd;
 
-FtlImpl_Dftl::FtlImpl_Dftl(Controller &controller):
-	FtlImpl_DftlParent(controller),
+FtlImpl_Dftl::FtlImpl_Dftl(Ssd &ssd):
+	FtlImpl_DftlParent(ssd),
 	over_provisioning_percentage(0.2)
 {
 	uint ssdSize = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
@@ -64,7 +64,7 @@ void FtlImpl_Dftl::read(Event *event)
 	}
 
 	resolve_mapping(event, false);
-	controller.stats.numFTLRead++;
+	//controller.stats.numFTLRead++;
 	current_dependent_events.push_back(event);
 	IOScheduler::instance()->schedule_events_queue(current_dependent_events);
 }
@@ -76,7 +76,7 @@ void FtlImpl_Dftl::write(Event *event)
 	assert(event->get_logical_address() < num_pages - num_mapping_pages);
 
 	resolve_mapping(event, true);
-	controller.stats.numFTLWrite++;
+	//controller.stats.numFTLWrite++;
 	current_dependent_events.push_back(event);
 	IOScheduler::instance()->schedule_events_queue(current_dependent_events);
 }
@@ -98,7 +98,7 @@ void FtlImpl_Dftl::register_trim_completion(Event & event) {
 		num_pages_written--;
 	}
 
-	controller.stats.numFTLTrim++;
+	//controller.stats.numFTLTrim++;
 
 }
 

@@ -22,6 +22,7 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 {
 	assert(threads.size() > 0);
 	for (uint i = 0; i < threads.size(); i++) {
+		threads[i]->set_os(this);
 		events[i] = threads[i]->run();
 		if (events[i] != NULL && events[i]->get_event_type() != NOT_VALID) {
 			currently_pending_ios_counter++;
@@ -55,7 +56,6 @@ void OperatingSystem::run() {
 	int idle_time = 0;
 	bool finished_experiment, still_more_work;
 	do {
-
 		int thread_id = pick_unlocked_event_with_shortest_start_time();
 		bool no_pending_event = thread_id == UNDEFINED;
 		bool queue_is_full = currently_executing_ios_counter >= MAX_SSD_QUEUE_SIZE;
@@ -125,6 +125,7 @@ void OperatingSystem::dispatch_event(int thread_id) {
 	currently_executing_ios.insert(event->get_application_io_id());
 	currently_pending_ios_counter--;
 	assert(currently_pending_ios_counter >= 0);
+	app_id_to_thread_id_mapping[event->get_application_io_id()] = thread_id;
 
 	//Thread* dispatching_thread = threads[thread_id];
 	//dispatching_thread->set_time(event->get_ssd_submission_time());
@@ -132,8 +133,7 @@ void OperatingSystem::dispatch_event(int thread_id) {
 	double min_completion_time = get_event_minimal_completion_time(event);
 	last_dispatched_event_minimal_finish_time = max(last_dispatched_event_minimal_finish_time, min_completion_time);
 
-	map<long, queue<uint> >& map = get_relevant_LBA_to_thread_map(event->get_event_type());
-	map[event->get_logical_address()].push(thread_id);
+	lock(event, thread_id);
 
 	//printf("dispatching:\t"); event->print();
 
@@ -157,14 +157,9 @@ void OperatingSystem::register_event_completion(Event* event) {
 	//printf("finished:\t"); event->print();
 	//printf("queue size:\t%d\n", currently_executing_ios_counter);
 
-	ulong la = event->get_logical_address();
-	map<long, queue<uint> >& map = get_relevant_LBA_to_thread_map(event->get_event_type());
-	uint thread_id = map[la].front();
-	map[la].pop();
-	if (map[la].size() == 0) {
-		map.erase(la);
-	}
+	release_lock(event);
 
+	long thread_id = app_id_to_thread_id_mapping[event->get_application_io_id()];
 	Thread* thread = threads[thread_id];
 	thread->register_event_completion(event);
 
@@ -177,10 +172,12 @@ void OperatingSystem::register_event_completion(Event* event) {
 		vector<Thread*> follow_up_threads = thread->get_follow_up_threads();
 		if (follow_up_threads.size() > 0) {
 			threads[thread_id] = follow_up_threads[0];
+			threads[thread_id]->set_os(this);
 			threads[thread_id]->set_time(event->get_current_time());
 		}
 		for (uint i = 1; i < follow_up_threads.size(); i++) {
 			follow_up_threads[i]->set_time(event->get_current_time());
+			follow_up_threads[i]->set_os(this);
 			threads.push_back(follow_up_threads[i]);
 			Event* first_thread_event = follow_up_threads[i]->run();
 			events.push_back(first_thread_event);
@@ -243,15 +240,22 @@ double OperatingSystem::get_event_minimal_completion_time(Event const*const even
 	return result;
 }
 
-map<long, queue<uint> >& OperatingSystem::get_relevant_LBA_to_thread_map(event_type type) {
-	if (type == READ || type == READ_TRANSFER) {
-		return read_LBA_to_thread_id;
-	}
-	else if (type == WRITE) {
-		return write_LBA_to_thread_id;
-	}
-	else {
-		return trim_LBA_to_thread_id;
+void OperatingSystem::lock(Event* event, int thread_id) {
+	event_type type = event->get_event_type();
+	long logical_address = event->get_logical_address();
+	map<long, queue<uint> >& map = (type == READ || type == READ_TRANSFER) ? read_LBA_to_thread_id :
+				type == WRITE ? write_LBA_to_thread_id : trim_LBA_to_thread_id;
+	map[logical_address].push(thread_id);
+}
+
+void OperatingSystem::release_lock(Event* event) {
+	event_type type = event->get_event_type();
+	long logical_address = event->get_logical_address();
+	map<long, queue<uint> >& map = (type == READ || type == READ_TRANSFER) ? read_LBA_to_thread_id :
+			type == WRITE ? write_LBA_to_thread_id : trim_LBA_to_thread_id;
+	map[logical_address].pop();
+	if (map[logical_address].size() == 0) {
+		map.erase(logical_address);
 	}
 }
 
@@ -265,5 +269,11 @@ bool OperatingSystem::is_LBA_locked(ulong lba) {
 
 double OperatingSystem::get_experiment_runtime() const {
 	return time_of_last_event_completed - time_of_experiment_start;
+}
+
+Flexible_Reader* OperatingSystem::create_flexible_reader(vector<Address_Range> ranges) {
+	FtlParent const& ftl = ssd->get_ftl();
+	Flexible_Reader* reader = new Flexible_Reader(ftl, ranges);
+	return reader;
 }
 

@@ -43,27 +43,15 @@ using namespace ssd;
  * order listed here */
 Ssd::Ssd(uint ssd_size):
 	size(ssd_size), 
-	controller(*this), 
 	ram(RAM_READ_DELAY, RAM_WRITE_DELAY), 
 	bus(this, size, BUS_CTRL_DELAY, BUS_DATA_DELAY, BUS_TABLE_SIZE, BUS_MAX_CONNECT),
-
 	/* use a const pointer (Package * const data) to use as an array
 	 * but like a reference, we cannot reseat the pointer */
 	data((Package *) malloc(ssd_size * sizeof(Package))), 
-
-	/* set erases remaining to BLOCK_ERASES to match Block constructor args 
-	 *	in Plane class
-	 * this is the cheap implementation but can change to pass through classes */
-	erases_remaining(BLOCK_ERASES), 
-
-	/* assume all Planes are same so first one can start as least worn */
-	least_worn(0), 
-
-	/* assume hardware created at time 0 and had an implied free erasure */
-	last_erase_time(0.0),
 	last_io_submission_time(0.0),
 	os(NULL)
 {
+	ftl = new FtlImpl_Page(*this);
 	uint i;
 
 	/* new cannot initialize an array with constructor args so
@@ -111,42 +99,33 @@ Ssd::Ssd(uint ssd_size):
 	assert(VIRTUAL_BLOCK_SIZE > 0);
 	assert(VIRTUAL_PAGE_SIZE > 0);
 
-	IOScheduler::instance_initialize(*this, controller.get_ftl());
+	IOScheduler::instance_initialize(*this, *ftl);
 	VisualTracer::init();
 	StateVisualiser::init(this);
 	StatisticsGatherer::init(this);
 
 	Event::reset_id_generators(); // reset id generator
-
-	return;
 }
 
 Ssd::~Ssd(void)
 {
-
+	VisualTracer::get_instance()->print_horizontally(2000);
 	if (!IOScheduler::instance()->is_empty()) {
 		IOScheduler::instance()->execute_soonest_events();
 	}
-
 	//StateTracer::print();
 	if (PRINT_LEVEL >= 1) StatisticsGatherer::get_instance()->print();
 	//StatisticsGatherer::get_instance()->print_gc_info();
 	//IOScheduler::instance()->print_stats();
-	/* explicitly call destructors and use free
-	 * since we used malloc and placement new */
-	for (uint i = 0; i < size; i++)
-	{
+	for (uint i = 0; i < size; i++)	{
 		data[i].~Package();
 	}
 	free(data);
 
-	if (PAGE_ENABLE_DATA)
-	{
+	if (PAGE_ENABLE_DATA) {
 		ulong pageSize = ((ulong)(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE)) * (ulong)PAGE_SIZE;
 		munmap(page_data, pageSize);
 	}
-
-	return;
 }
 
 void Ssd::event_arrive(Event* event) {
@@ -162,7 +141,13 @@ void Ssd::event_arrive(Event* event) {
 
 	event->set_original_application_io(true);
 	//IOScheduler::instance()->finish_all_events_until_this_time(event->get_ssd_submission_time());
-	controller.event_arrive(event);
+
+	if(event->get_event_type() == READ)
+		ftl->read(event);
+	else if(event->get_event_type() == WRITE)
+		ftl->write(event);
+	else if(event->get_event_type() == TRIM)
+		ftl->trim(event);
 }
 
 void Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, double start_time)
@@ -192,7 +177,8 @@ void Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, d
 }
 
 void Ssd::progress_since_os_is_waiting() {
-	IOScheduler::instance()->execute_soonest_events();}
+	IOScheduler::instance()->execute_soonest_events();
+}
 
 void Ssd::register_event_completion(Event * event) {
 	if (event->is_original_application_io() && !event->get_noop() && (event->get_event_type() == WRITE || event->get_event_type() == READ_COMMAND)) {
@@ -248,103 +234,48 @@ enum status Ssd::replace(Event &event)
 enum status Ssd::erase(Event &event)
 {
 	assert(data != NULL && event.get_address().package < size && event.get_address().valid >= PACKAGE);
-	enum status status = data[event.get_address().package].erase(event);
-
-	/* update values if no errors */
-	if (status == SUCCESS)
-		update_wear_stats(event.get_address());
-	return status;
+	return data[event.get_address().package].erase(event);
 }
-
-/* add up the erases remaining for all packages in the ssd*/
-ulong Ssd::get_erases_remaining(const Address &address) const
-{
-	assert (data != NULL);
-	
-	if (address.package < size && address.valid >= PACKAGE)
-		return data[address.package].get_erases_remaining(address);
-	else return erases_remaining;
-}
-
-void Ssd::update_wear_stats(const Address &address)
-{
-	assert(data != NULL);
-	uint i;
-	uint max_index = 0;
-	ulong max = data[0].get_erases_remaining(address);
-	for(i = 1; i < size; i++)
-		if(data[i].get_erases_remaining(address) > max)
-			max_index = i;
-	least_worn = max_index;
-	erases_remaining = max;
-	last_erase_time = data[max_index].get_last_erase_time(address);
-	return;
-}
-
-double Ssd::get_last_erase_time(const Address &address) const
-{
-	assert(data != NULL);
-	if(address.package < size && address.valid >= PACKAGE)
-		return data[address.package].get_last_erase_time(address);
-	else
-		return last_erase_time;
-}
-
-enum page_state Ssd::get_state(const Address &address) const
-{
-	assert(data != NULL);
-	assert(address.package < size && address.valid >= PACKAGE);
-	return data[address.package].get_state(address);
-}
-
-enum block_state Ssd::get_block_state(const Address &address) const
-{
-	assert(data != NULL);
-	assert(address.package < size && address.valid >= PACKAGE);
-	return data[address.package].get_block_state(address);
-}
-
-void Ssd::get_free_page(Address &address) const
-{
-	assert(address.package < size && address.valid >= PACKAGE);
-	data[address.package].get_free_page(address);
-	return;
-}
-
-uint Ssd::get_num_free(const Address &address) const
-{  
-	return 0;
-/* 	return data[address.package].get_num_free(address); */
-}
-
-uint Ssd::get_num_valid(const Address &address) const
-{  
-	assert(address.valid >= PACKAGE);
-	return data[address.package].get_num_valid(address);
-}
-
-uint Ssd::get_num_invalid(const Address &address) const
-{
-	assert(address.valid >= PACKAGE);
-	return data[address.package].get_num_invalid(address);
-}
-
-Block *Ssd::get_block_pointer(const Address & address)
-{
-	assert(address.valid >= PACKAGE);
-	return data[address.package].get_block_pointer(address);
-}
-
-const Controller &Ssd::get_controller(void)
-{
-	return controller;
-}
-
-// Inlined for speed
-/*Package* Ssd::getPackages() {
-	return data;
-}*/
 
 void Ssd::set_operating_system(OperatingSystem* new_os) {
 	os = new_os;
+}
+
+
+enum status Ssd::issue(Event *event) {
+	if(event -> get_event_type() == READ_COMMAND) {
+		assert(event -> get_address().valid > NONE);
+		bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY, *event);
+		read(*event);
+	}
+	else if(event -> get_event_type() == READ_TRANSFER) {
+		assert(event -> get_address().valid > NONE);
+		bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY + BUS_DATA_DELAY, *event);
+		//ssd.ram.write(*event);
+		//ssd.ram.read(*event);
+	}
+	else if(event -> get_event_type() == WRITE) {
+		assert(event -> get_address().valid > NONE);
+		bus.lock(event -> get_address().package, event -> get_current_time(), 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY, *event);
+		//ssd.ram.write(*event);
+		//ssd.ram.read(*event);
+		write(*event);
+		return SUCCESS;
+	}
+	else if(event -> get_event_type() == COPY_BACK) {
+		assert(event -> get_address().valid > NONE);
+		assert(event -> get_replace_address().valid > NONE);
+		bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY, *event);
+		write(*event);
+	}
+	else if(event -> get_event_type() == ERASE) {
+		assert(event -> get_address().valid > NONE);
+		bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY, *event);
+		erase(*event);
+	}
+	return SUCCESS;
+}
+
+FtlParent& Ssd::get_ftl() const {
+	return *ftl;
 }
