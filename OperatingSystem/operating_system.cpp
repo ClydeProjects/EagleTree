@@ -163,7 +163,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	Thread* thread = threads[thread_id];
 	thread->register_event_completion(event);
 
-	if (event->is_experiment_io() && !event->get_noop() && (event->get_event_type() == WRITE || event->get_event_type() == READ_TRANSFER) ) {
+	if (event->is_experiment_io() && !event->get_noop() && (/*event->get_event_type() == WRITE ||*/ event->get_event_type() == READ_TRANSFER) ) {
 		num_writes_completed++;
 	}
 

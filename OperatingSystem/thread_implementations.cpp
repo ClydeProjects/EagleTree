@@ -116,6 +116,7 @@ void Flexible_Reader_Thread::handle_event_completion(Event* event) {
 	time = event->get_current_time();
 	if (flex_reader->is_finished()) {
 		delete flex_reader;
+		flex_reader = NULL;
 		if (--number_of_times_to_repeat == 0) {
 			finished = true;
 			//StateVisualiser::print_page_status();

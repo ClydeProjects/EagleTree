@@ -109,7 +109,7 @@ Ssd::Ssd(uint ssd_size):
 
 Ssd::~Ssd(void)
 {
-	VisualTracer::get_instance()->print_horizontally(2000);
+	//VisualTracer::get_instance()->print_horizontally(2000);
 	if (!IOScheduler::instance()->is_empty()) {
 		IOScheduler::instance()->execute_soonest_events();
 	}

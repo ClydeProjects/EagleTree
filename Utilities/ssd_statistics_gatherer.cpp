@@ -47,7 +47,9 @@ StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
 	  num_gc_targeting_anything(0),
 	  num_wl_writes_per_LUN_origin(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_wl_writes_per_LUN_destination(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
-	  expleriment_started(false)
+	  expleriment_started(false),
+	  start_time(UNDEFINED),
+	  end_time(UNDEFINED)
 {}
 
 vector<vector<double> > num_valid_pages_per_gc_op;
@@ -71,6 +73,10 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 		return;
 	}
 	expleriment_started = true;
+	if (start_time == UNDEFINED) {
+		start_time = event.get_start_time();
+	}
+	end_time = event.get_current_time();
 
 	uint current_window = floor(event.get_current_time() / io_counter_window_size);
 	while (application_io_history.size() < current_window + 1) application_io_history.push_back(0);
@@ -335,6 +341,8 @@ void StatisticsGatherer::print() {
 	printf("\n\n");
 	printf("Erase avg:\t%f \n", get_average(num_erases_per_LUN));
 	printf("Erase std:\t%f \n", get_std(num_erases_per_LUN));
+	double milliseconds = (end_time - start_time) / 1000;
+	printf("Time taken (ms):\t%d\n", (int)milliseconds);
 	printf("\n\n");
 }
 

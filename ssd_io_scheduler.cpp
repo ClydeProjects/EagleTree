@@ -174,10 +174,6 @@ void IOScheduler::execute_current_waiting_ios() {
 		Event * event = events.back();
 		events.pop_back();
 
-		if (event->get_application_io_id() == 152363) {
-			event->print();
-		}
-
 		event_type type = event->get_event_type();
 		bool is_GC = event->is_garbage_collection_op();
 
@@ -484,9 +480,6 @@ void IOScheduler::make_dependent(Event* dependent_event, uint independent_code/*
 
 // executes read_commands, read_transfers and erases
 void IOScheduler::handle_event(Event* event) {
-	if (event->get_application_io_id() == 152363) {
-		event->print();
-	}
 	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
 	bool can_schedule = bm->can_schedule_on_die(event);
 	if (can_schedule && time == 0) {
@@ -501,11 +494,6 @@ void IOScheduler::handle_event(Event* event) {
 
 enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd.issue(event);
-
-	if (event->get_id() == 34354) {
-		int i =0 ;
-		i++;
-	}
 
 	if (PRINT_LEVEL > 0) {
 		event->print();

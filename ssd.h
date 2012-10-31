@@ -374,60 +374,6 @@ public:
 	ulong get_linear_address() const;
 };
 
-class Stats
-{
-public:
-	// Flash Translation Layer
-	long numFTLRead;
-	long numFTLWrite;
-	long numFTLErase;
-	long numFTLTrim;
-
-	// Garbage Collection
-	long numGCRead;
-	long numGCWrite;
-	long numGCErase;
-
-	// Wear-leveling
-	long numWLRead;
-	long numWLWrite;
-	long numWLErase;
-
-	// Log based FTL's
-	long numLogMergeSwitch;
-	long numLogMergePartial;
-	long numLogMergeFull;
-
-	// Page based FTL's
-	long numPageBlockToPageConversion;
-
-	// Cache based FTL's
-	long numCacheHits;
-	long numCacheFaults;
-
-	// Memory consumptions (Bytes)
-	long numMemoryTranslation;
-	long numMemoryCache;
-
-	long numMemoryRead;
-	long numMemoryWrite;
-
-	// Advance statictics
-	double translation_overhead() const;
-	double variance_of_io() const;
-	double cache_hit_ratio() const;
-
-	// Constructors, maintainance, output, etc.
-	Stats(void);
-
-	void print_statistics();
-	void reset_statistics();
-	void write_statistics(FILE *stream);
-	void write_header(FILE *stream);
-private:
-	void reset();
-};
-
 /* Class to emulate a log block with page-level mapping. */
 class LogPageBlock
 {
@@ -746,7 +692,6 @@ public:
 	void clear_register();
 	int get_last_read_application_io();
 	bool register_is_busy();
-
 private:
 	void update_wear_stats(const Address &address);
 	uint size;
@@ -1635,6 +1580,8 @@ private:
 	vector<vector<uint> > num_wl_writes_per_LUN_destination;
 
 	bool expleriment_started;
+	double start_time;
+	double end_time;
 };
 
 class Thread

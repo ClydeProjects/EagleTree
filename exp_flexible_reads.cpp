@@ -37,14 +37,21 @@ vector<Thread*> flexible_reads(int highest_lba, double IO_submission_rate) {
 
 	Thread* initial_write = new Asynchronous_Sequential_Thread(0, log_space_per_thread * 4, 1, WRITE, 100, 0);
 
-	Thread* flexible_reads = new Flexible_Reader_Thread(0, log_space_per_thread * 2, 2);
-	Thread* random_writes = new Synchronous_Random_Thread(log_space_per_thread * 2 + 1, log_space_per_thread * 4, 10000, 472, WRITE);
+	Thread* flexible_reads = new Flexible_Reader_Thread(0, log_space_per_thread * 1, 1000);
+
+	Thread* random_writes1 = new Synchronous_Random_Thread(log_space_per_thread * 1 + 1, log_space_per_thread * 2, 1000000, 472, WRITE);
+	Thread* random_writes2 = new Synchronous_Random_Thread(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 1000000, 537, WRITE);
+	Thread* random_writes3 = new Synchronous_Random_Thread(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, 246, WRITE);
 
 	flexible_reads->set_experiment_thread(true);
-	random_writes->set_experiment_thread(true);
+	random_writes1->set_experiment_thread(true);
+	random_writes2->set_experiment_thread(true);
+	random_writes3->set_experiment_thread(true);
 
 	initial_write->add_follow_up_thread(flexible_reads);
-	initial_write->add_follow_up_thread(random_writes);
+	initial_write->add_follow_up_thread(random_writes1);
+	initial_write->add_follow_up_thread(random_writes2);
+	initial_write->add_follow_up_thread(random_writes3);
 
 	vector<Thread*> threads;
 	threads.push_back(initial_write);
@@ -62,14 +69,21 @@ vector<Thread*> synch_sequential_reads(int highest_lba, double IO_submission_rat
 
 	Thread* initial_write = new Asynchronous_Sequential_Thread(0, log_space_per_thread * 4, 1, WRITE, 100, 0);
 
-	Thread* seq_reads = new Synchronous_Sequential_Thread(0, log_space_per_thread * 2, 2, READ);
-	Thread* random_writes = new Asynchronous_Random_Thread(log_space_per_thread * 2 + 1, log_space_per_thread * 4, 10000, 472, WRITE);
+	Thread* seq_reads = new Synchronous_Sequential_Thread(0, log_space_per_thread * 1, 1000, READ);
 
-	random_writes->set_experiment_thread(true);
+	Thread* random_writes1 = new Synchronous_Random_Thread(log_space_per_thread * 1 + 1, log_space_per_thread * 2, 1000000, 472, WRITE);
+	Thread* random_writes2 = new Synchronous_Random_Thread(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 1000000, 537, WRITE);
+	Thread* random_writes3 = new Synchronous_Random_Thread(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, 246, WRITE);
+
 	seq_reads->set_experiment_thread(true);
+	random_writes1->set_experiment_thread(true);
+	random_writes2->set_experiment_thread(true);
+	random_writes3->set_experiment_thread(true);
 
 	initial_write->add_follow_up_thread(seq_reads);
-	initial_write->add_follow_up_thread(random_writes);
+	initial_write->add_follow_up_thread(random_writes1);
+	initial_write->add_follow_up_thread(random_writes2);
+	initial_write->add_follow_up_thread(random_writes3);
 
 	vector<Thread*> threads;
 	threads.push_back(initial_write);
@@ -89,18 +103,18 @@ int main()
 	PLANE_SIZE = 64;
 	BLOCK_SIZE = 32;
 
-	PAGE_READ_DELAY = 3;
-	PAGE_WRITE_DELAY = 10;
-	BUS_CTRL_DELAY = 1;
-	BUS_DATA_DELAY = 6;
-	BLOCK_ERASE_DELAY = 60;
+	PAGE_READ_DELAY = 50;
+	PAGE_WRITE_DELAY = 200;
+	BUS_CTRL_DELAY = 5;
+	BUS_DATA_DELAY = 100;
+	BLOCK_ERASE_DELAY = 1500;
 
 	int IO_limit = 100000;
 	int space_min = 80;
 	int space_max = 80;
 	int space_inc = 5;
 
-	PRINT_LEVEL = 1;
+	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 15;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 
@@ -109,7 +123,7 @@ int main()
 	vector<ExperimentResult> exp;
 
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(flexible_reads,			space_min, space_max, space_inc, exp_folder + "flexible_reads/",			"flexible reads", IO_limit) );
-	//exp.push_back( Experiment_Runner::overprovisioning_experiment(synch_sequential_reads,	space_min, space_max, space_inc, exp_folder + "synch_sequential_reads/",	"synch sequential reads", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(synch_sequential_reads,	space_min, space_max, space_inc, exp_folder + "synch_sequential_reads/",	"synch sequential reads", IO_limit) );
 
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write latency, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
