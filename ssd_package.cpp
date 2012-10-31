@@ -194,8 +194,3 @@ Block *Package::get_block_pointer(const Address & address)
 	assert(address.valid >= DIE);
 	return data[address.die].get_block_pointer(address);
 }
-
-// Inlined for speed
-/*Die *Package::getDies() {
-	return data;
-}*/

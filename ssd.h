@@ -510,8 +510,6 @@ public:
 	~Channel(void);
 	enum status lock(double start_time, double duration, Event &event);
 	double get_currently_executing_operation_finish_time();
-	enum status connect(void);
-	enum status disconnect(void);
 	double ready_time(void);
 private:
 	//void unlock(double current_time);
@@ -521,19 +519,6 @@ private:
 		double unlock_time;
 		int event_id;
 	};
-
-	//static bool timings_sorter(lock_times const& lhs, lock_times const& rhs);
-	//vector<lock_times> timings;
-
-	uint table_entries;
-	uint selected_entry;
-	uint num_connected;
-	uint max_connections;
-	double ctrl_delay;
-	double data_delay;
-
-	// Stores the highest unlock_time in the vector timings list.
-	double ready_at;
 
 	double currently_executing_operation_finish_time;
 	Ssd* ssd;
@@ -553,8 +538,6 @@ public:
 	Bus(Ssd* ssd, uint num_channels = SSD_SIZE, double ctrl_delay = BUS_CTRL_DELAY, double data_delay = BUS_DATA_DELAY, uint table_size = BUS_TABLE_SIZE, uint max_connections = BUS_MAX_CONNECT);
 	~Bus(void);
 	enum status lock(uint channel, double start_time, double duration, Event &event);
-	enum status connect(uint channel);
-	enum status disconnect(uint channel);
 	inline Channel &get_channel(uint channel) { assert(channels != NULL && channel < num_channels); return channels[channel]; }
 	double ready_time(uint channel);
 private:
