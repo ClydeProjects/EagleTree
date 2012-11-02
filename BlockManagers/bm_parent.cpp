@@ -407,7 +407,7 @@ void Block_manager_parent::Wear_Level(Event const& event) {
 
 	if (blocks_being_wl.count(b) > 0) {
 		blocks_being_wl.erase(b);
-		StatisticsGatherer::get_instance()->print();
+		StatisticsGatherer::get_global_instance()->print();
 	}
 
 	// looking for gc candidates every single time to update the list. This is CPU expensive, so we want to make it more seldom in the future.
@@ -786,15 +786,15 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 		victim = choose_gc_victim(candidates);
 	}
 
-	StatisticsGatherer::get_instance()->register_scheduled_gc(*gc_event);
+	StatisticsGatherer::get_global_instance()->register_scheduled_gc(*gc_event);
 
 	if (victim == NULL) {
-		StatisticsGatherer::get_instance()->num_gc_cancelled_no_candidate++;
+		StatisticsGatherer::get_global_instance()->num_gc_cancelled_no_candidate++;
 		return migrations;
 	}
 
 	if (num_available_pages_for_new_writes < victim->get_pages_valid()) {
-		StatisticsGatherer::get_instance()->num_gc_cancelled_not_enough_free_space++;
+		StatisticsGatherer::get_global_instance()->num_gc_cancelled_not_enough_free_space++;
 		return migrations;
 	}
 
@@ -802,7 +802,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	uint max_num_gc_per_LUN = 1; //GREEDY_GC ? 2 : 1;
 	if (num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die] >= max_num_gc_per_LUN) {
-		StatisticsGatherer::get_instance()->num_gc_cancelled_gc_already_happening++;
+		StatisticsGatherer::get_global_instance()->num_gc_cancelled_gc_already_happening++;
 		return migrations;
 	}
 
@@ -840,7 +840,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 	num_available_pages_for_new_writes -= victim->get_pages_valid();
 
 	//deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
-	StatisticsGatherer::get_instance()->register_executed_gc(*gc_event, *victim);
+	StatisticsGatherer::get_global_instance()->register_executed_gc(*gc_event, *victim);
 
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	for (uint i = 0; i < BLOCK_SIZE; i++) {

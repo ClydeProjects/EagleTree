@@ -1464,11 +1464,41 @@ public:
 	static void init(Ssd * ssd);
 };
 
+class StatisticsFormatter
+{
+public:
+	static string histogram_csv(map<double, uint> histogram);
+	static string stacked_histogram_csv(vector<map<double, uint> > histograms, vector<string> names);
+
+};
+
+class SsdStatisticsExtractor //(TM)
+{
+public:
+	static void init(Ssd * ssd);
+	SsdStatisticsExtractor(Ssd & ssd);
+	~SsdStatisticsExtractor();
+	static class SsdStatisticsExtractor* get_instance();
+	static string age_histogram_csv();
+	static uint max_age_freq();
+	static uint max_age();
+	static inline double get_age_histogram_bin_size() { return age_histogram_bin_size; }
+
+private:
+	static SsdStatisticsExtractor *inst;
+	Ssd & ssd;
+	static const double age_histogram_bin_size;
+};
+
 class StatisticsGatherer
 {
 public:
-	static StatisticsGatherer *get_instance();
+	static StatisticsGatherer *get_global_instance();
 	static void init(Ssd * ssd);
+
+	StatisticsGatherer(/*Ssd & ssd*/);
+	~StatisticsGatherer();
+
 	void register_completed_event(Event const& event);
 	void register_scheduled_gc(Event const& gc);
 	void register_executed_gc(Event const& gc, Block const& victim);
@@ -1477,7 +1507,6 @@ public:
 	void print_gc_info();
 	void print_csv();
 	inline double get_wait_time_histogram_bin_size() { return wait_time_histogram_bin_size; }
-	inline double get_age_histogram_bin_size() { return age_histogram_bin_size; }
 
 	string totals_csv_header();
 	vector<string> totals_vector_header();
@@ -1500,12 +1529,10 @@ public:
 
 private:
 	static StatisticsGatherer *inst;
-	Ssd & ssd;
-	StatisticsGatherer(Ssd & ssd);
-	~StatisticsGatherer();
+//	Ssd & ssd;
 	double compute_average_age(uint package_id, uint die_id);
-	string histogram_csv(map<double, uint> histogram);
-	string stacked_histogram_csv(vector<map<double, uint> > histograms, vector<string> names);
+//	string histogram_csv(map<double, uint> histogram);
+//	string stacked_histogram_csv(vector<map<double, uint> > histograms, vector<string> names);
 
 	vector<vector<vector<double> > > bus_wait_time_for_reads_per_LUN;
 	vector<vector<uint> > num_reads_per_LUN;
@@ -1524,14 +1551,13 @@ private:
 
 	vector<vector<uint> > num_gc_scheduled_per_LUN;
 
-	static const uint queue_length_tracker_resolution = 1000; // microseconds
+	static const uint queue_length_tracker_resolution = 1000; // microseconds = 1 ms
 	vector<uint> queue_length_tracker;
 
 	vector<vector<uint> > num_executed_gc_ops;
 	vector<vector<uint> > num_live_pages_in_gc_exec;
 
 	static const double wait_time_histogram_bin_size;
-	static const double age_histogram_bin_size;
 	map<double, uint> wait_time_histogram_appIOs_write;
 	map<double, uint> wait_time_histogram_appIOs_read;
 	map<double, uint> wait_time_histogram_appIOs_write_and_read;
@@ -1593,6 +1619,7 @@ protected:
 private:
 	ulong num_ios_finished;
 	bool experiment_thread;
+	StatisticsGatherer statistics_gatherer;
 };
 
 class Synchronous_Sequential_Thread : public Thread
@@ -2006,8 +2033,8 @@ private:
 	//static const string experiments_folder = "./Experiments/";
 	static const string markers[];
 	static const double M; // One million
-	static const double K;    // One thousand
-	static double calibration_precision;        // microseconds
+	static const double K; // One thousand
+	static double calibration_precision;      // microseconds
 	static double calibration_starting_point; // microseconds
 };
 

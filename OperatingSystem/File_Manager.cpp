@@ -88,7 +88,7 @@ void File_Manager::handle_file_completion(double current_time) {
 	} while (num_free_pages == 0);
 	//StateVisualiser::print_page_status();
 	if (PRINT_FILE_MANAGER_INFO) {
-		StatisticsGatherer::get_instance()->print();
+		StatisticsGatherer::get_global_instance()->print();
 	}
 	write_next_file(current_time);
 }

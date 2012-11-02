@@ -100,20 +100,20 @@ void ExperimentResult::start_experiment() {
 	// Write header of stat csv file
     stats_file = new std::ofstream();
     stats_file->open((stats_filename + datafile_postfix).c_str());
-    (*stats_file) << "\"" << variable_parameter_name << "\", " << StatisticsGatherer::get_instance()->totals_csv_header() << ", \"" << throughput_column_name << "\", \"" << write_throughput_column_name << "\", \"" << read_throughput_column_name << "\"" << "\n";
+    (*stats_file) << "\"" << variable_parameter_name << "\", " << StatisticsGatherer::get_global_instance()->totals_csv_header() << ", \"" << throughput_column_name << "\", \"" << write_throughput_column_name << "\", \"" << read_throughput_column_name << "\"" << "\n";
 }
 
 void ExperimentResult::collect_stats(uint variable_parameter_value, double os_runtime) {
 	assert(experiment_started && !experiment_finished);
 
 	// Compute throughput
-	int total_read_IOs_issued  = StatisticsGatherer::get_instance()->total_reads();
-	int total_write_IOs_issued = StatisticsGatherer::get_instance()->total_writes();
+	int total_read_IOs_issued  = StatisticsGatherer::get_global_instance()->total_reads();
+	int total_write_IOs_issued = StatisticsGatherer::get_global_instance()->total_writes();
 	long double read_throughput = (long double) (total_read_IOs_issued / os_runtime) * 1000; // IOs/sec
 	long double write_throughput = (long double) (total_write_IOs_issued / os_runtime) * 1000; // IOs/sec
 	long double total_throughput = write_throughput + read_throughput;
 
-	(*stats_file) << variable_parameter_value << ", " << StatisticsGatherer::get_instance()->totals_csv_line() << ", " << total_throughput << ", " << write_throughput << ", " << read_throughput << "\n";
+	(*stats_file) << variable_parameter_value << ", " << StatisticsGatherer::get_global_instance()->totals_csv_line() << ", " << total_throughput << ", " << write_throughput << ", " << read_throughput << "\n";
 
 	stringstream hist_filename;
 	stringstream age_filename;
@@ -129,33 +129,33 @@ void ExperimentResult::collect_stats(uint variable_parameter_value, double os_ru
 
 	std::ofstream hist_file;
 	hist_file.open(hist_filename.str().c_str());
-	hist_file << StatisticsGatherer::get_instance()->wait_time_histogram_all_IOs_csv();
+	hist_file << StatisticsGatherer::get_global_instance()->wait_time_histogram_all_IOs_csv();
 	hist_file.close();
-	vp_max_waittimes[variable_parameter_value] = StatisticsGatherer::get_instance()->max_waittimes();
+	vp_max_waittimes[variable_parameter_value] = StatisticsGatherer::get_global_instance()->max_waittimes();
 	for (uint i = 0; i < vp_max_waittimes[variable_parameter_value].size(); i++) {
 		max_waittimes[i] = max(max_waittimes[i], vp_max_waittimes[variable_parameter_value][i]);
 	}
 
 	std::ofstream age_file;
 	age_file.open(age_filename.str().c_str());
-	age_file << StatisticsGatherer::get_instance()->age_histogram_csv();
+	age_file << SsdStatisticsExtractor::get_instance()->age_histogram_csv();
 	age_file.close();
-	max_age = max(max_age, StatisticsGatherer::get_instance()->max_age());
-	max_age_freq = max(max_age_freq, StatisticsGatherer::get_instance()->max_age_freq());
+	max_age = max(max_age, SsdStatisticsExtractor::get_instance()->max_age());
+	max_age_freq = max(max_age_freq, SsdStatisticsExtractor::get_instance()->max_age_freq());
 
 	std::ofstream queue_file;
 	queue_file.open(queue_filename.str().c_str());
-	queue_file << StatisticsGatherer::get_instance()->queue_length_csv();
+	queue_file << StatisticsGatherer::get_global_instance()->queue_length_csv();
 	queue_file.close();
 
 	std::ofstream throughput_file;
 	queue_file.open(throughput_filename.str().c_str());
-	queue_file << StatisticsGatherer::get_instance()->app_and_gc_throughput_csv();
+	queue_file << StatisticsGatherer::get_global_instance()->app_and_gc_throughput_csv();
 	queue_file.close();
 
 	std::ofstream latency_file;
 	queue_file.open(latency_filename.str().c_str());
-	queue_file << StatisticsGatherer::get_instance()->latency_csv();
+	queue_file << StatisticsGatherer::get_global_instance()->latency_csv();
 	queue_file.close();
 
 	vp_num_IOs[variable_parameter_value].push_back(total_write_IOs_issued);
@@ -174,7 +174,7 @@ void ExperimentResult::end_experiment() {
 	printf("=== Experiment '%s' completed in %s. ===\n", experiment_name.c_str(), Experiment_Runner::pretty_time(time_elapsed()).c_str());
 	printf("\n");
 
-	vector<string> original_column_names = StatisticsGatherer::get_instance()->totals_vector_header();
+	vector<string> original_column_names = StatisticsGatherer::get_global_instance()->totals_vector_header();
 	column_names.push_back(variable_parameter_name);
 	column_names.insert(column_names.end(), original_column_names.begin(), original_column_names.end());
 	column_names.push_back(throughput_column_name);
@@ -249,7 +249,7 @@ double Experiment_Runner::measure_throughput(int highest_lba, double IO_submissi
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->set_num_writes_to_stop_after(IO_limit);
 	os->run();
-	int total_IOs_issued = StatisticsGatherer::get_instance()->total_reads() + StatisticsGatherer::get_instance()->total_writes();
+	int total_IOs_issued = StatisticsGatherer::get_global_instance()->total_reads() + StatisticsGatherer::get_global_instance()->total_writes();
 	return (double) total_IOs_issued / os->get_experiment_runtime();
 }
 
@@ -322,7 +322,7 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 
 
 		// Print shit
-		StatisticsGatherer::get_instance()->print();
+		StatisticsGatherer::get_global_instance()->print();
 		if (PRINT_LEVEL >= 1) {
 			StateVisualiser::print_page_status();
 			StateVisualiser::print_block_ages();
@@ -362,7 +362,7 @@ ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experi
 		experiment_result.collect_stats(copybacks_allowed, os->get_experiment_runtime());
 
 		// Print shit
-		StatisticsGatherer::get_instance()->print();
+		StatisticsGatherer::get_global_instance()->print();
 		if (PRINT_LEVEL >= 1) {
 			StateVisualiser::print_page_status();
 			StateVisualiser::print_block_ages();
@@ -402,7 +402,7 @@ ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*ex
 		experiment_result.collect_stats(copyback_map_size, os->get_experiment_runtime());
 
 		// Print shit
-		StatisticsGatherer::get_instance()->print();
+		StatisticsGatherer::get_global_instance()->print();
 		if (PRINT_LEVEL >= 1) {
 			StateVisualiser::print_page_status();
 			StateVisualiser::print_block_ages();
@@ -570,7 +570,7 @@ void Experiment_Runner::waittime_histogram(int sizeX, int sizeY, string outputFi
 	vector<string> commands;
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "hist 0 " << i << " \"" << ExperimentResult::waittime_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Wait time histogram (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"log min 1\" \"Event wait time (µs)\" " << max(experiment.max_waittimes[black_column], (red_column == -1 ? 0 : experiment.max_waittimes[red_column])) << " " << StatisticsGatherer::get_instance()->get_wait_time_histogram_bin_size() << " " << black_column << " " << red_column;
+		command << "hist 0 " << i << " \"" << ExperimentResult::waittime_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Wait time histogram (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"log min 1\" \"Event wait time (µs)\" " << max(experiment.max_waittimes[black_column], (red_column == -1 ? 0 : experiment.max_waittimes[red_column])) << " " << StatisticsGatherer::get_global_instance()->get_wait_time_histogram_bin_size() << " " << black_column << " " << red_column;
 		commands.push_back(command.str());
 	}
 
@@ -591,7 +591,7 @@ void Experiment_Runner::cross_experiment_waittime_histogram(int sizeX, int sizeY
 	for (uint i = 0; i < experiments.size(); i++) {
 		ExperimentResult& e = experiments[i];
 		stringstream command;
-		command << "hist 0 " << i << " \"" << e.data_folder << ExperimentResult::waittime_filename_prefix << point << ExperimentResult::datafile_postfix << "\" \"Wait time histogram (" << e.experiment_name << ", " << e.variable_parameter_name << " = " << point << ")\" \"log min 1\" \"Event wait time (µs)\" " << cross_experiment_max_waittime << " " << StatisticsGatherer::get_instance()->get_wait_time_histogram_bin_size() << " " << black_column << " " << red_column;
+		command << "hist 0 " << i << " \"" << e.data_folder << ExperimentResult::waittime_filename_prefix << point << ExperimentResult::datafile_postfix << "\" \"Wait time histogram (" << e.experiment_name << ", " << e.variable_parameter_name << " = " << point << ")\" \"log min 1\" \"Event wait time (µs)\" " << cross_experiment_max_waittime << " " << StatisticsGatherer::get_global_instance()->get_wait_time_histogram_bin_size() << " " << black_column << " " << red_column;
 		commands.push_back(command.str());
 	}
 
@@ -608,7 +608,7 @@ void Experiment_Runner::age_histogram(int sizeX, int sizeY, string outputFile, E
 	vector<string> commands;
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "hist 0 " << i << " \"" << ExperimentResult::age_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Block age histogram (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"on min 0 max " << experiment.max_age_freq << "\" \"Block age\" age_max " << StatisticsGatherer::get_instance()->get_age_histogram_bin_size();
+		command << "hist 0 " << i << " \"" << ExperimentResult::age_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Block age histogram (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"on min 0 max " << experiment.max_age_freq << "\" \"Block age\" age_max " << SsdStatisticsExtractor::get_age_histogram_bin_size();
 		commands.push_back(command.str());
 	}
 

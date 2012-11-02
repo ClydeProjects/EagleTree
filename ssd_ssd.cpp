@@ -103,6 +103,7 @@ Ssd::Ssd(uint ssd_size):
 	VisualTracer::init();
 	StateVisualiser::init(this);
 	StatisticsGatherer::init(this);
+	SsdStatisticsExtractor::init(this);
 
 	Event::reset_id_generators(); // reset id generator
 }
@@ -114,7 +115,7 @@ Ssd::~Ssd(void)
 		IOScheduler::instance()->execute_soonest_events();
 	}
 	//StateTracer::print();
-	if (PRINT_LEVEL >= 1) StatisticsGatherer::get_instance()->print();
+	if (PRINT_LEVEL >= 1) StatisticsGatherer::get_global_instance()->print();
 	//StatisticsGatherer::get_instance()->print_gc_info();
 	//IOScheduler::instance()->print_stats();
 	for (uint i = 0; i < size; i++)	{

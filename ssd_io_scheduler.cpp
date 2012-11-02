@@ -303,7 +303,7 @@ long IOScheduler::get_current_events_size() {
 // in light of these new events, see if any other existing pending events are now redundant
 void IOScheduler::update_current_events() {
 
-	StatisticsGatherer::get_instance()->register_events_queue_length(get_current_events_size(), get_current_time());
+	StatisticsGatherer::get_global_instance()->register_events_queue_length(get_current_events_size(), get_current_time());
 
 	double current_time = get_current_time();
 	random_shuffle(future_events.begin(), future_events.end(), random_range); // Process events with same timestamp in random order to prevent imbalances
@@ -595,7 +595,7 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		StateVisualiser::print_page_status();
 	}*/
 
-	StatisticsGatherer::get_instance()->register_completed_event(*event);
+	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
 
 	/*if (event->is_original_application_io() && event->get_bus_wait_time() > 1509) {
 		event->print();

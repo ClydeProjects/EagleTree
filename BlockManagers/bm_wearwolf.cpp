@@ -56,7 +56,7 @@ void Wearwolf::register_write_outcome(Event const& event, enum status status) {
 void Wearwolf::handle_cold_pointer_out_of_space(enum read_hotness rh, double start_time) {
 	Address addr = page_hotness_measurer->get_best_target_die_for_WC(rh);
 	printf("Best place "); addr.print(); printf("\n");
-	StatisticsGatherer::get_instance()->print();
+	StatisticsGatherer::get_global_instance()->print();
 	Address& pointer = rh == READ_COLD ? wcrc_pointer : wcrh_pointer;
 	Address block = find_free_unused_block(addr.package, addr.die, OLD, start_time);
 	if (has_free_pages(block)) {

@@ -14,14 +14,13 @@ using namespace ssd;
 StatisticsGatherer *StatisticsGatherer::inst = NULL;
 
 const double StatisticsGatherer::wait_time_histogram_bin_size = 1000;
-const double StatisticsGatherer::age_histogram_bin_size = 1;
 const double StatisticsGatherer::io_counter_window_size = 1000000; // second
 
-StatisticsGatherer::StatisticsGatherer(Ssd& ssd)
+StatisticsGatherer::StatisticsGatherer(/*Ssd& ssd*/)
 	: num_gc_cancelled_no_candidate(0),
 	  num_gc_cancelled_not_enough_free_space(0),
 	  num_gc_cancelled_gc_already_happening(0),
-	  ssd(ssd),
+//	  ssd(ssd),
 	  bus_wait_time_for_reads_per_LUN(SSD_SIZE, vector<vector<double> >(PACKAGE_SIZE, vector<double>())),
 	  num_reads_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  bus_wait_time_for_writes_per_LUN(SSD_SIZE, vector<vector<double> >(PACKAGE_SIZE, vector<double>())),
@@ -60,15 +59,16 @@ StatisticsGatherer::~StatisticsGatherer() {}
 void StatisticsGatherer::init(Ssd * ssd)
 {
 	if (inst != NULL) delete inst;
-	inst = new StatisticsGatherer(*ssd);
+	inst = new StatisticsGatherer(/**ssd*/);
 }
 
-StatisticsGatherer *StatisticsGatherer::get_instance()
+StatisticsGatherer *StatisticsGatherer::get_global_instance()
 {
 	return inst;
 }
 
 void StatisticsGatherer::register_completed_event(Event const& event) {
+	if (inst != this) inst->register_completed_event(event); // Do the same for global instance
 	if (!expleriment_started && !event.is_experiment_io()) {
 		return;
 	}
@@ -134,6 +134,7 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 
 
 void StatisticsGatherer::register_scheduled_gc(Event const& gc) {
+	if (inst != this) inst->register_scheduled_gc(gc); // Do the same for global instance
 	num_gc_scheduled++;
 
 	int age_class = gc.get_age_class();
@@ -167,6 +168,7 @@ void StatisticsGatherer::register_scheduled_gc(Event const& gc) {
 }
 
 void StatisticsGatherer::register_executed_gc(Event const& gc, Block const& victim) {
+	if (inst != this) inst->register_executed_gc(gc, victim); // Do the same for global instance
 	num_gc_executed++;
 	num_migrations += victim.get_pages_valid();
 	Address a = Address(victim.get_physical_address(), BLOCK);
@@ -176,6 +178,7 @@ void StatisticsGatherer::register_executed_gc(Event const& gc, Block const& vict
 }
 
 void StatisticsGatherer::register_events_queue_length(uint queue_size, double time) {
+	if (inst != this) inst->register_events_queue_length(queue_size, time); // Do the same for global instance
 	if (time == 0) return;
 	uint current_window = floor(time / queue_length_tracker_resolution);
 	while (current_window > 0 && queue_length_tracker.size() < current_window) {
@@ -395,20 +398,20 @@ void StatisticsGatherer::print_gc_info() {
 	printf("%d\t\t", (int) get_sum(num_copy_backs_per_LUN));
 	printf("%d\t\t", (int) get_sum(num_erases_per_LUN));
 	printf("\n\n");
-	printf("num scheduled gc: %d \n", num_gc_scheduled);
-	printf("num executed gc: %d \n", num_gc_executed);
+	printf("num scheduled gc: %ld \n", num_gc_scheduled);
+	printf("num executed gc: %ld \n", num_gc_executed);
 	printf("num migrations per gc: %f \n", (double)num_migrations / num_gc_executed);
 	printf("\n");
-	printf("gc targeting package die class: %d \n", num_gc_targeting_package_die_class);
-	printf("gc targeting package die: %d \n", num_gc_targeting_package_die);
-	printf("gc targeting package class: %d \n", num_gc_targeting_package_class);
-	printf("gc targeting package: %d \n", num_gc_targeting_package);
-	printf("gc targeting class: %d \n", num_gc_targeting_class);
-	printf("gc targeting anything: %d \n", num_gc_targeting_anything);
+	printf("gc targeting package die class: %ld \n", num_gc_targeting_package_die_class);
+	printf("gc targeting package die: %ld \n", num_gc_targeting_package_die);
+	printf("gc targeting package class: %ld \n", num_gc_targeting_package_class);
+	printf("gc targeting package: %ld \n", num_gc_targeting_package);
+	printf("gc targeting class: %ld \n", num_gc_targeting_class);
+	printf("gc targeting anything: %ld \n", num_gc_targeting_anything);
 	printf("\n");
-	printf("num_gc_cancelled_no_candidate: %d \n", num_gc_cancelled_no_candidate);
-	printf("num_gc_cancelled_not_enough_free_space: %d \n", num_gc_cancelled_not_enough_free_space);
-	printf("num_gc_cancelled_gc_already_happening: %d \n", num_gc_cancelled_gc_already_happening);
+	printf("num_gc_cancelled_no_candidate: %ld \n", num_gc_cancelled_no_candidate);
+	printf("num_gc_cancelled_not_enough_free_space: %ld \n", num_gc_cancelled_not_enough_free_space);
+	printf("num_gc_cancelled_gc_already_happening: %ld \n", num_gc_cancelled_gc_already_happening);
 }
 
 
@@ -585,7 +588,7 @@ string StatisticsGatherer::latency_csv() {
 	return ss.str();
 }
 
-string StatisticsGatherer::histogram_csv(map<double, uint> histogram) {
+string StatisticsFormatter::histogram_csv(map<double, uint> histogram) {
 	stringstream ss;
 	ss << "\"Interval\", \"Frequency\"" << "\n";
 	for (map<double,uint>::iterator it = histogram.begin(); it != histogram.end(); ++it) {
@@ -594,7 +597,7 @@ string StatisticsGatherer::histogram_csv(map<double, uint> histogram) {
 	return ss.str();
 }
 
-string StatisticsGatherer::stacked_histogram_csv(vector<map<double, uint> > histograms, vector<string> names) {
+string StatisticsFormatter::stacked_histogram_csv(vector<map<double, uint> > histograms, vector<string> names) {
 	stringstream ss;
 	ss << "\"Interval\"";
 	for (uint i = 0; i < names.size(); i++) ss << ", \"" << names[i] << "\"";
@@ -628,45 +631,6 @@ string StatisticsGatherer::stacked_histogram_csv(vector<map<double, uint> > hist
 	return ss.str();
 }
 
-uint StatisticsGatherer::max_age() {
-	uint max_age = 0;
-	map<double, uint> age_histogram;
-	for (uint i = 0; i < SSD_SIZE; i++) {
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			for (uint k = 0; k < DIE_SIZE; k++) {
-				for (uint t = 0; t < PLANE_SIZE; t++) {
-					Block const& block = ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
-					uint age = BLOCK_ERASES - block.get_erases_remaining();
-					max_age = max(age, max_age);
-				}
-			}
-		}
-	}
-	return max_age;
-}
-
-uint StatisticsGatherer::max_age_freq() {
-	uint max_age_freq = 0;
-	map<double, uint> age_histogram;
-	for (uint i = 0; i < SSD_SIZE; i++) {
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			for (uint k = 0; k < DIE_SIZE; k++) {
-				for (uint t = 0; t < PLANE_SIZE; t++) {
-					Block const& block = ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
-					uint age = BLOCK_ERASES - block.get_erases_remaining();
-					age_histogram[floor((double) age / age_histogram_bin_size)*age_histogram_bin_size]++;
-				}
-			}
-		}
-	}
-
-	for (map<double,uint>::iterator it = age_histogram.begin(); it != age_histogram.end(); ++it) {
-		max_age_freq = max(it->second, max_age_freq);
-	}
-
-	return max_age_freq;
-}
-
 vector<double> StatisticsGatherer::max_waittimes() {
 	vector<double> result;
 	result.push_back(wait_time_histogram_appIOs_write_and_read.size() > 0 ? wait_time_histogram_appIOs_write_and_read.rbegin()->first : 0);
@@ -678,24 +642,8 @@ vector<double> StatisticsGatherer::max_waittimes() {
 	return result;
 }
 
-string StatisticsGatherer::age_histogram_csv() {
-	map<double, uint> age_histogram;
-	for (uint i = 0; i < SSD_SIZE; i++) {
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			for (uint k = 0; k < DIE_SIZE; k++) {
-				for (uint t = 0; t < PLANE_SIZE; t++) {
-					Block const& block = ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
-					uint age = BLOCK_ERASES - block.get_erases_remaining();
-					age_histogram[floor((double) age / age_histogram_bin_size)*age_histogram_bin_size]++;
-				}
-			}
-		}
-	}
-	return histogram_csv(age_histogram);
-}
-
 string StatisticsGatherer::wait_time_histogram_appIOs_csv() {
-	return histogram_csv(wait_time_histogram_appIOs_write_and_read);
+	return StatisticsFormatter::histogram_csv(wait_time_histogram_appIOs_write_and_read);
 }
 
 string StatisticsGatherer::wait_time_histogram_all_IOs_csv() {
@@ -713,7 +661,7 @@ string StatisticsGatherer::wait_time_histogram_all_IOs_csv() {
 	histograms.push_back(wait_time_histogram_non_appIOs_write);
 	names.push_back("Internal operations, Reads");
 	histograms.push_back(wait_time_histogram_non_appIOs_read);
-	return stacked_histogram_csv(histograms, names);
+	return StatisticsFormatter::stacked_histogram_csv(histograms, names);
 }
 
 string StatisticsGatherer::queue_length_csv() {
@@ -776,7 +724,79 @@ void StatisticsGatherer::print_csv() {
 	}
 }
 
+const double SsdStatisticsExtractor::age_histogram_bin_size = 1;
+SsdStatisticsExtractor *SsdStatisticsExtractor::inst = NULL;
 
+SsdStatisticsExtractor::SsdStatisticsExtractor(Ssd& ssd)
+	: ssd(ssd)
+{}
+
+SsdStatisticsExtractor::~SsdStatisticsExtractor()
+{}
+
+void SsdStatisticsExtractor::init(Ssd * ssd) {
+	if (inst != NULL) delete inst;
+	inst = new SsdStatisticsExtractor(*ssd);
+}
+
+uint SsdStatisticsExtractor::max_age() {
+	uint max_age = 0;
+	map<double, uint> age_histogram;
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			for (uint k = 0; k < DIE_SIZE; k++) {
+				for (uint t = 0; t < PLANE_SIZE; t++) {
+					Block const& block = get_instance()->ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
+					uint age = BLOCK_ERASES - block.get_erases_remaining();
+					max_age = max(age, max_age);
+				}
+			}
+		}
+	}
+	return max_age;
+}
+
+uint SsdStatisticsExtractor::max_age_freq() {
+	uint max_age_freq = 0;
+	map<double, uint> age_histogram;
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			for (uint k = 0; k < DIE_SIZE; k++) {
+				for (uint t = 0; t < PLANE_SIZE; t++) {
+					Block const& block = get_instance()->ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
+					uint age = BLOCK_ERASES - block.get_erases_remaining();
+					age_histogram[floor((double) age / age_histogram_bin_size)*age_histogram_bin_size]++;
+				}
+			}
+		}
+	}
+
+	for (map<double,uint>::iterator it = age_histogram.begin(); it != age_histogram.end(); ++it) {
+		max_age_freq = max(it->second, max_age_freq);
+	}
+
+	return max_age_freq;
+}
+
+string SsdStatisticsExtractor::age_histogram_csv() {
+	map<double, uint> age_histogram;
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			for (uint k = 0; k < DIE_SIZE; k++) {
+				for (uint t = 0; t < PLANE_SIZE; t++) {
+					Block const& block = get_instance()->ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
+					uint age = BLOCK_ERASES - block.get_erases_remaining();
+					age_histogram[floor((double) age / age_histogram_bin_size)*age_histogram_bin_size]++;
+				}
+			}
+		}
+	}
+	return StatisticsFormatter::histogram_csv(age_histogram);
+}
+
+SsdStatisticsExtractor* SsdStatisticsExtractor::get_instance() {
+	return inst;
+}
 
 
 
