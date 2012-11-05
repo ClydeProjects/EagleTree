@@ -31,6 +31,7 @@ Event* Thread::run() {
 }
 
 void Thread::register_event_completion(Event* event) {
+	statistics_gatherer.register_completed_event(*event);
 	Address phys = event->get_address();
 	Address ra = event->get_replace_address();
 	handle_event_completion(event);

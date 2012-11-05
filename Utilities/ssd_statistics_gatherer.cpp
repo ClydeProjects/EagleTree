@@ -69,7 +69,8 @@ StatisticsGatherer *StatisticsGatherer::get_global_instance()
 
 void StatisticsGatherer::register_completed_event(Event const& event) {
 	if (inst != this) inst->register_completed_event(event); // Do the same for global instance
-	if (!expleriment_started && !event.is_experiment_io()) {
+
+	if (inst == this && !expleriment_started && !event.is_experiment_io()) {
 		return;
 	}
 	expleriment_started = true;

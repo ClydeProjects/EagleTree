@@ -595,7 +595,7 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		StateVisualiser::print_page_status();
 	}*/
 
-	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
+	// StatisticsGatherer::get_global_instance()->register_completed_event(*event); // Commented out because this is now done from the thread implementation
 
 	/*if (event->is_original_application_io() && event->get_bus_wait_time() > 1509) {
 		event->print();
