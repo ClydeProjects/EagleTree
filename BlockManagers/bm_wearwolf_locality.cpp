@@ -70,7 +70,13 @@ Address Wearwolf_Locality::choose_best_address(Event const& event) {
 	}
 
 	int tag = event.get_tag();
-	if (tag != UNDEFINED && tag_map.count(tag) == 1 && seq_write_key_to_pointers_mapping[tag_map[tag].key].num_pointers > 0) {
+	if (tag >= 0 && tag_map[tag].key < 0) {
+		tagged_sequential_write& t = tag_map[tag];
+		int i = 0;
+		i++;
+	}
+	//assert(tag_map[tag].key >= 0);
+	if (tag != UNDEFINED && tag_map.count(tag) == 1 && seq_write_key_to_pointers_mapping.count(tag_map[tag].key) > 0 && seq_write_key_to_pointers_mapping[tag_map[tag].key].num_pointers > 0) {
 		return perform_sequential_write(event, tag_map[tag].key);
 	}
 
@@ -82,7 +88,7 @@ Address Wearwolf_Locality::choose_best_address(Event const& event) {
 	}
 
 	int key = arrived_writes_to_sequential_key_mapping[event.get_id()];
-
+	assert(key >= 0);
 	if (seq_write_key_to_pointers_mapping.count(key) == 0) {
 		num_misses++;
 		arrived_writes_to_sequential_key_mapping.erase(event.get_id());
@@ -119,6 +125,7 @@ Address Wearwolf_Locality::choose_any_address(Event const& write) {
 
 Address Wearwolf_Locality::perform_sequential_write(Event const& event, long key) {
 	Address to_return;
+	assert(key >= 0);
 	sequential_writes_pointers& swp = seq_write_key_to_pointers_mapping[key];
 	//printf("num seq pointers left: %d\n", seq_write_key_to_pointers_mapping[key].num_pointers);
 
@@ -161,6 +168,7 @@ Address Wearwolf_Locality::perform_sequential_write_round_robin(sequential_write
 
 // TODO: for the ONE and LUN degrees, try to do read-balancing
 void Wearwolf_Locality::set_pointers_for_sequential_write(long key, double time) {
+	assert(key >= 0);
 	assert(seq_write_key_to_pointers_mapping.count(key) == 0);
 	if (parallel_degree == ONE) {
 		seq_write_key_to_pointers_mapping[key].pointers = vector<vector<Address> >(1, vector<Address>(1));
@@ -197,6 +205,7 @@ void Wearwolf_Locality::set_pointers_for_tagged_sequential_write(int tag, double
 	int num_LUNs = SSD_SIZE * PACKAGE_SIZE;
 	int num_blocks_to_allocate_now = min(num_blocks_needed, num_LUNs);
 	int key = tag_map[tag].key;
+	assert(key >= 0);
 	seq_write_key_to_pointers_mapping[key].tag = tag;
 	vector<vector<Address> >& pointers = seq_write_key_to_pointers_mapping[key].pointers = vector<vector<Address> >(SSD_SIZE, vector<Address>(PACKAGE_SIZE));
 	int random_offset = random_number_generator();
@@ -222,7 +231,7 @@ void Wearwolf_Locality::process_write_completion(Event const& event, long key, p
 
 	//page_hotness_measurer->register_event(event);
 
-
+	assert(key >= 0);
 	sequential_writes_pointers& swp = seq_write_key_to_pointers_mapping[key];
 
 	Address selected_pointer = swp.pointers[index.first][index.second];
@@ -273,6 +282,7 @@ void Wearwolf_Locality::print_tags() {
 	map<long, tagged_sequential_write>::iterator iter = tag_map.begin();
 	for (; iter != tag_map.end(); iter++) {
 		tagged_sequential_write& f = (*iter).second;
+		assert(f.key >= 0);
 		sequential_writes_pointers& d = seq_write_key_to_pointers_mapping[f.key];
 		printf("  %d  %d  %d   %d   %d   %d  %d\n", (*iter).first, f.key, f.size, f.free_allocated_space, f.num_written, d.num_pointers, d.tag);
 		for (uint i = 0; i < d.pointers.size(); i++) {
@@ -318,6 +328,7 @@ void Wearwolf_Locality::register_write_outcome(Event const& event, enum status s
 }
 
 void Wearwolf_Locality::sequential_event_metadata_removed(long key) {
+	assert(key >= 0);
 	if (seq_write_key_to_pointers_mapping.count(key) == 0) {
 		return;
 	}
@@ -349,7 +360,8 @@ void Wearwolf_Locality::register_erase_outcome(Event const& event, enum status s
 	map<long, sequential_writes_pointers >::iterator iter = seq_write_key_to_pointers_mapping.begin();
 	for (; iter != seq_write_key_to_pointers_mapping.end(); iter++) {
 		sequential_writes_pointers& swt = (*iter).second;
-		if (swt.tag != -1 && !tag_map[swt.tag].need_more_space()) {
+		long key = (*iter).first;
+		if (swt.tag != UNDEFINED && !tag_map[swt.tag].need_more_space()) {
 			continue;
 		}
 		Address& pointer = swt.pointers[i][j];
