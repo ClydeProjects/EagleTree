@@ -78,7 +78,7 @@ Event* Flexible_Reader::read_next(double start_time) {
 	return new Flexible_Read_Event(this, start_time);
 }
 
-void Flexible_Reader::register_read_commencement(Event* event) {
+void Flexible_Reader::register_read_commencement(Flexible_Read_Event* event) {
 	Address phys_addr = event->get_address();
 	int package = phys_addr.package;
 	int die = phys_addr.die;

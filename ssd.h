@@ -425,7 +425,7 @@ public:
 	inline uint get_id() const 							{ return id; }
 	inline int get_tag() const 							{ return tag; }
 	inline bool is_experiment_io() const 				{ return experiment_io; }
-	inline void set_experiment_io(bool val) 		{ experiment_io = val; }
+	inline void set_experiment_io(bool val) 			{ experiment_io = val; }
 	inline void set_tag(int new_tag) 					{ tag = new_tag; }
 	inline void set_address(const Address &address) {
 		if (type == WRITE || type == READ || type == READ_COMMAND || type == READ_TRANSFER) {
@@ -896,7 +896,7 @@ public:
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual void register_register_cleared();
 	virtual Address choose_address(Event const& write);
-	Address choose_flexible_read_address(Event* read);
+	Address choose_flexible_read_address(Flexible_Read_Event* fr);
 	virtual void register_write_arrival(Event const& write);
 	virtual void trim(Event const& write);
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double current_time) const;
@@ -1750,6 +1750,49 @@ private:
 	bool can_start_next_read;
 };
 
+// Simulates the IO pattern of a grace hash join between two relations
+class Grace_Hash_Join : public Thread
+{
+public:
+	Grace_Hash_Join(long relation_A_min_LBA,        long relation_A_max_LBA,
+					long relation_B_min_LBA,        long relation_B_max_LBA,
+					long free_space_min_LBA,        long free_space_max_LBA,
+					long RAM_available,             double start_time = 1,
+					bool use_flexible_reads = true, bool use_tagging  = true,
+					long rows_per_page      = 8);
+	Event* issue_next_io();
+	Event* execute_build_phase();
+	Event* execute_probe_phase();
+	Event* execute_third_phase();
+	void handle_event_completion(Event* event);
+private:
+	long relation_A_min_LBA, relation_A_max_LBA;
+	long relation_B_min_LBA, relation_B_max_LBA;
+	long free_space_min_LBA, free_space_max_LBA;
+	long RAM_available;
+	bool use_flexible_reads, use_tagging;
+	long input_cursor;
+	long relation_A_size, relation_B_size, free_space_size;
+	long rows_per_page;
+	int num_partitions, partition_size;
+
+	// Bookkeeping variables
+	Flexible_Reader* flex_reader;
+	MTRand_int32 random_number_generator;
+	enum {BUILD, PROBE, DONE} phase;
+	long buffer_size;
+	vector<int> output_buffers;
+	vector<int> output_cursors;
+	vector<int> output_cursors_startpoints;
+	vector<int> output_cursors_splitpoints; // Separates relation A and B in output buffers
+	int victim_buffer;
+	int reads_in_progress, writes_in_progress;
+	int small_bucket_begin, small_bucket_cursor, small_bucket_end;
+	int large_bucket_begin, large_bucket_cursor, large_bucket_end;
+	int trim_cursor;
+
+};
+
 /*class Throughput_Moderator {
 public:
 	Throughput_Moderator();
@@ -1860,11 +1903,11 @@ class Flexible_Reader {
 public:
 	Flexible_Reader(FtlParent const& ftl, vector<Address_Range>);
 	Event* read_next(double start_time);
-	void register_read_commencement(Event*);
+	void register_read_commencement(Flexible_Read_Event*);
 	inline bool is_finished() { return finished_counter == 0; }
 	inline vector<vector<Address> > const& get_immediate_candidates() { return immediate_candidates_physical_addresses; }
 	//inline vector<vector<long> > const& get_immediate_candidates_logical_addresses() { return immediate_candidates_logical_addresses; }
-private:
+//private:
 	void set_new_candidate();
 	struct progress_tracker {
 		vector<Address_Range> ranges;

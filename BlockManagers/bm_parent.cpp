@@ -68,8 +68,7 @@ Address Block_manager_parent::choose_copbyback_address(Event const& write) {
 	return has_free_pages(free_block_pointers[ra.package][ra.die]) ? free_block_pointers[ra.package][ra.die] : Address();
 }
 
-Address Block_manager_parent::choose_flexible_read_address(Event* read) {
-	Flexible_Read_Event* fr = dynamic_cast<Flexible_Read_Event*>(read);
+Address Block_manager_parent::choose_flexible_read_address(Flexible_Read_Event* fr) {
 	vector<vector<Address> > candidates = fr->get_candidates();
 	pair<bool, pair<int, int> > result = get_free_block_pointer_with_shortest_IO_queue(candidates);
 	if (!result.first) {
