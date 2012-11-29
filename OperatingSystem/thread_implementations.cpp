@@ -192,7 +192,7 @@ Event* Synchronous_Random_Thread::issue_next_io() {
 void Synchronous_Random_Thread::handle_event_completion(Event* event) {
 	assert(!ready_to_issue_next_write);
 	ready_to_issue_next_write = true;
-	time = event->get_current_time() + time_breaks;
+	time = max(time, event->get_current_time()) + 1;
 }
 
 

@@ -182,7 +182,7 @@ void Ssd::progress_since_os_is_waiting() {
 }
 
 void Ssd::register_event_completion(Event * event) {
-	if (event->is_original_application_io() && !event->get_noop() && (event->get_event_type() == WRITE || event->get_event_type() == READ_COMMAND)) {
+	if (event->is_original_application_io() && !event->get_noop() && (event->get_event_type() == WRITE || event->get_event_type() == READ_TRANSFER)) {
 		last_io_submission_time = max(last_io_submission_time, event->get_ssd_submission_time());
 	}
 	if (event->get_event_type() == READ_COMMAND) {

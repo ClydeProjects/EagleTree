@@ -356,7 +356,16 @@ void IOScheduler::handle_flexible_read(Event* event) {
 	if ( wait_time == 0 && !bm->can_schedule_on_die(fr) )  {
 		wait_time = 10;
 	}
-	if (wait_time == 0) {
+
+	// Check if the logical address is locked
+	ulong logical_address = fr->get_candidates_lba()[addr.package][addr.die];
+	bool logical_address_locked = LBA_currently_executing.count(logical_address) == 1;
+	if (logical_address_locked) {
+		//printf("---! LBA %ld locked. Pushing event into the future.\n", logical_address);
+		fr->find_alternative_immediate_candidate(addr.package, addr.die);
+	}
+
+	if (wait_time == 0 && !logical_address_locked) {
 		fr->set_address(addr);
 		fr->register_read_commencement();
 		dependencies[event->get_application_io_id()].front()->set_logical_address(event->get_logical_address());
@@ -449,6 +458,7 @@ void IOScheduler::handle_noop_events(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
+
 		uint dependency_code = event->get_application_io_id();
 		deque<Event*>& dependents = dependencies[dependency_code];
 		while (dependents.size() > 0) {
@@ -497,6 +507,9 @@ enum status IOScheduler::execute_next(Event* event) {
 
 	if (PRINT_LEVEL > 0) {
 		event->print();
+		if (event->is_flexible_read()) {
+			printf("FLEX\n");
+		}
 	}
 
 	handle_finished_event(event, result);
@@ -738,8 +751,6 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		remove_event_from_current_events(existing_event); // Remove old event from current_events; it's added again when independent event (the copy back) finishes
 	}
 	else */
-
-
 
 	if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
 		promote_to_gc(existing_event);

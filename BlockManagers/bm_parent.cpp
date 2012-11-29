@@ -69,13 +69,35 @@ Address Block_manager_parent::choose_copbyback_address(Event const& write) {
 }
 
 Address Block_manager_parent::choose_flexible_read_address(Flexible_Read_Event* fr) {
-	vector<vector<Address> > candidates = fr->get_candidates();
-	pair<bool, pair<int, int> > result = get_free_block_pointer_with_shortest_IO_queue(candidates);
-	if (!result.first) {
-		return Address();
-	}
-	pair<int, int> coor = result.second;
-	return candidates[coor.first][coor.second];
+	Address a;
+//	printf("------------------\n");
+	do {
+		vector<vector<Address> > candidates = fr->get_candidates();
+/*
+		int c = 0; int d = 0; int e = 0;
+		for (int i = 0; i < candidates.size(); i++)
+			for (int j = 0; j < candidates[i].size(); j++)
+				if (candidates[i][j].valid != NONE) c++;
+				else {
+					d++;
+				}
+		printf("IMMEDIATE %d valid candidates, %d invalid candidates.\n", c,d);
+
+		if (c==0) {
+			printf("No immediate candidates!\n");
+			a = fr->get_verified_candidate_address(0,0);//candidates[coor.first][coor.second];
+		}
+*/
+		pair<bool, pair<int, int> > result = get_free_block_pointer_with_shortest_IO_queue(candidates);
+		if (!result.first) {
+			return Address();
+		}
+		pair<int, int> coor = result.second;
+
+		//return candidates[coor.first][coor.second];
+		a = fr->get_verified_candidate_address(coor.first, coor.second);//candidates[coor.first][coor.second];
+    } while (a.valid == NONE);
+	return a;
 }
 
 Address Block_manager_parent::choose_address(Event const& write) {

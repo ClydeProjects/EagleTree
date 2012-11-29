@@ -26,10 +26,18 @@ enum status Channel::lock(double start_time, double duration, Event& event) {
 
 	if (event.get_event_type() == READ_TRANSFER || event.get_event_type() == COPY_BACK) {
 		Address adr = event.get_address();
-		uint last_read_application_io = ssd->getPackages()[adr.package].getDies()[adr.die].get_last_read_application_io();
-		if (last_read_application_io != event.get_application_io_id()) {
-			fprintf(stderr, "Data belonging to a different read was in the register\n", __func__);
-			return FAILURE;
+		int last_read_application_io = ssd->getPackages()[adr.package].getDies()[adr.die].get_last_read_application_io();
+
+		if (last_read_application_io == event.get_application_io_id()) {
+			ssd->getPackages()[adr.package].getDies()[adr.die].clear_register();
+		}
+		else if (last_read_application_io == UNDEFINED) {
+			fprintf(stderr, "Register was empty\n", __func__);
+			assert(false);
+		}
+		else if (last_read_application_io != event.get_application_io_id()) {
+			fprintf(stderr, "Data belonging to a different read was in the register:  %d\n", __func__, last_read_application_io);
+			assert(false);
 		} else {
 			ssd->getPackages()[adr.package].getDies()[adr.die].clear_register();
 		}

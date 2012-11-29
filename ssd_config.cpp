@@ -195,7 +195,7 @@ int MAX_ONGOING_WL_OPS = 1;
  * 3 -> Wearwolf with Locality
  * 4 -> Round Robin
  */
-int BLOCK_MANAGER_ID = 2;
+int BLOCK_MANAGER_ID = 3;
 
 bool GREED_SCALE = 1;
 

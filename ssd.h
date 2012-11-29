@@ -1779,7 +1779,7 @@ private:
 	// Bookkeeping variables
 	Flexible_Reader* flex_reader;
 	MTRand_int32 random_number_generator;
-	enum {BUILD, PROBE, DONE} phase;
+	enum {BUILD, PROBE_SYNC, PROBE_ASYNC, DONE} phase;
 	long buffer_size;
 	vector<int> output_buffers;
 	vector<int> output_cursors;
@@ -1905,7 +1905,11 @@ public:
 	Event* read_next(double start_time);
 	void register_read_commencement(Flexible_Read_Event*);
 	inline bool is_finished() { return finished_counter == 0; }
-	inline vector<vector<Address> > const& get_immediate_candidates() { return immediate_candidates_physical_addresses; }
+	inline vector<vector<Address> > const& get_immediate_candidates()     { return immediate_candidates_physical_addresses; }
+	inline vector<vector<long> >    const& get_immediate_candidates_lba() { return immediate_candidates_logical_addresses; }
+	Address get_verified_candidate_address(uint package, uint die);
+	void find_alternative_immediate_candidate(uint package, uint die);
+
 	//inline vector<vector<long> > const& get_immediate_candidates_logical_addresses() { return immediate_candidates_logical_addresses; }
 //private:
 	void set_new_candidate();
@@ -1925,7 +1929,7 @@ public:
 		Address physical_address;
 		candidate(Address phys, long log) : logical_address(log), physical_address(phys) {}
 	};
-	vector<vector<vector<candidate> > > candidate_list;		// current physcial addresses, ready to be read.
+	vector<vector<vector<candidate> > > candidate_list;	// current physcial addresses, ready to be read.
 
 	vector<vector<Address> > immediate_candidates_physical_addresses;
 	vector<vector<long> > immediate_candidates_logical_addresses;
@@ -1940,8 +1944,11 @@ private:
 public:
 	Flexible_Read_Event(Flexible_Reader* fr, double time) : Event(READ, 0, 1, time), reader(fr) {};
 	~Flexible_Read_Event() {}
-	inline vector<vector<Address> > const& get_candidates() { return reader->get_immediate_candidates(); }
+	inline vector<vector<Address> > const& get_candidates()     { return reader->get_immediate_candidates(); }
+	inline vector<vector<long> >    const& get_candidates_lba() { return reader->get_immediate_candidates_lba(); }
 	inline void register_read_commencement() { reader->register_read_commencement(this); }
+	inline Address get_verified_candidate_address(uint package, uint die) { return reader->get_verified_candidate_address(package, die); }
+	inline void find_alternative_immediate_candidate(uint package, uint die) { reader->find_alternative_immediate_candidate(package, die); }
 };
 
 class Flexible_Reader_Thread : public Thread

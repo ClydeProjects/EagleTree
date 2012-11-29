@@ -24,19 +24,48 @@ double r1 = .1; // Relation 1 percentage use of addresses
 double r2 = .2; // Relation 2 percentage use of addresses
 double ns = .3; // "noise space" percentage use of addresses
 double fs = .4; // Free space percentage use of addresses
-//----------
+//------------;
 // total  =1.0
 
 vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool use_tagging) {
+	printf("Address division overview:\n");
+	printf("Address 0 - %f: Relation one\n", highest_lba*r1);
+	printf("Address %f - %f: Relation two\n", (int)highest_lba*r1+1, (int)highest_lba*(r1+r2));
+	printf("Address %f - %f: Noise space\n", (int)highest_lba*(r1+r2)+1, (int)highest_lba*(r1+r2+ns));
+	printf("Address %f - %f: Free space\n", (int)highest_lba*(r1+r2+ns), (int)highest_lba);
+	int random_read_threads = 1;
+	int random_write_threads = 1;
+
+	int noise_timebreaks = 1;
+	int noise_repetition = std::numeric_limits<int>::max();
 	Thread* initial_write    = new Asynchronous_Sequential_Thread(0, highest_lba*(r1+r2+ns), 1, WRITE, 1, 1);
-	Thread* grace_hash_join  = new Grace_Hash_Join(0,highest_lba*r1, highest_lba*r1+1, highest_lba*(r1+r2), highest_lba*(r1+r2+ns)+1,highest_lba*(r1+r2+ns+fs), highest_lba*(r1+r2)/2,1,use_flexible_reads,use_tagging,32);
-	Thread* background_noise = new Asynchronous_Random_Thread_Reader_Writer(highest_lba*(r1+r2)+1, highest_lba*(r1+r2+ns),10,0,1);
+	Thread* background_noise = new Asynchronous_Random_Thread_Reader_Writer(highest_lba*(r1+r2)+1, highest_lba*(r1+r2+ns),noise_repetition);
+	//Thread* background_relation_reads = new Asynchronous_Random_Thread(0,highest_lba*(r1+r2), 10,666,READ,noise_timebreaks,1);
 
-	grace_hash_join->set_experiment_thread(true);
-//	background_noise->set_experiment_thread(true);
+	for (int i = 0; i < random_write_threads; i++) {
+		Thread* random_writes = new Synchronous_Random_Thread(highest_lba*(r1+r2)+1, highest_lba*(r1+r2+ns), 1000000, i+537, WRITE, 999);
+		//random_writes->set_experiment_thread(true);
+		initial_write->add_follow_up_thread(random_writes);
+	}
 
-	initial_write->add_follow_up_thread(grace_hash_join);
-	initial_write->add_follow_up_thread(background_noise);
+	for (int i = 0; i < random_read_threads; i++) {
+		Thread* random_reads = new Synchronous_Random_Thread(highest_lba*(r1+r2)+1 + 0, highest_lba*(r1+r2+ns), 1000000, i+637, READ);
+		//random_reads->set_experiment_thread(true);
+		initial_write->add_follow_up_thread(random_reads);
+	}
+
+	//	background_noise->set_experiment_thread(true);
+	// initial_write->add_follow_up_thread(background_noise);
+	// initial_write->add_follow_up_thread(background_relation_reads);
+
+	Thread* recursive_madness = initial_write;
+
+	for (int i = 0; i < 1000; i++) {
+		Thread* grace_hash_join = new Grace_Hash_Join(0,highest_lba*r1, highest_lba*r1+1, highest_lba*(r1+r2), highest_lba*(r1+r2+ns)+1,highest_lba*(r1+r2+ns+fs), highest_lba*(r1+r2)/2,1,use_flexible_reads,use_tagging,32);
+		grace_hash_join->set_experiment_thread(true);
+		recursive_madness->add_follow_up_thread(grace_hash_join);
+		recursive_madness = grace_hash_join;
+	}
 
 	vector<Thread*> threads;
 	threads.push_back(initial_write);
@@ -79,7 +108,7 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 100000;
+	int IO_limit = 25000;
 	int space_min = 40;
 	int space_max = 80;
 	int space_inc = 5;
@@ -92,10 +121,10 @@ int main()
 
 	vector<ExperimentResult> exp;
 
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join,			space_min, space_max, space_inc, exp_folder + "__/", "Both off", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join_flex,	    space_min, space_max, space_inc, exp_folder + "F_/", "Flexible reads enabled", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join_tag,	    space_min, space_max, space_inc, exp_folder + "_T/", "Tagging enabled", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join_flex_tag, space_min, space_max, space_inc, exp_folder + "FT/", "Flexible reads and tagging enabled", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join,			space_min, space_max, space_inc, exp_folder + "__/", "None", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join_flex,	    space_min, space_max, space_inc, exp_folder + "F_/", "Flexible reads", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join_tag,	    space_min, space_max, space_inc, exp_folder + "_T/", "Tagging", IO_limit) );
+	exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join_flex_tag, space_min, space_max, space_inc, exp_folder + "FT/", "Flexible reads + tagging", IO_limit) );
 
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write latency, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
@@ -107,18 +136,23 @@ int main()
 	int sx = 16;
 	int sy = 8;
 
-	//for (int i = 0; i < exp[0].column_names.size(); i++) printf("%d: %s\n", i, exp[0].column_names[i].c_str());
+	for (int i = 0; i < exp[0].column_names.size(); i++) printf("%d: %s\n", i, exp[0].column_names[i].c_str());
 
 	chdir(exp_folder.c_str());
 
 	Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			24, exp, 30);
 	Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	25, exp, 30);
+	Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 		26, exp, 30);
 	Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp, 16000);
 	Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp, 500000);
 
-	Experiment_Runner::graph(sx, sy,   "Write latency, mean", 			"Write latency, mean", 		9, 	exp, 12000);
-	Experiment_Runner::graph(sx, sy,   "Write latency, max", 			"Write latency, max", 		14, exp, 40000);
-	Experiment_Runner::graph(sx, sy,   "Write latency, std", 			"Write latency, std", 		15, exp, 14000);
+	Experiment_Runner::graph(sx, sy,   "Write latency, mean", 			"Write latency, mean", 		9, 	exp, 1000);
+	Experiment_Runner::graph(sx, sy,   "Write latency, max", 			"Write latency, max", 		14, exp, 10000);
+	Experiment_Runner::graph(sx, sy,   "Write latency, std", 			"Write latency, std", 		15, exp, 1000);
+
+	Experiment_Runner::graph(sx, sy,   "Read latency, mean", 			"Read latency, mean", 		16,	exp, 1000);
+	Experiment_Runner::graph(sx, sy,   "Read latency, max", 			"Read latency, max", 		21, exp, 10000);
+	Experiment_Runner::graph(sx, sy,   "Read latency, std", 			"Read latency, std", 		22, exp, 1000);
 
 	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
 	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, 1, 4);

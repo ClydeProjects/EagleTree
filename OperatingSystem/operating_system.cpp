@@ -18,7 +18,8 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	  NUM_WRITES_TO_STOP_AFTER(UNDEFINED),
 	  num_writes_completed(0),
 	  time_of_last_event_completed(1),
-	  counter_for_user(1)
+	  counter_for_user(1),
+	  time_of_experiment_start(UNDEFINED)
 {
 	assert(threads.size() > 0);
 	for (uint i = 0; i < threads.size(); i++) {
@@ -52,7 +53,7 @@ OperatingSystem::~OperatingSystem() {
 }
 
 void OperatingSystem::run() {
-	const int idle_limit = 50000000;
+	const int idle_limit = 2500000;
 	int idle_time = 0;
 	bool finished_experiment, still_more_work;
 	do {
@@ -61,7 +62,8 @@ void OperatingSystem::run() {
 		bool queue_is_full = currently_executing_ios_counter >= MAX_SSD_QUEUE_SIZE;
 
 		if (no_pending_event || queue_is_full) {
-			if (idle_time >= idle_limit) {
+			if (idle_time > 100000 && idle_time % 100000 == 0) printf("Idle for %f seconds. No_pending_event=%d  Queue_is_full=%d\n", (double) idle_time / 1000000, no_pending_event, queue_is_full);
+			if (/*no_pending_event &&*/ idle_time >= idle_limit) {
 				printf("Idle time limit reached\n");
 				printf("Running IOs:\n");
 				for (set<uint>::iterator it = currently_executing_ios.begin(); it != currently_executing_ios.end(); it++) {
@@ -120,7 +122,7 @@ int OperatingSystem::pick_unlocked_event_with_shortest_start_time() {
 
 void OperatingSystem::dispatch_event(int thread_id) {
 	Event* event = events[thread_id];
-
+	//printf("submitting:   " ); event->print();
 	currently_executing_ios_counter++;
 	currently_executing_ios.insert(event->get_application_io_id());
 	currently_pending_ios_counter--;
@@ -149,6 +151,7 @@ void OperatingSystem::dispatch_event(int thread_id) {
 }
 
 void OperatingSystem::register_event_completion(Event* event) {
+
 	bool queue_was_full = currently_executing_ios_counter == MAX_SSD_QUEUE_SIZE;
 	currently_executing_ios_counter--;
 	assert(currently_executing_ios_counter >= 0);   // there is currently a bug where this number goes below 0. need to fix it.
@@ -203,6 +206,23 @@ void OperatingSystem::register_event_completion(Event* event) {
 					if (diff > 0) {
 						e->incr_os_wait_time(diff);
 					}
+				}
+			}
+		}
+	}
+
+	for (uint i = 0; i < threads.size(); i++) {
+		Thread* t = threads[i];
+		if (!t->is_finished()) {
+			double thread_time = t->get_time();
+			if (thread_time < event->get_ssd_submission_time()) {
+				t->set_time(event->get_current_time() + 1);
+			}
+			Event* e = events[i];
+			if (e != NULL) {
+				double diff = event->get_ssd_submission_time() - e->get_current_time() ;
+				if (diff > 0) {
+					e->incr_os_wait_time(diff);
 				}
 			}
 		}
