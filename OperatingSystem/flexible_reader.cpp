@@ -139,13 +139,13 @@ Address Flexible_Reader::get_verified_candidate_address(uint package, uint die) 
 			return a;
 		// If not, move candidate to the right place matching package and die, and find a new immediate candidate
 		} else {
-			if (PRINT_LEVEL >= 0) {
+			if (PRINT_LEVEL >= 1) {
 				printf("get_verified_candidate_address(): Physical address of flexible reader candidate no longer valid. Performing correction. LBA=%ld, Phy=", l);
 				a.print(); printf(" --> ");
 			}
 			a.package = phys.package;
 			a.die     = phys.die;
-			if (PRINT_LEVEL >= 0) {
+			if (PRINT_LEVEL >= 1) {
 				a.print();
 				printf("\n");
 			}
@@ -166,7 +166,7 @@ Address Flexible_Reader::get_verified_candidate_address(uint package, uint die) 
 			} else {
 				immediate_candidates_physical_addresses[package][die] = Address();
 				immediate_candidates_logical_addresses[package][die] = UNDEFINED;
-				printf("Out of candidates :(\n");
+				//printf("Out of candidates :(\n");
 				return Address();
 			}
 		}

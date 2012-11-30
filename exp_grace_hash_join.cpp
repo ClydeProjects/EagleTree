@@ -20,36 +20,64 @@
 
 using namespace ssd;
 
-double r1 = .1; // Relation 1 percentage use of addresses
-double r2 = .2; // Relation 2 percentage use of addresses
-double ns = .3; // "noise space" percentage use of addresses
-double fs = .4; // Free space percentage use of addresses
+//double r1 = .1; // Relation 1 percentage use of addresses
+//double r2 = .2; // Relation 2 percentage use of addresses
+
+// Internal division of space in each grace hash join instance
+double r1 = .20; // Relation 1 percentage use of addresses
+double r2 = .20; // Relation 2 percentage use of addresses
+double fs = .60; // Free space percentage use of addresses
+
+// Overall division of space
+double gh = .5; // Grace hash join(s) percentage use of addresses
+double ns = .5; // "Noise space" percentage use of addresses
 //------------;
 // total  =1.0
 
-vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool use_tagging) {
-	printf("Address division overview:\n");
+/* TO-DO stuff
+ * - Variable grace threads
+ * - Experiment param =  #write threads, secondly, #grace threads
+ * - GC in stats (again)
+ * - Attach statistics gatherer(s) to threads, instead of the opposite
+ * - Scheduling?
+ * - Vagrind
+ */
+
+Thread* grace_hash_join_thread(int lowest_lba, int highest_lba, bool use_flexible_reads, bool use_tagging) {
+	int span = highest_lba - lowest_lba;
+	assert(span >= 10);
+	return new Grace_Hash_Join(lowest_lba,                lowest_lba+span*r1,
+			                   lowest_lba+span*r1+1,      lowest_lba+span*(r1+r2),
+			                   lowest_lba+span*(r1+r2)+1, lowest_lba+span*(r1+r2+fs),
+			                   (span*(r1+r2))/2, 1, use_flexible_reads, use_tagging, 32);
+}
+
+vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool use_tagging, int random_read_threads = 0, int random_write_threads = 6, int grace_hash_join_threads = 1) {
+/*	printf("Address division overview:\n");
 	printf("Address 0 - %f: Relation one\n", highest_lba*r1);
 	printf("Address %f - %f: Relation two\n", (int)highest_lba*r1+1, (int)highest_lba*(r1+r2));
 	printf("Address %f - %f: Noise space\n", (int)highest_lba*(r1+r2)+1, (int)highest_lba*(r1+r2+ns));
-	printf("Address %f - %f: Free space\n", (int)highest_lba*(r1+r2+ns), (int)highest_lba);
-	int random_read_threads = 1;
-	int random_write_threads = 1;
+	printf("Address %f - %f: Free space\n", (int)highest_lba*(r1+r2+ns), (int)highest_lba);*/
+/*	int random_read_threads     = 0;
+	int random_write_threads    = 6;
+	int grace_hash_join_threads = 2; */
 
-	int noise_timebreaks = 1;
-	int noise_repetition = std::numeric_limits<int>::max();
-	Thread* initial_write    = new Asynchronous_Sequential_Thread(0, highest_lba*(r1+r2+ns), 1, WRITE, 1, 1);
-	Thread* background_noise = new Asynchronous_Random_Thread_Reader_Writer(highest_lba*(r1+r2)+1, highest_lba*(r1+r2+ns),noise_repetition);
-	//Thread* background_relation_reads = new Asynchronous_Random_Thread(0,highest_lba*(r1+r2), 10,666,READ,noise_timebreaks,1);
+	//int noise_repetition = std::numeric_limits<int>::max();
+	Thread* initial_write    = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, 1, 1);
+	//Thread* background_noise = new Asynchronous_Random_Thread_Reader_Writer(highest_lba*gh+1, highest_lba*(gh+ns),noise_repetition);
+	//Thread* background_relation_reads = new Asynchronous_Random_Thread(0,highest_lba*(gh), 10,666,READ,noise_timebreaks,1);
 
-	for (int i = 0; i < random_write_threads; i++) {
-		Thread* random_writes = new Synchronous_Random_Thread(highest_lba*(r1+r2)+1, highest_lba*(r1+r2+ns), 1000000, i+537, WRITE, 999);
+/*	for (int i = 0; i < random_write_threads; i++) {
+		Thread* random_writes = new Synchronous_Random_Thread(highest_lba*gh+1, highest_lba*(gh+ns), std::numeric_limits<int>::max(), i+537, WRITE, 999);
 		//random_writes->set_experiment_thread(true);
 		initial_write->add_follow_up_thread(random_writes);
-	}
+	}*/
+
+	// TODO: For giving the grace hash join threads chucks of space of uneaven sizes
+	vector<double> space_fractions;
 
 	for (int i = 0; i < random_read_threads; i++) {
-		Thread* random_reads = new Synchronous_Random_Thread(highest_lba*(r1+r2)+1 + 0, highest_lba*(r1+r2+ns), 1000000, i+637, READ);
+		Thread* random_reads = new Synchronous_Random_Thread(highest_lba*gh+1 + 0, highest_lba*(gh+ns), std::numeric_limits<int>::max(), i+637, READ);
 		//random_reads->set_experiment_thread(true);
 		initial_write->add_follow_up_thread(random_reads);
 	}
@@ -58,15 +86,23 @@ vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool u
 	// initial_write->add_follow_up_thread(background_noise);
 	// initial_write->add_follow_up_thread(background_relation_reads);
 
-	Thread* recursive_madness = initial_write;
+//	printf("%d\n",highest_lba);
+//	printf("%d <-> %d\n", 0, (int) (highest_lba*gh));
 
-	for (int i = 0; i < 1000; i++) {
-		Thread* grace_hash_join = new Grace_Hash_Join(0,highest_lba*r1, highest_lba*r1+1, highest_lba*(r1+r2), highest_lba*(r1+r2+ns)+1,highest_lba*(r1+r2+ns+fs), highest_lba*(r1+r2)/2,1,use_flexible_reads,use_tagging,32);
-		grace_hash_join->set_experiment_thread(true);
-		recursive_madness->add_follow_up_thread(grace_hash_join);
-		recursive_madness = grace_hash_join;
+	for (int gt = 0; gt < grace_hash_join_threads; gt++) {
+		Thread* recursive_madness = initial_write;
+		int low_lba =  (highest_lba*gh)*gt/grace_hash_join_threads;
+		int high_lba = ((highest_lba*gh)*(gt+1)/grace_hash_join_threads)-1;
+//		printf("(%d -> %d)\n", low_lba, high_lba);
+		for (int i = 0; i < 1000; i++) {
+			//Thread* grace_hash_join = new Grace_Hash_Join(0,highest_lba*r1, highest_lba*r1+1, highest_lba*(r1+r2), highest_lba*(r1+r2+ns)+1,highest_lba*(r1+r2+ns+fs), highest_lba*(r1+r2)/2,1,use_flexible_reads,use_tagging,32);
+			//printf("%d -> %d\n", (int) (highest_lba*gh)*gt/grace_hash_join_threads, (int) ((highest_lba*gh)*(gt+1)/grace_hash_join_threads)-1);
+			Thread* grace_hash_join = grace_hash_join_thread(low_lba, high_lba, use_flexible_reads, use_tagging);
+			grace_hash_join->set_experiment_thread(true);
+			recursive_madness->add_follow_up_thread(grace_hash_join);
+			recursive_madness = grace_hash_join;
+		}
 	}
-
 	vector<Thread*> threads;
 	threads.push_back(initial_write);
 
@@ -108,24 +144,37 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 25000;
+	int IO_limit = 250000;
 	int space_min = 40;
-	int space_max = 80;
+	int space_max = 85;
 	int space_inc = 5;
+
+	int write_threads_min = 0;
+	int write_threads_max = 6;
+	double used_space = .80; // overprovisioning level for variable random write threads experiment
 
 	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 15;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 
+	const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
+	const int avail_pages = num_pages * used_space;
+
 	double start_time = Experiment_Runner::wall_clock_time();
 
 	vector<ExperimentResult> exp;
 
+	exp.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join,			 write_threads_min, write_threads_max, 1, exp_folder + "__/", "None", IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+	exp.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex,	 write_threads_min, write_threads_max, 1, exp_folder + "F_/", "Flexible reads", IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+	exp.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_tag,		 write_threads_min, write_threads_max, 1, exp_folder + "_T/", "Tagging", IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+	exp.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex_tag, write_threads_min, write_threads_max, 1, exp_folder + "FT/", "Flexible reads + tagging", IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+
+/*
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join,			space_min, space_max, space_inc, exp_folder + "__/", "None", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join_flex,	    space_min, space_max, space_inc, exp_folder + "F_/", "Flexible reads", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join_tag,	    space_min, space_max, space_inc, exp_folder + "_T/", "Tagging", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join_flex_tag, space_min, space_max, space_inc, exp_folder + "FT/", "Flexible reads + tagging", IO_limit) );
-
+*/
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write latency, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
 

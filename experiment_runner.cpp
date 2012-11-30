@@ -335,6 +335,54 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 	return experiment_result;
 }
 
+ExperimentResult Experiment_Runner::random_writes_on_the_side_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
+    ExperimentResult experiment_result(name, data_folder, "Number of concurrent random write threads");
+    experiment_result.start_experiment();
+
+    const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
+
+    for (int random_write_threads = write_threads_min; random_write_threads <= write_threads_max; random_write_threads += write_threads_inc) {
+		printf("----------------------------------------------------------------------------------------------------------\n");
+		printf("%s : Experiment with max %d concurrent random writes threads.\n", name.c_str(), random_write_threads);
+		printf("----------------------------------------------------------------------------------------------------------\n");
+
+		double IO_submission_rate = 10; // Whatever
+
+		// Run experiment
+		vector<Thread*> threads = experiment(num_pages * used_space, IO_submission_rate);
+
+		for (int i = 0; i < random_write_threads; i++) {
+			Thread* random_writes = new Synchronous_Random_Thread(random_writes_min_lba, random_writes_max_lba, std::numeric_limits<int>::max(), i+537, WRITE, 999);
+			//random_writes->set_experiment_thread(true);
+			threads[0]->add_follow_up_thread(random_writes);
+		}
+
+		OperatingSystem* os = new OperatingSystem(threads);
+		os->set_num_writes_to_stop_after(IO_limit);
+		try {
+			os->run();
+
+			// Collect statistics from this experiment iteration (save in csv files)
+			experiment_result.collect_stats(random_write_threads, os->get_experiment_runtime());
+		} catch(...) {
+			printf("An exception was thrown, but we continue for now\n");
+		}
+
+
+		// Print shit
+		StatisticsGatherer::get_global_instance()->print();
+		if (PRINT_LEVEL >= 1) {
+			StateVisualiser::print_page_status();
+			StateVisualiser::print_block_ages();
+		}
+
+		delete os;
+	}
+
+	experiment_result.end_experiment();
+	return experiment_result;
+}
+
 ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int used_space, int max_copybacks, string data_folder, string name, int IO_limit) {
     ExperimentResult experiment_result(name, data_folder, "CopyBacks allowed before ECC check");
     experiment_result.start_experiment();

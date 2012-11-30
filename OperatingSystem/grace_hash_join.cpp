@@ -124,7 +124,7 @@ Event* Grace_Hash_Join::execute_build_phase() {
 		bool at_relation_A = (input_cursor >= relation_A_min_LBA && input_cursor <= relation_A_max_LBA);
 		int estimated_tag_size = at_relation_A ? relation_A_size / num_partitions : relation_B_size / num_partitions;
 
-		Event* e = new Event(WRITE, output_cursors[victim_buffer]++, estimated_tag_size, time++);
+		Event* e = new Event(WRITE, output_cursors[victim_buffer]++, estimated_tag_size, time);
 		if (use_tagging) e->set_tag(victim_buffer * 2 + at_relation_A);
 		return e;
 
@@ -176,9 +176,9 @@ Event* Grace_Hash_Join::execute_build_phase() {
 	if (use_flexible_reads) {
 		input_cursor++;
 		assert(!flex_reader->is_finished());
-		return flex_reader->read_next(time++);
+		return flex_reader->read_next(time);
 	} else {
-		return new Event(READ, input_cursor++, 1, time++);
+		return new Event(READ, input_cursor++, 1, time);
 	}
 
 }
@@ -236,9 +236,9 @@ Event* Grace_Hash_Join::execute_probe_phase() {
 				flex_reader = os->create_flexible_reader(ranges);
 			}
 			small_bucket_cursor++;
-			return flex_reader->read_next(time++);
+			return flex_reader->read_next(time);
 		} else {
-			return new Event(READ, small_bucket_cursor++, 1, time++);
+			return new Event(READ, small_bucket_cursor++, 1, time);
 		}
 
 	// If we are currently in the process of trimming the small bucket from disk, continue with next address in range
@@ -265,9 +265,9 @@ Event* Grace_Hash_Join::execute_probe_phase() {
 				flex_reader = os->create_flexible_reader(ranges);
 			}
 			large_bucket_cursor++;
-			return flex_reader->read_next(time++);
+			return flex_reader->read_next(time);
 		} else {
-			return new Event(READ, large_bucket_cursor++, 1, time++);
+			return new Event(READ, large_bucket_cursor++, 1, time);
 		}
 	}
 

@@ -363,6 +363,7 @@ void IOScheduler::handle_flexible_read(Event* event) {
 	if (logical_address_locked) {
 		//printf("---! LBA %ld locked. Pushing event into the future.\n", logical_address);
 		fr->find_alternative_immediate_candidate(addr.package, addr.die);
+		wait_time = 10;
 	}
 
 	if (wait_time == 0 && !logical_address_locked) {

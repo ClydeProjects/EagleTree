@@ -53,7 +53,7 @@ OperatingSystem::~OperatingSystem() {
 }
 
 void OperatingSystem::run() {
-	const int idle_limit = 2500000;
+	const int idle_limit = 5000000;
 	int idle_time = 0;
 	bool finished_experiment, still_more_work;
 	do {
@@ -171,7 +171,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	}
 
 	if (thread->is_finished() && thread->get_follow_up_threads().size() > 0) {
-		/*if (PRINT_LEVEL >= 1)*/ printf("Switching to new follow up thread\n");
+		if (PRINT_LEVEL >= 1) printf("Switching to new follow up thread\n");
 		vector<Thread*> follow_up_threads = thread->get_follow_up_threads();
 		if (follow_up_threads.size() > 0) {
 			threads[thread_id] = follow_up_threads[0];
