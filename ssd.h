@@ -1596,7 +1596,7 @@ private:
 class Thread
 {
 public:
-	Thread(double time) : finished(false), time(time), threads_to_start_when_this_thread_finishes(), num_ios_finished(0), experiment_thread(false), os(NULL), statistics_gatherer() {}
+	Thread(double time) : finished(false), time(time), threads_to_start_when_this_thread_finishes(), num_ios_finished(0), experiment_thread(false), os(NULL), statistics_gatherer(new StatisticsGatherer()) {}
 	virtual ~Thread();
 	Event* run();
 	inline bool is_finished() { return finished; }
@@ -1609,7 +1609,11 @@ public:
 	inline void set_experiment_thread(bool val) { experiment_thread = val; }
 	inline bool is_experiment_thread() { return experiment_thread; }
 	void set_os(OperatingSystem*  op_sys);
-	StatisticsGatherer* get_statistics_gatherer() { return &statistics_gatherer; }
+	StatisticsGatherer* get_statistics_gatherer() { return statistics_gatherer; }
+	void set_statistics_gatherer(StatisticsGatherer* new_statistics_gatherer) {
+		if (statistics_gatherer != NULL) delete statistics_gatherer;
+		statistics_gatherer = new_statistics_gatherer;
+	}
 protected:
 	virtual Event* issue_next_io() = 0;
 	virtual void handle_event_completion(Event* event) = 0;
@@ -1620,7 +1624,7 @@ protected:
 private:
 	ulong num_ios_finished;
 	bool experiment_thread;
-	StatisticsGatherer statistics_gatherer;
+	StatisticsGatherer* statistics_gatherer;
 };
 
 class Synchronous_Sequential_Thread : public Thread
@@ -1759,7 +1763,7 @@ public:
 					long free_space_min_LBA,        long free_space_max_LBA,
 					long RAM_available,             double start_time = 1,
 					bool use_flexible_reads = true, bool use_tagging  = true,
-					long rows_per_page      = 8);
+					long rows_per_page      = 8,    int ranseed = 72);
 	Event* issue_next_io();
 	Event* execute_build_phase();
 	Event* execute_probe_phase();

@@ -70,9 +70,10 @@ StatisticsGatherer *StatisticsGatherer::get_global_instance()
 void StatisticsGatherer::register_completed_event(Event const& event) {
 	if (inst != this) inst->register_completed_event(event); // Do the same for global instance
 
-	if (inst == this && !expleriment_started && !event.is_experiment_io()) {
+	if (inst == this && /*!expleriment_started &&*/ !event.is_experiment_io()) { // Only register experiment IOs in global instance?!?
 		return;
 	}
+
 	expleriment_started = true;
 	if (start_time == UNDEFINED) {
 		start_time = event.get_start_time();
@@ -140,11 +141,6 @@ void StatisticsGatherer::register_scheduled_gc(Event const& gc) {
 
 	int age_class = gc.get_age_class();
 	Address addr = gc.get_address();
-
-	if (age_class == UNDEFINED) {
-		int i = 0;
-		i++;
-	}
 
 	if (addr.valid == DIE && age_class != UNDEFINED) {
 		num_gc_targeting_package_die_class++;

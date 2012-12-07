@@ -579,6 +579,11 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		assert(false);
 	}
 
+	// Reason for this: Finished non-app IOs is not handled in any thread
+	if (!event->is_original_application_io()) {
+		StatisticsGatherer::get_global_instance()->register_completed_event(*event);
+	}
+
 	VisualTracer::get_instance()->register_completed_event(*event);
 
 	if (event->get_event_type() == WRITE || event->get_event_type() == COPY_BACK) {

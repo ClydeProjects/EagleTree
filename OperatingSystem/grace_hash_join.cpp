@@ -16,7 +16,7 @@ Grace_Hash_Join::Grace_Hash_Join
 		long free_space_min_LBA, long free_space_max_LBA,
 		long RAM_available,      double start_time,
 		bool use_flexible_reads, bool use_tagging,
-		long rows_per_page) :
+		long rows_per_page,      int randseed) :
 
 		Thread(start_time),
 		relation_A_min_LBA(relation_A_min_LBA), relation_A_max_LBA(relation_A_max_LBA),
@@ -28,7 +28,7 @@ Grace_Hash_Join::Grace_Hash_Join
 		rows_per_page(rows_per_page),
 		phase(BUILD),
         flex_reader(NULL),
-		random_number_generator((int)'S'+'A'+'T'+'A'+'N' * 666), // Evil randseed
+		random_number_generator(randseed),
 		victim_buffer(UNDEFINED),
         small_bucket_begin(0), small_bucket_cursor(0), small_bucket_end(0),
         large_bucket_begin(0), large_bucket_cursor(0), large_bucket_end(0),

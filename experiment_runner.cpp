@@ -352,7 +352,7 @@ ExperimentResult Experiment_Runner::random_writes_on_the_side_experiment(vector<
 		vector<Thread*> threads = experiment(num_pages * used_space, IO_submission_rate);
 
 		for (int i = 0; i < random_write_threads; i++) {
-			Thread* random_writes = new Synchronous_Random_Thread(random_writes_min_lba, random_writes_max_lba, std::numeric_limits<int>::max(), i+537, WRITE, 999);
+			Thread* random_writes = new Synchronous_Random_Thread(random_writes_min_lba, random_writes_max_lba, std::numeric_limits<int>::max(), (i*3)+537, WRITE, 999);
 			//random_writes->set_experiment_thread(true);
 			threads[0]->add_follow_up_thread(random_writes);
 		}
