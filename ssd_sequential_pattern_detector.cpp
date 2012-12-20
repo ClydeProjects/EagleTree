@@ -32,6 +32,7 @@ Sequential_Pattern_Detector::~Sequential_Pattern_Detector() {
 }
 
 sequential_writes_tracking const& Sequential_Pattern_Detector::register_event(logical_address lb, double time) {
+	//printf("lb=%ld  \tt=%f\tA=%d\tB=%d\n", lb, time, sequential_writes_identification_and_data.count(lb), sequential_writes_key_lookup.count(lb));
 	sequential_writes_tracking * swt;
 	if (sequential_writes_identification_and_data.count(lb) == 1) {
 		swt = restart_pattern(lb, time);
@@ -73,10 +74,12 @@ sequential_writes_tracking* Sequential_Pattern_Detector::process_next_write(int 
 }
 
 sequential_writes_tracking * Sequential_Pattern_Detector::restart_pattern(int key, double time) {
+	assert(sequential_writes_identification_and_data.count(key) == 1);
 	sequential_writes_tracking* swm = sequential_writes_identification_and_data[key];
 	if (swm->counter < threshold) {
 		return swm;
 	}
+	assert(swm->counter != 0);
 	swm->num_times_pattern_has_repeated++;
 	sequential_writes_key_lookup.erase(key + swm->counter);
 	sequential_writes_key_lookup[key + 1] = key;
@@ -105,11 +108,14 @@ void Sequential_Pattern_Detector::remove_old_sequential_writes_metadata(double t
 			}
 			uint next_expected_lba = (*iter).second->counter + key;
 			sequential_writes_key_lookup.erase(next_expected_lba);
-			delete (*iter).second;;
+			delete (*iter).second;
 			sequential_writes_identification_and_data.erase(iter++);
+			//sequential_writes_identification_and_data.erase(iter);
 			if (listener != NULL) {
 				listener->sequential_event_metadata_removed(key);
 			}
+			assert(sequential_writes_identification_and_data.count(key) == 0);
+			//++iter;
 		} else {
 			++iter;
 		}

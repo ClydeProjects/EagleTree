@@ -104,16 +104,22 @@ void ExperimentResult::start_experiment() {
 }
 
 void ExperimentResult::collect_stats(uint variable_parameter_value, double os_runtime) {
+	collect_stats(variable_parameter_value, os_runtime, StatisticsGatherer::get_global_instance());
+}
+
+void ExperimentResult::collect_stats(uint variable_parameter_value, double os_runtime, StatisticsGatherer* statistics_gatherer) {
 	assert(experiment_started && !experiment_finished);
 
+	chdir(data_folder.c_str());
+
 	// Compute throughput
-	int total_read_IOs_issued  = StatisticsGatherer::get_global_instance()->total_reads();
-	int total_write_IOs_issued = StatisticsGatherer::get_global_instance()->total_writes();
+	int total_read_IOs_issued  = statistics_gatherer->total_reads();
+	int total_write_IOs_issued = statistics_gatherer->total_writes();
 	long double read_throughput = (long double) (total_read_IOs_issued / os_runtime) * 1000; // IOs/sec
 	long double write_throughput = (long double) (total_write_IOs_issued / os_runtime) * 1000; // IOs/sec
 	long double total_throughput = write_throughput + read_throughput;
 
-	(*stats_file) << variable_parameter_value << ", " << StatisticsGatherer::get_global_instance()->totals_csv_line() << ", " << total_throughput << ", " << write_throughput << ", " << read_throughput << "\n";
+	(*stats_file) << variable_parameter_value << ", " << statistics_gatherer->totals_csv_line() << ", " << total_throughput << ", " << write_throughput << ", " << read_throughput << "\n";
 
 	stringstream hist_filename;
 	stringstream age_filename;
@@ -129,9 +135,9 @@ void ExperimentResult::collect_stats(uint variable_parameter_value, double os_ru
 
 	std::ofstream hist_file;
 	hist_file.open(hist_filename.str().c_str());
-	hist_file << StatisticsGatherer::get_global_instance()->wait_time_histogram_all_IOs_csv();
+	hist_file << statistics_gatherer->wait_time_histogram_all_IOs_csv();
 	hist_file.close();
-	vp_max_waittimes[variable_parameter_value] = StatisticsGatherer::get_global_instance()->max_waittimes();
+	vp_max_waittimes[variable_parameter_value] = statistics_gatherer->max_waittimes();
 	for (uint i = 0; i < vp_max_waittimes[variable_parameter_value].size(); i++) {
 		max_waittimes[i] = max(max_waittimes[i], vp_max_waittimes[variable_parameter_value][i]);
 	}
@@ -145,17 +151,17 @@ void ExperimentResult::collect_stats(uint variable_parameter_value, double os_ru
 
 	std::ofstream queue_file;
 	queue_file.open(queue_filename.str().c_str());
-	queue_file << StatisticsGatherer::get_global_instance()->queue_length_csv();
+	queue_file << statistics_gatherer->queue_length_csv();
 	queue_file.close();
 
 	std::ofstream throughput_file;
 	queue_file.open(throughput_filename.str().c_str());
-	queue_file << StatisticsGatherer::get_global_instance()->app_and_gc_throughput_csv();
+	queue_file << statistics_gatherer->app_and_gc_throughput_csv();
 	queue_file.close();
 
 	std::ofstream latency_file;
 	queue_file.open(latency_filename.str().c_str());
-	queue_file << StatisticsGatherer::get_global_instance()->latency_csv();
+	queue_file << statistics_gatherer->latency_csv();
 	queue_file.close();
 
 	vp_num_IOs[variable_parameter_value].push_back(total_write_IOs_issued);
@@ -335,9 +341,22 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 	return experiment_result;
 }
 
-ExperimentResult Experiment_Runner::random_writes_on_the_side_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
-    ExperimentResult experiment_result(name, data_folder, "Number of concurrent random write threads");
+void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer) {
+	for (int i = 0; i < threads.size(); ++i) {
+		threads[i]->set_statistics_gatherer(statistics_gatherer);
+		unify_under_one_statistics_gatherer(threads[i]->get_follow_up_threads(), statistics_gatherer); // Recurse
+	}
+}
+
+vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
+	mkdir(data_folder.c_str(), 0755);
+	ExperimentResult global_result       (name, data_folder,                         "Number of concurrent random write threads");
+    ExperimentResult experiment_result   (name, data_folder + "Experiment_Threads/", "Number of concurrent random write threads");
+    ExperimentResult write_threads_result(name, data_folder + "Noise_Threads/",      "Number of concurrent random write threads");
+
+    global_result.start_experiment();
     experiment_result.start_experiment();
+    write_threads_result.start_experiment();
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 
@@ -351,9 +370,14 @@ ExperimentResult Experiment_Runner::random_writes_on_the_side_experiment(vector<
 		// Run experiment
 		vector<Thread*> threads = experiment(num_pages * used_space, IO_submission_rate);
 
+		StatisticsGatherer* experiment_statistics_gatherer = new StatisticsGatherer();
+		StatisticsGatherer* random_writes_statics_gatherer = new StatisticsGatherer();
+		unify_under_one_statistics_gatherer(threads, experiment_statistics_gatherer);
+
 		for (int i = 0; i < random_write_threads; i++) {
 			Thread* random_writes = new Synchronous_Random_Thread(random_writes_min_lba, random_writes_max_lba, std::numeric_limits<int>::max(), (i*3)+537, WRITE, 999);
 			//random_writes->set_experiment_thread(true);
+			random_writes->set_statistics_gatherer(random_writes_statics_gatherer);
 			threads[0]->add_follow_up_thread(random_writes);
 		}
 
@@ -363,7 +387,9 @@ ExperimentResult Experiment_Runner::random_writes_on_the_side_experiment(vector<
 			os->run();
 
 			// Collect statistics from this experiment iteration (save in csv files)
-			experiment_result.collect_stats(random_write_threads, os->get_experiment_runtime());
+			global_result.collect_stats       (random_write_threads, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
+			experiment_result.collect_stats   (random_write_threads, os->get_experiment_runtime(), experiment_statistics_gatherer);
+			write_threads_result.collect_stats(random_write_threads, os->get_experiment_runtime(), random_writes_statics_gatherer);
 		} catch(...) {
 			printf("An exception was thrown, but we continue for now\n");
 		}
@@ -378,9 +404,16 @@ ExperimentResult Experiment_Runner::random_writes_on_the_side_experiment(vector<
 
 		delete os;
 	}
+    global_result.end_experiment();
+    experiment_result.end_experiment();
+    write_threads_result.end_experiment();
 
-	experiment_result.end_experiment();
-	return experiment_result;
+    vector<ExperimentResult> results;
+    results.push_back(global_result);
+    results.push_back(experiment_result);
+    results.push_back(write_threads_result);
+
+	return results;
 }
 
 ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int used_space, int max_copybacks, string data_folder, string name, int IO_limit) {
@@ -465,7 +498,7 @@ ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*ex
 
 
 // Plotting x number of experiments into one graph
-void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments, int y_max) {
+void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments, int y_max, string subfolder) {
 	// Write temporary file containing GLE script
     string scriptFilename = Experiment_Runner::graph_filename_prefix + filename + ".gle"; // Name of temporary script file
     ofstream gleScript;
@@ -490,7 +523,7 @@ void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filenam
     for (uint i = 0; i < experiments.size(); i++) {
     	ExperimentResult e = experiments[i];
         gleScript <<
-       	"   data   \"" << e.data_folder << ExperimentResult::stats_filename << ExperimentResult::datafile_postfix << "\"" << " d"<<i+1<<"=c1,c" << column+1 << endl <<
+       	"   data   \"" << e.data_folder << subfolder << (subfolder != "" ? "/" : "") << ExperimentResult::stats_filename << ExperimentResult::datafile_postfix << "\"" << " d"<<i+1<<"=c1,c" << column+1 << endl <<
         "   d"<<i+1<<" line marker " << markers[i] << " key " << "\"" << e.experiment_name << "\"" << endl;
     }
 

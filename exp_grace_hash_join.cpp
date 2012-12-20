@@ -109,7 +109,7 @@ int main()
 	BLOCK_ERASE_DELAY = 1500;
 
 //	int IO_limit =  25000;
-	int IO_limit = 250000;
+	int IO_limit = 2500;
 	int space_min = 40;
 	int space_max = 85;
 	int space_inc = 5;
@@ -121,12 +121,13 @@ int main()
 	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 15;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
+	SCHEDULING_SCHEME = 3;
 
 	const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 	const int avail_pages = num_pages * used_space;
 
 
-	for (num_grace_hash_join_threads = 1; num_grace_hash_join_threads <= 4; num_grace_hash_join_threads++) {
+	for (num_grace_hash_join_threads = 1; num_grace_hash_join_threads <= 1; num_grace_hash_join_threads++) {
 		stringstream num_grace_hash_join_text;
 		num_grace_hash_join_text << num_grace_hash_join_threads;
 
@@ -135,22 +136,15 @@ int main()
 
 		double start_time = Experiment_Runner::wall_clock_time();
 
-		vector<ExperimentResult> exp;
+		vector<vector<ExperimentResult> > exps;
 
-		exp.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join,			 write_threads_min, write_threads_max, 1, exp_folder + "__/", "None", IO_limit, used_space, avail_pages*ns+1, avail_pages) );
-		exp.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex,	 write_threads_min, write_threads_max, 1, exp_folder + "F_/", "Flexible reads", IO_limit, used_space, avail_pages*ns+1, avail_pages) );
-		exp.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_tag,		 write_threads_min, write_threads_max, 1, exp_folder + "_T/", "Tagging", IO_limit, used_space, avail_pages*ns+1, avail_pages) );
-		exp.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex_tag, write_threads_min, write_threads_max, 1, exp_folder + "FT/", "Flexible reads + tagging", IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join,		  write_threads_min, write_threads_max, 1, exp_folder + "__/", "None",                  IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex,	  write_threads_min, write_threads_max, 1, exp_folder + "F_/", "Flexible reads",            IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_tag,      write_threads_min, write_threads_max, 1, exp_folder + "_T/", "Tagging",               IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex_tag, write_threads_min, write_threads_max, 1, exp_folder + "FT/", "Flexible reads + tagging", IO_limit, used_space, avail_pages*ns+1, avail_pages) );
 
-	/*
-		exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join,			space_min, space_max, space_inc, exp_folder + "__/", "None", IO_limit) );
-		exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join_flex,	    space_min, space_max, space_inc, exp_folder + "F_/", "Flexible reads", IO_limit) );
-		exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join_tag,	    space_min, space_max, space_inc, exp_folder + "_T/", "Tagging", IO_limit) );
-		exp.push_back( Experiment_Runner::overprovisioning_experiment(grace_hash_join_flex_tag, space_min, space_max, space_inc, exp_folder + "FT/", "Flexible reads + tagging", IO_limit) );
-	*/
-
-		uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write latency, mean (µs)") - exp[0].column_names.begin();
-		assert(mean_pos_in_datafile != exp[0].column_names.size());
+		uint mean_pos_in_datafile = std::find(exps[0][0].column_names.begin(), exps[0][0].column_names.end(), "Write latency, mean (µs)") - exps[0][0].column_names.begin();
+		assert(mean_pos_in_datafile != exps[0][0].column_names.size());
 
 		vector<int> num_write_thread_values_to_show;
 		for (int i = write_threads_min; i <= write_threads_max; i += 1)
@@ -159,29 +153,35 @@ int main()
 		int sx = 16;
 		int sy = 8;
 
-		for (int i = 0; i < exp[0].column_names.size(); i++) printf("%d: %s\n", i, exp[0].column_names[i].c_str());
+		for (int i = 0; i < exps[0][0].column_names.size(); i++) printf("%d: %s\n", i, exps[0][0].column_names[i].c_str());
 
 		chdir(exp_folder.c_str());
+		for (int i = 0; i < exps[0].size(); ++i) { // i = 0: GLOBAL, i = 1: EXPERIMENT, i = 2: WRITE_THREADS
+			vector<ExperimentResult> exp;
+			for (int j = 0; j < exps.size(); ++j) exp.push_back(exps[j][i]);
+			if      (i == 1) { mkdir("Experiment_Threads",    0755); chdir("Experiment_Threads"); }
+			else if (i == 2) { mkdir("Noise_Threads", 0755); chdir("Noise_Threads"); }
+			Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			24, exp/*, 30*/, UNDEFINED);
+			Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	25, exp/*, 30*/);
+			Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 		26, exp/*, 30*/);
+			Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp/*, 16000*/);
+			Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp/*, 500000*/);
 
-		Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			24, exp, 30);
-		Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	25, exp, 30);
-		Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 		26, exp, 30);
-		Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp, 16000);
-		Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp, 500000);
+			Experiment_Runner::graph(sx, sy,   "Write latency, mean", 			"Write latency, mean", 		9, 	exp);
+			Experiment_Runner::graph(sx, sy,   "Write latency, max", 			"Write latency, max", 		14, exp);
+			Experiment_Runner::graph(sx, sy,   "Write latency, std", 			"Write latency, std", 		15, exp);
 
-		Experiment_Runner::graph(sx, sy,   "Write latency, mean", 			"Write latency, mean", 		9, 	exp, 1000);
-		Experiment_Runner::graph(sx, sy,   "Write latency, max", 			"Write latency, max", 		14, exp, 10000);
-		Experiment_Runner::graph(sx, sy,   "Write latency, std", 			"Write latency, std", 		15, exp, 1000);
+			Experiment_Runner::graph(sx, sy,   "Read latency, mean", 			"Read latency, mean", 		16,	exp);
+			Experiment_Runner::graph(sx, sy,   "Read latency, max", 			"Read latency, max", 		21, exp);
+			Experiment_Runner::graph(sx, sy,   "Read latency, std", 			"Read latency, std", 		22, exp);
 
-		Experiment_Runner::graph(sx, sy,   "Read latency, mean", 			"Read latency, mean", 		16,	exp, 1000);
-		Experiment_Runner::graph(sx, sy,   "Read latency, max", 			"Read latency, max", 		21, exp, 10000);
-		Experiment_Runner::graph(sx, sy,   "Read latency, std", 			"Read latency, std", 		22, exp, 1000);
-
-		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
-		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, 1, 4);
-		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 70, 1, 4);
-		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 60, 1, 4);
-
+			Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
+			Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, 1, 4);
+			Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 70, 1, 4);
+			Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 60, 1, 4);
+			if (i > 0) { chdir(".."); }
+		}
+		vector<ExperimentResult>& exp = exps[0]; // Global one
 		for (uint i = 0; i < exp.size(); i++) {
 			printf("%s\n", exp[i].data_folder.c_str());
 			chdir(exp[i].data_folder.c_str());
@@ -191,9 +191,8 @@ int main()
 			Experiment_Runner::age_histogram			(sx, sy/2, "age-histograms", exp[i], num_write_thread_values_to_show);
 			Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], num_write_thread_values_to_show);
 			Experiment_Runner::throughput_history		(sx, sy/2, "throughput_history", exp[i], num_write_thread_values_to_show);
-			chdir("..");
+			chdir("../..");
 		}
-
 		double end_time = Experiment_Runner::wall_clock_time();
 		printf("=== Entire experiment finished in %s ===\n", Experiment_Runner::pretty_time(end_time - start_time).c_str());
 
