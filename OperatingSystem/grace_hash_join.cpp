@@ -209,10 +209,14 @@ Event* Grace_Hash_Join::execute_probe_phase() {
 
 	// If we have finished processing the last bucket, we are done with this phase
 	if (victim_buffer == num_partitions - 1 && trim_cursor > large_bucket_end) {
-		printf("Very last event issued!\n");
+		//printf("Very last event issued!\n");
 		phase = DONE;
 		finished = true;
 		grace_counter++;
+		printf("grace_counter: %d\n", grace_counter);
+		if (71 == grace_counter) {
+			PRINT_LEVEL = 1;
+		}
 		return NULL;
 	}
 

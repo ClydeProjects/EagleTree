@@ -62,7 +62,9 @@ void OperatingSystem::run() {
 		bool queue_is_full = currently_executing_ios_counter >= MAX_SSD_QUEUE_SIZE;
 
 		if (no_pending_event || queue_is_full) {
-			if (idle_time > 100000 && idle_time % 100000 == 0) printf("Idle for %f seconds. No_pending_event=%d  Queue_is_full=%d\n", (double) idle_time / 1000000, no_pending_event, queue_is_full);
+			if (idle_time > 100000 && idle_time % 100000 == 0) {
+				printf("Idle for %f seconds. No_pending_event=%d  Queue_is_full=%d\n", (double) idle_time / 1000000, no_pending_event, queue_is_full);
+			}
 			if (/*no_pending_event &&*/ idle_time >= idle_limit) {
 				printf("Idle time limit reached\n");
 				printf("Running IOs:\n");

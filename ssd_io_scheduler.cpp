@@ -355,7 +355,8 @@ void IOScheduler::push_into_current_events(Event* event) {
 		i++;
 	}
 	if (current_events.count(current_time) == 0) {
-		vector<Event*> events(1, event);
+		vector<Event*> events(0);
+		events.push_back(event);
 		current_events[current_time] = events;
 	} else {
 		vector<Event*>& events_with_this_time = current_events[current_time];
@@ -612,9 +613,9 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	}
 
 	// Reason for this: Finished non-app IOs is not handled in any thread
-	if (!event->is_original_application_io()) {
+	//if (!event->is_original_application_io()) {
 		StatisticsGatherer::get_global_instance()->register_completed_event(*event);
-	}
+	//}
 
 	VisualTracer::get_instance()->register_completed_event(*event);
 

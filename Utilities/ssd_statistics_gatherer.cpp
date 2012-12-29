@@ -68,11 +68,11 @@ StatisticsGatherer *StatisticsGatherer::get_global_instance()
 }
 
 void StatisticsGatherer::register_completed_event(Event const& event) {
-	if (inst != this) inst->register_completed_event(event); // Do the same for global instance
+	//if (inst != this) inst->register_completed_event(event); // Do the same for global instance
 
-	if (inst == this && /*!expleriment_started &&*/ !event.is_experiment_io()) { // Only register experiment IOs in global instance?!?
-		return;
-	}
+	//if (inst == this && /*!expleriment_started &&*/ !event.is_experiment_io()) { // Only register experiment IOs in global instance?!?
+	//	return;
+	//}
 
 	expleriment_started = true;
 	if (start_time == UNDEFINED) {
