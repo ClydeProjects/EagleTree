@@ -1765,11 +1765,18 @@ public:
 					bool use_flexible_reads = true, bool use_tagging  = true,
 					long rows_per_page      = 8,    int ranseed = 72);
 	Event* issue_next_io();
+
+	void handle_event_completion(Event* event);
+
+private:
+	static int grace_counter;
 	Event* execute_build_phase();
 	Event* execute_probe_phase();
 	Event* execute_third_phase();
-	void handle_event_completion(Event* event);
-private:
+	void create_flexible_reader(int start, int finish);
+	void handle_read_completion_build(Event* event);
+	void flush_buffer(int buffer_id);
+
 	long relation_A_min_LBA, relation_A_max_LBA;
 	long relation_B_min_LBA, relation_B_max_LBA;
 	long free_space_min_LBA, free_space_max_LBA;
@@ -1794,6 +1801,7 @@ private:
 	int small_bucket_begin, small_bucket_cursor, small_bucket_end;
 	int large_bucket_begin, large_bucket_cursor, large_bucket_end;
 	int trim_cursor;
+	queue<Event*> pending_writes;
 
 };
 
