@@ -77,18 +77,22 @@ vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool u
 }
 
 vector<Thread*> grace_hash_join(int highest_lba, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
 	return grace_hash_join(highest_lba, false, false, num_grace_hash_join_threads);
 }
 
 vector<Thread*> grace_hash_join_flex(int highest_lba, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
 	return grace_hash_join(highest_lba, true, false, num_grace_hash_join_threads);
 }
 
 vector<Thread*> grace_hash_join_tag(int highest_lba, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
 	return grace_hash_join(highest_lba, false, true, num_grace_hash_join_threads);
 }
 
 vector<Thread*> grace_hash_join_flex_tag(int highest_lba, double IO_submission_rate) {
+	BLOCK_MANAGER_ID = 3;
 	return grace_hash_join(highest_lba, true, true, num_grace_hash_join_threads);
 }
 
@@ -108,15 +112,13 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	BLOCK_MANAGER_ID = 0;
-
-	int IO_limit = 100000;
+	int IO_limit = 50000;
 	//int space_min = 40;
 	//int space_max = 85;
 	//int space_inc = 5;
 
-	int write_threads_min = 6;
-	int write_threads_max = 8;
+	int write_threads_min = 0;
+	int write_threads_max = 3;
 	double used_space = .80; // overprovisioning level for variable random write threads experiment
 
 	PRINT_LEVEL = 0;

@@ -427,6 +427,7 @@ public:
 	inline bool is_experiment_io() const 				{ return experiment_io; }
 	inline void set_experiment_io(bool val) 			{ experiment_io = val; }
 	inline void set_tag(int new_tag) 					{ tag = new_tag; }
+	inline void set_thread_id(int new_thread_id)		{ thread_id = new_thread_id; }
 	inline void set_address(const Address &address) {
 		if (type == WRITE || type == READ || type == READ_COMMAND || type == READ_TRANSFER) {
 			assert(address.valid == PAGE);
@@ -492,6 +493,8 @@ protected:
 
 	int age_class;
 	int tag;
+
+	int thread_id;
 };
 
 /* Single bus channel
@@ -1797,7 +1800,7 @@ private:
 	vector<int> output_cursors_startpoints;
 	vector<int> output_cursors_splitpoints; // Separates relation A and B in output buffers
 	int victim_buffer;
-	int writes_in_progress;
+	int writes_in_progress, reads_in_progress;
 	set<long> reads_in_progress_set;
 	int small_bucket_begin, small_bucket_cursor, small_bucket_end;
 	int large_bucket_begin, large_bucket_cursor, large_bucket_end;
@@ -1918,13 +1921,14 @@ public:
 	Event* read_next(double start_time);
 	void register_read_commencement(Flexible_Read_Event*);
 	inline bool is_finished() { return finished_counter == 0; }
+	inline uint get_num_reads_left() { return finished_counter; }
 	inline vector<vector<Address> > const& get_immediate_candidates()     { return immediate_candidates_physical_addresses; }
 	inline vector<vector<long> >    const& get_immediate_candidates_lba() { return immediate_candidates_logical_addresses; }
 	Address get_verified_candidate_address(uint package, uint die);
 	void find_alternative_immediate_candidate(uint package, uint die);
 
 	//inline vector<vector<long> > const& get_immediate_candidates_logical_addresses() { return immediate_candidates_logical_addresses; }
-//private:
+private:
 	void set_new_candidate();
 	struct progress_tracker {
 		vector<Address_Range> ranges;

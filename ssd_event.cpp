@@ -55,7 +55,8 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	age_class(0),
 	tag(-1),
 	accumulated_wait_time(0),
-	experiment_io(false)
+	experiment_io(false),
+	thread_id(UNDEFINED)
 {
 	assert(start_time >= 0.0);
 	if (logical_address > NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE) {
@@ -84,7 +85,8 @@ Event::Event(Event& event) :
 	age_class(event.age_class),
 	tag(event.tag),
 	accumulated_wait_time(0),
-	experiment_io(event.experiment_io)
+	experiment_io(event.experiment_io),
+	thread_id(event.thread_id)
 {}
 
 bool Event::is_flexible_read() {
@@ -129,6 +131,9 @@ void Event::print(FILE *stream) const
 	fprintf(stream, " ID: %d ", id);
 	fprintf(stream, " appID: %d", application_io_id);
 
+	if(thread_id != UNDEFINED) {
+		fprintf(stream, " thread: %d", thread_id);
+	}
 	if (garbage_collection_op) {
 		fprintf(stream, " GC");
 	} else if (mapping_op)  {

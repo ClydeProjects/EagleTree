@@ -339,8 +339,8 @@ void StatisticsGatherer::print() {
 
 	printf("%f\t\t", avg_overall_read_wait_time);
 	printf("\n\n");
-	printf("Erase avg:\t%f \n", get_average(num_erases_per_LUN));
-	printf("Erase std:\t%f \n", get_std(num_erases_per_LUN));
+	//printf("Erase avg:\t%f \n", get_average(num_erases_per_LUN));
+	//printf("Erase std:\t%f \n", get_std(num_erases_per_LUN));
 	double milliseconds = (end_time - start_time) / 1000;
 	printf("Time taken (ms):\t%d\n", (int)milliseconds);
 	printf("\n\n");
@@ -534,8 +534,8 @@ string StatisticsGatherer::totals_csv_line() {
 	ss << all_write_wait_times.back() << ", ";  // max
 	ss << get_std(all_write_wait_times) << ", ";
 
-	printf("write max:  %f\n", all_write_wait_times.back());
-	printf("write std:  %f\n", get_std(all_write_wait_times));
+	//printf("write max:  %f\n", all_write_wait_times.back());
+	//printf("write std:  %f\n", get_std(all_write_wait_times));
 
 	ss << get_average(all_read_wait_times) << ", ";  // mean
 	ss << all_read_wait_times.front() << ", "; // min
@@ -545,8 +545,8 @@ string StatisticsGatherer::totals_csv_line() {
 	ss << all_read_wait_times.back() << ", ";  // max
 	ss << get_std(all_read_wait_times) << ", ";
 
-	printf("read max:  %f\n", all_read_wait_times.back());
-	printf("read std:  %f\n", get_std(all_read_wait_times));
+	//printf("read max:  %f\n", all_read_wait_times.back());
+	//printf("read std:  %f\n", get_std(all_read_wait_times));
 
 	ss << stddev_overall_gc_wait_time;
 
