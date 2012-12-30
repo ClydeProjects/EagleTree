@@ -1774,7 +1774,7 @@ private:
 	Event* execute_probe_phase();
 	Event* execute_third_phase();
 	void create_flexible_reader(int start, int finish);
-	void handle_read_completion_build(Event* event);
+	void handle_read_completion_build();
 	void flush_buffer(int buffer_id);
 
 	long relation_A_min_LBA, relation_A_max_LBA;
@@ -1798,6 +1798,7 @@ private:
 	vector<int> output_cursors_splitpoints; // Separates relation A and B in output buffers
 	int victim_buffer;
 	int reads_in_progress, writes_in_progress;
+	set<long> reads_in_progress_set;
 	int small_bucket_begin, small_bucket_cursor, small_bucket_end;
 	int large_bucket_begin, large_bucket_cursor, large_bucket_end;
 	int trim_cursor;
