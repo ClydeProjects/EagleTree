@@ -1797,7 +1797,7 @@ private:
 	vector<int> output_cursors_startpoints;
 	vector<int> output_cursors_splitpoints; // Separates relation A and B in output buffers
 	int victim_buffer;
-	int reads_in_progress, writes_in_progress;
+	int writes_in_progress;
 	set<long> reads_in_progress_set;
 	int small_bucket_begin, small_bucket_cursor, small_bucket_end;
 	int large_bucket_begin, large_bucket_cursor, large_bucket_end;

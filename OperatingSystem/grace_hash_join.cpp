@@ -35,7 +35,7 @@ Grace_Hash_Join::Grace_Hash_Join
         small_bucket_begin(0), small_bucket_cursor(0), small_bucket_end(0),
         large_bucket_begin(0), large_bucket_cursor(0), large_bucket_end(0),
         trim_cursor(0),
-        reads_in_progress(0),
+        reads_in_progress_set(),
         writes_in_progress(0)
 {
 	assert(relation_A_min_LBA < relation_A_max_LBA);
@@ -112,14 +112,8 @@ void Grace_Hash_Join::flush_buffer(int buffer_id) {
 void Grace_Hash_Join::handle_event_completion(Event* event) {
 	bool done_reading = (input_cursor == relation_A_max_LBA + 1 || input_cursor == relation_B_max_LBA + 1);
 
-	if (1356 == event->get_logical_address() && PRINT_LEVEL == 1) {
-		int i = 0;
-		i++;
-	}
-
 	// If we have finished processing the last bucket, we are done with this phase
 	if (victim_buffer == num_partitions - 1 && trim_cursor > large_bucket_end && reads_in_progress_set.size() == 0) {
-		//printf("Very last event issued!\n");
 		phase = DONE;
 		finished = true;
 		grace_counter++;
@@ -128,23 +122,12 @@ void Grace_Hash_Join::handle_event_completion(Event* event) {
 
 	// Maintain read/writes in progress bookkeeping variables
 	if (event->get_event_type() == READ_TRANSFER) {
-		reads_in_progress--;
 		reads_in_progress_set.erase(event->get_logical_address());
-
-		if (reads_in_progress != reads_in_progress_set.size()) {
-			printf("reads_in_progress: %d\n", reads_in_progress);
-			printf("set size: %d\n", reads_in_progress_set.size());
-			set<long>::iterator iter = reads_in_progress_set.begin();
-			for (; iter != reads_in_progress_set.end(); iter++) {
-				printf("set: %d\n", *iter);
-			}
-		}
-		assert(reads_in_progress == reads_in_progress_set.size());
 
 		if (phase == BUILD) {
 			handle_read_completion_build();
 		}
-		if (phase == PROBE_ASYNC && trim_cursor == small_bucket_begin && reads_in_progress == 0) { // The very last read we're waiting for (before we can trim)
+		if (phase == PROBE_ASYNC && trim_cursor == small_bucket_begin && reads_in_progress_set.size() == 0) { // The very last read we're waiting for (before we can trim)
 		    time = max(time, event->get_current_time());
 	    }
 	} else if (event->get_event_type() == WRITE) {
@@ -208,11 +191,6 @@ Event* Grace_Hash_Join::execute_build_phase() {
 	if (reads_in_progress_set.size() > 0) return NULL;
 
 	// Read new content to input buffer
-	reads_in_progress++;
-	if (input_cursor == 0) {
-		int i = 0;
-		i++;
-	}
 	reads_in_progress_set.insert(input_cursor);
 	Event* event = use_flexible_reads ? flex_reader->read_next(time) : new Event(READ, input_cursor, 1, time);
 	input_cursor++;
@@ -250,10 +228,10 @@ Event* Grace_Hash_Join::execute_probe_phase() {
 		small_bucket_end    = output_cursors_splitpoints[victim_buffer];
 		large_bucket_begin  = output_cursors_splitpoints[victim_buffer]+1;
 		large_bucket_end    = output_cursors[victim_buffer]-1; // ?
-		if (small_bucket_end - small_bucket_cursor > large_bucket_end - large_bucket_cursor) {
+		/*if (small_bucket_end - small_bucket_cursor > large_bucket_end - large_bucket_cursor) {
 			swap(small_bucket_begin, large_bucket_begin);
 			swap(small_bucket_end,   large_bucket_end);
-		}
+		}*/
 		small_bucket_cursor = small_bucket_begin;
 		large_bucket_cursor = large_bucket_begin;
 		trim_cursor         = small_bucket_cursor;
@@ -271,19 +249,9 @@ Event* Grace_Hash_Join::execute_probe_phase() {
 
 	//printf("Small %d:%d   Large %d:%d\n", small_bucket_cursor, small_bucket_end, large_bucket_cursor, large_bucket_end);
 
-	if ((1356 == small_bucket_cursor || large_bucket_cursor == 1356) && PRINT_LEVEL == 1) {
-		int i = 0;
-		i++;
-	}
-
 	// If we are currently in the process of reading the small bucket into memory, continue with next page in buckets range
 	if (small_bucket_cursor <= small_bucket_end) {
-		reads_in_progress++;
 		reads_in_progress_set.insert(small_bucket_cursor);
-		if (small_bucket_cursor == 0) {
-			int i = 0;
-			i++;
-		}
 		phase = PROBE_ASYNC;
 		Event* event = use_flexible_reads ? flex_reader->read_next(time) : new Event(READ, small_bucket_cursor, 1, time);
 		small_bucket_cursor++;
@@ -292,17 +260,7 @@ Event* Grace_Hash_Join::execute_probe_phase() {
 	// If we are in the process of reading the large bucket one page at a time (for joining with the small one in memory), continue with next page
 	else {
 		if (reads_in_progress_set.size() > 0) return NULL; // Only one read at the same time = synchronous reads
-
-		if (victim_buffer == 13 && PRINT_LEVEL == 1) {
-			int i = 0;
-			i++;
-		}
-		if (large_bucket_cursor == 0) {
-			int i = 0;
-			i++;
-		}
 		reads_in_progress_set.insert(large_bucket_cursor);
-		reads_in_progress++;
 		phase = PROBE_SYNC;
 		if (use_flexible_reads && large_bucket_cursor == large_bucket_begin) { // First time in this range
 			create_flexible_reader(large_bucket_cursor, large_bucket_end);
