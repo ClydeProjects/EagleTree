@@ -19,7 +19,8 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	  num_writes_completed(0),
 	  time_of_last_event_completed(1),
 	  counter_for_user(1),
-	  time_of_experiment_start(UNDEFINED)
+	  time_of_experiment_start(UNDEFINED),
+	  idle_time(0)
 {
 	assert(threads.size() > 0);
 	for (uint i = 0; i < threads.size(); i++) {
@@ -54,7 +55,6 @@ OperatingSystem::~OperatingSystem() {
 
 void OperatingSystem::run() {
 	const int idle_limit = 5000000;
-	int idle_time = 0;
 	bool finished_experiment, still_more_work;
 	do {
 		int thread_id = pick_unlocked_event_with_shortest_start_time();
@@ -64,6 +64,7 @@ void OperatingSystem::run() {
 		if (no_pending_event || queue_is_full) {
 			if (idle_time > 100000 && idle_time % 100000 == 0) {
 				printf("Idle for %f seconds. No_pending_event=%d  Queue_is_full=%d\n", (double) idle_time / 1000000, no_pending_event, queue_is_full);
+				PRINT_LEVEL = 1;
 			}
 			if (/*no_pending_event &&*/ idle_time >= idle_limit) {
 				printf("Idle time limit reached\n");
@@ -76,12 +77,10 @@ void OperatingSystem::run() {
 				//StateVisualiser::print_page_status();
 				throw;
 			}
-
 			ssd->progress_since_os_is_waiting();
 			idle_time++;
 		}
 		else {
-			idle_time = 0;
 			dispatch_event(thread_id);
 		}
 
@@ -123,6 +122,7 @@ int OperatingSystem::pick_unlocked_event_with_shortest_start_time() {
 }
 
 void OperatingSystem::dispatch_event(int thread_id) {
+	idle_time = 0;
 	Event* event = events[thread_id];
 	//printf("submitting:   " ); event->print();
 	currently_executing_ios_counter++;
@@ -168,7 +168,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	Thread* thread = threads[thread_id];
 	thread->register_event_completion(event);
 
-	if (event->is_experiment_io() && !event->get_noop() && (/*event->get_event_type() == WRITE ||*/ event->get_event_type() == READ_TRANSFER) ) {
+	if (/*event->is_experiment_io() &&*/ !event->get_noop() && event->get_event_type() == WRITE ) {
 		num_writes_completed++;
 	}
 

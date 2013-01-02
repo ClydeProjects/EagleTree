@@ -1686,6 +1686,7 @@ private:
 	MTRand_int32 random_number_generator;
 	event_type type;
 	double time_breaks;
+	int num_IOs_processing;
 };
 
 class Asynchronous_Random_Thread_Reader_Writer : public Thread
@@ -1770,7 +1771,8 @@ public:
 	Event* issue_next_io();
 
 	void handle_event_completion(Event* event);
-
+	void static initialize_counter() { printf("grace_counter: %d\n", grace_counter); grace_counter = 0; };
+	int get_counter() { return grace_counter; };
 private:
 	static int grace_counter;
 	Event* execute_build_phase();
@@ -2023,8 +2025,8 @@ private:
 	double time_of_experiment_start;
 	double time_of_last_event_completed;
 
-
 	int counter_for_user;
+	int idle_time;
 };
 
 class ExperimentResult {

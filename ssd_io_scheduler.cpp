@@ -125,10 +125,8 @@ void IOScheduler::finish_all_events_until_this_time(double time) {
 
 }
 
-
 void IOScheduler::execute_soonest_events() {
 	finish_all_events_until_this_time(get_current_time() + 1);
-
 }
 
 // this is used to signal the SSD object when all events have finished executing
@@ -269,12 +267,8 @@ void IOScheduler::execute_current_waiting_ios() {
 	// FLEXIBLE READS AND WRITES EQUAL PRIORITY
 	else if (SCHEDULING_SCHEME == 3) {
 		writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
-
-		// Put flexible reads in write vector - simple but ugly way to give flexible reads and writes equal priority
 		writes.insert(writes.end(), read_commands_flexible.begin(), read_commands_flexible.end());
-
 		read_transfers.insert(read_transfers.end(), copy_backs.begin(), copy_backs.end());
-		//read_commands.insert(read_commands.end(), read_commands_copybacks.begin(), read_commands_copybacks.end());
 
 		sort(erases.begin(), erases.end(), current_wait_time_comparator);
 		sort(read_commands.begin(), read_commands.end(), overall_wait_time_comparator);
@@ -285,10 +279,8 @@ void IOScheduler::execute_current_waiting_ios() {
 		handle(erases);
 		handle(read_commands);
 		handle(read_commands_copybacks);
-		//handle(read_commands_copybacks);
 		handle(writes);
 		handle(read_transfers);
-		//handle(copy_backs);
 	}
 
 	handle_noop_events(noop_events);

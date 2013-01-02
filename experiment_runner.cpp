@@ -17,10 +17,6 @@
 
 /****************************************************************************/
 
-/* Basic test driver
- * Brendan Tauras 2010-08-03
- *
- * driver to create and run a very basic test of writes then reads */
 #define BOOST_FILESYSTEM_VERSION 3
 #include "ssd.h"
 #include <fstream>

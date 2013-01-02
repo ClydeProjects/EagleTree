@@ -183,7 +183,9 @@ Synchronous_Random_Thread::Synchronous_Random_Thread(long min_LBA, long max_LBA,
 Event* Synchronous_Random_Thread::issue_next_io() {
 	if (ready_to_issue_next_write && 0 < number_of_times_to_repeat--) {
 		ready_to_issue_next_write = false;
-		return new Event(type, min_LBA + random_number_generator() % (max_LBA - min_LBA + 1), 1, time);
+		Event* e = new Event(type, min_LBA + random_number_generator() % (max_LBA - min_LBA + 1), 1, time);
+		e->set_thread_id(2);
+		return e;
 	} else {
 		return NULL;
 	}
@@ -205,29 +207,22 @@ Asynchronous_Random_Thread::Asynchronous_Random_Thread(long min_LBA, long max_LB
 	  number_of_times_to_repeat(num_ios_to_issue),
 	  type(type),
 	  time_breaks(time_breaks),
-	  random_number_generator(randseed)
+	  random_number_generator(randseed),
+	  num_IOs_processing(0)
 {}
 
 Event* Asynchronous_Random_Thread::issue_next_io() {
-	Event* event;
-	if (0 < number_of_times_to_repeat) {
-		event =  new Event(type, min_LBA + random_number_generator() % (max_LBA - min_LBA + 1), 1, time);
-		time += 1;
-	} else {
-		event = NULL;
-	}
+	Event* event = 0 == number_of_times_to_repeat ? NULL : new Event(type, min_LBA + random_number_generator() % (max_LBA - min_LBA + 1), 1, time++);
 	number_of_times_to_repeat--;
-	if (number_of_times_to_repeat == 0) {
-		finished = true;
-	}
-
-	//printf("creating event:  " ); event->print();
-
+	num_IOs_processing++;
 	return event;
 }
 
 void Asynchronous_Random_Thread::handle_event_completion(Event* event) {
-	//time += event->get_bus_wait_time();
+	num_IOs_processing--;
+	if (num_IOs_processing == 0 && number_of_times_to_repeat == 0) {
+		finished = true;
+	}
 }
 
 // =================  Asynchronous_Random_Thread_Reader_Writer  =============================

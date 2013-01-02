@@ -46,6 +46,7 @@ Thread* grace_hash_join_thread(int lowest_lba, int highest_lba, bool use_flexibl
 }
 
 vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool use_tagging, int grace_hash_join_threads = 2, int random_read_threads = 0, int random_write_threads = 0) {
+	Grace_Hash_Join::initialize_counter();
 	Thread* initial_write    = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, 1, 1);
 
 	// TODO: For giving the grace hash join threads chucks of space of uneaven sizes
@@ -77,12 +78,12 @@ vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool u
 }
 
 vector<Thread*> grace_hash_join(int highest_lba, double IO_submission_rate) {
-	BLOCK_MANAGER_ID = 3;
+	BLOCK_MANAGER_ID = 0;
 	return grace_hash_join(highest_lba, false, false, num_grace_hash_join_threads);
 }
 
 vector<Thread*> grace_hash_join_flex(int highest_lba, double IO_submission_rate) {
-	BLOCK_MANAGER_ID = 3;
+	BLOCK_MANAGER_ID = 0;
 	return grace_hash_join(highest_lba, true, false, num_grace_hash_join_threads);
 }
 
@@ -101,7 +102,7 @@ int main()
 	load_config();
 
 	SSD_SIZE = 4;
-	PACKAGE_SIZE = 2;
+	PACKAGE_SIZE = 3;
 	DIE_SIZE = 1;
 	PLANE_SIZE = 32;
 	BLOCK_SIZE = 16;
@@ -112,17 +113,18 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 50000;
+	int IO_limit = 100000;
 	//int space_min = 40;
 	//int space_max = 85;
 	//int space_inc = 5;
 
 	int write_threads_min = 0;
-	int write_threads_max = 3;
-	double used_space = .80; // overprovisioning level for variable random write threads experiment
+	int write_threads_max = 10;
+	double used_space = .70; // overprovisioning level for variable random write threads experiment
+
 
 	PRINT_LEVEL = 0;
-	MAX_SSD_QUEUE_SIZE = 15;
+	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 	SCHEDULING_SCHEME = 2;
 
@@ -144,10 +146,10 @@ int main()
 
 		vector<vector<ExperimentResult> > exps;
 
-		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join,		  write_threads_min, write_threads_max, 1, exp_folder + "None/", "None",                  IO_limit, used_space, avail_pages*ns+1, avail_pages) );
-		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex,	  write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads/", "Flexible reads",            IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join,		  write_threads_min, write_threads_max, 1, exp_folder + "None/", "None",                  			IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+		//exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex,	  write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads/", "Flexible reads",        IO_limit, used_space, avail_pages*ns+1, avail_pages) );
 		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_tag,      write_threads_min, write_threads_max, 1, exp_folder + "Tagging/", "Tagging",               IO_limit, used_space, avail_pages*ns+1, avail_pages) );
-		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex_tag, write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads_&_tagging/", "Flexible reads + tagging", IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+		//exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex_tag, write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads_&_tagging/", "Flexible reads + tagging", IO_limit, used_space, avail_pages*ns+1, avail_pages) );
 
 		uint mean_pos_in_datafile = std::find(exps[0][0].column_names.begin(), exps[0][0].column_names.end(), "Write latency, mean (µs)") - exps[0][0].column_names.begin();
 		assert(mean_pos_in_datafile != exps[0][0].column_names.size());

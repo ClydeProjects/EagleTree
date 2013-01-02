@@ -94,11 +94,9 @@ void Grace_Hash_Join::handle_read_completion_build() {
 
 	// If we finished doing all the reads in the build phase, flush all the buckets
 	bool done_reading = (input_cursor == relation_A_max_LBA + 1 || input_cursor == relation_B_max_LBA + 1);
-
-	for (uint i = 0; i < output_buffers.size(); i++)
-		if (done_reading && output_buffers[i] > 0)
+	for (uint i = 0; done_reading && i < output_buffers.size(); i++)
+		if (output_buffers[i] > 0)
 			flush_buffer(i);
-
 }
 
 void Grace_Hash_Join::flush_buffer(int buffer_id) {

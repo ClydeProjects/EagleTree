@@ -44,8 +44,8 @@ vector<Thread*> sequential_experiment(int highest_lba, double IO_submission_rate
 
 	Thread* initial_write = new Asynchronous_Sequential_Thread(0, log_space_per_thread * 4, 1, WRITE, 100, 0);
 
-	Thread* random_formatter = new Asynchronous_Random_Thread_Reader_Writer(0, highest_lba, highest_lba * 3, 4246);
-	initial_write->add_follow_up_thread(random_formatter);
+	Thread* random_formatter = new Asynchronous_Random_Thread_Reader_Writer(0, log_space_per_thread * 4, highest_lba * 3, 4246);
+	//initial_write->add_follow_up_thread(random_formatter);
 
 
 	//Thread* random_formatter = new Asynchronous_Random_Thread(0, log_space_per_thread * 4, highest_lba * 3, 269, WRITE, IO_submission_rate, 1);
@@ -59,9 +59,9 @@ vector<Thread*> sequential_experiment(int highest_lba, double IO_submission_rate
 	experiment_thread2->set_experiment_thread(true);
 	experiment_thread3->set_experiment_thread(true);
 
-	random_formatter->add_follow_up_thread(experiment_thread1);
-	random_formatter->add_follow_up_thread(experiment_thread2);
-	random_formatter->add_follow_up_thread(experiment_thread3);
+	initial_write->add_follow_up_thread(experiment_thread1);
+	initial_write->add_follow_up_thread(experiment_thread2);
+	initial_write->add_follow_up_thread(experiment_thread3);
 
 	vector<Thread*> threads;
 	threads.push_back(initial_write);
@@ -121,7 +121,7 @@ int main()
 
 	int IO_limit = 200000;
 	int space_min = 60;
-	int space_max = 90;
+	int space_max = 80;
 	int space_inc = 5;
 
 	PRINT_LEVEL = 0;
@@ -151,14 +151,14 @@ int main()
 
 	chdir(exp_folder.c_str());
 
-	Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			24, exp, 30);
-	Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	25, exp, 30);
-	Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp, 16000);
-	Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp, 500000);
+	Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			24, exp);
+	Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	25, exp);
+	Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp);
+	Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp);
 
-	Experiment_Runner::graph(sx, sy,   "Write latency, mean", 			"Write latency, mean", 	9, 	exp, 12000);
-	Experiment_Runner::graph(sx, sy,   "Write latency, max", 			"Write latency, max", 		14, exp, 40000);
-	Experiment_Runner::graph(sx, sy,   "Write latency, std", 			"Write latency, std", 		15, exp, 14000);
+	Experiment_Runner::graph(sx, sy,   "Write latency, mean", 			"Write latency, mean", 	9, 	exp);
+	Experiment_Runner::graph(sx, sy,   "Write latency, max", 			"Write latency, max", 	14, exp);
+	Experiment_Runner::graph(sx, sy,   "Write latency, std", 			"Write latency, std", 	15, exp);
 
 	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
 	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, 1, 4);
