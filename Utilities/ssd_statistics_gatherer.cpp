@@ -546,7 +546,7 @@ string StatisticsGatherer::totals_csv_line() {
 	ss << get_std(all_read_wait_times) << ", ";
 
 	//printf("read max:  %f\n", all_read_wait_times.back());
-	//printf("read std:  %f\n", get_std(all_read_wait_times));
+	printf("read std:  %f\n", get_std(all_read_wait_times));
 
 	ss << stddev_overall_gc_wait_time;
 

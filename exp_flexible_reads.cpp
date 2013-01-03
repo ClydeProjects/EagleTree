@@ -39,9 +39,9 @@ vector<Thread*> flexible_reads(int highest_lba, double IO_submission_rate) {
 
 	Thread* flexible_reads = new Flexible_Reader_Thread(0, log_space_per_thread * 1, 1000);
 
-	Thread* random_writes1 = new Synchronous_Random_Thread(log_space_per_thread * 1 + 1, log_space_per_thread * 2, 1000000, 472, WRITE);
-	Thread* random_writes2 = new Synchronous_Random_Thread(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 1000000, 537, WRITE);
-	Thread* random_writes3 = new Synchronous_Random_Thread(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, 246, WRITE);
+	Thread* random_writes1 = new Synchronous_Random_Writer(log_space_per_thread * 1 + 1, log_space_per_thread * 2, 472);
+	Thread* random_writes2 = new Synchronous_Random_Writer(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 537);
+	Thread* random_writes3 = new Synchronous_Random_Writer(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 246);
 
 	flexible_reads->set_experiment_thread(true);
 	random_writes1->set_experiment_thread(true);
@@ -71,9 +71,9 @@ vector<Thread*> synch_sequential_reads(int highest_lba, double IO_submission_rat
 
 	Thread* seq_reads = new Synchronous_Sequential_Thread(0, log_space_per_thread * 1, 1000, READ);
 
-	Thread* random_writes1 = new Synchronous_Random_Thread(log_space_per_thread * 1 + 1, log_space_per_thread * 2, 1000000, 472, WRITE);
-	Thread* random_writes2 = new Synchronous_Random_Thread(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 1000000, 537, WRITE);
-	Thread* random_writes3 = new Synchronous_Random_Thread(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, 246, WRITE);
+	Thread* random_writes1 = new Synchronous_Random_Writer(log_space_per_thread * 1 + 1, log_space_per_thread * 2, 472);
+	Thread* random_writes2 = new Synchronous_Random_Writer(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 537);
+	Thread* random_writes3 = new Synchronous_Random_Writer(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 246);
 
 	seq_reads->set_experiment_thread(true);
 	random_writes1->set_experiment_thread(true);
@@ -92,7 +92,7 @@ vector<Thread*> synch_sequential_reads(int highest_lba, double IO_submission_rat
 
 int main()
 {
-	string exp_folder  = "exp_sequential/";
+	string exp_folder  = "exp_flexible_reads/";
 	mkdir(exp_folder.c_str(), 0755);
 
 	load_config();
@@ -110,7 +110,7 @@ int main()
 	BLOCK_ERASE_DELAY = 1500;
 
 	int IO_limit = 100000;
-	int space_min = 80;
+	int space_min = 75;
 	int space_max = 80;
 	int space_inc = 5;
 

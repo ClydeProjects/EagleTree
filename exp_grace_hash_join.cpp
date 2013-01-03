@@ -104,8 +104,8 @@ int main()
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 32;
-	BLOCK_SIZE = 16;
+	PLANE_SIZE = 128;
+	BLOCK_SIZE = 64;
 
 	PAGE_READ_DELAY = 50;
 	PAGE_WRITE_DELAY = 200;
@@ -113,13 +113,13 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 300000;
+	int IO_limit = 400000;
 	//int space_min = 40;
 	//int space_max = 85;
 	//int space_inc = 5;
 
 	int write_threads_min = 0;
-	int write_threads_max = 6;
+	int write_threads_max = 3;
 	double used_space = .80; // overprovisioning level for variable random write threads experiment
 
 
@@ -127,6 +127,7 @@ int main()
 	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 	SCHEDULING_SCHEME = 2;
+	GREED_SCALE = 2;
 
 	const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 	const int avail_pages = num_pages * used_space;
