@@ -263,6 +263,7 @@ double OperatingSystem::get_event_minimal_completion_time(Event const*const even
 }
 
 void OperatingSystem::lock(Event* event, int thread_id) {
+	if (event->is_flexible_read()) return;
 	event_type type = event->get_event_type();
 	long logical_address = event->get_logical_address();
 	map<long, queue<uint> >& map = (type == READ || type == READ_TRANSFER) ? read_LBA_to_thread_id :
@@ -275,9 +276,11 @@ void OperatingSystem::release_lock(Event* event) {
 	long logical_address = event->get_logical_address();
 	map<long, queue<uint> >& map = (type == READ || type == READ_TRANSFER) ? read_LBA_to_thread_id :
 			type == WRITE ? write_LBA_to_thread_id : trim_LBA_to_thread_id;
-	map[logical_address].pop();
-	if (map[logical_address].size() == 0) {
-		map.erase(logical_address);
+	if (map.count(logical_address) == 1) {
+		map[logical_address].pop();
+		if (map[logical_address].size() == 0) {
+			map.erase(logical_address);
+		}
 	}
 }
 
