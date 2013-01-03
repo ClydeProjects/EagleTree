@@ -928,8 +928,6 @@ protected:
 	Address find_free_unused_block(double time);
 	Address find_free_unused_block(enum age age, double time);
 
-
-
 	void return_unfilled_block(Address block_address);
 
 	pair<bool, pair<int, int> > get_free_block_pointer_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
@@ -1630,6 +1628,72 @@ private:
 	StatisticsGatherer* statistics_gatherer;
 };
 
+
+class IO_Pattern_Generator
+{
+public:
+	IO_Pattern_Generator(long min_LBA, long max_LBA) : min_LBA(min_LBA), max_LBA(max_LBA) {};
+	~IO_Pattern_Generator() {};
+	virtual int next() = 0;
+protected:
+	const long min_LBA, max_LBA;
+};
+
+class Random_IO_Pattern_Generator : IO_Pattern_Generator
+{
+public:
+	Random_IO_Pattern_Generator(long min_LBA, long max_LBA, ulong seed) : IO_Pattern_Generator(min_LBA, max_LBA), random_number_generator(seed) {};
+	~Random_IO_Pattern_Generator() {};
+	int next() { return min_LBA + random_number_generator() % (max_LBA - min_LBA + 1); };
+private:
+	MTRand_int32 random_number_generator;
+};
+
+class Sequential_IO_Pattern_Generator : IO_Pattern_Generator
+{
+public:
+	Sequential_IO_Pattern_Generator(long min_LBA, long max_LBA) : IO_Pattern_Generator(min_LBA, max_LBA), counter(min_LBA - 1) {};
+	~Sequential_IO_Pattern_Generator() {};
+	int next() { return counter == max_LBA ? counter = min_LBA - 1: ++counter; };
+private:
+	long counter;
+};
+
+class Random_Thread : public Thread
+{
+public:
+	Random_Thread(long min_LBA, long max_LAB, ulong randseed, int MAX_IOS, event_type type, int number_of_times_to_repeat);
+	virtual Event* issue_next_io();
+	virtual void handle_event_completion(Event* event);
+private:
+	int number_of_times_to_repeat;
+	event_type type;
+	int num_ongoing_IOs;
+	const int MAX_IOS;
+	Random_IO_Pattern_Generator io_gen;
+};
+
+class Synchronous_Random_Writer : public Random_Thread
+{
+public:
+	Synchronous_Random_Writer(long min_LBA, long max_LBA, ulong randseed, int number_of_times_to_repeat = std::numeric_limits<int>::max() )
+		: Random_Thread(min_LBA, max_LBA, randseed, 1, WRITE, number_of_times_to_repeat) {}
+};
+
+class Synchronous_Random_Reader : public Random_Thread
+{
+public:
+	Synchronous_Random_Reader(long min_LBA, long max_LBA, ulong randseed, int number_of_times_to_repeat = std::numeric_limits<int>::max() )
+		: Random_Thread(min_LBA, max_LBA, randseed, 1, READ, number_of_times_to_repeat) {}
+};
+
+class Asynchronous_Random_Writer : public Random_Thread
+{
+public:
+	Asynchronous_Random_Writer(long min_LBA, long max_LBA, ulong randseed, int number_of_times_to_repeat = std::numeric_limits<int>::max() )
+		: Random_Thread(min_LBA, max_LBA, randseed, std::numeric_limits<int>::max(), WRITE, number_of_times_to_repeat) {}
+};
+
 class Synchronous_Sequential_Thread : public Thread
 {
 public:
@@ -1656,37 +1720,6 @@ private:
 	event_type type;
 	int number_finished;
 	double time_breaks;
-};
-
-
-class Synchronous_Random_Thread : public Thread
-{
-public:
-	Synchronous_Random_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed, event_type type = WRITE, double time_breaks = 0, double start_time = 1);
-	Event* issue_next_io();
-	void handle_event_completion(Event* event);
-private:
-	long min_LBA, max_LBA;
-	bool ready_to_issue_next_write;
-	int number_of_times_to_repeat;
-	MTRand_int32 random_number_generator;
-	event_type type;
-	double time_breaks;
-};
-
-class Asynchronous_Random_Thread : public Thread
-{
-public:
-	Asynchronous_Random_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed = 0, event_type type = WRITE,  double time_breaks = 5, double start_time = 1);
-	Event* issue_next_io();
-	void handle_event_completion(Event* event);
-private:
-	long min_LBA, max_LBA;
-	int number_of_times_to_repeat;
-	MTRand_int32 random_number_generator;
-	event_type type;
-	double time_breaks;
-	int num_IOs_processing;
 };
 
 class Asynchronous_Random_Thread_Reader_Writer : public Thread

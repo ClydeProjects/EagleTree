@@ -51,7 +51,7 @@ vector<Thread*> sequential_experiment(int highest_lba, double IO_submission_rate
 	//Thread* random_formatter = new Asynchronous_Random_Thread(0, log_space_per_thread * 4, highest_lba * 3, 269, WRITE, IO_submission_rate, 1);
 	//t1->add_follow_up_thread(random_formatter);
 
-	Thread* experiment_thread1 = new Asynchronous_Random_Thread(0, log_space_per_thread * 2, 500000000, 472, WRITE, IO_submission_rate, 1);
+	Thread* experiment_thread1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 472);
 	Thread* experiment_thread2 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 1000000, max_file_size, IO_submission_rate, 1, 713);
 	Thread* experiment_thread3 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, max_file_size, IO_submission_rate, 2, 5);
 

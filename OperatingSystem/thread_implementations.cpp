@@ -167,62 +167,33 @@ void Asynchronous_Sequential_Thread::handle_event_completion(Event* event) {
 	}
 }
 
-// =================  Synchronous_Random_Writer  =============================
+// =================  Random_Thread  =============================
 
-Synchronous_Random_Thread::Synchronous_Random_Thread(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed, event_type type, double time_breaks, double start_time)
-	: Thread(start_time),
-	  min_LBA(min_LBA),
-	  max_LBA(max_LBA),
-	  ready_to_issue_next_write(true),
-	  number_of_times_to_repeat(num_ios_to_issue),
+Random_Thread::Random_Thread(long min_LBA, long max_LAB, ulong randseed, int MAX_IOS, event_type type, int number_of_times_to_repeat = std::numeric_limits<int>::max())
+	: Thread(0),
+	  number_of_times_to_repeat(number_of_times_to_repeat),
 	  type(type),
-	  random_number_generator(randseed),
-	  time_breaks(time_breaks)
-{}
-
-Event* Synchronous_Random_Thread::issue_next_io() {
-	if (ready_to_issue_next_write && 0 < number_of_times_to_repeat--) {
-		ready_to_issue_next_write = false;
-		Event* e = new Event(type, min_LBA + random_number_generator() % (max_LBA - min_LBA + 1), 1, time);
-		e->set_thread_id(2);
-		return e;
-	} else {
-		return NULL;
-	}
+	  num_ongoing_IOs(0),
+	  MAX_IOS(MAX_IOS),
+	  io_gen(min_LBA, max_LAB, randseed)
+{
+	assert(MAX_IOS > 0);
 }
 
-void Synchronous_Random_Thread::handle_event_completion(Event* event) {
-	assert(!ready_to_issue_next_write);
-	ready_to_issue_next_write = true;
+Event* Random_Thread::issue_next_io() {
+	bool issue = num_ongoing_IOs < MAX_IOS && number_of_times_to_repeat > 0;
+	if (issue) {
+		num_ongoing_IOs++;
+		number_of_times_to_repeat--;
+		return new Event(type, io_gen.next(), 1, time);
+	}
+	else return NULL;
+}
+
+void Random_Thread::handle_event_completion(Event* event) {
 	time = max(time, event->get_current_time()) + 1;
-}
-
-
-// =================  Asynchronous_Random_Writer  =============================
-
-Asynchronous_Random_Thread::Asynchronous_Random_Thread(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed, event_type type, double time_breaks, double start_time)
-	: Thread(start_time),
-	  min_LBA(min_LBA),
-	  max_LBA(max_LBA),
-	  number_of_times_to_repeat(num_ios_to_issue),
-	  type(type),
-	  time_breaks(time_breaks),
-	  random_number_generator(randseed),
-	  num_IOs_processing(0)
-{}
-
-Event* Asynchronous_Random_Thread::issue_next_io() {
-	Event* event = 0 == number_of_times_to_repeat ? NULL : new Event(type, min_LBA + random_number_generator() % (max_LBA - min_LBA + 1), 1, time++);
-	number_of_times_to_repeat--;
-	num_IOs_processing++;
-	return event;
-}
-
-void Asynchronous_Random_Thread::handle_event_completion(Event* event) {
-	num_IOs_processing--;
-	if (num_IOs_processing == 0 && number_of_times_to_repeat == 0) {
-		finished = true;
-	}
+	num_ongoing_IOs--;
+	finished = number_of_times_to_repeat == 0 && num_ongoing_IOs == 0;
 }
 
 // =================  Asynchronous_Random_Thread_Reader_Writer  =============================
