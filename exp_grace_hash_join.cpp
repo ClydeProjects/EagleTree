@@ -113,7 +113,7 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 200000;
+	int IO_limit = 300000;
 	//int space_min = 40;
 	//int space_max = 85;
 	//int space_inc = 5;
@@ -146,7 +146,7 @@ int main()
 
 		vector<vector<ExperimentResult> > exps;
 
-		//exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join,		  write_threads_min, write_threads_max, 1, exp_folder + "None/", "None",                  			IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join,		  write_threads_min, write_threads_max, 1, exp_folder + "None/", "None",                  			IO_limit, used_space, avail_pages*ns+1, avail_pages) );
 		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex,	  write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads/", "Flexible reads",        IO_limit, used_space, avail_pages*ns+1, avail_pages) );
 		//exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_tag,      write_threads_min, write_threads_max, 1, exp_folder + "Tagging/", "Tagging",               IO_limit, used_space, avail_pages*ns+1, avail_pages) );
 		//exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex_tag, write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads_&_tagging/", "Flexible reads + tagging", IO_limit, used_space, avail_pages*ns+1, avail_pages) );
