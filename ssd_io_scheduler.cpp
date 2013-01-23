@@ -11,6 +11,8 @@
 
 using namespace ssd;
 
+#define WAIT_TIME 3;
+
 IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
 	future_events(0),
 	current_events(),
@@ -79,9 +81,6 @@ IOScheduler *IOScheduler::instance()
 	return IOScheduler::inst;
 }
 
-
-
-
 // assumption is that all events within an operation have the same LBA
 void IOScheduler::schedule_events_queue(deque<Event*> events) {
 	long logical_address = events.back()->get_logical_address();
@@ -117,13 +116,12 @@ void IOScheduler::schedule_event(Event* event) {
 
 void IOScheduler::finish_all_events_until_this_time(double time) {
 	update_current_events();
-
 	while ( get_current_time() < time && current_events.size() > 0 ) {
 		execute_current_waiting_ios();
 		update_current_events();
 	}
-
 }
+
 
 void IOScheduler::execute_soonest_events() {
 	finish_all_events_until_this_time(get_current_time() + 1);
@@ -157,16 +155,11 @@ void IOScheduler::execute_current_waiting_ios() {
 	vector<Event*> read_commands_copybacks;
 	vector<Event*> read_commands_flexible;
 	//vector<Event*> gc_read_commands;
-
 	vector<Event*> read_transfers;
-
 	vector<Event*> gc_writes;
 	vector<Event*> writes;
-
 	vector<Event*> erases;
-
 	vector<Event*> copy_backs;
-
 	vector<Event*> noop_events;
 
 	while (events.size() > 0) {
@@ -208,12 +201,8 @@ void IOScheduler::execute_current_waiting_ios() {
 			execute_next(event);
 		}
 	}
-
-
 	//handle_writes(copy_backs); // Copy backs should be prioritized first to avoid conflict, since they have a reserved page waiting to be written
-
 	//read_commands.insert(read_commands.end(), gc_read_commands.begin(), gc_read_commands.end());
-
 	// Intuitive scheme. Prioritize Application IOs
 	if (SCHEDULING_SCHEME == 0) {
 		read_commands.insert(read_commands.end(), read_commands_flexible.begin(), read_commands_flexible.end());
@@ -258,6 +247,7 @@ void IOScheduler::execute_current_waiting_ios() {
 		handle(erases);
 		handle(read_commands);
 		handle(read_commands_copybacks);
+
 		//handle(read_commands_copybacks);
 		handle(writes);
 		handle(read_transfers);
@@ -267,8 +257,11 @@ void IOScheduler::execute_current_waiting_ios() {
 	// FLEXIBLE READS AND WRITES EQUAL PRIORITY
 	else if (SCHEDULING_SCHEME == 3) {
 		writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
+
+		// Put flexible reads in write vector - simple but ugly way to give flexible reads and writes equal priority
 		writes.insert(writes.end(), read_commands_flexible.begin(), read_commands_flexible.end());
 		read_transfers.insert(read_transfers.end(), copy_backs.begin(), copy_backs.end());
+		//read_commands.insert(read_commands.end(), read_commands_copybacks.begin(), read_commands_copybacks.end());
 
 		sort(erases.begin(), erases.end(), current_wait_time_comparator);
 		sort(read_commands.begin(), read_commands.end(), overall_wait_time_comparator);
@@ -279,15 +272,14 @@ void IOScheduler::execute_current_waiting_ios() {
 		handle(erases);
 		handle(read_commands);
 		handle(read_commands_copybacks);
+		//handle(read_commands_copybacks);
 		handle(writes);
 		handle(read_transfers);
+		//handle(copy_backs);
 	}
 
 	handle_noop_events(noop_events);
 }
-
-
-
 
 double IOScheduler::get_soonest_event_time(vector<Event*> const& events) const {
 	double earliest_time = events.front()->get_current_time();
@@ -360,6 +352,12 @@ void IOScheduler::handle(vector<Event*>& events) {
 	//sort(events.begin(), events.end(), overall_wait_time_comparator);
 	while (events.size() > 0) {
 		Event* event = events.back();
+
+		if (event->get_application_io_id() == 14379 && event->get_event_type() != WRITE && event->get_event_type() != READ_TRANSFER) {
+			int i = 0;
+			i++;
+		}
+
 		events.pop_back();
 		event_type type = event->get_event_type();
 		if (type == WRITE || type == COPY_BACK) {
@@ -374,12 +372,26 @@ void IOScheduler::handle(vector<Event*>& events) {
 	}
 }
 
+// executes read_commands, read_transfers and erases
+void IOScheduler::handle_event(Event* event) {
+	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
+	bool can_schedule = bm->can_schedule_on_die(event->get_address(), event->get_event_type(), event->get_application_io_id());
+	if (can_schedule && time == 0) {
+		execute_next(event);
+	}
+	else {
+		double bus_wait_time = can_schedule ? time : WAIT_TIME;
+		event->incr_bus_wait_time(bus_wait_time);
+		push_into_current_events(event);
+	}
+}
+
 void IOScheduler::handle_flexible_read(Event* event) {
 	Flexible_Read_Event* fr = dynamic_cast<Flexible_Read_Event*>(event);
 	Address addr = bm->choose_flexible_read_address(fr);
 	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, fr->get_current_time());
-	if ( wait_time == 0 && !bm->can_schedule_on_die(fr) )  {
-		wait_time = 10;
+	if ( wait_time == 0 && !bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id())) {
+		wait_time = WAIT_TIME;
 	}
 
 	// Check if the logical address is locked
@@ -388,7 +400,6 @@ void IOScheduler::handle_flexible_read(Event* event) {
 	if (logical_address_locked) {
 		//printf("---! LBA %ld locked. Pushing event into the future.\n", logical_address);
 		fr->find_alternative_immediate_candidate(addr.package, addr.die);
-		wait_time = 10;
 	}
 
 	if (wait_time == 0 && !logical_address_locked) {
@@ -407,10 +418,10 @@ void IOScheduler::handle_flexible_read(Event* event) {
 
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_write(Event* event) {
-	Address addr = bm->choose_address(*event);
+	Address addr = bm->choose_write_address(*event);
 	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time());
-	if ( wait_time == 0 && !bm->can_schedule_on_die(event) )  {
-		wait_time = 10;
+	if ( wait_time == 0 && !bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id()))  {
+		wait_time = WAIT_TIME;
 	}
 	if (wait_time == 0) {
 		event->set_address(addr);
@@ -514,20 +525,6 @@ void IOScheduler::make_dependent(Event* dependent_event, uint independent_code/*
 	dependencies[dependent_code].push_front(dependent_event);
 }
 
-// executes read_commands, read_transfers and erases
-void IOScheduler::handle_event(Event* event) {
-	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
-	bool can_schedule = bm->can_schedule_on_die(event);
-	if (can_schedule && time == 0) {
-		execute_next(event);
-	}
-	else {
-		double bus_wait_time = can_schedule ? time : 10;
-		event->incr_bus_wait_time(bus_wait_time);
-		push_into_current_events(event);
-	}
-}
-
 enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd.issue(event);
 
@@ -603,13 +600,14 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		event->print();
 		assert(false);
 	}
-
-	// Reason for this: Finished non-app IOs is not handled in any thread
-	//if (!event->is_original_application_io()) {
-		StatisticsGatherer::get_global_instance()->register_completed_event(*event);
-	//}
-
+	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
 	//VisualTracer::get_instance()->register_completed_event(*event);
+
+	/*if (event->get_latency() > 2000) {
+		VisualTracer::get_instance()->print_horizontally(10000);
+		event->print();
+		printf(" ");
+	}*/
 
 	if (event->get_event_type() == WRITE || event->get_event_type() == COPY_BACK) {
 		ftl.register_write_completion(*event, outcome);
@@ -629,9 +627,6 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		printf("LOOK HERE ");
 		event->print();
 	}
-
-
-
 	/*if (event->get_event_type() == READ_TRANSFER && event->get_overall_wait_time() >= 1778) {
 		event->print();
 		VisualTracer::get_instance()->print_horizontally_with_breaks();
@@ -647,7 +642,6 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		event->print();
 		StateVisualiser::print_page_status();
 	}*/
-
 }
 
 void IOScheduler::print_stats() {

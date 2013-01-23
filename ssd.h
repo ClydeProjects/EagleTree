@@ -1,24 +1,5 @@
-/* Copyright 2009, 2010 Brendan Tauras */
-
-/* ssd.h is part of FlashSim. */
-
-/* FlashSim is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * any later version. */
-
-/* FlashSim is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details. */
-
-/* You should have received a copy of the GNU General Public License
- * along with FlashSim.  If not, see <http://www.gnu.org/licenses/>. */
-
-/****************************************************************************/
 
 /* ssd.h
- * Brendan Tauras 2010-07-16
  * Main SSD header file
  * 	Lists definitions of all classes, structures,
  * 		typedefs, and constants used in ssd namespace
@@ -406,8 +387,6 @@ public:
 	inline ulong get_logical_address() const 			{ return logical_address; }
 	inline void set_logical_address(ulong addr) 		{ logical_address = addr; }
 	inline const Address &get_address() const 			{ return address; }
-	inline const Address &get_merge_address() const 	{ return merge_address; }
-	inline const Address &get_log_address() const 		{ return log_address; }
 	inline const Address &get_replace_address() const 	{ return replace_address; }
 	inline uint get_size() const 						{ return size; }
 	inline enum event_type get_event_type() const 		{ return type; }
@@ -434,8 +413,6 @@ public:
 		}
 		this -> address = address;
 	}
-	inline void set_merge_address(const Address &address) 	{ merge_address = address; }
-	inline void set_log_address(const Address &address) 	{ log_address = address; }
 	inline void set_replace_address(const Address &address) { replace_address = address; }
 	inline void set_payload(void *payload) 					{ this->payload = payload; }
 	inline void set_event_type(const enum event_type &type) { this->type = type; }
@@ -470,8 +447,6 @@ protected:
 	ulong logical_address;
 	Address address;
 	Address replace_address;
-	Address merge_address; // Deprecated
-	Address log_address;   // Deprecated
 	uint size;
 	void *payload;
 	bool noop;
@@ -898,14 +873,14 @@ public:
 	virtual void register_read_transfer_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual void register_register_cleared();
-	virtual Address choose_address(Event const& write);
+	virtual Address choose_write_address(Event const& write);
 	Address choose_flexible_read_address(Flexible_Read_Event* fr);
 	virtual void register_write_arrival(Event const& write);
 	virtual void trim(Event const& write);
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double current_time) const;
 	vector<deque<Event*> > migrate(Event * gc_event);
 	bool Copy_backs_in_progress(Address const& address);
-	bool can_schedule_on_die(Event const* event) const;
+	bool can_schedule_on_die(Address const& address, event_type type, uint app_io_id) const;
 	bool is_die_register_busy(Address const& addr) const;
 	void register_trim_making_gc_redundant();
 	Address choose_copbyback_address(Event const& write);
@@ -1798,9 +1773,9 @@ public:
 	Grace_Hash_Join(long relation_A_min_LBA,        long relation_A_max_LBA,
 					long relation_B_min_LBA,        long relation_B_max_LBA,
 					long free_space_min_LBA,        long free_space_max_LBA,
-					long RAM_available,             double start_time = 1,
+					double start_time = 1,
 					bool use_flexible_reads = true, bool use_tagging  = true,
-					long rows_per_page      = 8,    int ranseed = 72);
+					long rows_per_page      = 32,    int ranseed = 72);
 	Event* issue_next_io();
 
 	void handle_event_completion(Event* event);
@@ -1812,13 +1787,12 @@ private:
 	Event* execute_probe_phase();
 	Event* execute_third_phase();
 	void create_flexible_reader(int start, int finish);
-	void handle_read_completion_build();
+	void handle_read_completion_build(Event* read);
 	void flush_buffer(int buffer_id);
 
 	long relation_A_min_LBA, relation_A_max_LBA;
 	long relation_B_min_LBA, relation_B_max_LBA;
 	long free_space_min_LBA, free_space_max_LBA;
-	long RAM_available;
 	bool use_flexible_reads, use_tagging;
 	long input_cursor;
 	long relation_A_size, relation_B_size, free_space_size;
@@ -1829,7 +1803,6 @@ private:
 	Flexible_Reader* flex_reader;
 	MTRand_int32 random_number_generator;
 	enum {BUILD, PROBE_SYNC, PROBE_ASYNC, DONE} phase;
-	long buffer_size;
 	vector<int> output_buffers;
 	vector<int> output_cursors;
 	vector<int> output_cursors_startpoints;
@@ -1840,7 +1813,7 @@ private:
 	int small_bucket_begin, small_bucket_cursor, small_bucket_end;
 	int large_bucket_begin, large_bucket_cursor, large_bucket_end;
 	int trim_cursor;
-	queue<Event*> pending_writes;
+	queue<Event*> pending_ios;
 
 };
 

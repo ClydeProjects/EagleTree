@@ -120,7 +120,7 @@ int main()
 	BLOCK_ERASE_DELAY = 1500;
 
 	int IO_limit = 200000;
-	int space_min = 60;
+	int space_min = 65;
 	int space_max = 80;
 	int space_inc = 5;
 

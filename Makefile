@@ -1,24 +1,5 @@
-# Copyright 2009, 2010 Brendan Tauras
-
-# Makefile is part of FlashSim.
-
-# FlashSim is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# any later version.
-
-# FlashSim is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-
-# You should have received a copy of the GNU General Public License
-# along with FlashSim.  If not, see <http://www.gnu.org/licenses/>.
-
-##############################################################################
 
 # FlashSim makefile
-# Brendan Tauras 2010-08-03
 # 
 # Use the "ssd" (default) make target for separate compilation to include
 # with external programs, such as DiskSim or a custom drivers.

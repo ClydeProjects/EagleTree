@@ -100,7 +100,7 @@ Address Block_manager_parent::choose_flexible_read_address(Flexible_Read_Event* 
 	return a;
 }
 
-Address Block_manager_parent::choose_address(Event const& write) {
+Address Block_manager_parent::choose_write_address(Event const& write) {
 	bool can_write = num_available_pages_for_new_writes > 0 || write.is_garbage_collection_op();
 	if (!can_write) {
 		return Address();
@@ -552,7 +552,7 @@ bool Block_manager_parent::Copy_backs_in_progress(Address const& addr) {
 // gives time until both the channel and die are clear
 double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& address, double event_time) const {
 	if (address.valid == NONE) {
-		return 10;
+		return 5;
 	}
 
 	uint package_id = address.package;
@@ -565,16 +565,15 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 	return time < 0 ? 0 : time;
 }
 
-bool Block_manager_parent::can_schedule_on_die(Event const* event) const {
-	uint package_id = event->get_address().package;
-	uint die_id = event->get_address().die;
+bool Block_manager_parent::can_schedule_on_die(Address const& address, event_type type, uint app_io_id) const {
+	uint package_id = address.package;
+	uint die_id = address.die;
 	bool busy = ssd.getPackages()[package_id].getDies()[die_id].register_is_busy();
 	if (!busy) {
 		return true;
 	}
 	uint application_io = ssd.getPackages()[package_id].getDies()[die_id].get_last_read_application_io();
-	event_type type = event->get_event_type();
-	return (type == READ_TRANSFER || type == COPY_BACK ) && application_io == event->get_application_io_id();
+	return (type == READ_TRANSFER || type == COPY_BACK ) && application_io == app_io_id;
 }
 
 bool Block_manager_parent::is_die_register_busy(Address const& addr) const {

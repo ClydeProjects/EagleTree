@@ -16,7 +16,7 @@ Grace_Hash_Join::Grace_Hash_Join
        (long relation_A_min_LBA, long relation_A_max_LBA,
 		long relation_B_min_LBA, long relation_B_max_LBA,
 		long free_space_min_LBA, long free_space_max_LBA,
-		long RAM_available,      double start_time,
+        double start_time,
 		bool use_flexible_reads, bool use_tagging,
 		long rows_per_page,      int randseed) :
 
@@ -24,7 +24,6 @@ Grace_Hash_Join::Grace_Hash_Join
 		relation_A_min_LBA(relation_A_min_LBA), relation_A_max_LBA(relation_A_max_LBA),
 		relation_B_min_LBA(relation_B_min_LBA), relation_B_max_LBA(relation_B_max_LBA),
 		free_space_min_LBA(free_space_min_LBA), free_space_max_LBA(free_space_max_LBA),
-		RAM_available(RAM_available),
         use_flexible_reads(use_flexible_reads), use_tagging(use_tagging),
 		input_cursor(relation_A_min_LBA),
 		rows_per_page(rows_per_page),
@@ -34,7 +33,6 @@ Grace_Hash_Join::Grace_Hash_Join
 		victim_buffer(UNDEFINED),
         small_bucket_begin(0), small_bucket_cursor(0), small_bucket_end(0),
         large_bucket_begin(0), large_bucket_cursor(0), large_bucket_end(0),
-        trim_cursor(0),
         reads_in_progress_set(),
         writes_in_progress(0),
         reads_in_progress(0)
@@ -47,13 +45,11 @@ Grace_Hash_Join::Grace_Hash_Join
 	relation_B_size = (relation_B_max_LBA - relation_B_min_LBA);
 	free_space_size = (free_space_max_LBA - free_space_min_LBA);
 
-	assert(RAM_available   <  relation_A_size + relation_B_size);
 	assert(free_space_size >= relation_A_size + relation_B_size);
 
 	long larger_relation_size = max(relation_A_size, relation_B_size);
 	num_partitions = floor(sqrt(larger_relation_size));
 	partition_size = free_space_size / num_partitions;
-	buffer_size = (int) ((double) RAM_available / (num_partitions + 1) * rows_per_page);
 
 	output_buffers.resize(num_partitions, 0);
 	for (int i = 0; i < num_partitions; i++) {
@@ -64,10 +60,10 @@ Grace_Hash_Join::Grace_Hash_Join
 
 Event* Grace_Hash_Join::issue_next_io() {
 	Event* e = NULL;
-	if (pending_writes.size() > 0) {
-		Event* next_write = pending_writes.front();
+	if (pending_ios.size() > 0) {
+		Event* next_write = pending_ios.front();
 		next_write->incr_os_wait_time(time - next_write->get_start_time());
-		pending_writes.pop();
+		pending_ios.pop();
 		e = next_write;
 	}
 	else if (phase == BUILD) {
@@ -83,7 +79,7 @@ Event* Grace_Hash_Join::issue_next_io() {
 	return e;
 }
 
-void Grace_Hash_Join::handle_read_completion_build() {
+void Grace_Hash_Join::handle_read_completion_build(Event* read) {
 	//put the records into an appropriate bucket
 	for (int i = 0; i < rows_per_page; i++) {
 		int bucket_index = random_number_generator() % num_partitions;
@@ -106,17 +102,19 @@ void Grace_Hash_Join::flush_buffer(int buffer_id) {
 	Event* write = new Event(WRITE, lba, estimated_tag_size, time);
 	//if (use_tagging) write->set_tag(buffer_id * 2 + at_relation_A);
 	if (use_tagging) write->set_tag(1234);
-	pending_writes.push(write);
+	pending_ios.push(write);
 	output_buffers[buffer_id] = 0;
 	writes_in_progress++;
 
 }
 
 void Grace_Hash_Join::handle_event_completion(Event* event) {
+
+
 	bool done_reading = (input_cursor == relation_A_max_LBA + 1 || input_cursor == relation_B_max_LBA + 1);
 
 	// If we have finished processing the last bucket, we are done with this phase
-	if (victim_buffer == num_partitions - 1 && trim_cursor > large_bucket_end && reads_in_progress == 0) {
+	if (victim_buffer == num_partitions - 1 && reads_in_progress == 0) {
 		phase = DONE;
 		finished = true;
 		grace_counter++;
@@ -128,9 +126,12 @@ void Grace_Hash_Join::handle_event_completion(Event* event) {
 		reads_in_progress_set.erase(event->get_logical_address());
 		reads_in_progress--;
 		if (phase == BUILD) {
-			handle_read_completion_build();
+			handle_read_completion_build(event);
+		} else {
+			Event* trim = new Event(TRIM, event->get_logical_address(), 1, time);
+			pending_ios.push(trim);
 		}
-		if (phase == PROBE_ASYNC && trim_cursor == small_bucket_begin && reads_in_progress == 0) { // The very last read we're waiting for (before we can trim)
+		if (phase == PROBE_ASYNC && large_bucket_cursor == large_bucket_end && reads_in_progress == 0 && pending_ios.size() == 0) { // The very last read we're waiting for (before we can trim)
 		    time = max(time, event->get_current_time());
 	    }
 	} else if (event->get_event_type() == WRITE) {
@@ -173,11 +174,13 @@ Event* Grace_Hash_Join::execute_build_phase() {
 			assert(flex_reader->is_finished());
 			create_flexible_reader(relation_B_min_LBA, relation_B_max_LBA);
 		}
+		//VisualTracer::get_instance()->print_horizontally(6000);
 	}
 	else if (done_reading_relation_B) {
 		phase = PROBE_SYNC;
 		input_cursor = free_space_min_LBA;
 		victim_buffer = UNDEFINED;
+		//VisualTracer::get_instance()->print_horizontally(3000);
 		return execute_probe_phase();
 	}
 
@@ -200,14 +203,13 @@ void Grace_Hash_Join::create_flexible_reader(int start, int finish) {
 
 Event* Grace_Hash_Join::execute_probe_phase() {
 
-	if (victim_buffer == num_partitions - 1 && trim_cursor > large_bucket_end) {
+	if (victim_buffer == num_partitions - 1 && large_bucket_cursor > large_bucket_end) {
 		return NULL;
 	}
 
-	if (trim_cursor == small_bucket_end + 1) trim_cursor = large_bucket_begin;
 	// If we are done with a bucket pair, progress to the next, or, if we just started, begin with buffer zero
 	bool first_run = (small_bucket_cursor == 0 && small_bucket_end == 0 && large_bucket_cursor == 0 && large_bucket_end == 0);
-	bool finished_with_current_bucket = (small_bucket_cursor > small_bucket_end && large_bucket_cursor > large_bucket_end && trim_cursor == large_bucket_end + 1);
+	bool finished_with_current_bucket = (small_bucket_cursor > small_bucket_end && large_bucket_cursor > large_bucket_end);
 	if (first_run || finished_with_current_bucket) {
 		if (reads_in_progress > 0) return NULL; // Finish current reads before progressing
 		assert(flex_reader == NULL || flex_reader->is_finished());
@@ -222,21 +224,20 @@ Event* Grace_Hash_Join::execute_probe_phase() {
 		large_bucket_end    = output_cursors[victim_buffer]-1; // ?
 		/*if (small_bucket_end - small_bucket_cursor > large_bucket_end - large_bucket_cursor) {
 			swap(small_bucket_begin, large_bucket_begin);
-			swap(small_bucket_end,   large_bucket_end);
-		}*/
+			swap(small_bucket_end,   large_bucket_end);}*/
 		small_bucket_cursor = small_bucket_begin;
 		large_bucket_cursor = large_bucket_begin;
-		trim_cursor         = small_bucket_cursor;
 
 		if (use_flexible_reads) {
 			create_flexible_reader(small_bucket_cursor, small_bucket_end);
 		}
 	}
 
-	if (small_bucket_cursor > small_bucket_end && large_bucket_cursor > large_bucket_end && trim_cursor <= large_bucket_end) {
+	if (small_bucket_cursor > small_bucket_end && large_bucket_cursor > large_bucket_end) {
 		if (reads_in_progress > 0) return NULL; // Finish reads into memory before trimming
 		phase = PROBE_ASYNC;
-		return new Event(TRIM, trim_cursor++, 1, time);
+		//return new Event(TRIM, trim_cursor++, 1, time);
+		return NULL;
 	}
 
 	//printf("Small %d:%d   Large %d:%d\n", small_bucket_cursor, small_bucket_end, large_bucket_cursor, large_bucket_end);
@@ -253,7 +254,9 @@ Event* Grace_Hash_Join::execute_probe_phase() {
 	// If we are in the process of reading the large bucket one page at a time (for joining with the small one in memory), continue with next page
 	else {
 		if (reads_in_progress > 0) return NULL; // Only one read at the same time = synchronous reads
+		//VisualTracer::get_instance()->print_horizontally(3000);
 		reads_in_progress_set.insert(large_bucket_cursor);
+		//VisualTracer::get_instance()->print_horizontally(1400);
 		reads_in_progress++;
 		phase = PROBE_SYNC;
 		if (use_flexible_reads && large_bucket_cursor == large_bucket_begin) { // First time in this range
