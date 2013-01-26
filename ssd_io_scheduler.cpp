@@ -13,32 +13,23 @@ using namespace ssd;
 
 #define WAIT_TIME 3;
 
-IOScheduler::IOScheduler(Ssd& ssd,  FtlParent& ftl) :
+IOScheduler::IOScheduler() :
 	future_events(0),
 	current_events(),
 	dependencies(),
-	ssd(ssd),
-	ftl(ftl),
+	ssd(NULL),
+	ftl(NULL),
+	bm(NULL),
 	dependency_code_to_LBA(),
 	dependency_code_to_type(),
-	stats(),
-	random_number_generator(42)
-{
-	if (BLOCK_MANAGER_ID == 0) {
-		bm = new Block_manager_parallel(ssd, ftl);
-	} else if (BLOCK_MANAGER_ID == 1) {
-		bm = new Shortest_Queue_Hot_Cold_BM(ssd, ftl);
-	} else if (BLOCK_MANAGER_ID == 2) {
-		bm = new Wearwolf(ssd, ftl);
-	} else if (BLOCK_MANAGER_ID == 3) {
-		bm = new Wearwolf_Locality(ssd, ftl);
-	} else if (BLOCK_MANAGER_ID == 4) {
-		bm = new Block_manager_roundrobin(ssd, ftl);
-	} else {
-		assert(false);
-	}
-}
+	stats()
+{}
 
+void IOScheduler::set_all(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent* new_bm) {
+	ssd = new_ssd;
+	ftl = new_ftl;
+	bm = new_bm;
+}
 
 IOScheduler::~IOScheduler(){
 	for (uint i = 0; i < future_events.size(); i++) {
@@ -64,21 +55,6 @@ IOScheduler::~IOScheduler(){
 	}
 	dependencies.clear();
 	delete bm;
-}
-
-IOScheduler *IOScheduler::inst = NULL;
-
-void IOScheduler::instance_initialize(Ssd& ssd, FtlParent& ftl)
-{
-	if (inst != NULL) {
-		delete inst;
-	}
-	inst = new IOScheduler(ssd, ftl);
-}
-
-IOScheduler *IOScheduler::instance()
-{
-	return IOScheduler::inst;
 }
 
 // assumption is that all events within an operation have the same LBA
@@ -300,9 +276,12 @@ double IOScheduler::get_current_time() const {
 		return floor(get_soonest_event_time(future_events));
 }
 
+MTRand_int32 random_number_generator(42);
+int i = 0;
+
 // Generates a number between 0 and limit-1, used by the random_shuffle in update_current_events()
 ptrdiff_t random_range(ptrdiff_t limit) {
-	return IOScheduler::instance()->random_number_generator() % limit;
+	return random_number_generator() % limit;
 }
 
 long IOScheduler::get_current_events_size() {
@@ -425,7 +404,7 @@ void IOScheduler::handle_write(Event* event) {
 	}
 	if (wait_time == 0) {
 		event->set_address(addr);
-		ftl.set_replace_address(*event);
+		ftl->set_replace_address(*event);
 		assert(addr.page < BLOCK_SIZE);
 		execute_next(event);
 	}
@@ -483,10 +462,10 @@ Event* IOScheduler::find_scheduled_event(uint dependency_code) {
 void IOScheduler::remove_current_operation(Event* event) {
 	event->set_noop(true);
 	if (event->get_event_type() == READ_TRANSFER) {
-		ssd.getPackages()[event->get_address().package].getDies()[event->get_address().die].clear_register();
+		ssd->getPackages()[event->get_address().package].getDies()[event->get_address().die].clear_register();
 		bm->register_register_cleared();
 	} else if (event->get_event_type() == COPY_BACK) {
-		ssd.getPackages()[event->get_replace_address().package].getDies()[event->get_replace_address().die].clear_register();
+		ssd->getPackages()[event->get_replace_address().package].getDies()[event->get_replace_address().die].clear_register();
 		bm->register_register_cleared();
 	}
 }
@@ -501,13 +480,13 @@ void IOScheduler::handle_noop_events(vector<Event*>& events) {
 		while (dependents.size() > 0) {
 			Event *e = dependents.front();
 			dependents.pop_front();
-			ssd.register_event_completion(e);
+			ssd->register_event_completion(e);
 		}
 		dependencies.erase(dependency_code);
 		dependency_code_to_LBA.erase(dependency_code);
 		dependency_code_to_type.erase(dependency_code);
 		manage_operation_completion(event);
-		ssd.register_event_completion(event);
+		ssd->register_event_completion(event);
 	}
 }
 
@@ -526,7 +505,7 @@ void IOScheduler::make_dependent(Event* dependent_event, uint independent_code/*
 }
 
 enum status IOScheduler::execute_next(Event* event) {
-	enum status result = ssd.issue(event);
+	enum status result = ssd->issue(event);
 
 	if (PRINT_LEVEL > 0) {
 		event->print();
@@ -575,7 +554,7 @@ enum status IOScheduler::execute_next(Event* event) {
 		dependencies.erase(event->get_application_io_id()); // possible memory leak here, since events are not deleted
 	}
 
-	ssd.register_event_completion(event);
+	ssd->register_event_completion(event);
 	return result;
 }
 
@@ -610,7 +589,7 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	}*/
 
 	if (event->get_event_type() == WRITE || event->get_event_type() == COPY_BACK) {
-		ftl.register_write_completion(*event, outcome);
+		ftl->register_write_completion(*event, outcome);
 		bm->register_write_outcome(*event, outcome);
 		//StateTracer::print();
 	} else if (event->get_event_type() == ERASE) {
@@ -618,10 +597,10 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	} else if (event->get_event_type() == READ_COMMAND) {
 		bm->register_read_command_outcome(*event, outcome);
 	} else if (event->get_event_type() == READ_TRANSFER) {
-		ftl.register_read_completion(*event, outcome);
+		ftl->register_read_completion(*event, outcome);
 		bm->register_read_transfer_outcome(*event, outcome);
 	} else if (event->get_event_type() == TRIM) {
-		ftl.register_trim_completion(*event);
+		ftl->register_trim_completion(*event);
 		bm->trim(*event);
 	} else {
 		printf("LOOK HERE ");
@@ -681,14 +660,14 @@ void IOScheduler::init_event(Event* event) {
 		init_event(event);
 	}
 	else if (type == READ_COMMAND || type == READ_TRANSFER) {
-		ftl.set_read_address(*event);
+		ftl->set_read_address(*event);
 	}
 	else if (type == WRITE) {
 		bm->register_write_arrival(*event);
-//		ftl.set_replace_address(*event);
+//		ftl->set_replace_address(*event);
 	}
 	else if (type == TRIM) {
-		ftl.set_replace_address(*event);
+		ftl->set_replace_address(*event);
 	}
 	else if (type == GARBAGE_COLLECTION) {
 		vector<deque<Event*> > migrations = bm->migrate(event);

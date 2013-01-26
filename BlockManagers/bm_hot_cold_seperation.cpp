@@ -3,8 +3,8 @@
 
 using namespace ssd;
 
-Shortest_Queue_Hot_Cold_BM::Shortest_Queue_Hot_Cold_BM(Ssd& ssd, FtlParent& ftl)
-	: Block_manager_parent(ssd, ftl, 1),
+Shortest_Queue_Hot_Cold_BM::Shortest_Queue_Hot_Cold_BM()
+	: Block_manager_parent(1),
 	  page_hotness_measurer(),
 	  cold_pointer(find_free_unused_block(0))
 {}

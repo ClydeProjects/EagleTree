@@ -15,9 +15,9 @@
 using namespace ssd;
 using namespace std;
 
-Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age_classes)
- : ssd(ssd),
-   ftl(ftl),
+Block_manager_parent::Block_manager_parent(int num_age_classes)
+ : ssd(NULL),
+   ftl(NULL),
    free_block_pointers(SSD_SIZE, vector<Address>(PACKAGE_SIZE)),
    free_blocks(SSD_SIZE, vector<vector<vector<Address> > >(PACKAGE_SIZE, vector<vector<Address> >(num_age_classes, vector<Address>(0)) )),
    all_blocks(0),
@@ -34,10 +34,20 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
    erase_queue(SSD_SIZE, queue< Event*>()),
    num_erases_scheduled_per_package(SSD_SIZE, 0),
    random_number_generator(90),
-   num_erases_up_to_date(0)
+   num_erases_up_to_date(0),
+   scheduler(NULL)
 {
+}
+
+Block_manager_parent::~Block_manager_parent() {}
+
+void Block_manager_parent::set_all(Ssd* new_ssd, FtlParent* new_ftl, IOScheduler* new_sched) {
+	ssd = new_ssd;
+	ftl = new_ftl;
+	scheduler = new_sched;
+
 	for (uint i = 0; i < SSD_SIZE; i++) {
-		Package& package = ssd.getPackages()[i];
+		Package& package = ssd->getPackages()[i];
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			Die& die = package.getDies()[j];
 			for (uint t = 0; t < DIE_SIZE; t++) {
@@ -54,8 +64,6 @@ Block_manager_parent::Block_manager_parent(Ssd& ssd, FtlParent& ftl, int num_age
 		}
 	}
 }
-
-Block_manager_parent::~Block_manager_parent() {}
 
 Address Block_manager_parent::choose_copbyback_address(Event const& write) {
 	Address ra = write.get_replace_address();
@@ -137,7 +145,7 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	Address a = event.get_address();
 	a.valid = PAGE;
 	a.page = 0;
-	Block* b = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
+	Block* b = &ssd->getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 
 	if (b->get_age() > max_age) {
 		max_age = b->get_age();
@@ -156,7 +164,7 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 			new_erase->incr_bus_wait_time(diff);
 			erase_queue[a.package].pop();
 			num_erases_scheduled_per_package[a.package]++;
-			IOScheduler::instance()->schedule_event(new_erase);
+			scheduler->schedule_event(new_erase);
 		}
 	}
 
@@ -202,7 +210,7 @@ void Block_manager_parent::register_register_cleared() {
 }
 
 uint Block_manager_parent::sort_into_age_class(Address const& a) const {
-	Block* b = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
+	Block* b = &ssd->getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 	uint age = b->get_age();
 	double normalized_age = get_normalised_age(age);
 	int klass = floor(normalized_age * num_age_classes * 0.99999);
@@ -280,7 +288,7 @@ void Block_manager_parent::trim(Event const& event) {
 		return;
 	}
 
-	Block& block = ssd.getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
+	Block& block = ssd->getPackages()[ra.package].getDies()[ra.die].getPlanes()[ra.plane].getBlocks()[ra.block];
 	Page const& page = block.getPages()[ra.page];
 	uint age_class = sort_into_age_class(ra);
 	long const phys_addr = block.get_physical_address();
@@ -360,7 +368,7 @@ void Block_manager_parent::issue_erase(Address ra, double time) {
 	}
 	else {
 		num_erases_scheduled_per_package[ra.package]++;
-		IOScheduler::instance()->schedule_event(erase);
+		scheduler->schedule_event(erase);
 	}
 }
 
@@ -412,7 +420,7 @@ void Block_manager_parent::Wear_Level(Event const& event) {
 	assert(blocks_with_min_age.size() > 0);
 	num_erases_up_to_date++;
 	Address pba = event.get_address();
-	Block* b = &ssd.getPackages()[pba.package].getDies()[pba.die].getPlanes()[pba.plane].getBlocks()[pba.block];
+	Block* b = &ssd->getPackages()[pba.package].getDies()[pba.die].getPlanes()[pba.plane].getBlocks()[pba.block];
 
 	double time_since_last_erase = event.get_current_time() - b->get_second_last_erase_time();
 	average_erase_cycle_time = average_erase_cycle_time * 0.8 + 0.2 * time_since_last_erase;
@@ -496,11 +504,11 @@ pair<bool, pair<int, int> > Block_manager_parent::get_free_block_pointer_with_sh
 			bool die_has_free_pages = has_free_pages(pointer);
 			uint channel_id = pointer.package;
 			uint die_id = pointer.die;
-			bool die_register_is_busy = ssd.getPackages()[channel_id].getDies()[die_id].register_is_busy();
+			bool die_register_is_busy = ssd->getPackages()[channel_id].getDies()[die_id].register_is_busy();
 			if (die_has_free_pages && !die_register_is_busy) {
 				can_write = true;
-				double channel_finish_time = ssd.bus.get_channel(channel_id).get_currently_executing_operation_finish_time();
-				double die_finish_time = ssd.getPackages()[channel_id].getDies()[die_id].get_currently_executing_io_finish_time();
+				double channel_finish_time = ssd->bus.get_channel(channel_id).get_currently_executing_operation_finish_time();
+				double die_finish_time = ssd->getPackages()[channel_id].getDies()[die_id].get_currently_executing_io_finish_time();
 				double max = std::max(channel_finish_time,die_finish_time);
 
 				if (die_finish_time < earliest_die_finish_time) {
@@ -557,8 +565,8 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 
 	uint package_id = address.package;
 	uint die_id = address.die;
-	double channel_finish_time = ssd.bus.get_channel(package_id).get_currently_executing_operation_finish_time();
-	double die_finish_time = ssd.getPackages()[package_id].getDies()[die_id].get_currently_executing_io_finish_time();
+	double channel_finish_time = ssd->bus.get_channel(package_id).get_currently_executing_operation_finish_time();
+	double die_finish_time = ssd->getPackages()[package_id].getDies()[die_id].get_currently_executing_io_finish_time();
 	double max = std::max(channel_finish_time, die_finish_time);
 
 	double time = max - event_time;
@@ -568,18 +576,18 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 bool Block_manager_parent::can_schedule_on_die(Address const& address, event_type type, uint app_io_id) const {
 	uint package_id = address.package;
 	uint die_id = address.die;
-	bool busy = ssd.getPackages()[package_id].getDies()[die_id].register_is_busy();
+	bool busy = ssd->getPackages()[package_id].getDies()[die_id].register_is_busy();
 	if (!busy) {
 		return true;
 	}
-	uint application_io = ssd.getPackages()[package_id].getDies()[die_id].get_last_read_application_io();
+	uint application_io = ssd->getPackages()[package_id].getDies()[die_id].get_last_read_application_io();
 	return (type == READ_TRANSFER || type == COPY_BACK ) && application_io == app_io_id;
 }
 
 bool Block_manager_parent::is_die_register_busy(Address const& addr) const {
 	uint package_id = addr.package;
 	uint die_id = addr.die;
-	return ssd.getPackages()[package_id].getDies()[die_id].register_is_busy();
+	return ssd->getPackages()[package_id].getDies()[die_id].register_is_busy();
 }
 
 bool Block_manager_parent::can_schedule_write_immediately(Address const& prospective_dest, double current_time) {
@@ -663,7 +671,7 @@ void Block_manager_parent::schedule_gc(double time, int package, int die, int bl
 		//StateTracer::print();
 		printf("scheduling gc in (%d %d %d %d)  -  ", package, die, block, klass); gc->print();
 	}
-	IOScheduler::instance()->schedule_event(gc);
+	scheduler->schedule_event(gc);
 }
 
 vector<long> Block_manager_parent::get_relevant_gc_candidates(int package_id, int die_id, int klass) const {
@@ -699,7 +707,7 @@ Block* Block_manager_parent::choose_gc_victim(vector<long> candidates) const {
 	for (uint i = 0; i < candidates.size(); i++) {
 		long physical_address = candidates[i];
 		Address a = Address(physical_address, BLOCK);
-		Block* block = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
+		Block* block = &ssd->getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 		if (block->get_pages_valid() < min_valid_pages && block->get_state() == ACTIVE) {
 			min_valid_pages = block->get_pages_valid();
 			best_block = block;
@@ -799,7 +807,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	Block * victim;
 	if (is_wear_leveling_op) {
-		victim = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
+		victim = &ssd->getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 	}
 	else {
 		vector<long> candidates = get_relevant_gc_candidates(package_id, die_id, gc_event->get_age_class());
@@ -868,7 +876,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 			Address addr = Address(victim->physical_address, PAGE);
 			addr.page = i;
-			long logical_address = ftl.get_logical_address(addr.get_linear_address());
+			long logical_address = ftl->get_logical_address(addr.get_linear_address());
 
 			deque<Event*> migration;
 

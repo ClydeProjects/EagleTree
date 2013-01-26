@@ -1,5 +1,3 @@
-/* Copyright 2011 Matias Bjørling */
-
 /* page_ftl.cpp  */
 
 /* FlashSim is free software: you can redistribute it and/or modify
@@ -44,17 +42,17 @@ Address FtlImpl_Page::get_physical_address(Event const& event) const {
 
 void FtlImpl_Page::read(Event *event)
 {
-	IOScheduler::instance()->schedule_event(event);
+	scheduler->schedule_event(event);
 }
 
 void FtlImpl_Page::write(Event *event)
 {
-	IOScheduler::instance()->schedule_event(event);
+	scheduler->schedule_event(event);
 }
 
 void FtlImpl_Page::trim(Event *event)
 {
-	IOScheduler::instance()->schedule_event(event);
+	scheduler->schedule_event(event);
 }
 
 void FtlImpl_Page::register_write_completion(Event const& event, enum status result) {

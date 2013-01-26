@@ -866,8 +866,11 @@ private:
 
 class Block_manager_parent {
 public:
-	Block_manager_parent(Ssd& ssd, FtlParent& ftl, int classes = 1);
+	Block_manager_parent(int classes = 1);
 	virtual ~Block_manager_parent();
+
+	void set_all(Ssd*, FtlParent*, IOScheduler*);
+
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_command_outcome(Event const& event, enum status status);
 	virtual void register_read_transfer_outcome(Event const& event, enum status status);
@@ -912,8 +915,9 @@ protected:
 
 	inline bool has_free_pages(Address const& address) const { return address.valid == PAGE && address.page < BLOCK_SIZE; }
 
-	Ssd& ssd;
-	FtlParent& ftl;
+	Ssd* ssd;
+	FtlParent* ftl;
+	IOScheduler *scheduler;
 	vector<vector<Address> > free_block_pointers;
 
 	map<long, uint> page_copy_back_count; // Pages that have experienced a copy-back, mapped to a count of the number of copy-backs
@@ -964,7 +968,7 @@ private:
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation
 class Block_manager_parallel : public Block_manager_parent {
 public:
-	Block_manager_parallel(Ssd& ssd, FtlParent& ftl);
+	Block_manager_parallel();
 	~Block_manager_parallel() {}
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
@@ -976,7 +980,7 @@ protected:
 // A simple BM that assigns writes sequentially to dies in a round-robin fashion. No hot-cold separation or anything else intelligent
 class Block_manager_roundrobin : public Block_manager_parent {
 public:
-	Block_manager_roundrobin(Ssd& ssd, FtlParent& ftl, bool channel_alternation = true);
+	Block_manager_roundrobin(bool channel_alternation = true);
 	~Block_manager_roundrobin();
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
@@ -992,7 +996,7 @@ private:
 // A BM that assigns each write to the die with the shortest queue, as well as hot-cold seperation
 class Shortest_Queue_Hot_Cold_BM : public Block_manager_parent {
 public:
-	Shortest_Queue_Hot_Cold_BM(Ssd& ssd, FtlParent& ftl);
+	Shortest_Queue_Hot_Cold_BM();
 	~Shortest_Queue_Hot_Cold_BM();
 	void register_write_outcome(Event const& event, enum status status);
 	void register_read_command_outcome(Event const& event, enum status status);
@@ -1010,7 +1014,7 @@ private:
 
 class Wearwolf : public Block_manager_parent {
 public:
-	Wearwolf(Ssd& ssd, FtlParent& ftl);
+	Wearwolf();
 	~Wearwolf();
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_command_outcome(Event const& event, enum status status);
@@ -1064,7 +1068,7 @@ private:
 
 class Wearwolf_Locality : public Block_manager_parallel, public Sequential_Pattern_Detector_Listener {
 public:
-	Wearwolf_Locality(Ssd& ssd, FtlParent& ftl);
+	Wearwolf_Locality();
 	~Wearwolf_Locality();
 	void register_write_arrival(Event const& write);
 	void register_write_outcome(Event const& event, enum status status);
@@ -1118,20 +1122,21 @@ private:
 
 class IOScheduler {
 public:
+	IOScheduler();
+	~IOScheduler();
 	//void schedule_dependent_events_queue(deque<deque<Event*> > events);
+
+	void set_all(Ssd*, FtlParent*, Block_manager_parent*);
+
 	void schedule_events_queue(deque<Event*> events);
 	void schedule_event(Event* events);
 	bool is_empty();
 	void finish_all_events_until_this_time(double time);
 	void execute_soonest_events();
-	static IOScheduler *instance();
-	static void instance_initialize(Ssd& ssd, FtlParent& ftl);
+	//static IOScheduler *instance();
+	//static void instance_initialize(Ssd& ssd, FtlParent& ftl);
 	void print_stats();
-	MTRand_int32 random_number_generator;
 private:
-	IOScheduler(Ssd& ssd, FtlParent& ftl);
-	~IOScheduler();
-
 	void setup_structures(deque<Event*> events);
 	enum status execute_next(Event* event);
 	void execute_current_waiting_ios();
@@ -1160,9 +1165,9 @@ private:
 	map<long, vector<Event*> > current_events;
 	map<uint, deque<Event*> > dependencies;
 
-	static IOScheduler *inst;
-	Ssd& ssd;
-	FtlParent& ftl;
+	//static IOScheduler *inst;
+	Ssd* ssd;
+	FtlParent* ftl;
 	Block_manager_parent* bm;
 
 	//map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations. to be removed
@@ -1191,7 +1196,8 @@ private:
 class FtlParent
 {
 public:
-	FtlParent(Ssd &ssd) : ssd(ssd) {};
+	FtlParent(Ssd &ssd) : ssd(ssd), scheduler(NULL) {};
+	inline void set_scheduler(IOScheduler* sched) { scheduler = sched; }
 	virtual ~FtlParent () {};
 	virtual void read(Event *event) = 0;
 	virtual void write(Event *event) = 0;
@@ -1205,6 +1211,7 @@ public:
 	virtual void set_read_address(Event& event) = 0;
 protected:
 	Ssd &ssd;
+	IOScheduler *scheduler;
 };
 
 class FtlImpl_Page : public FtlParent
@@ -1389,6 +1396,7 @@ private:
 	double last_io_submission_time;
 	OperatingSystem* os;
 	FtlParent *ftl;
+	IOScheduler *scheduler;
 };
 
 class RaidSsd

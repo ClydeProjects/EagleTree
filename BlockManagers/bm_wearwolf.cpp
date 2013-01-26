@@ -3,8 +3,8 @@
 
 using namespace ssd;
 
-Wearwolf::Wearwolf(Ssd& ssd, FtlParent& ftl)
-	: Block_manager_parent(ssd, ftl, 4)
+Wearwolf::Wearwolf()
+	: Block_manager_parent(4)
 {
 	if (PAGE_HOTNESS_MEASURER == 0) {
 		page_hotness_measurer = new Ignorant_Hotness_Measurer();

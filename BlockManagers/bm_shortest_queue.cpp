@@ -14,8 +14,8 @@
 
 using namespace ssd;
 
-Block_manager_parallel::Block_manager_parallel(Ssd& ssd, FtlParent& ftl)
-: Block_manager_parent(ssd, ftl)
+Block_manager_parallel::Block_manager_parallel()
+: Block_manager_parent()
 {}
 
 void Block_manager_parallel::register_write_outcome(Event const& event, enum status status) {

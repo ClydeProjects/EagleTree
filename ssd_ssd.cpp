@@ -51,24 +51,15 @@ Ssd::Ssd(uint ssd_size):
 	last_io_submission_time(0.0),
 	os(NULL)
 {
-	ftl = new FtlImpl_Page(*this);
-	uint i;
-
-	/* new cannot initialize an array with constructor args so
-	 *		malloc the array
-	 *		then use placement new to call the constructor for each element
-	 * chose an array over container class so we don't have to rely on anything
-	 * 	i.e. STL's std::vector */
-	/* array allocated in initializer list:
-	 * data = (Package *) malloc(ssd_size * sizeof(Package)); */
 	if(data == NULL){
 		fprintf(stderr, "Ssd error: %s: constructor unable to allocate Package data\n", __func__);
 		exit(MEM_ERR);
 	}
-	for (i = 0; i < ssd_size; i++)
+	for (uint i = 0; i < ssd_size; i++)
 	{
 		(void) new (&data[i]) Package(*this, bus.get_channel(i), PACKAGE_SIZE, PACKAGE_SIZE*DIE_SIZE*PLANE_SIZE*BLOCK_SIZE*i);
 	}
+	this->getPackages();
 	
 	// Check for 32bit machine. We do not allow page data on 32bit machines.
 	if (PAGE_ENABLE_DATA == 1 && sizeof(void*) == 4)
@@ -99,7 +90,22 @@ Ssd::Ssd(uint ssd_size):
 	assert(VIRTUAL_BLOCK_SIZE > 0);
 	assert(VIRTUAL_PAGE_SIZE > 0);
 
-	IOScheduler::instance_initialize(*this, *ftl);
+	ftl = new FtlImpl_Page(*this);
+	scheduler = new IOScheduler();
+	Block_manager_parent* bm;
+
+	switch ( BLOCK_MANAGER_ID ) {
+		case 1: bm = new Shortest_Queue_Hot_Cold_BM(); break;
+		case 2: bm = new Wearwolf(); break;
+		case 3: bm = new Block_manager_parallel(); break;
+		case 4: bm = new Block_manager_roundrobin(); break;
+		default: bm = new Block_manager_parallel(); break;
+	}
+
+	ftl->set_scheduler(scheduler);
+	bm->set_all(this, ftl, scheduler);
+	scheduler->set_all(this, ftl, bm);
+
 	VisualTracer::init();
 	StateVisualiser::init(this);
 	StatisticsGatherer::init(this);
@@ -111,8 +117,8 @@ Ssd::Ssd(uint ssd_size):
 Ssd::~Ssd(void)
 {
 	//VisualTracer::get_instance()->print_horizontally(2000);
-	if (!IOScheduler::instance()->is_empty()) {
-		IOScheduler::instance()->execute_soonest_events();
+	if (!scheduler->is_empty()) {
+		scheduler->execute_soonest_events();
 	}
 	//StateTracer::print();
 	if (PRINT_LEVEL >= 1) StatisticsGatherer::get_global_instance()->print();
@@ -143,12 +149,10 @@ void Ssd::event_arrive(Event* event) {
 	event->set_original_application_io(true);
 	//IOScheduler::instance()->finish_all_events_until_this_time(event->get_ssd_submission_time());
 
-	if(event->get_event_type() == READ)
-		ftl->read(event);
-	else if(event->get_event_type() == WRITE)
-		ftl->write(event);
-	else if(event->get_event_type() == TRIM)
-		ftl->trim(event);
+
+	if(event->get_event_type() 		== READ) 	ftl->read(event);
+	else if(event->get_event_type() == WRITE) 	ftl->write(event);
+	else if(event->get_event_type() == TRIM) 	ftl->trim(event);
 }
 
 void Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, double start_time)
@@ -178,7 +182,7 @@ void Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, d
 }
 
 void Ssd::progress_since_os_is_waiting() {
-	IOScheduler::instance()->execute_soonest_events();
+	scheduler->execute_soonest_events();
 }
 
 void Ssd::register_event_completion(Event * event) {

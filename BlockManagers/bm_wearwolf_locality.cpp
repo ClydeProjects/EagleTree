@@ -4,8 +4,8 @@
 using namespace ssd;
 using namespace std;
 
-Wearwolf_Locality::Wearwolf_Locality(Ssd& ssd, FtlParent& ftl)
-	: Block_manager_parallel(ssd, ftl),
+Wearwolf_Locality::Wearwolf_Locality()
+	: Block_manager_parallel(),
 	  seq_write_key_to_pointers_mapping(),
 	  detector(new Sequential_Pattern_Detector(WEARWOLF_LOCALITY_THRESHOLD)),
 	  strat(SHOREST_QUEUE),

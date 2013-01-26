@@ -14,8 +14,8 @@
 
 using namespace ssd;
 
-Block_manager_roundrobin::Block_manager_roundrobin(Ssd& ssd, FtlParent& ftl, bool channel_alternation)
-:	Block_manager_parent(ssd, ftl),
+Block_manager_roundrobin::Block_manager_roundrobin(bool channel_alternation)
+:	Block_manager_parent(),
 	channel_alternation(channel_alternation)
 {}
 
