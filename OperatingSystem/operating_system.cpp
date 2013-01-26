@@ -64,17 +64,13 @@ void OperatingSystem::run() {
 		if (no_pending_event || queue_is_full) {
 			if (idle_time > 100000 && idle_time % 100000 == 0) {
 				printf("Idle for %f seconds. No_pending_event=%d  Queue_is_full=%d\n", (double) idle_time / 1000000, no_pending_event, queue_is_full);
-				PRINT_LEVEL = 1;
 			}
-			if (/*no_pending_event &&*/ idle_time >= idle_limit) {
-				printf("Idle time limit reached\n");
-				printf("Running IOs:\n");
+			if (idle_time >= idle_limit) {
+				printf("Idle time limit reached\nRunning IOs:");
 				for (set<uint>::iterator it = currently_executing_ios.begin(); it != currently_executing_ios.end(); it++) {
 					printf("%d ", *it);
 				}
 				printf("\n");
-				//VisualTracer::get_instance()->print_horizontally_with_breaks();
-				//StateVisualiser::print_page_status();
 				throw;
 			}
 			ssd->progress_since_os_is_waiting();
@@ -102,22 +98,13 @@ void OperatingSystem::run() {
 int OperatingSystem::pick_unlocked_event_with_shortest_start_time() {
 	double soonest_time = numeric_limits<double>::max();
 	int thread_id = UNDEFINED;
-	int num_pending_events_confirmation = 0;
 	for (uint i = 0; i < events.size(); i++) {
 		Event* e = events[i];
 		if (e != NULL && e->get_start_time() < soonest_time && !is_LBA_locked(e->get_logical_address()) ) {
 			soonest_time = events[i]->get_start_time();
 			thread_id = i;
 		}
-		if (e != NULL && e->get_event_type() != NOT_VALID) {
-			num_pending_events_confirmation++;
-		}
 	}
-	if (num_pending_events_confirmation != currently_pending_ios_counter) {
-		int i = 0;
-		i++;
-	}
-	//assert(num_pending_events_confirmation == currently_pending_ios_counter);
 	return thread_id;
 }
 

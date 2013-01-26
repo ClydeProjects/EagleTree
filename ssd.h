@@ -2024,6 +2024,7 @@ private:
 	void lock(Event* event, int thread_id);
 	void release_lock(Event*);
 
+	// used to record which thread dispatched which IO
 	map<long, long> app_id_to_thread_id_mapping;
 
 	int currently_executing_ios_counter;

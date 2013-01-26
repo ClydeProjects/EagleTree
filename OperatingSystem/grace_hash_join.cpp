@@ -109,10 +109,6 @@ void Grace_Hash_Join::flush_buffer(int buffer_id) {
 }
 
 void Grace_Hash_Join::handle_event_completion(Event* event) {
-
-
-	bool done_reading = (input_cursor == relation_A_max_LBA + 1 || input_cursor == relation_B_max_LBA + 1);
-
 	// If we have finished processing the last bucket, we are done with this phase
 	if (victim_buffer == num_partitions - 1 && reads_in_progress == 0) {
 		phase = DONE;
@@ -136,6 +132,7 @@ void Grace_Hash_Join::handle_event_completion(Event* event) {
 	    }
 	} else if (event->get_event_type() == WRITE) {
 		writes_in_progress--;
+		bool done_reading = (input_cursor == relation_A_max_LBA + 1 || input_cursor == relation_B_max_LBA + 1);
 		if (done_reading && writes_in_progress == 0) { // The very last write we have been waiting for
 			time = max(time, event->get_current_time());
 		}
@@ -234,9 +231,6 @@ Event* Grace_Hash_Join::execute_probe_phase() {
 	}
 
 	if (small_bucket_cursor > small_bucket_end && large_bucket_cursor > large_bucket_end) {
-		if (reads_in_progress > 0) return NULL; // Finish reads into memory before trimming
-		phase = PROBE_ASYNC;
-		//return new Event(TRIM, trim_cursor++, 1, time);
 		return NULL;
 	}
 
