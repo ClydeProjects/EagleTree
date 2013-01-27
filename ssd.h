@@ -413,6 +413,7 @@ public:
 		}
 		this -> address = address;
 	}
+	inline void set_start_time(double time) 				{ start_time = time; }
 	inline void set_replace_address(const Address &address) { replace_address = address; }
 	inline void set_payload(void *payload) 					{ this->payload = payload; }
 	inline void set_event_type(const enum event_type &type) { this->type = type; }
@@ -1582,14 +1583,14 @@ class Thread
 public:
 	Thread(double time) : finished(false), time(time), threads_to_start_when_this_thread_finishes(), num_ios_finished(0), experiment_thread(false), os(NULL), statistics_gatherer(new StatisticsGatherer()) {}
 	virtual ~Thread();
-	Event* run();
+	deque<Event*> run();
 	inline bool is_finished() { return finished; }
 	inline void set_time(double current_time) { time = current_time; }
 	inline double get_time() { return time; }
 	inline void add_follow_up_thread(Thread* thread) { threads_to_start_when_this_thread_finishes.push_back(thread); }
 	inline vector<Thread*>& get_follow_up_threads() { return threads_to_start_when_this_thread_finishes; }
 	virtual void print_thread_stats();
-	void register_event_completion(Event* event);
+	deque<Event*> register_event_completion(Event* event);
 	inline void set_experiment_thread(bool val) { experiment_thread = val; }
 	inline bool is_experiment_thread() { return experiment_thread; }
 	void set_os(OperatingSystem*  op_sys);
@@ -1605,10 +1606,13 @@ protected:
 	double time;
 	vector<Thread*> threads_to_start_when_this_thread_finishes;
 	OperatingSystem* os;
+
+	void submit(Event* event);
 private:
 	ulong num_ios_finished;
 	bool experiment_thread;
 	StatisticsGatherer* statistics_gatherer;
+	deque<Event*> submitted_events;
 };
 
 
@@ -1685,7 +1689,6 @@ public:
 	void handle_event_completion(Event* event);
 private:
 	long min_LBA, max_LBA;
-	bool ready_to_issue_next_write;
 	int number_of_times_to_repeat, counter;
 	event_type type;
 };
@@ -1731,28 +1734,6 @@ private:
 	double time_breaks;
 	set<long> logical_addresses_submitted;
 };
-
-/*
-class Reliable_Random_Int_Generator {
-public:
-	Reliable_Random_Int_Generator(int seed, int num_numbers_needed);
-	int next();
-private:
-	MTRand_int32 random_number_generator;
-	deque<int> numbers;
-};
-
-class Reliable_Random_Double_Generator {
-public:
-	Reliable_Random_Double_Generator(int seed, int num_numbers_needed);
-	double next();
-private:
-	MTRand_open random_number_generator;
-	deque<double> numbers;
-};
-*/
-
-
 
 // assuming the relation is made of contigouse pages
 // RAM_available is the number of pages that fit into RAM
@@ -2007,14 +1988,29 @@ public:
 	void set_num_writes_to_stop_after(long num_writes);
 	double get_experiment_runtime() const;
 	Flexible_Reader* create_flexible_reader(vector<Address_Range>);
+	void submit(Event* event);
 private:
 	int pick_unlocked_event_with_shortest_start_time();
 	void dispatch_event(int thread_id);
 	double get_event_minimal_completion_time(Event const*const event) const;
 	bool is_LBA_locked(ulong lba);
+	void update_thread_times(double time);
 	Ssd * ssd;
 	vector<Thread*> threads;
-	vector<Event*> events;
+
+	struct Pending_Events {
+		vector<deque<Event*> > event_queues;
+		int num_pending_events;
+		Pending_Events(int i);
+		~Pending_Events();
+		Event* peek(int i);
+		Event* pop(int i);
+		void append(int i, deque<Event*>);
+		inline int get_num_pending_events() { return num_pending_events; }
+		inline int size() {return event_queues.size();};
+	};
+	Pending_Events events;
+
 
 	//map<long, uint> LBA_to_thread_id_map;
 
@@ -2028,7 +2024,6 @@ private:
 	map<long, long> app_id_to_thread_id_mapping;
 
 	int currently_executing_ios_counter;
-	int currently_pending_ios_counter;
 	double last_dispatched_event_minimal_finish_time;
 
 	int currently_executing_trims_counter;

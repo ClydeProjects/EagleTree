@@ -21,23 +21,32 @@ Thread::~Thread() {
 	}
 }
 
-Event* Thread::run() {
-	if (finished) return NULL;
+deque<Event*> Thread::run() {
+	deque<Event*> empty;
+	swap(empty, submitted_events);
+	if (finished) return empty;
+	//Event* event = issue_next_io();
 	Event* event = issue_next_io();
-	if (event != NULL && is_experiment_thread()) {
-		event->set_experiment_io(true);
+	if (event != NULL) {
+		submitted_events.push_back(event);
 	}
-	return event;
+	for (uint i = 0; i < submitted_events.size() && is_experiment_thread(); i++) {
+		Event* e = submitted_events[i];
+		if (e != NULL) e->set_experiment_io(true);
+	}
+	return submitted_events;
 }
 
-void Thread::register_event_completion(Event* event) {
+deque<Event*> Thread::register_event_completion(Event* event) {
+	deque<Event*> empty;
+	time = event->get_current_time();
+	swap(empty, submitted_events);
 	statistics_gatherer->register_completed_event(*event);
-	Address phys = event->get_address();
-	Address ra = event->get_replace_address();
 	handle_event_completion(event);
 	if (!event->get_noop() && event->get_event_type() != TRIM) {
 		num_ios_finished++;
 	}
+	return submitted_events;
 }
 
 void Thread::print_thread_stats() {
@@ -49,6 +58,11 @@ void Thread::set_os(OperatingSystem*  op_sys) {
 	op_sys->get_experiment_runtime();
 }
 
+void Thread::submit(Event* event) {
+	event->set_start_time(event->get_current_time());
+	submitted_events.push_front(event);
+}
+
 // =================  Synchronous_Sequential_Thread  =============================
 
 Synchronous_Sequential_Thread::Synchronous_Sequential_Thread(long min_LBA, long max_LBA, int repetitions_num, event_type type, double start_time)
@@ -56,30 +70,24 @@ Synchronous_Sequential_Thread::Synchronous_Sequential_Thread(long min_LBA, long 
 	  min_LBA(min_LBA),
 	  max_LBA(max_LBA),
 	  counter(0),
-	  ready_to_issue_next_write(true),
 	  number_of_times_to_repeat(repetitions_num),
 	  type(type)
 {}
 
 Event* Synchronous_Sequential_Thread::issue_next_io() {
-	if (ready_to_issue_next_write && number_of_times_to_repeat > 0) {
-		ready_to_issue_next_write = false;
-		return new Event(type, min_LBA + counter++, 1, time);
-	} else {
-		return NULL;
+	if (number_of_times_to_repeat > 0) {
+		Event* e = new Event(type, min_LBA + counter++, 1, time);
+		submit(e);
 	}
+	return NULL;
 }
 
 void Synchronous_Sequential_Thread::handle_event_completion(Event* event) {
-	assert(!ready_to_issue_next_write);
-	ready_to_issue_next_write = true;
 	time = event->get_current_time();
 	if (min_LBA + counter > max_LBA) {
 		counter = 0;
-		//StateTracer::print();
 		if (--number_of_times_to_repeat == 0) {
 			finished = true;
-			StateVisualiser::print_page_status();
 		}
 	}
 }
