@@ -205,7 +205,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 		if (!t->is_finished()) {
 			double thread_time = t->get_time();
 			if (thread_time < event->get_ssd_submission_time()) {
-				t->set_time(event->get_current_time() + 1);
+				t->set_time(event->get_ssd_submission_time() + 1);
 			}
 			Event* e = events[i];
 			if (e != NULL) {
