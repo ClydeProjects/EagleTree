@@ -157,11 +157,11 @@ int main()
 	//int space_inc = 5;
 
 	int write_threads_min = 0;
-	int write_threads_max = 3;
+	int write_threads_max = 5;
 	double used_space = .80; // overprovisioning level for variable random write threads experiment
 
 
-	PRINT_LEVEL = 1;
+	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 	SCHEDULING_SCHEME = 2;

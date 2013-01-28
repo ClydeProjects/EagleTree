@@ -12,6 +12,10 @@ using namespace ssd;
 
 // =================  Thread =============================
 
+Thread::Thread() :
+		finished(false), time(1), threads_to_start_when_this_thread_finishes(), num_ios_finished(0),
+		experiment_thread(false), os(NULL), statistics_gatherer(new StatisticsGatherer()), last_IO_was_null(false) {}
+
 Thread::~Thread() {
 	for (uint i = 0; i < threads_to_start_when_this_thread_finishes.size(); i++) {
 		Thread* t = threads_to_start_when_this_thread_finishes[i];
@@ -33,16 +37,19 @@ deque<Event*> Thread::run() {
 		Event* e = submitted_events[i];
 		if (e != NULL) e->set_experiment_io(true);
 	}
+	if (submitted_events.size() == 0) {
+		last_IO_was_null = true;
+	}
 	return submitted_events;
 }
 
 deque<Event*> Thread::register_event_completion(Event* event) {
 	deque<Event*> empty;
 	swap(empty, submitted_events);
-	if (event->is_synchronous()) {
-		//time = max(time, event->get_current_time());
-	}
 	statistics_gatherer->register_completed_event(*event);
+	if (last_IO_was_null) {
+		time = event->get_current_time();
+	}
 	handle_event_completion(event);
 	for (uint i = 0; i < submitted_events.size() && is_experiment_thread(); i++) {
 		Event* e = submitted_events[i];
@@ -69,6 +76,35 @@ void Thread::set_os(OperatingSystem*  op_sys) {
 void Thread::submit(Event* event) {
 	event->set_start_time(event->get_current_time());
 	submitted_events.push_front(event);
+}
+
+// =================  Simple_Thread  =============================
+
+Simple_Thread::Simple_Thread(IO_Pattern_Generator* generator, int MAX_IOS, event_type type)
+	: Thread(),
+	  type(type),
+	  num_ongoing_IOs(0),
+	  MAX_IOS(MAX_IOS),
+	  io_gen(generator)
+{
+	assert(MAX_IOS > 0);
+	number_of_times_to_repeat = generator->max_LBA - generator->min_LBA + 1;
+}
+
+Event* Simple_Thread::issue_next_io() {
+	bool issue = num_ongoing_IOs < MAX_IOS && number_of_times_to_repeat > 0;
+	if (issue) {
+		num_ongoing_IOs++;
+		number_of_times_to_repeat--;
+		Event* e = new Event(type, io_gen->next(), 1, time);
+		submit(e);
+	}
+	return NULL;
+}
+
+void Simple_Thread::handle_event_completion(Event* event) {
+	num_ongoing_IOs--;
+	finished = number_of_times_to_repeat == 0 && num_ongoing_IOs == 0;
 }
 
 // =================  Flexible_Reader_Thread  =============================
@@ -111,34 +147,7 @@ void Flexible_Reader_Thread::handle_event_completion(Event* event) {
 	}
 }
 
-// =================  Simple_Thread  =============================
 
-Simple_Thread::Simple_Thread(IO_Pattern_Generator* generator, int MAX_IOS, event_type type)
-	: Thread(),
-	  type(type),
-	  num_ongoing_IOs(0),
-	  MAX_IOS(MAX_IOS),
-	  io_gen(generator)
-{
-	assert(MAX_IOS > 0);
-	number_of_times_to_repeat = generator->max_LBA - generator->min_LBA + 1;
-}
-
-Event* Simple_Thread::issue_next_io() {
-	bool issue = num_ongoing_IOs < MAX_IOS && number_of_times_to_repeat > 0;
-	if (issue) {
-		num_ongoing_IOs++;
-		number_of_times_to_repeat--;
-		Event* e = new Event(type, io_gen->next(), 1, time);
-		submit(e);
-	}
-	return NULL;
-}
-
-void Simple_Thread::handle_event_completion(Event* event) {
-	num_ongoing_IOs--;
-	finished = number_of_times_to_repeat == 0 && num_ongoing_IOs == 0;
-}
 
 // =================  Asynchronous_Random_Thread_Reader_Writer  =============================
 

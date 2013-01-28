@@ -33,7 +33,9 @@ Grace_Hash_Join::Grace_Hash_Join
         large_bucket_begin(0), large_bucket_cursor(0), large_bucket_end(0),
         reads_in_progress_set(),
         writes_in_progress(0),
-        reads_in_progress(0)
+        reads_in_progress(0),
+        finished_reading_smaller_bucket(false),
+        finished_trimming_smaller_bucket(false)
 {
 	assert(relation_A_min_LBA < relation_A_max_LBA);
 	assert(relation_B_min_LBA < relation_B_max_LBA);
@@ -132,7 +134,7 @@ void Grace_Hash_Join::execute_build_phase() {
 	else if (done_reading_relation_A) {
 		if (PRINT_LEVEL >= 1) printf("Grace Hash Join, build phase: Switching to relation 2\n");
 		input_cursor = relation_B_min_LBA;
-		VisualTracer::get_instance()->print_horizontally(6000);
+		//VisualTracer::get_instance()->print_horizontally(6000);
 		output_cursors_splitpoints = vector<int>(output_cursors);
 		if (use_flexible_reads) {
 			assert(flex_reader->is_finished());
@@ -142,20 +144,20 @@ void Grace_Hash_Join::execute_build_phase() {
 	}
 	else if (done_reading_relation_B) {
 		phase = PROBE;
-		VisualTracer::get_instance()->print_horizontally(6000);
 		input_cursor = free_space_min_LBA;
 		victim_buffer = UNDEFINED;
 		//VisualTracer::get_instance()->print_horizontally(3000);
 		execute_probe_phase();
+		return;
 	}
-	else {
+
 		// Read new content to input buffer
 		reads_in_progress_set.insert(input_cursor);
 		reads_in_progress++;
 		Event* event = use_flexible_reads ? flex_reader->read_next(time) : new Event(READ, input_cursor, 1, time);
 		input_cursor++;
 		submit(event);
-	}
+
 }
 
 void Grace_Hash_Join::handle_read_completion_build() {
@@ -206,16 +208,18 @@ void Grace_Hash_Join::execute_probe_phase(Event* finished_event) {
 	//printf("Small %d:%d   Large %d:%d\n", small_bucket_cursor, small_bucket_end, large_bucket_cursor, large_bucket_end);
 
 	if (reads_in_progress == 0 && !finished_reading_smaller_bucket) {
-		VisualTracer::get_instance()->print_horizontally(6000);
+		//VisualTracer::get_instance()->print_horizontally(6000);
 		read_smaller_bucket();
 	}
 	else if (reads_in_progress == 0 && !finished_trimming_smaller_bucket) {
-		VisualTracer::get_instance()->print_horizontally(6000);
+		//VisualTracer::get_instance()->print_horizontally(6000);
 		trim_smaller_bucket();
 	}
-	else if (reads_in_progress == 0 && large_bucket_cursor < large_bucket_end) {
-		VisualTracer::get_instance()->print_horizontally(6000);
+	else if (reads_in_progress == 0 && large_bucket_cursor <= large_bucket_end) {
+		//VisualTracer::get_instance()->print_horizontally(6000);
 		read_next_in_larger_bucket(finished_event);
+	} else if (reads_in_progress == 0) {
+		assert(false);
 	}
 }
 

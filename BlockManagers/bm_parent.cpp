@@ -34,8 +34,9 @@ Block_manager_parent::Block_manager_parent(int num_age_classes)
    erase_queue(SSD_SIZE, queue< Event*>()),
    num_erases_scheduled_per_package(SSD_SIZE, 0),
    random_number_generator(90),
-   num_erases_up_to_date(0),
-   scheduler(NULL)
+   scheduler(NULL),
+   num_erases_up_to_date(0)
+
 {
 }
 

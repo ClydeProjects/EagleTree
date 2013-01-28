@@ -110,6 +110,9 @@ void OperatingSystem::run() {
 
 		if ((double)num_writes_completed / NUM_WRITES_TO_STOP_AFTER > (double)counter_for_user / 10.0) {
 			printf("finished %d%%.\t\tNum writes completed:  %d \n", counter_for_user * 10, num_writes_completed);
+			if (counter_for_user == 7) {
+				//PRINT_LEVEL = 1;
+			}
 			counter_for_user++;
 		}
 
@@ -175,6 +178,11 @@ void OperatingSystem::register_event_completion(Event* event) {
 
 	release_lock(event);
 
+	if (event->get_application_io_id() == 372945) {
+		int i = 0;
+		i++;
+	}
+
 	long thread_id = app_id_to_thread_id_mapping[event->get_application_io_id()];
 	Thread* thread = threads[thread_id];
 	deque<Event*> incoming = thread->register_event_completion(event);
@@ -203,9 +211,9 @@ void OperatingSystem::register_event_completion(Event* event) {
 		thread->get_follow_up_threads().clear();
 		delete thread;
 	}
-
 	// we update the current time of all threads
-	time = queue_was_full ? event->get_current_time() : event->get_ssd_submission_time();
+	double new_time = queue_was_full ? event->get_current_time() : event->get_ssd_submission_time();
+	time = max(time, new_time);
 	update_thread_times(time);
 
 	if (events.peek(thread_id) == NULL) {

@@ -32,10 +32,10 @@ int main() {
     printf("\n");
     PRINT_LEVEL = 1;
 	vector<Thread*> threads;
-	Thread* t1 = new Synchronous_Random_Writer(0, 99, 457); // 799
+	Thread* t1 = new Asynchronous_Random_Writer(0, 99, 457); // 799
 	Thread* t2 = new Synchronous_Sequential_Writer(100, 199); // 799
 	//threads.push_back(t1);
-	//t2->add_follow_up_thread(t1);
+	t2->add_follow_up_thread(t1);
 	threads.push_back(t2);
 	OperatingSystem* os = new OperatingSystem(threads);
 	os->run();

@@ -1582,7 +1582,7 @@ private:
 class Thread
 {
 public:
-	Thread() : finished(false), time(1), threads_to_start_when_this_thread_finishes(), num_ios_finished(0), experiment_thread(false), os(NULL), statistics_gatherer(new StatisticsGatherer()) {}
+	Thread();
 	virtual ~Thread();
 	deque<Event*> run();
 	inline bool is_finished() { return finished; }
@@ -1614,6 +1614,7 @@ private:
 	bool experiment_thread;
 	StatisticsGatherer* statistics_gatherer;
 	deque<Event*> submitted_events;
+	bool last_IO_was_null;
 };
 
 
@@ -2027,8 +2028,6 @@ private:
 
 	int currently_executing_ios_counter;
 	double last_dispatched_event_minimal_finish_time;
-
-	int currently_executing_trims_counter;
 
 	set<uint> currently_executing_ios;
 	long NUM_WRITES_TO_STOP_AFTER;
