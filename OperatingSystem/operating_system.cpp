@@ -19,7 +19,8 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	  time_of_last_event_completed(1),
 	  counter_for_user(1),
 	  time_of_experiment_start(UNDEFINED),
-	  idle_time(0)
+	  idle_time(0),
+	  time(0)
 {
 	assert(threads.size() > 0);
 	for (uint i = 0; i < threads.size(); i++) {
@@ -60,7 +61,7 @@ OperatingSystem::Pending_Events::~Pending_Events() {
 }
 
 Event* OperatingSystem::Pending_Events::pop(int i) {
-	deque<Event*> queue = event_queues[i];
+	deque<Event*>& queue = event_queues[i];
 	Event* event = queue.front();
 	if (event != NULL) {
 		queue.pop_front();
@@ -70,14 +71,14 @@ Event* OperatingSystem::Pending_Events::pop(int i) {
 }
 
 void OperatingSystem::Pending_Events::append(int i, deque<Event*> incoming_events) {
-	deque<Event*> queue = event_queues[i];
+	deque<Event*>& queue = event_queues[i];
 	queue.insert(queue.end(), incoming_events.begin(), incoming_events.end());
 	num_pending_events += incoming_events.size();
 }
 
 Event* OperatingSystem::Pending_Events::peek(int i) {
-	deque<Event*> queue = event_queues[i];
-	return queue.front();
+	deque<Event*>& queue = event_queues[i];
+	return queue.size() > 0 ? queue.front() : NULL;
 }
 
 void OperatingSystem::run() {
@@ -135,6 +136,9 @@ int OperatingSystem::pick_unlocked_event_with_shortest_start_time() {
 void OperatingSystem::dispatch_event(int thread_id) {
 	idle_time = 0;
 	Event* event = events.pop(thread_id);
+	if (event->get_start_time() < time) {
+		event->incr_os_wait_time(time - event->get_start_time());
+	}
 	//printf("submitting:   " ); event->print();
 	currently_executing_ios_counter++;
 	currently_executing_ios.insert(event->get_application_io_id());
@@ -173,9 +177,10 @@ void OperatingSystem::register_event_completion(Event* event) {
 
 	long thread_id = app_id_to_thread_id_mapping[event->get_application_io_id()];
 	Thread* thread = threads[thread_id];
-	thread->register_event_completion(event);
+	deque<Event*> incoming = thread->register_event_completion(event);
+	events.append(thread_id, incoming);
 
-	if (/*event->is_experiment_io() &&*/ !event->get_noop() && event->get_event_type() == WRITE ) {
+	if (!event->get_noop() && event->get_event_type() == WRITE ) {
 		num_writes_completed++;
 	}
 
@@ -192,45 +197,16 @@ void OperatingSystem::register_event_completion(Event* event) {
 			follow_up_threads[i]->set_os(this);
 			threads.push_back(follow_up_threads[i]);
 			deque<Event*> incoming = follow_up_threads[i]->run();
+			events.push_back();
 			events.append(i, incoming);
 		}
 		thread->get_follow_up_threads().clear();
 		delete thread;
 	}
 
-	for (uint i = 0; i < threads.size() && queue_was_full; i++) {
-		Thread* t = threads[i];
-		if (!t->is_finished()) {
-			double thread_time = t->get_time();
-			if (thread_time < event->get_current_time() + 1) {
-				t->set_time(event->get_current_time() + 1);
-			}
-			Event* e = events.peek(i);
-			if (e != NULL) {
-				double diff = event->get_current_time() - e->get_current_time() ;
-				if (diff > 0) {
-					e->incr_os_wait_time(diff);
-				}
-			}
-		}
-	}
-
-	for (uint i = 0; i < threads.size(); i++) {
-		Thread* t = threads[i];
-		if (!t->is_finished()) {
-			double thread_time = t->get_time();
-			if (thread_time < event->get_ssd_submission_time()) {
-				t->set_time(event->get_current_time() + 1);
-			}
-			Event* e = events.peek(i);
-			if (e != NULL) {
-				double diff = event->get_ssd_submission_time() - e->get_current_time() ;
-				if (diff > 0) {
-					e->incr_os_wait_time(diff);
-				}
-			}
-		}
-	}
+	// we update the current time of all threads
+	time = queue_was_full ? event->get_current_time() : event->get_ssd_submission_time();
+	update_thread_times(time);
 
 	if (events.peek(thread_id) == NULL) {
 		deque<Event*> incoming = threads[thread_id]->run();
@@ -247,24 +223,14 @@ void OperatingSystem::register_event_completion(Event* event) {
 	delete event;
 }
 
-/*void OperatingSystem::update_thread_times(double time) {
+void OperatingSystem::update_thread_times(double time) {
 	for (uint i = 0; i < threads.size(); i++) {
 		Thread* t = threads[i];
-		if (!t->is_finished()) {
-			double thread_time = t->get_time();
-			if (thread_time < event->get_ssd_submission_time()) {
-				t->set_time(event->get_current_time() + 1);
-			}
-			Event* e = events.peek(i);
-			if (e != NULL) {
-				double diff = event->get_ssd_submission_time() - e->get_current_time() ;
-				if (diff > 0) {
-					e->incr_os_wait_time(diff);
-				}
-			}
+		if (!t->is_finished() && t->get_time() < time) {
+			t->set_time(time + 1);
 		}
 	}
-}*/
+}
 
 void OperatingSystem::set_num_writes_to_stop_after(long num_writes) {
 	NUM_WRITES_TO_STOP_AFTER = num_writes;

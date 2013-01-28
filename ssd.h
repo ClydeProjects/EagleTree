@@ -702,6 +702,7 @@ private:
 };
 
 const int UNDEFINED = -1;
+const int INFINITE = std::numeric_limits<long>::max();
 
 class Page_Hotness_Measurer {
 public:
@@ -1581,7 +1582,7 @@ private:
 class Thread
 {
 public:
-	Thread(double time) : finished(false), time(time), threads_to_start_when_this_thread_finishes(), num_ios_finished(0), experiment_thread(false), os(NULL), statistics_gatherer(new StatisticsGatherer()) {}
+	Thread() : finished(false), time(1), threads_to_start_when_this_thread_finishes(), num_ios_finished(0), experiment_thread(false), os(NULL), statistics_gatherer(new StatisticsGatherer()) {}
 	virtual ~Thread();
 	deque<Event*> run();
 	inline bool is_finished() { return finished; }
@@ -1620,13 +1621,12 @@ class IO_Pattern_Generator
 {
 public:
 	IO_Pattern_Generator(long min_LBA, long max_LBA) : min_LBA(min_LBA), max_LBA(max_LBA) {};
-	~IO_Pattern_Generator() {};
+	virtual ~IO_Pattern_Generator() {};
 	virtual int next() = 0;
-protected:
 	const long min_LBA, max_LBA;
 };
 
-class Random_IO_Pattern_Generator : IO_Pattern_Generator
+class Random_IO_Pattern_Generator : public IO_Pattern_Generator
 {
 public:
 	Random_IO_Pattern_Generator(long min_LBA, long max_LBA, ulong seed) : IO_Pattern_Generator(min_LBA, max_LBA), random_number_generator(seed) {};
@@ -1636,7 +1636,7 @@ private:
 	MTRand_int32 random_number_generator;
 };
 
-class Sequential_IO_Pattern_Generator : IO_Pattern_Generator
+class Sequential_IO_Pattern_Generator : public IO_Pattern_Generator
 {
 public:
 	Sequential_IO_Pattern_Generator(long min_LBA, long max_LBA) : IO_Pattern_Generator(min_LBA, max_LBA), counter(min_LBA - 1) {};
@@ -1646,74 +1646,77 @@ private:
 	long counter;
 };
 
-class Random_Thread : public Thread
+class Simple_Thread : public Thread
 {
 public:
-	Random_Thread(long min_LBA, long max_LAB, ulong randseed, int MAX_IOS, event_type type, int number_of_times_to_repeat);
+	Simple_Thread(IO_Pattern_Generator* generator, int MAX_IOS, event_type type);
 	virtual Event* issue_next_io();
 	virtual void handle_event_completion(Event* event);
+	inline void set_num_ios(ulong num_ios) { number_of_times_to_repeat = num_ios; }
 private:
-	int number_of_times_to_repeat;
+	long number_of_times_to_repeat;
 	event_type type;
 	int num_ongoing_IOs;
 	const int MAX_IOS;
-	Random_IO_Pattern_Generator io_gen;
+	IO_Pattern_Generator* io_gen;
 };
 
-class Synchronous_Random_Writer : public Random_Thread
+class Synchronous_Random_Writer : public Simple_Thread
 {
 public:
-	Synchronous_Random_Writer(long min_LBA, long max_LBA, ulong randseed, int number_of_times_to_repeat = std::numeric_limits<int>::max() )
-		: Random_Thread(min_LBA, max_LBA, randseed, 1, WRITE, number_of_times_to_repeat) {}
+	Synchronous_Random_Writer(long min_LBA, long max_LBA, ulong randseed)
+		: Simple_Thread(new Random_IO_Pattern_Generator(min_LBA, max_LBA, randseed), 1, WRITE) {}
 };
 
-class Synchronous_Random_Reader : public Random_Thread
+class Synchronous_Random_Reader : public Simple_Thread
 {
 public:
-	Synchronous_Random_Reader(long min_LBA, long max_LBA, ulong randseed, int number_of_times_to_repeat = std::numeric_limits<int>::max() )
-		: Random_Thread(min_LBA, max_LBA, randseed, 1, READ, number_of_times_to_repeat) {}
+	Synchronous_Random_Reader(long min_LBA, long max_LBA, ulong randseed )
+		: Simple_Thread(new Random_IO_Pattern_Generator(min_LBA, max_LBA, randseed), 1, READ) {}
 };
 
-class Asynchronous_Random_Writer : public Random_Thread
+class Asynchronous_Random_Writer : public Simple_Thread
 {
 public:
-	Asynchronous_Random_Writer(long min_LBA, long max_LBA, ulong randseed, int number_of_times_to_repeat = std::numeric_limits<int>::max() )
-		: Random_Thread(min_LBA, max_LBA, randseed, std::numeric_limits<int>::max(), WRITE, number_of_times_to_repeat) {}
+	Asynchronous_Random_Writer(long min_LBA, long max_LBA, ulong randseed)
+		: Simple_Thread(new Random_IO_Pattern_Generator(min_LBA, max_LBA, randseed), std::numeric_limits<int>::max(), WRITE) {}
 };
 
-class Synchronous_Sequential_Thread : public Thread
+class Synchronous_Sequential_Writer : public Simple_Thread
 {
 public:
-	Synchronous_Sequential_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, event_type type, double start_time = 1);
-	Event* issue_next_io();
-	void handle_event_completion(Event* event);
-private:
-	long min_LBA, max_LBA;
-	int number_of_times_to_repeat, counter;
-	event_type type;
+	Synchronous_Sequential_Writer(long min_LBA, long max_LBA )
+		: Simple_Thread(new Sequential_IO_Pattern_Generator(min_LBA, max_LBA), 1, WRITE) {}
 };
 
-class Asynchronous_Sequential_Thread : public Thread
+class Asynchronous_Sequential_Writer : public Simple_Thread
 {
 public:
-	Asynchronous_Sequential_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, event_type type, double time_breaks = 20, double start_time = 1);
-	Event* issue_next_io();
-	void handle_event_completion(Event* event);
-private:
-	long min_LBA, max_LBA;
-	int number_of_times_to_repeat, offset;
-	bool finished_round;
-	event_type type;
-	int number_finished;
-	double time_breaks;
+	Asynchronous_Sequential_Writer(long min_LBA, long max_LBA)
+		: Simple_Thread(new Sequential_IO_Pattern_Generator(min_LBA, max_LBA), std::numeric_limits<int>::max(), WRITE) {
+	}
+};
+
+class Synchronous_Sequential_Reader : public Simple_Thread
+{
+public:
+	Synchronous_Sequential_Reader(long min_LBA, long max_LBA )
+		: Simple_Thread(new Sequential_IO_Pattern_Generator(min_LBA, max_LBA), 1, READ) {}
+};
+
+class Asynchronous_Sequential_Reader : public Simple_Thread
+{
+public:
+	Asynchronous_Sequential_Reader(long min_LBA, long max_LBA )
+		: Simple_Thread(new Sequential_IO_Pattern_Generator(min_LBA, max_LBA), std::numeric_limits<int>::max(), READ) {}
 };
 
 class Asynchronous_Random_Thread_Reader_Writer : public Thread
 {
 public:
-	Asynchronous_Random_Thread_Reader_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed = 0, double start_time = 1);
+	Asynchronous_Random_Thread_Reader_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed = 0);
 	Event* issue_next_io();
-	void handle_event_completion(Event* event);
+	void handle_event_completion(Event* event) {};
 private:
 	long min_LBA, max_LBA;
 	int number_of_times_to_repeat;
@@ -1723,7 +1726,7 @@ private:
 class Collision_Free_Asynchronous_Random_Thread : public Thread
 {
 public:
-	Collision_Free_Asynchronous_Random_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed = 0, event_type type = WRITE,  double time_breaks = 5, double start_time = 1);
+	Collision_Free_Asynchronous_Random_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed = 0, event_type type = WRITE);
 	Event* issue_next_io();
 	void handle_event_completion(Event* event);
 private:
@@ -1731,7 +1734,6 @@ private:
 	int number_of_times_to_repeat;
 	MTRand_int32 random_number_generator;
 	event_type type;
-	double time_breaks;
 	set<long> logical_addresses_submitted;
 };
 
@@ -1741,7 +1743,7 @@ class External_Sort : public Thread
 {
 public:
 	External_Sort(long relation_min_LBA, long relation_max_LBA, long RAM_available,
-			long free_space_min_LBA, long free_space_max_LBA, double start_time = 1);
+			long free_space_min_LBA, long free_space_max_LBA);
 	Event* issue_next_io();
 	Event* execute_first_phase();
 	Event* execute_second_phase();
@@ -1762,7 +1764,6 @@ public:
 	Grace_Hash_Join(long relation_A_min_LBA,        long relation_A_max_LBA,
 					long relation_B_min_LBA,        long relation_B_max_LBA,
 					long free_space_min_LBA,        long free_space_max_LBA,
-					double start_time = 1,
 					bool use_flexible_reads = true, bool use_tagging  = true,
 					long rows_per_page      = 32,    int ranseed = 72);
 	Event* issue_next_io();
@@ -1772,11 +1773,16 @@ public:
 	int get_counter() { return grace_counter; };
 private:
 	static int grace_counter;
-	Event* execute_build_phase();
-	Event* execute_probe_phase();
-	Event* execute_third_phase();
+	void execute_build_phase();
+
+	void execute_probe_phase(Event* finished_event = NULL);
+	void setup_probe_run();
+	void read_smaller_bucket();
+	void trim_smaller_bucket();
+	void read_next_in_larger_bucket(Event* finished_event);
+
 	void create_flexible_reader(int start, int finish);
-	void handle_read_completion_build(Event* read);
+	void handle_read_completion_build();
 	void flush_buffer(int buffer_id);
 
 	long relation_A_min_LBA, relation_A_max_LBA;
@@ -1791,7 +1797,7 @@ private:
 	// Bookkeeping variables
 	Flexible_Reader* flex_reader;
 	MTRand_int32 random_number_generator;
-	enum {BUILD, PROBE_SYNC, PROBE_ASYNC, DONE} phase;
+	enum {BUILD, PROBE, DONE} phase;
 	vector<int> output_buffers;
 	vector<int> output_cursors;
 	vector<int> output_cursors_startpoints;
@@ -1799,10 +1805,9 @@ private:
 	int victim_buffer;
 	int writes_in_progress, reads_in_progress;
 	set<long> reads_in_progress_set;
-	int small_bucket_begin, small_bucket_cursor, small_bucket_end;
+	int small_bucket_begin, small_bucket_end;
 	int large_bucket_begin, large_bucket_cursor, large_bucket_end;
-	int trim_cursor;
-	queue<Event*> pending_ios;
+	bool finished_reading_smaller_bucket, finished_trimming_smaller_bucket;
 
 };
 
@@ -1844,7 +1849,7 @@ struct Address_Range {
 class File_Manager : public Thread
 {
 public:
-	File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, double time_breaks = 10, double start_time = 1, ulong randseed = 0);
+	File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, ulong randseed = 0);
 	~File_Manager();
 	Event* issue_next_io();
 	void handle_event_completion(Event* event);
@@ -1899,7 +1904,6 @@ private:
 
 	MTRand_int32 random_number_generator;
 	MTRand_open double_generator;
-	double time_breaks;
 	set<long> addresses_to_trim;
 	const long max_file_size;
 	//Throughput_Moderator throughout_moderator;
@@ -1968,7 +1972,7 @@ public:
 class Flexible_Reader_Thread : public Thread
 {
 public:
-	Flexible_Reader_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, double start_time = 1);
+	Flexible_Reader_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat);
 	Event* issue_next_io();
 	void handle_event_completion(Event* event);
 private:
@@ -2006,13 +2010,11 @@ private:
 		Event* peek(int i);
 		Event* pop(int i);
 		void append(int i, deque<Event*>);
+		void push_back() { event_queues.push_back(deque<Event*>()); }
 		inline int get_num_pending_events() { return num_pending_events; }
 		inline int size() {return event_queues.size();};
 	};
 	Pending_Events events;
-
-
-	//map<long, uint> LBA_to_thread_id_map;
 
 	map<long, queue<uint> > write_LBA_to_thread_id;
 	map<long, queue<uint> > read_LBA_to_thread_id;
@@ -2037,6 +2039,7 @@ private:
 
 	int counter_for_user;
 	int idle_time;
+	double time;
 };
 
 class ExperimentResult {
@@ -2102,7 +2105,7 @@ public:
 
 	static void unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer);
 
-	static ExperimentResult overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
+	static ExperimentResult overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
 	static vector<ExperimentResult> random_writes_on_the_side_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba);
 	static ExperimentResult copyback_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
 	static ExperimentResult copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);

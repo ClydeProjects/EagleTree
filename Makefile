@@ -13,7 +13,7 @@
 # classes.  It is suggested to test with the "test" make target first.
 
 CC = /usr/bin/gcc
-CFLAGS = -Wall -Wextra -g -O2
+CFLAGS = -Wall -Wextra -g
 CXX = /usr/bin/g++
 CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
@@ -38,7 +38,12 @@ ssd: $(HDR) $(SRC)
 
 # All Target
 
-all: sequential grace flexible_reads #scheduling sequential_tuning sequential greediness copybacks
+all: run_test sequential grace flexible_reads #scheduling sequential_tuning sequential greediness copybacks
+
+run_test: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o run_test run_test3.cpp $(OBJ)
+	-chmod $(PERMS) $(OBJ)
+	-chmod $(EPERMS) run_test
 
 flexible_reads: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o flexible_reads exp_flexible_reads.cpp $(OBJ)

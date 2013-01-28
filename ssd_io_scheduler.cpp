@@ -580,7 +580,7 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		assert(false);
 	}
 	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
-	//VisualTracer::get_instance()->register_completed_event(*event);
+	VisualTracer::get_instance()->register_completed_event(*event);
 
 	/*if (event->get_latency() > 2000) {
 		VisualTracer::get_instance()->print_horizontally(10000);

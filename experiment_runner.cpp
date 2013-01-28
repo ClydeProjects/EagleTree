@@ -294,7 +294,7 @@ double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_l
 	return max_rate;
 }
 
-ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit) {
+ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit) {
     ExperimentResult experiment_result(name, data_folder, "Used space (%)");
     experiment_result.start_experiment();
 
@@ -305,22 +305,18 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 		printf("%s : Experiment with max %d pct used space: Writing to no LBA higher than %d (out of %d total available)\n", name.c_str(), used_space, highest_lba, num_pages);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
-		// Calibrate IO submission rate
-		double IO_submission_rate = 10; //calibrate_IO_submission_rate_queue_based(highest_lba, IO_limit, experiment);
-		//printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
-
 		// Run experiment
-		vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
+		vector<Thread*> threads = experiment(highest_lba);
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
-		try {
+		//try {
 			os->run();
 
 			// Collect statistics from this experiment iteration (save in csv files)
 			experiment_result.collect_stats(used_space, os->get_experiment_runtime());
-		} catch(...) {
-			printf("An exception was thrown, but we continue for now\n");
-		}
+		//} catch(...) {
+		//	printf("An exception was thrown, but we continue for now\n");
+		//}
 
 
 		// Print shit
@@ -371,7 +367,9 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 		unify_under_one_statistics_gatherer(threads, experiment_statistics_gatherer);
 
 		for (int i = 0; i < random_write_threads; i++) {
-			Thread* random_writes = new Random_Thread(random_writes_min_lba, random_writes_max_lba, (i*3)+537, 1, WRITE, std::numeric_limits<int>::max());
+			ulong randseed = (i*3)+537;
+			Simple_Thread* random_writes = new Synchronous_Random_Writer(random_writes_min_lba, random_writes_max_lba, randseed);
+			random_writes->set_num_ios(INFINITE);
 			//random_writes->set_experiment_thread(true);
 			random_writes->set_statistics_gatherer(random_writes_statics_gatherer);
 			threads[0]->add_follow_up_thread(random_writes);
@@ -379,16 +377,16 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
-		try {
+		//try {
 			os->run();
 
 			// Collect statistics from this experiment iteration (save in csv files)
 			global_result.collect_stats       (random_write_threads, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 			experiment_result.collect_stats   (random_write_threads, os->get_experiment_runtime(), experiment_statistics_gatherer);
 			write_threads_result.collect_stats(random_write_threads, os->get_experiment_runtime(), random_writes_statics_gatherer);
-		} catch(...) {
-			printf("An exception was thrown, but we continue for now\n");
-		}
+		//} catch(...) {
+		//	printf("An exception was thrown, but we continue for now\n");
+		//}
 
 
 		// Print shit

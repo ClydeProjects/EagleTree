@@ -42,7 +42,7 @@ Thread* grace_hash_join_thread(int lowest_lba, int highest_lba, bool use_flexibl
 	return new Grace_Hash_Join(lowest_lba,                lowest_lba+span*r1,
 			                   lowest_lba+span*r1+1,      lowest_lba+span*(r1+r2),
 			                   lowest_lba+span*(r1+r2)+1, lowest_lba+span*(r1+r2+fs),
-			                   1, use_flexible_reads, use_tagging, 32, randseed);
+			                   use_flexible_reads, use_tagging, 32, randseed);
 }
 
 /*vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool use_tagging, int grace_hash_join_threads = 2, int random_read_threads = 0, int random_write_threads = 0) {
@@ -89,9 +89,9 @@ vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool u
 	int noise_space_start = temp_space_end + 1;
 	int noise_space_end = highest_lba;
 
-	Thread* relation1_write    = new Asynchronous_Sequential_Thread(relation_1_start, relation_1_end, 1, WRITE, 1, 1);
-	Thread* relation2_write    = new Asynchronous_Sequential_Thread(relation_2_start, relation_2_end, 1, WRITE, 1, 1);
-	Thread* noise_space_write    = new Asynchronous_Sequential_Thread(noise_space_start, noise_space_end, 1, WRITE, 1, 1);
+	Thread* relation1_write    = new Asynchronous_Sequential_Writer(relation_1_start, relation_1_end);
+	Thread* relation2_write    = new Asynchronous_Sequential_Writer(relation_2_start, relation_2_end);
+	Thread* noise_space_write  = new Asynchronous_Sequential_Writer(noise_space_start, noise_space_end);
 
 	relation1_write->add_follow_up_thread(relation2_write);
 	relation2_write->add_follow_up_thread(noise_space_write);
@@ -102,7 +102,7 @@ vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool u
 			Thread* grace_hash_join = new Grace_Hash_Join(	relation_1_start,	relation_1_end,
 										relation_2_start,	relation_2_end,
 										temp_space_start, temp_space_end,
-										1, use_flexible_reads, use_tagging, 32, 462);
+										use_flexible_reads, use_tagging, 32, 462);
 
 			grace_hash_join->set_experiment_thread(true);
 			preceding_thread->add_follow_up_thread(grace_hash_join);
@@ -142,8 +142,8 @@ int main()
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 256;
-	BLOCK_SIZE = 64;
+	PLANE_SIZE = 64;
+	BLOCK_SIZE = 32;
 
 	PAGE_READ_DELAY = 50;
 	PAGE_WRITE_DELAY = 200;
@@ -151,17 +151,17 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 1000000;
+	int IO_limit = 200000;
 	//int space_min = 40;
 	//int space_max = 85;
 	//int space_inc = 5;
 
 	int write_threads_min = 0;
-	int write_threads_max = 5;
+	int write_threads_max = 3;
 	double used_space = .80; // overprovisioning level for variable random write threads experiment
 
 
-	PRINT_LEVEL = 0;
+	PRINT_LEVEL = 1;
 	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 	SCHEDULING_SCHEME = 2;

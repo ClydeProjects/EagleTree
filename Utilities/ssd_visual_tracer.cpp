@@ -63,7 +63,7 @@ void VisualTracer::register_completed_event(Event const& event) {
 		write(add.package, add.die, 't', BUS_CTRL_DELAY);
 		//write(add.package, add.die, 'r', PAGE_READ_DELAY - 1);
 		vector<vector<char> > symbols;
-		vector<char> logical_address = get_int_as_char_vector(event.get_application_io_id());
+		vector<char> logical_address = get_int_as_char_vector(event.get_logical_address());
 		symbols.push_back(logical_address);
 		write_with_id(add.package, add.die, 'r', PAGE_READ_DELAY - 1, symbols);
 	} else if (type == READ_TRANSFER) {
