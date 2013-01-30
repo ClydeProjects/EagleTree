@@ -14,7 +14,7 @@ using namespace ssd;
 
 Thread::Thread() :
 		finished(false), time(1), threads_to_start_when_this_thread_finishes(), num_ios_finished(0),
-		experiment_thread(false), os(NULL), statistics_gatherer(new StatisticsGatherer()), last_IO_was_null(false) {}
+		experiment_thread(false), os(NULL), statistics_gatherer(NULL), last_IO_was_null(false) {}
 
 Thread::~Thread() {
 	for (uint i = 0; i < threads_to_start_when_this_thread_finishes.size(); i++) {
@@ -46,7 +46,9 @@ deque<Event*> Thread::run() {
 deque<Event*> Thread::register_event_completion(Event* event) {
 	deque<Event*> empty;
 	swap(empty, submitted_events);
-	statistics_gatherer->register_completed_event(*event);
+	if (statistics_gatherer != NULL) {
+		statistics_gatherer->register_completed_event(*event);
+	}
 	if (last_IO_was_null) {
 		time = event->get_current_time();
 	}
@@ -89,6 +91,10 @@ Simple_Thread::Simple_Thread(IO_Pattern_Generator* generator, int MAX_IOS, event
 {
 	assert(MAX_IOS > 0);
 	number_of_times_to_repeat = generator->max_LBA - generator->min_LBA + 1;
+}
+
+Simple_Thread::~Simple_Thread() {
+	delete io_gen;
 }
 
 Event* Simple_Thread::issue_next_io() {

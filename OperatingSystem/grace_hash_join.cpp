@@ -157,7 +157,6 @@ void Grace_Hash_Join::execute_build_phase() {
 		Event* event = use_flexible_reads ? flex_reader->read_next(time) : new Event(READ, input_cursor, 1, time);
 		input_cursor++;
 		submit(event);
-
 }
 
 void Grace_Hash_Join::handle_read_completion_build() {

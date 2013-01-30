@@ -1596,10 +1596,7 @@ public:
 	inline bool is_experiment_thread() { return experiment_thread; }
 	void set_os(OperatingSystem*  op_sys);
 	StatisticsGatherer* get_statistics_gatherer() { return statistics_gatherer; }
-	void set_statistics_gatherer(StatisticsGatherer* new_statistics_gatherer) {
-		if (statistics_gatherer != NULL) delete statistics_gatherer;
-		statistics_gatherer = new_statistics_gatherer;
-	}
+	inline void set_statistics_gatherer(StatisticsGatherer* new_statistics_gatherer) { statistics_gatherer = new_statistics_gatherer; }
 protected:
 	virtual Event* issue_next_io() = 0;
 	virtual void handle_event_completion(Event* event) = 0;
@@ -1651,6 +1648,7 @@ class Simple_Thread : public Thread
 {
 public:
 	Simple_Thread(IO_Pattern_Generator* generator, int MAX_IOS, event_type type);
+	virtual ~Simple_Thread();
 	virtual Event* issue_next_io();
 	virtual void handle_event_completion(Event* event);
 	inline void set_num_ios(ulong num_ios) { number_of_times_to_repeat = num_ios; }

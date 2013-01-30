@@ -133,6 +133,8 @@ Ssd::~Ssd(void)
 		ulong pageSize = ((ulong)(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE)) * (ulong)PAGE_SIZE;
 		munmap(page_data, pageSize);
 	}
+	delete ftl;
+	delete scheduler;
 }
 
 void Ssd::event_arrive(Event* event) {
