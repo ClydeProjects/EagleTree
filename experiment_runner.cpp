@@ -395,8 +395,9 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 			StateVisualiser::print_page_status();
 			StateVisualiser::print_block_ages();
 		}
-
 		delete os;
+		delete experiment_statistics_gatherer;
+		delete random_writes_statics_gatherer;
 	}
     global_result.end_experiment();
     experiment_result.end_experiment();
@@ -406,6 +407,7 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
     results.push_back(global_result);
     results.push_back(experiment_result);
     results.push_back(write_threads_result);
+
 
 	return results;
 }
