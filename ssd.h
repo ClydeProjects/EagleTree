@@ -1774,11 +1774,11 @@ private:
 	static int grace_counter;
 	void execute_build_phase();
 
-	void execute_probe_phase(Event* finished_event = NULL);
+	void execute_probe_phase();
 	void setup_probe_run();
 	void read_smaller_bucket();
 	void trim_smaller_bucket();
-	void read_next_in_larger_bucket(Event* finished_event);
+	void read_next_in_larger_bucket();
 
 	void create_flexible_reader(int start, int finish);
 	void handle_read_completion_build();
@@ -1796,7 +1796,7 @@ private:
 	// Bookkeeping variables
 	Flexible_Reader* flex_reader;
 	MTRand_int32 random_number_generator;
-	enum {BUILD, PROBE, DONE} phase;
+	enum {BUILD, PROBE_SYNCH, PROBE_ASYNCH, DONE} phase;
 	vector<int> output_buffers;
 	vector<int> output_cursors;
 	vector<int> output_cursors_startpoints;

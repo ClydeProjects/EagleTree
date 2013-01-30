@@ -75,41 +75,33 @@ Event* Grace_Hash_Join::issue_next_io() {
 }
 
 void Grace_Hash_Join::handle_event_completion(Event* event) {
-	// If we have finished processing the last bucket, we are done with this phase
+	if (phase == PROBE_SYNCH && event->get_event_type() != TRIM) {
+		Event* trim = new Event(TRIM, event->get_logical_address(), 1, time);
+		submit(trim);
+	}
+
 	if (victim_buffer == num_partitions - 1 && reads_in_progress == 0) {
 		phase = DONE;
 		finished = true;
 		grace_counter++;
-		//printf("grace_counter: %d\n", grace_counter);
+		return;
 	}
 
-	// Maintain read/writes in progress bookkeeping variables
 	if (event->get_event_type() == READ_TRANSFER) {
 		reads_in_progress_set.erase(event->get_logical_address());
 		reads_in_progress--;
-		/*if (phase == PROBE_ASYNC && large_bucket_cursor == large_bucket_end && reads_in_progress == 0 && pending_ios.size() == 0) { // The very last read we're waiting for (before we can trim)
-		    time = max(time, event->get_current_time());
-	    }*/
 	} else if (event->get_event_type() == WRITE) {
 		writes_in_progress--;
-		//bool done_reading = (input_cursor == relation_A_max_LBA + 1 || input_cursor == relation_B_max_LBA + 1);
-		/*if (done_reading && writes_in_progress == 0) { // The very last write we have been waiting for
-			time = max(time, event->get_current_time());
-		}*/
 	}
 
 	if (event->get_event_type() != WRITE) {
 		if (phase == BUILD) {
 			handle_read_completion_build();
 			execute_build_phase();
-		} else if (phase == PROBE) {
-			execute_probe_phase(event);
+		} else if (phase == PROBE_SYNCH || phase == PROBE_ASYNCH) {
+			execute_probe_phase();
 		}
 	}
-
-	/*if (event->get_event_type() == READ_TRANSFER && (phase == BUILD || phase == PROBE_SYNC)) {
-		time = max(time, event->get_current_time());
-	}*/
 }
 
 void Grace_Hash_Join::execute_build_phase() {
@@ -143,7 +135,7 @@ void Grace_Hash_Join::execute_build_phase() {
 		//VisualTracer::get_instance()->print_horizontally(6000);
 	}
 	else if (done_reading_relation_B) {
-		phase = PROBE;
+		phase = PROBE_ASYNCH;
 		input_cursor = free_space_min_LBA;
 		victim_buffer = UNDEFINED;
 		//VisualTracer::get_instance()->print_horizontally(3000);
@@ -189,7 +181,7 @@ void Grace_Hash_Join::flush_buffer(int buffer_id) {
 }
 
 
-void Grace_Hash_Join::execute_probe_phase(Event* finished_event) {
+void Grace_Hash_Join::execute_probe_phase() {
 	if (victim_buffer == num_partitions - 1 && large_bucket_cursor > large_bucket_end) {
 		return;
 	}
@@ -213,10 +205,11 @@ void Grace_Hash_Join::execute_probe_phase(Event* finished_event) {
 	else if (reads_in_progress == 0 && !finished_trimming_smaller_bucket) {
 		//VisualTracer::get_instance()->print_horizontally(6000);
 		trim_smaller_bucket();
+		phase = PROBE_SYNCH;
 	}
 	else if (reads_in_progress == 0 && large_bucket_cursor <= large_bucket_end) {
 		//VisualTracer::get_instance()->print_horizontally(6000);
-		read_next_in_larger_bucket(finished_event);
+		read_next_in_larger_bucket();
 	} else if (reads_in_progress == 0) {
 		assert(false);
 	}
@@ -259,19 +252,13 @@ void Grace_Hash_Join::trim_smaller_bucket() {
 	finished_trimming_smaller_bucket = true;
 }
 
-void Grace_Hash_Join::read_next_in_larger_bucket(Event* finished_event) {
+void Grace_Hash_Join::read_next_in_larger_bucket() {
 	reads_in_progress_set.insert(large_bucket_cursor);
 	reads_in_progress++;
 	if (use_flexible_reads && large_bucket_cursor == large_bucket_begin) { // First time in this range
 		create_flexible_reader(large_bucket_cursor, large_bucket_end);
 	}
-	if (finished_event != NULL && finished_event->get_event_type() == READ_TRANSFER) {
-		assert(finished_event->get_logical_address() >= large_bucket_begin);
-		Event* trim = new Event(TRIM, finished_event->get_logical_address(), 1, time);
-		submit(trim);
-	}
 	Event* read = use_flexible_reads ? flex_reader->read_next(time) : new Event(READ, large_bucket_cursor, 1, time);
 	large_bucket_cursor++;
-
 	submit(read);
 }
