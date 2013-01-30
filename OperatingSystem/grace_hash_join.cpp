@@ -103,7 +103,7 @@ void Grace_Hash_Join::handle_event_completion(Event* event) {
 			handle_read_completion_build();
 			execute_build_phase();
 		} else if (phase == PROBE) {
-			execute_probe_phase();
+			execute_probe_phase(event);
 		}
 	}
 
@@ -265,7 +265,8 @@ void Grace_Hash_Join::read_next_in_larger_bucket(Event* finished_event) {
 	if (use_flexible_reads && large_bucket_cursor == large_bucket_begin) { // First time in this range
 		create_flexible_reader(large_bucket_cursor, large_bucket_end);
 	}
-	if (finished_event != NULL) {
+	if (finished_event != NULL && finished_event->get_event_type() == READ_TRANSFER) {
+		assert(finished_event->get_logical_address() >= large_bucket_begin);
 		Event* trim = new Event(TRIM, finished_event->get_logical_address(), 1, time);
 		submit(trim);
 	}

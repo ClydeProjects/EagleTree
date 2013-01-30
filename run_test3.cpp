@@ -42,7 +42,7 @@ int main() {
 	//VisualTracer::get_instance()->print_horizontally_with_breaks();
 	delete os;
 
-	VisualTracer::get_instance()->print_horizontally_with_breaks();
+	//VisualTracer::get_instance()->print_horizontally_with_breaks();
 
 	return 0;
 
@@ -69,7 +69,7 @@ int main() {
 
 	delete ssd;
 
-	VisualTracer::get_instance()->print_horizontally_with_breaks();
+	//VisualTracer::get_instance()->print_horizontally_with_breaks();
 
 	return 0;
 }

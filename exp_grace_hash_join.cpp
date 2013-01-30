@@ -142,8 +142,8 @@ int main()
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 64;
-	BLOCK_SIZE = 32;
+	PLANE_SIZE = 256;
+	BLOCK_SIZE = 64;
 
 	PAGE_READ_DELAY = 50;
 	PAGE_WRITE_DELAY = 200;
@@ -151,7 +151,7 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 200000;
+	int IO_limit = 500000;
 	//int space_min = 40;
 	//int space_max = 85;
 	//int space_inc = 5;
@@ -159,7 +159,6 @@ int main()
 	int write_threads_min = 0;
 	int write_threads_max = 5;
 	double used_space = .80; // overprovisioning level for variable random write threads experiment
-
 
 	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 32;

@@ -206,7 +206,6 @@ void IOScheduler::execute_current_waiting_ios() {
 		handle(writes);
 		handle(read_transfers);
 	}
-	// EQUAL PRIORITY - INTERLEAVED
 	else if (SCHEDULING_SCHEME == 2) {
 		read_commands.insert(read_commands.end(), read_commands_flexible.begin(), read_commands_flexible.end());
 
@@ -580,10 +579,10 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		assert(false);
 	}
 	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
-	VisualTracer::get_instance()->register_completed_event(*event);
+	//VisualTracer::get_instance()->register_completed_event(*event);
 
-	/*if (event->get_latency() > 2000) {
-		VisualTracer::get_instance()->print_horizontally(10000);
+	/*if (event->get_event_type() == READ_TRANSFER && event->get_latency() > 23000) {
+		VisualTracer::get_instance()->print_horizontally(30000);
 		event->print();
 		printf(" ");
 	}*/
@@ -721,10 +720,6 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	uint common_logical_address = new_event->get_logical_address();
 	uint dependency_code_of_other_event = LBA_currently_executing[common_logical_address];
 	Event * existing_event = find_scheduled_event(dependency_code_of_other_event);
-
-	if (new_event->get_application_io_id() == 152363 || dependency_code_of_other_event == 152363) {
-		new_event->print();
-	}
 
 	//bool both_events_are_gc = new_event->is_garbage_collection_op() && existing_event->is_garbage_collection_op();
 	//assert(!both_events_are_gc);
