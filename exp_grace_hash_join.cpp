@@ -142,8 +142,8 @@ int main()
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 256;
-	BLOCK_SIZE = 64;
+	PLANE_SIZE = 64;
+	BLOCK_SIZE = 32;
 
 	PAGE_READ_DELAY = 50;
 	PAGE_WRITE_DELAY = 200;
@@ -151,16 +151,16 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 500000;
+	int IO_limit = 100000;
 	//int space_min = 40;
 	//int space_max = 85;
 	//int space_inc = 5;
 
 	int write_threads_min = 0;
-	int write_threads_max = 5;
+	int write_threads_max = 3;
 	double used_space = .80; // overprovisioning level for variable random write threads experiment
 
-	PRINT_LEVEL = 1;
+	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 	SCHEDULING_SCHEME = 2;
@@ -185,7 +185,7 @@ int main()
 
 		vector<vector<ExperimentResult> > exps;
 
-		//exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join,		  write_threads_min, write_threads_max, 1, exp_folder + "None/", "None",                  			IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join,		  write_threads_min, write_threads_max, 1, exp_folder + "None/", "None",                  			IO_limit, used_space, avail_pages*ns+1, avail_pages) );
 		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex,	  write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads/", "Flexible reads",        IO_limit, used_space, avail_pages*ns+1, avail_pages) );
 		//exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_tag,      write_threads_min, write_threads_max, 1, exp_folder + "Tagging/", "Tagging",               IO_limit, used_space, avail_pages*ns+1, avail_pages) );
 		//exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex_tag, write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads_&_tagging/", "Flexible reads + tagging", IO_limit, used_space, avail_pages*ns+1, avail_pages) );

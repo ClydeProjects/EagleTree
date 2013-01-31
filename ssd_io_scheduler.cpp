@@ -579,13 +579,13 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		assert(false);
 	}
 	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
-	VisualTracer::get_instance()->register_completed_event(*event);
+	//VisualTracer::get_instance()->register_completed_event(*event);
 
 	if (event->get_id() == 1680006) {
 		//PRINT_LEVEL = 1;
 	}
 
-	/*if (event->get_event_type() == READ_TRANSFER && event->get_latency() > 9000) {
+	/*if (event->get_event_type() == READ_TRANSFER && event->get_latency() > 4000) {
 		VisualTracer::get_instance()->print_horizontally(40000);
 		event->print();
 		printf(" ");
