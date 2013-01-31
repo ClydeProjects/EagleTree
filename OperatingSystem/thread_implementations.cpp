@@ -14,7 +14,7 @@ using namespace ssd;
 
 Thread::Thread() :
 		finished(false), time(1), threads_to_start_when_this_thread_finishes(), num_ios_finished(0),
-		experiment_thread(false), os(NULL), statistics_gatherer(NULL), last_IO_was_null(false) {}
+		experiment_thread(false), os(NULL), statistics_gatherer(NULL), last_IO_was_null(false), num_IOs_executing(0) {}
 
 Thread::~Thread() {
 	for (uint i = 0; i < threads_to_start_when_this_thread_finishes.size(); i++) {
@@ -29,7 +29,10 @@ deque<Event*> Thread::run() {
 	deque<Event*> empty;
 	swap(empty, submitted_events);
 	if (finished) return empty;
-	Event* event = issue_next_io();
+	Event* event = NULL;
+	if (!finished) {
+		event = issue_next_io();
+	}
 	if (event != NULL) {
 		submitted_events.push_back(event);
 	}
@@ -40,19 +43,24 @@ deque<Event*> Thread::run() {
 	if (submitted_events.size() == 0) {
 		last_IO_was_null = true;
 	}
+	num_IOs_executing += submitted_events.size();
+	//printf("num_IOs_executing:  %d\n", num_IOs_executing);
 	return submitted_events;
 }
 
 deque<Event*> Thread::register_event_completion(Event* event) {
 	deque<Event*> empty;
 	swap(empty, submitted_events);
+	num_IOs_executing--;
 	if (statistics_gatherer != NULL) {
 		statistics_gatherer->register_completed_event(*event);
 	}
 	if (last_IO_was_null) {
 		time = event->get_current_time();
 	}
-	handle_event_completion(event);
+	if (!finished) {
+		handle_event_completion(event);
+	}
 	for (uint i = 0; i < submitted_events.size() && is_experiment_thread(); i++) {
 		Event* e = submitted_events[i];
 		if (e != NULL) {
@@ -63,7 +71,14 @@ deque<Event*> Thread::register_event_completion(Event* event) {
 	if (!event->get_noop() && event->get_event_type() != TRIM) {
 		num_ios_finished++;
 	}
+	//printf("num_IOs_executing:  %d\n", num_IOs_executing);
+	num_IOs_executing += submitted_events.size();
+	assert(num_IOs_executing >= 0);
 	return submitted_events;
+}
+
+bool Thread::is_finished() {
+	return finished && num_IOs_executing == 0;
 }
 
 void Thread::print_thread_stats() {
@@ -76,6 +91,9 @@ void Thread::set_os(OperatingSystem*  op_sys) {
 }
 
 void Thread::submit(Event* event) {
+	if (event->get_logical_address() == 51818) {
+		//event->print();
+	}
 	event->set_start_time(event->get_current_time());
 	submitted_events.push_front(event);
 }

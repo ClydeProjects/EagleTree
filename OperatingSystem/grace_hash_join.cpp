@@ -84,7 +84,6 @@ void Grace_Hash_Join::handle_event_completion(Event* event) {
 		phase = DONE;
 		finished = true;
 		grace_counter++;
-		return;
 	}
 
 	if (event->get_event_type() == READ_TRANSFER) {
@@ -126,7 +125,7 @@ void Grace_Hash_Join::execute_build_phase() {
 	else if (done_reading_relation_A) {
 		if (PRINT_LEVEL >= 1) printf("Grace Hash Join, build phase: Switching to relation 2\n");
 		input_cursor = relation_B_min_LBA;
-		//VisualTracer::get_instance()->print_horizontally(6000);
+		VisualTracer::get_instance()->print_horizontally(6000);
 		output_cursors_splitpoints = vector<int>(output_cursors);
 		if (use_flexible_reads) {
 			assert(flex_reader->is_finished());
@@ -138,7 +137,7 @@ void Grace_Hash_Join::execute_build_phase() {
 		phase = PROBE_ASYNCH;
 		input_cursor = free_space_min_LBA;
 		victim_buffer = UNDEFINED;
-		//VisualTracer::get_instance()->print_horizontally(3000);
+		VisualTracer::get_instance()->print_horizontally(6000);
 		execute_probe_phase();
 		return;
 	}
@@ -199,11 +198,12 @@ void Grace_Hash_Join::execute_probe_phase() {
 	//printf("Small %d:%d   Large %d:%d\n", small_bucket_cursor, small_bucket_end, large_bucket_cursor, large_bucket_end);
 
 	if (reads_in_progress == 0 && !finished_reading_smaller_bucket) {
-		//VisualTracer::get_instance()->print_horizontally(6000);
+		VisualTracer::get_instance()->print_horizontally(6000);
 		read_smaller_bucket();
+		phase = PROBE_ASYNCH;
 	}
 	else if (reads_in_progress == 0 && !finished_trimming_smaller_bucket) {
-		//VisualTracer::get_instance()->print_horizontally(6000);
+		VisualTracer::get_instance()->print_horizontally(6000);
 		trim_smaller_bucket();
 		phase = PROBE_SYNCH;
 	}
@@ -219,6 +219,7 @@ void Grace_Hash_Join::setup_probe_run() {
 	if (reads_in_progress > 0) return; // Finish current reads before progressing
 	assert(flex_reader == NULL || flex_reader->is_finished());
 	victim_buffer++;
+	VisualTracer::get_instance()->print_horizontally(6000);
 	// Set cursors corresponding to the chosen buffer
 	if (PRINT_LEVEL >= 1) printf("Grace Hash Join, probe phase: Probing buffer %d/%d\n", victim_buffer, num_partitions-1);
 	small_bucket_begin  = output_cursors_startpoints[victim_buffer];
@@ -244,6 +245,7 @@ void Grace_Hash_Join::read_smaller_bucket() {
 }
 
 void Grace_Hash_Join::trim_smaller_bucket() {
+	//printf("smaller buck:   %d\n", small_bucket_end - small_bucket_begin);
 	for (int i = small_bucket_begin; i <= small_bucket_end; i++) {
 		reads_in_progress_set.insert(i);
 		Event* event = new Event(TRIM, i, 1, time);

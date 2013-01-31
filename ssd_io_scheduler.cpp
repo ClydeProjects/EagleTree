@@ -219,10 +219,10 @@ void IOScheduler::execute_current_waiting_ios() {
 		sort(read_transfers.begin(), read_transfers.end(), overall_wait_time_comparator);
 		sort(read_commands_copybacks.begin(), read_commands_copybacks.end(), overall_wait_time_comparator);
 
-		handle(erases);
+
 		handle(read_commands);
 		handle(read_commands_copybacks);
-
+		handle(erases);
 		//handle(read_commands_copybacks);
 		handle(writes);
 		handle(read_transfers);
@@ -509,7 +509,7 @@ enum status IOScheduler::execute_next(Event* event) {
 	if (PRINT_LEVEL > 0) {
 		event->print();
 		if (event->is_flexible_read()) {
-			printf("FLEX\n");
+			//printf("FLEX\n");
 		}
 	}
 
@@ -579,10 +579,14 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		assert(false);
 	}
 	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
-	//VisualTracer::get_instance()->register_completed_event(*event);
+	VisualTracer::get_instance()->register_completed_event(*event);
 
-	/*if (event->get_event_type() == READ_TRANSFER && event->get_latency() > 23000) {
-		VisualTracer::get_instance()->print_horizontally(30000);
+	if (event->get_id() == 1680006) {
+		//PRINT_LEVEL = 1;
+	}
+
+	/*if (event->get_event_type() == READ_TRANSFER && event->get_latency() > 9000) {
+		VisualTracer::get_instance()->print_horizontally(40000);
 		event->print();
 		printf(" ");
 	}*/

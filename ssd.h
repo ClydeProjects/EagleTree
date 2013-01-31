@@ -1585,7 +1585,7 @@ public:
 	Thread();
 	virtual ~Thread();
 	deque<Event*> run();
-	inline bool is_finished() { return finished; }
+	bool is_finished();
 	inline void set_time(double current_time) { time = current_time; }
 	inline double get_time() { return time; }
 	inline void add_follow_up_thread(Thread* thread) { threads_to_start_when_this_thread_finishes.push_back(thread); }
@@ -1612,6 +1612,7 @@ private:
 	StatisticsGatherer* statistics_gatherer;
 	deque<Event*> submitted_events;
 	bool last_IO_was_null;
+	int num_IOs_executing;
 };
 
 
