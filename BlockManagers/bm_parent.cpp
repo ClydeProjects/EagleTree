@@ -553,9 +553,12 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 	uint die_id = address.die;
 	double channel_finish_time = ssd->bus.get_channel(package_id).get_currently_executing_operation_finish_time();
 	double die_finish_time = ssd->getPackages()[package_id].getDies()[die_id].get_currently_executing_io_finish_time();
-	double max = std::max(channel_finish_time, die_finish_time);
+	double max_time = max(channel_finish_time, die_finish_time);
 
-	double time = max - event_time;
+	double time = max_time - event_time;
+
+	time = min(time, BUS_DATA_DELAY + BUS_CTRL_DELAY);
+
 	return time < 0 ? 0 : time;
 }
 
