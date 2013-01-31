@@ -366,6 +366,12 @@ void IOScheduler::handle_event(Event* event) {
 
 void IOScheduler::handle_flexible_read(Event* event) {
 	Flexible_Read_Event* fr = dynamic_cast<Flexible_Read_Event*>(event);
+
+	/*if (event->get_application_io_id() == 237142) {
+		event->print();
+		VisualTracer::get_instance()->print_horizontally(2000);
+	}*/
+
 	Address addr = bm->choose_flexible_read_address(fr);
 	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, fr->get_current_time());
 	if ( wait_time == 0 && !bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id())) {
@@ -522,8 +528,11 @@ enum status IOScheduler::execute_next(Event* event) {
 			//LBA_currently_executing[dependent->get_logical_address()] = dependent->get_application_io_id();
 			dependent->set_application_io_id(dependency_code);
 
+
 			double diff = event->get_current_time() - dependent->get_current_time();
+			//dependent->incr_os_wait_time(event->get_os_wait_time());
 			dependent->incr_accumulated_wait_time(diff);
+			dependent->incr_pure_ssd_wait_time(event->get_bus_wait_time() + event->get_execution_time());
 
 			dependent->set_noop(event->get_noop());
 			dependencies[dependency_code].pop_front();
@@ -579,14 +588,14 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		assert(false);
 	}
 	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
-	//VisualTracer::get_instance()->register_completed_event(*event);
+	VisualTracer::get_instance()->register_completed_event(*event);
 
 	if (event->get_id() == 1680006) {
 		//PRINT_LEVEL = 1;
 	}
 
-	/*if (event->get_event_type() == READ_TRANSFER && event->get_latency() > 4000) {
-		VisualTracer::get_instance()->print_horizontally(40000);
+	/*if (event->get_event_type() == READ_TRANSFER && event->get_latency() > 3100) {
+		VisualTracer::get_instance()->print_horizontally(10000);
 		event->print();
 		printf(" ");
 	}*/

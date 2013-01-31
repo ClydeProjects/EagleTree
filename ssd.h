@@ -426,12 +426,13 @@ public:
 	inline bool is_garbage_collection_op() const 			{ return garbage_collection_op; }
 	inline bool is_mapping_op() const 						{ return mapping_op; }
 	inline void *get_payload() const 						{ return payload; }
-	inline double incr_bus_wait_time(double time_incr) 		{ if(time_incr > 0.0) bus_wait_time += time_incr; return bus_wait_time; }
-	inline double incr_os_wait_time(double time_incr) 		{ if(time_incr > 0.0) os_wait_time += time_incr; return os_wait_time; }
-	inline double incr_execution_time(double time_incr) 	{ if(time_incr > 0.0) execution_time += time_incr; return execution_time; }
-	inline double incr_accumulated_wait_time(double time_incr) 	{ if(time_incr > 0.0) accumulated_wait_time += time_incr; return accumulated_wait_time; }
+	inline void incr_bus_wait_time(double time_incr) 		{ bus_wait_time += time_incr; incr_pure_ssd_wait_time(time_incr); }
+	inline void incr_pure_ssd_wait_time(double time_incr) 	{ pure_ssd_wait_time += time_incr;}
+	inline void incr_os_wait_time(double time_incr) 		{ os_wait_time += time_incr; }
+	inline void incr_execution_time(double time_incr) 		{ execution_time += time_incr; incr_pure_ssd_wait_time(time_incr);  }
+	inline void incr_accumulated_wait_time(double time_incr) 	{ accumulated_wait_time += time_incr;  }
 	inline double get_overall_wait_time() const 				{ return accumulated_wait_time + bus_wait_time; }
-	inline double get_latency() const 				{ return accumulated_wait_time + bus_wait_time + execution_time; }
+	inline double get_latency() const 				{ return pure_ssd_wait_time; }
 	inline bool is_wear_leveling_op() const { return wear_leveling_op ; }
 	inline void set_wear_leveling_op(bool value) { wear_leveling_op = value; }
 	void print(FILE *stream = stdout) const;
@@ -471,6 +472,7 @@ protected:
 	int tag;
 
 	int thread_id;
+	double pure_ssd_wait_time;
 };
 
 /* Single bus channel
