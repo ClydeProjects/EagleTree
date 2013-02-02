@@ -183,7 +183,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	deque<Event*> incoming = thread->register_event_completion(event);
 	events.append(thread_id, incoming);
 
-	if (!event->get_noop() && event->get_event_type() == WRITE ) {
+	if (!event->get_noop() && event->get_event_type() == WRITE && event->is_experiment_io()) {
 		num_writes_completed++;
 	}
 

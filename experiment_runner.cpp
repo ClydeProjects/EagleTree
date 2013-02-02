@@ -341,6 +341,8 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 
 		// Print shit
 		StatisticsGatherer::get_global_instance()->print();
+		random_writes_statics_gatherer->print();
+		StatisticsGatherer::get_global_instance()->print_gc_info();
 		if (PRINT_LEVEL >= 1) {
 			StateVisualiser::print_page_status();
 			StateVisualiser::print_block_ages();

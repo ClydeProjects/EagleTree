@@ -110,7 +110,7 @@ int main()
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 64 * 4;
+	PLANE_SIZE = 64 * 2;
 	BLOCK_SIZE = 32 * 2;
 
 	PAGE_READ_DELAY = 50;
@@ -119,10 +119,7 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 500000;
-	//int space_min = 40;
-	//int space_max = 85;
-	//int space_inc = 5;
+	int IO_limit = 250000;
 
 	int write_threads_min = 0;
 	int write_threads_max = 5;

@@ -168,11 +168,11 @@ void Grace_Hash_Join::handle_read_completion_build() {
 
 void Grace_Hash_Join::flush_buffer(int buffer_id) {
 	bool at_relation_A = (input_cursor >= relation_A_min_LBA && input_cursor <= relation_A_max_LBA);
-	int estimated_tag_size = at_relation_A ? relation_A_size / num_partitions : relation_B_size / num_partitions;
+	int estimated_tag_size = 1;// at_relation_A ? relation_A_size / num_partitions : relation_B_size / num_partitions;
 	int lba = output_cursors[buffer_id]++;
 	Event* write = new Event(WRITE, lba, estimated_tag_size, time);
 	//if (use_tagging) write->set_tag(buffer_id * 2 + at_relation_A);
-	if (use_tagging) write->set_tag(1234);
+	//if (use_tagging) write->set_tag(1234);
 	output_buffers[buffer_id] = 0;
 	writes_in_progress++;
 	//pending_ios.push(write);
