@@ -83,22 +83,22 @@ vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool u
 	return threads;
 }
 
-vector<Thread*> grace_hash_join(int highest_lba, double IO_submission_rate) {
+vector<Thread*> grace_hash_join(int highest_lba) {
 	BLOCK_MANAGER_ID = 0;
 	return grace_hash_join(highest_lba, false, false, num_grace_hash_join_threads);
 }
 
-vector<Thread*> grace_hash_join_flex(int highest_lba, double IO_submission_rate) {
+vector<Thread*> grace_hash_join_flex(int highest_lba) {
 	BLOCK_MANAGER_ID = 0;
 	return grace_hash_join(highest_lba, true, false, num_grace_hash_join_threads);
 }
 
-vector<Thread*> grace_hash_join_tag(int highest_lba, double IO_submission_rate) {
+vector<Thread*> grace_hash_join_tag(int highest_lba) {
 	BLOCK_MANAGER_ID = 3;
 	return grace_hash_join(highest_lba, false, true, num_grace_hash_join_threads);
 }
 
-vector<Thread*> grace_hash_join_flex_tag(int highest_lba, double IO_submission_rate) {
+vector<Thread*> grace_hash_join_flex_tag(int highest_lba) {
 	BLOCK_MANAGER_ID = 3;
 	return grace_hash_join(highest_lba, true, true, num_grace_hash_join_threads);
 }

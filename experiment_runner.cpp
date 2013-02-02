@@ -340,7 +340,7 @@ void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> thre
 	}
 }
 
-vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
+vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment(vector<Thread*> (*experiment)(int highest_lba), int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
 	mkdir(data_folder.c_str(), 0755);
 	ExperimentResult global_result       (name, data_folder,                         "Number of concurrent random write threads");
     ExperimentResult experiment_result   (name, data_folder + "Experiment_Threads/", "Number of concurrent random write threads");
@@ -357,10 +357,8 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 		printf("%s : Experiment with max %d concurrent random writes threads.\n", name.c_str(), random_write_threads);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
-		double IO_submission_rate = 10; // Whatever
-
 		// Run experiment
-		vector<Thread*> threads = experiment(num_pages * used_space, IO_submission_rate);
+		vector<Thread*> threads = experiment(num_pages * used_space);
 
 		StatisticsGatherer* experiment_statistics_gatherer = new StatisticsGatherer();
 		StatisticsGatherer* random_writes_statics_gatherer = new StatisticsGatherer();
