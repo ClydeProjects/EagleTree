@@ -71,6 +71,12 @@ void VisualTracer::register_completed_event(Event const& event) {
 		vector<vector<char> > symbols;
 		vector<char> logical_address = get_int_as_char_vector(event.get_application_io_id());
 		symbols.push_back(logical_address);
+		if (event.is_garbage_collection_op()) {
+			vector<char> gc_symbol(2);
+			gc_symbol[0] = 'G';
+			gc_symbol[1] = 'C';
+			symbols.push_back(gc_symbol);
+		}
 		write_with_id(add.package, add.die, 't', BUS_CTRL_DELAY + BUS_DATA_DELAY - 1, symbols);
 	} else if (type == ERASE) {
 		write(add.package, add.die, 't', BUS_CTRL_DELAY);

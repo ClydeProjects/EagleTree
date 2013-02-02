@@ -128,6 +128,7 @@ void IOScheduler::execute_current_waiting_ios() {
 	vector<Event*> events = collect_soonest_events();
 
 	vector<Event*> read_commands;
+	vector<Event*> read_commands_gc;
 	vector<Event*> read_commands_copybacks;
 	vector<Event*> read_commands_flexible;
 	//vector<Event*> gc_read_commands;
@@ -150,6 +151,9 @@ void IOScheduler::execute_current_waiting_ios() {
 		}
 		else if (type == READ_COMMAND && dependency_code_to_type[event->get_application_io_id()] == COPY_BACK) {
 			read_commands_copybacks.push_back(event);
+		}
+		else if (type == READ_COMMAND && event->is_garbage_collection_op() && !event->is_original_application_io()) {
+			read_commands_gc.push_back(event);
 		}
 		else if (type == READ_COMMAND && event->is_flexible_read()) {
 			read_commands_flexible.push_back(event);
@@ -215,12 +219,14 @@ void IOScheduler::execute_current_waiting_ios() {
 
 		sort(erases.begin(), erases.end(), current_wait_time_comparator);
 		sort(read_commands.begin(), read_commands.end(), overall_wait_time_comparator);
+		sort(read_commands_gc.begin(), read_commands_gc.end(), overall_wait_time_comparator);
 		sort(writes.begin(), writes.end(), current_wait_time_comparator);
 		sort(read_transfers.begin(), read_transfers.end(), overall_wait_time_comparator);
 		sort(read_commands_copybacks.begin(), read_commands_copybacks.end(), overall_wait_time_comparator);
 
 
 		handle(read_commands);
+		handle(read_commands_gc);
 		handle(read_commands_copybacks);
 		handle(erases);
 		//handle(read_commands_copybacks);
@@ -587,18 +593,17 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		event->print();
 		assert(false);
 	}
-	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
-	VisualTracer::get_instance()->register_completed_event(*event);
 
-	if (event->get_id() == 1680006) {
-		//PRINT_LEVEL = 1;
-	}
+	//VisualTracer::get_instance()->register_completed_event(*event);
 
-	/*if (event->get_event_type() == READ_TRANSFER && event->get_latency() > 3100) {
-		VisualTracer::get_instance()->print_horizontally(10000);
+	if (event->get_event_type() == READ_TRANSFER && event->get_latency() > 7000 && !event->is_garbage_collection_op()) {
+		VisualTracer::get_instance()->print_horizontally(40000);
 		event->print();
 		printf(" ");
-	}*/
+	}
+
+	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
+
 
 	if (event->get_event_type() == WRITE || event->get_event_type() == COPY_BACK) {
 		ftl->register_write_completion(*event, outcome);

@@ -45,38 +45,6 @@ Thread* grace_hash_join_thread(int lowest_lba, int highest_lba, bool use_flexibl
 			                   use_flexible_reads, use_tagging, 32, randseed);
 }
 
-/*vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool use_tagging, int grace_hash_join_threads = 2, int random_read_threads = 0, int random_write_threads = 0) {
-	Grace_Hash_Join::initialize_counter();
-	Thread* initial_write    = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, 1, 1);
-
-	// TODO: For giving the grace hash join threads chucks of space of uneaven sizes
-	//vector<double> space_fractions;
-
-	read_statistics_gatherer = new StatisticsGatherer();
-	for (int i = 0; i < random_read_threads; i++) {
-		Thread* random_reads = new Synchronous_Random_Reader(highest_lba*gh+1, highest_lba*(gh+ns), (i*17)+637);
-		random_reads->set_statistics_gatherer(read_statistics_gatherer);
-		//random_reads->set_experiment_thread(true);
-		initial_write->add_follow_up_thread(random_reads);
-	}
-
-	for (int gt = 0; gt < grace_hash_join_threads; gt++) {
-		Thread* recursive_madness = initial_write;
-		int low_lba =  (highest_lba*gh)*gt/grace_hash_join_threads;
-		int high_lba = ((highest_lba*gh)*(gt+1)/grace_hash_join_threads)-1;
-		for (int i = 0; i < 1000; i++) {
-			Thread* grace_hash_join = grace_hash_join_thread(low_lba, high_lba, use_flexible_reads, use_tagging, ((gt+1)*17) * ((i+1)*31) + 72);
-			grace_hash_join->set_experiment_thread(true);
-			recursive_madness->add_follow_up_thread(grace_hash_join);
-			recursive_madness = grace_hash_join;
-		}
-	}
-	vector<Thread*> threads;
-	threads.push_back(initial_write);
-
-	return threads;
-}*/
-
 vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool use_tagging, int grace_hash_join_threads = 2, int random_read_threads = 0, int random_write_threads = 0) {
 	Grace_Hash_Join::initialize_counter();
 
