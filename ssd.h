@@ -2091,8 +2091,6 @@ public:
 	static string pretty_time(double time);
 	static void draw_graph(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command);
 	static void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command, vector<string> histogram_commands);
-	static double calibrate_IO_submission_rate_queue_based(int highest_lba, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
-	static double measure_throughput(int highest_lba, double IO_submission_rate, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate));
 	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments, int y_max = UNDEFINED, string subfolder = "");
 	static void latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, ExperimentResult experiment, int y_max = UNDEFINED);
 	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, ExperimentResult experiment);
@@ -2107,8 +2105,8 @@ public:
 
 	static ExperimentResult overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
 	static vector<ExperimentResult> random_writes_on_the_side_experiment(vector<Thread*> (*experiment)(int highest_lba), int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba);
-	static ExperimentResult copyback_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
-	static ExperimentResult copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);
+	static ExperimentResult copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
+	static ExperimentResult copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);
 
 	static string graph_filename_prefix;
 

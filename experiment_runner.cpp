@@ -246,54 +246,6 @@ string Experiment_Runner::pretty_time(double time) {
 	return time_text.str();
 }
 
-double Experiment_Runner::measure_throughput(int highest_lba, double IO_submission_rate, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
-	vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
-	OperatingSystem* os = new OperatingSystem(threads);
-	os->set_num_writes_to_stop_after(IO_limit);
-	os->run();
-	int total_IOs_issued = StatisticsGatherer::get_global_instance()->total_reads() + StatisticsGatherer::get_global_instance()->total_writes();
-	return (double) total_IOs_issued / os->get_experiment_runtime();
-}
-
-double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_lba, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
-	double max_rate = calibration_starting_point;
-	double min_rate = 0;
-	double current_rate;
-	bool success;
-	printf("Calibrating...\n");
-
-	// Finding an upper bound
-	do {
-		printf("Finding upper bound. Current is:  %f.\n", max_rate);
-		success = true;
-		vector<Thread*> threads = experiment(highest_lba, max_rate);
-		OperatingSystem* os = new OperatingSystem(threads);
-		os->set_num_writes_to_stop_after(IO_limit);
-		try        { os->run(); }
-		catch(...) { success = false; min_rate = max_rate; max_rate *= 2; }
-		delete os;
-	} while (!success);
-
-	while ((max_rate - min_rate) > calibration_precision)
-	{
-		current_rate = min_rate + ((max_rate - min_rate) / 2); // Pick a rate just between min and max
-		printf("Optimal submission rate in range %f - %f. Trying %f.\n", min_rate, max_rate, current_rate);
-		success = true;
-		{
-			vector<Thread*> threads = experiment(highest_lba, current_rate);
-			OperatingSystem* os = new OperatingSystem(threads);
-			os->set_num_writes_to_stop_after(IO_limit);
-			try        { os->run(); }
-			catch(...) { success = false; }
-			delete os;
-		}
-		if      ( success) max_rate = current_rate;
-		else if (!success) min_rate = current_rate;
-	}
-
-	return max_rate;
-}
-
 ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit) {
     ExperimentResult experiment_result(name, data_folder, "Used space (%)");
     experiment_result.start_experiment();
@@ -410,7 +362,7 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 	return results;
 }
 
-ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int used_space, int max_copybacks, string data_folder, string name, int IO_limit) {
+ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit) {
     ExperimentResult experiment_result(name, data_folder, "CopyBacks allowed before ECC check");
     experiment_result.start_experiment();
 
@@ -423,12 +375,8 @@ ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experi
 
 		MAX_REPEATED_COPY_BACKS_ALLOWED = copybacks_allowed;
 
-		// Calibrate IO submission rate
-		double IO_submission_rate = 10;//calibrate_IO_submission_rate_queue_based(highest_lba, IO_limit, experiment);
-		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
-
 		// Run experiment
-		vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
+		vector<Thread*> threads = experiment(highest_lba);
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
@@ -450,7 +398,7 @@ ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experi
 	return experiment_result;
 }
 
-ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit) {
+ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit) {
     ExperimentResult experiment_result(name, data_folder, "Max copyback map size");
     experiment_result.start_experiment();
 
@@ -463,12 +411,8 @@ ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*ex
 
 		MAX_ITEMS_IN_COPY_BACK_MAP = copyback_map_size;
 
-		// Calibrate IO submission rate
-		double IO_submission_rate = 10;//calibrate_IO_submission_rate_queue_based(highest_lba, IO_limit, experiment);
-		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
-
 		// Run experiment
-		vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
+		vector<Thread*> threads = experiment(highest_lba);
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
