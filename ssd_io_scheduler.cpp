@@ -365,6 +365,10 @@ void IOScheduler::handle_flexible_read(Event* event) {
 
 	Address addr = bm->choose_flexible_read_address(fr);
 
+	if (fr->get_application_io_id() == 2235357) {
+		event->print();
+	}
+
 	// Check if the logical address is locked
 	ulong logical_address = fr->get_candidates_lba()[addr.package][addr.die];
 	bool logical_address_locked = LBA_currently_executing.count(logical_address) == 1;
@@ -374,14 +378,9 @@ void IOScheduler::handle_flexible_read(Event* event) {
 		Event * existing_event = find_scheduled_event(dependency_code_of_other_event);
 		if (existing_event != NULL && existing_event->is_garbage_collection_op()) {
 			fr->set_noop(true);
+			fr->set_logical_address(event->get_logical_address());
 			fr->register_read_commencement();
 			make_dependent(fr, existing_event->get_application_io_id());
-
-			if (fr->get_application_io_id() == 6445082) {
-				fr->print();
-			}
-
-
 		} else {
 			//printf("---! LBA %ld locked. Pushing event into the future.\n", logical_address);
 			fr->find_alternative_immediate_candidate(addr.package, addr.die);
