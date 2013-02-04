@@ -228,15 +228,6 @@ enum status Ssd::write(Event &event)
 	return data[event.get_address().package].write(event);
 }
 
-enum status Ssd::replace(Event &event)
-{
-	assert(data != NULL && event.get_replace_address().package < size);
-	if (event.get_replace_address().valid == PAGE)
-		return data[event.get_replace_address().package].replace(event);
-	else
-		return SUCCESS;
-}
-
 
 enum status Ssd::erase(Event &event)
 {
@@ -250,6 +241,9 @@ void Ssd::set_operating_system(OperatingSystem* new_os) {
 
 
 enum status Ssd::issue(Event *event) {
+	if (event->get_logical_address() == 0 && event->get_event_type() != ERASE && event->get_event_type() != READ_COMMAND && event->get_event_type() != READ_TRANSFER) {
+		event->print();
+	}
 	if(event -> get_event_type() == READ_COMMAND) {
 		assert(event -> get_address().valid > NONE);
 		bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY, *event);

@@ -132,12 +132,6 @@ enum status Plane::write(Event &event)
 	return s;
 }
 
-enum status Plane::replace(Event &event)
-{
-	assert(event.get_address().block < size);
-	return data[event.get_replace_address().block].replace(event);
-}
-
 
 /* if no errors
  * 	updates last_erase_time if later time

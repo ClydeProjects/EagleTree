@@ -113,13 +113,6 @@ enum status Die::write(Event &event)
 	return result;
 }
 
-enum status Die::replace(Event &event)
-{
-	assert(data != NULL);
-	assert(event.get_address().plane < size);
-	return data[event.get_replace_address().plane].replace(event);
-}
-
 /* if no errors
  * 	updates last_erase_time if later time
  * 	updates erases_remaining if smaller value

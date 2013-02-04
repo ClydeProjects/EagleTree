@@ -121,13 +121,6 @@ enum status Block::write(Event &event)
 	return ret;
 }
 
-enum status Block::replace(Event &event)
-{
-	uint page = event.get_replace_address().page;
-	invalidate_page(event.get_replace_address().page);
-	return SUCCESS;
-}
-
 ulong Block::get_age() const {
 	return BLOCK_ERASES - erases_remaining;
 }

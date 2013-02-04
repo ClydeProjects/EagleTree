@@ -556,7 +556,6 @@ public:
 	~Block(void);
 	enum status read(Event &event);
 	enum status write(Event &event);
-	enum status replace(Event &event);
 	enum status _erase(Event &event);
 	const Plane &get_parent(void) const;
 	uint get_pages_valid(void) const;
@@ -603,7 +602,6 @@ public:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	enum status replace(Event &event);
 	const Die &get_parent(void) const;
 	double get_last_erase_time(const Address &address) const;
 	ulong get_erases_remaining(const Address &address) const;
@@ -640,7 +638,6 @@ public:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	enum status replace(Event &event);
 	const Package &get_parent(void) const;
 	double get_last_erase_time(const Address &address) const;
 	ulong get_erases_remaining(const Address &address) const;
@@ -681,7 +678,6 @@ public:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	enum status replace(Event &event);
 	const Ssd &get_parent(void) const;
 	double get_last_erase_time (const Address &address) const;
 	ulong get_erases_remaining (const Address &address) const;
@@ -1390,7 +1386,6 @@ private:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	enum status replace(Event &event);
 	Package &get_data(void);
 
 	uint size;
