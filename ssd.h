@@ -1430,7 +1430,7 @@ class VisualTracer
 public:
 	static VisualTracer *get_instance();
 	static void init();
-	void register_completed_event(Event const& event);
+	void register_completed_event(Event& event);
 	void print_horizontally(int last_how_many_characters = UNDEFINED);
 	void print_horizontally_with_breaks();
 	void print_vertically();

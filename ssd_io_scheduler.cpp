@@ -318,10 +318,6 @@ void IOScheduler::update_current_events() {
 
 void IOScheduler::push_into_current_events(Event* event) {
 	long current_time = floor(event->get_current_time());
-	if (event->get_logical_address() == 9838 && event->get_event_type() != WRITE) {
-		int i = 0;
-		i++;
-	}
 	if (current_events.count(current_time) == 0) {
 		vector<Event*> events(0);
 		events.push_back(event);
@@ -336,12 +332,6 @@ void IOScheduler::handle(vector<Event*>& events) {
 	//sort(events.begin(), events.end(), overall_wait_time_comparator);
 	while (events.size() > 0) {
 		Event* event = events.back();
-
-		if (event->get_application_io_id() == 14379 && event->get_event_type() != WRITE && event->get_event_type() != READ_TRANSFER) {
-			int i = 0;
-			i++;
-		}
-
 		events.pop_back();
 		event_type type = event->get_event_type();
 		if (type == WRITE || type == COPY_BACK) {
@@ -373,26 +363,46 @@ void IOScheduler::handle_event(Event* event) {
 void IOScheduler::handle_flexible_read(Event* event) {
 	Flexible_Read_Event* fr = dynamic_cast<Flexible_Read_Event*>(event);
 
-	/*if (event->get_application_io_id() == 237142) {
-		event->print();
-		VisualTracer::get_instance()->print_horizontally(2000);
-	}*/
-
 	Address addr = bm->choose_flexible_read_address(fr);
-	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, fr->get_current_time());
-	if ( wait_time == 0 && !bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id())) {
-		wait_time = WAIT_TIME;
-	}
 
 	// Check if the logical address is locked
 	ulong logical_address = fr->get_candidates_lba()[addr.package][addr.die];
 	bool logical_address_locked = LBA_currently_executing.count(logical_address) == 1;
 	if (logical_address_locked) {
-		//printf("---! LBA %ld locked. Pushing event into the future.\n", logical_address);
-		fr->find_alternative_immediate_candidate(addr.package, addr.die);
+
+		uint dependency_code_of_other_event = LBA_currently_executing[logical_address];
+		Event * existing_event = find_scheduled_event(dependency_code_of_other_event);
+		if (existing_event != NULL && existing_event->is_garbage_collection_op()) {
+			fr->set_noop(true);
+			fr->register_read_commencement();
+			make_dependent(fr, existing_event->get_application_io_id());
+
+			if (fr->get_application_io_id() == 6445082) {
+				fr->print();
+			}
+
+
+		} else {
+			//printf("---! LBA %ld locked. Pushing event into the future.\n", logical_address);
+			fr->find_alternative_immediate_candidate(addr.package, addr.die);
+			double wait_time = WAIT_TIME;
+			fr->incr_bus_wait_time(wait_time);
+			push_into_current_events(fr);
+			//assert(false);
+		}
+		return;
 	}
 
-	if (wait_time == 0 && !logical_address_locked) {
+	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, fr->get_current_time());
+	if ( wait_time == 0 && !bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id())) {
+		wait_time = WAIT_TIME;
+	}
+
+	if (event->get_application_io_id() == 71500) {
+		event->print();
+	}
+
+	if (wait_time == 0) {
 		fr->set_address(addr);
 		fr->register_read_commencement();
 		dependencies[event->get_application_io_id()].front()->set_logical_address(event->get_logical_address());
@@ -534,12 +544,10 @@ enum status IOScheduler::execute_next(Event* event) {
 			//LBA_currently_executing[dependent->get_logical_address()] = dependent->get_application_io_id();
 			dependent->set_application_io_id(dependency_code);
 
-
 			double diff = event->get_current_time() - dependent->get_current_time();
 			//dependent->incr_os_wait_time(event->get_os_wait_time());
 			dependent->incr_accumulated_wait_time(diff);
 			dependent->incr_pure_ssd_wait_time(event->get_bus_wait_time() + event->get_execution_time());
-
 			dependent->set_noop(event->get_noop());
 			dependencies[dependency_code].pop_front();
 			// The dependent event might have a different LBA and type - record this in bookkeeping maps
@@ -596,8 +604,8 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 
 	//VisualTracer::get_instance()->register_completed_event(*event);
 
-	if (event->get_event_type() == READ_TRANSFER && event->get_latency() > 7000 && !event->is_garbage_collection_op()) {
-		VisualTracer::get_instance()->print_horizontally(40000);
+	if (event->get_event_type() == READ_TRANSFER && event->get_latency() > 5500 && !event->is_garbage_collection_op()) {
+		VisualTracer::get_instance()->print_horizontally(20000);
 		event->print();
 		printf(" ");
 	}
@@ -676,7 +684,7 @@ void IOScheduler::init_event(Event* event) {
 		dependencies[dep_code].push_front(read_transfer);
 		init_event(event);
 	}
-	else if (type == READ_COMMAND || type == READ_TRANSFER) {
+	else if ((type == READ_COMMAND || type == READ_TRANSFER) && !event->is_flexible_read()) {
 		ftl->set_read_address(*event);
 	}
 	else if (type == WRITE) {
@@ -694,27 +702,11 @@ void IOScheduler::init_event(Event* event) {
 			migrations.pop_back();
 			// Pick first event from migration
 			Event* first = migration.front();
-			/*if (first->get_event_type() == COPY_BACK) {
-				// Make a chain of dependencies, to enforce an order of execution: first -> second -> third, etc.
-				for (deque<Event*>::iterator e = migration.begin(); e != migration.end(); e++) {
-					Event* current = *(e);
-					Event* next    = *(e+1);
-					bool last  = (e+1 == migration.end());
-					bool first = (e   == migration.begin());
-					dependency_code_to_LBA[current->get_application_io_id()] = current->get_logical_address();
-					dependency_code_to_type[current->get_application_io_id()] = current->get_event_type(); // = WRITE for normal GC, COPY_BACK for copy backs
-					if (first) dependencies[current->get_application_io_id()] = deque<Event*>();
-					remove_redundant_events(current);
-					if (!last) make_dependent(next, current->get_application_io_id());
-				}
-			} else {*/
 			migration.pop_front();
 			Event* second = migration.front();
 			dependencies[first->get_application_io_id()] = migration;
 			dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
 			dependency_code_to_type[first->get_application_io_id()] = second->get_event_type(); // = WRITE for normal GC, COPY_BACK for copy backs
-			//}
-			//dependency_code_to_type[first->get_application_io_id()] = WRITE;
 			init_event(first);
 		}
 		delete event;
@@ -745,7 +737,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	event_type new_op_code = dependency_code_to_type[dependency_code_of_new_event];
 	event_type scheduled_op_code = dependency_code_to_type[dependency_code_of_other_event];
 
-	if (new_op_code == COPY_BACK || scheduled_op_code == COPY_BACK) {
+	if (new_event->get_application_io_id() == 79667) {
 		int i = 0;
 		i++;
 	}
@@ -815,6 +807,10 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		make_dependent(new_event, dependency_code_of_other_event);
 	}
 	// if there is a read, and a write is scheduled, then the contents of the write must be buffered, so the read can wait
+	else if (new_op_code == READ && existing_event != NULL && existing_event->is_garbage_collection_op()) {
+		new_event->set_noop(true);
+		make_dependent(new_event, dependency_code_of_other_event);
+	}
 	else if (new_op_code == READ && (scheduled_op_code == WRITE || scheduled_op_code == COPY_BACK )) {
 		//remove_current_operation(new_event);
 		//current_events.push_back(new_event);

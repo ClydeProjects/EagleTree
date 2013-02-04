@@ -37,7 +37,7 @@ vector<char> get_int_as_char_vector(int num) {
 	return vec;
 }
 
-void VisualTracer::register_completed_event(Event const& event) {
+void VisualTracer::register_completed_event(Event& event) {
 	if (event.get_event_type() == TRIM) {
 		return;
 	}
@@ -50,7 +50,7 @@ void VisualTracer::register_completed_event(Event const& event) {
 	if (type == WRITE) {
 		write(add.package, add.die, 't', 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY);
 		vector<vector<char> > symbols;
-		vector<char> logical_address = get_int_as_char_vector(event.get_id());
+		vector<char> logical_address = get_int_as_char_vector(event.get_logical_address());
 		symbols.push_back(logical_address);
 		if (event.is_garbage_collection_op()) {
 			vector<char> gc_symbol(2);
@@ -65,6 +65,12 @@ void VisualTracer::register_completed_event(Event const& event) {
 		vector<vector<char> > symbols;
 		vector<char> logical_address = get_int_as_char_vector(event.get_logical_address());
 		symbols.push_back(logical_address);
+		if (event.is_flexible_read()) {
+			vector<char> gc_symbol(2);
+			gc_symbol[0] = 'F';
+			gc_symbol[1] = 'X';
+			symbols.push_back(gc_symbol);
+		}
 		write_with_id(add.package, add.die, 'r', PAGE_READ_DELAY - 1, symbols);
 	} else if (type == READ_TRANSFER) {
 		//write(add.package, add.die, 't', BUS_CTRL_DELAY + BUS_DATA_DELAY - 1);
