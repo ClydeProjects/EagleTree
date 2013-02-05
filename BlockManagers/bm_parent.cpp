@@ -78,20 +78,13 @@ Address Block_manager_parent::choose_copbyback_address(Event const& write) {
 }
 
 Address Block_manager_parent::choose_flexible_read_address(Flexible_Read_Event* fr) {
-	Address a;
-//	printf("------------------\n");
-	do {
-		vector<vector<Address> > candidates = fr->get_candidates();
-		pair<bool, pair<int, int> > result = get_free_block_pointer_with_shortest_IO_queue(candidates);
-		if (!result.first) {
-			return Address();
-		}
-		pair<int, int> coor = result.second;
-
-		//return candidates[coor.first][coor.second];
-		a = fr->get_verified_candidate_address(coor.first, coor.second);//candidates[coor.first][coor.second];
-    } while (a.valid == NONE);
-	return a;
+	vector<vector<Address> > candidates = fr->get_candidates();
+	pair<bool, pair<int, int> > result = get_free_block_pointer_with_shortest_IO_queue(candidates);
+	if (!result.first) {
+		return Address();
+	}
+	pair<int, int> coor = result.second;
+	return candidates[coor.first][coor.second];
 }
 
 Address Block_manager_parent::choose_write_address(Event const& write) {

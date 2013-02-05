@@ -91,9 +91,6 @@ void Thread::set_os(OperatingSystem*  op_sys) {
 }
 
 void Thread::submit(Event* event) {
-	if (event->get_event_type() == TRIM && event->get_logical_address() < 1000) {
-		event->print();
-	}
 	event->set_start_time(event->get_current_time());
 	submitted_events.push_front(event);
 }

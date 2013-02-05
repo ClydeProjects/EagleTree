@@ -119,10 +119,10 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 1000000;
+	int IO_limit = 250000;
 
-	int write_threads_min = 4;
-	int write_threads_max = 4;
+	int write_threads_min = 0;
+	int write_threads_max = 3;
 	double used_space = .80; // overprovisioning level for variable random write threads experiment
 
 	PRINT_LEVEL = 0;

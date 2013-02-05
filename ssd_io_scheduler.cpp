@@ -365,30 +365,38 @@ void IOScheduler::handle_flexible_read(Event* event) {
 
 	Address addr = bm->choose_flexible_read_address(fr);
 
-	if (fr->get_application_io_id() == 2235357) {
-		event->print();
-	}
-
 	// Check if the logical address is locked
 	ulong logical_address = fr->get_candidates_lba()[addr.package][addr.die];
+
 	bool logical_address_locked = LBA_currently_executing.count(logical_address) == 1;
-	if (logical_address_locked) {
+	if (addr.valid == PAGE && logical_address_locked) {
 
 		uint dependency_code_of_other_event = LBA_currently_executing[logical_address];
 		Event * existing_event = find_scheduled_event(dependency_code_of_other_event);
 		if (existing_event != NULL && existing_event->is_garbage_collection_op()) {
 			fr->set_noop(true);
-			fr->set_logical_address(event->get_logical_address());
+			fr->set_address(addr);
+			fr->set_logical_address(existing_event->get_logical_address());
+			dependencies[fr->get_application_io_id()].front()->set_logical_address(existing_event->get_logical_address());
 			fr->register_read_commencement();
 			make_dependent(fr, existing_event->get_application_io_id());
 		} else {
-			//printf("---! LBA %ld locked. Pushing event into the future.\n", logical_address);
-			fr->find_alternative_immediate_candidate(addr.package, addr.die);
+			//fr->find_alternative_immediate_candidate(addr.package, addr.die);
 			double wait_time = WAIT_TIME;
 			fr->incr_bus_wait_time(wait_time);
 			push_into_current_events(fr);
-			//assert(false);
 		}
+		return;
+	}
+
+	Address ftl_address = ftl->get_physical_address(logical_address);
+	if (addr.valid == PAGE && ftl_address.compare(addr) != PAGE) {
+		fr->set_noop(true);
+		fr->set_address(addr);
+		fr->set_logical_address(logical_address);
+		dependencies[fr->get_application_io_id()].front()->set_logical_address(fr->get_logical_address());
+		fr->register_read_commencement();
+		push_into_current_events(fr);
 		return;
 	}
 
@@ -397,12 +405,9 @@ void IOScheduler::handle_flexible_read(Event* event) {
 		wait_time = WAIT_TIME;
 	}
 
-	if (event->get_application_io_id() == 71500) {
-		event->print();
-	}
-
 	if (wait_time == 0) {
 		fr->set_address(addr);
+		fr->set_logical_address(logical_address);
 		fr->register_read_commencement();
 		dependencies[event->get_application_io_id()].front()->set_logical_address(event->get_logical_address());
 		assert(addr.page < BLOCK_SIZE);
@@ -462,8 +467,6 @@ bool IOScheduler::remove_event_from_current_events(Event* event) {
 	events.erase(e);
 	return true;
 }
-
-
 
 Event* IOScheduler::find_scheduled_event(uint dependency_code) {
 	map<long, vector<Event*> >::iterator k = current_events.begin();

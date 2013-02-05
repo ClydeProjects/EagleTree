@@ -1922,7 +1922,6 @@ public:
 	inline uint get_num_reads_left() { return finished_counter; }
 	inline vector<vector<Address> > const& get_immediate_candidates()     { return immediate_candidates_physical_addresses; }
 	inline vector<vector<long> >    const& get_immediate_candidates_lba() { return immediate_candidates_logical_addresses; }
-	Address get_verified_candidate_address(uint package, uint die);
 	void find_alternative_immediate_candidate(uint package, uint die);
 
 	//inline vector<vector<long> > const& get_immediate_candidates_logical_addresses() { return immediate_candidates_logical_addresses; }
@@ -1962,7 +1961,6 @@ public:
 	inline vector<vector<Address> > const& get_candidates()     { return reader->get_immediate_candidates(); }
 	inline vector<vector<long> >    const& get_candidates_lba() { return reader->get_immediate_candidates_lba(); }
 	inline void register_read_commencement() { reader->register_read_commencement(this); }
-	inline Address get_verified_candidate_address(uint package, uint die) { return reader->get_verified_candidate_address(package, die); }
 	inline void find_alternative_immediate_candidate(uint package, uint die) { reader->find_alternative_immediate_candidate(package, die); }
 };
 
