@@ -42,40 +42,8 @@ Thread* grace_hash_join_thread(int lowest_lba, int highest_lba, bool use_flexibl
 	return new Grace_Hash_Join(lowest_lba,                lowest_lba+span*r1,
 			                   lowest_lba+span*r1+1,      lowest_lba+span*(r1+r2),
 			                   lowest_lba+span*(r1+r2)+1, lowest_lba+span*(r1+r2+fs),
-			                   1, use_flexible_reads, use_tagging, 32, randseed);
+			                   use_flexible_reads, use_tagging, 32, randseed);
 }
-
-/*vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool use_tagging, int grace_hash_join_threads = 2, int random_read_threads = 0, int random_write_threads = 0) {
-	Grace_Hash_Join::initialize_counter();
-	Thread* initial_write    = new Asynchronous_Sequential_Thread(0, highest_lba, 1, WRITE, 1, 1);
-
-	// TODO: For giving the grace hash join threads chucks of space of uneaven sizes
-	//vector<double> space_fractions;
-
-	read_statistics_gatherer = new StatisticsGatherer();
-	for (int i = 0; i < random_read_threads; i++) {
-		Thread* random_reads = new Synchronous_Random_Reader(highest_lba*gh+1, highest_lba*(gh+ns), (i*17)+637);
-		random_reads->set_statistics_gatherer(read_statistics_gatherer);
-		//random_reads->set_experiment_thread(true);
-		initial_write->add_follow_up_thread(random_reads);
-	}
-
-	for (int gt = 0; gt < grace_hash_join_threads; gt++) {
-		Thread* recursive_madness = initial_write;
-		int low_lba =  (highest_lba*gh)*gt/grace_hash_join_threads;
-		int high_lba = ((highest_lba*gh)*(gt+1)/grace_hash_join_threads)-1;
-		for (int i = 0; i < 1000; i++) {
-			Thread* grace_hash_join = grace_hash_join_thread(low_lba, high_lba, use_flexible_reads, use_tagging, ((gt+1)*17) * ((i+1)*31) + 72);
-			grace_hash_join->set_experiment_thread(true);
-			recursive_madness->add_follow_up_thread(grace_hash_join);
-			recursive_madness = grace_hash_join;
-		}
-	}
-	vector<Thread*> threads;
-	threads.push_back(initial_write);
-
-	return threads;
-}*/
 
 vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool use_tagging, int grace_hash_join_threads = 2, int random_read_threads = 0, int random_write_threads = 0) {
 	Grace_Hash_Join::initialize_counter();
@@ -89,9 +57,9 @@ vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool u
 	int noise_space_start = temp_space_end + 1;
 	int noise_space_end = highest_lba;
 
-	Thread* relation1_write    = new Asynchronous_Sequential_Thread(relation_1_start, relation_1_end, 1, WRITE, 1, 1);
-	Thread* relation2_write    = new Asynchronous_Sequential_Thread(relation_2_start, relation_2_end, 1, WRITE, 1, 1);
-	Thread* noise_space_write    = new Asynchronous_Sequential_Thread(noise_space_start, noise_space_end, 1, WRITE, 1, 1);
+	Thread* relation1_write    = new Asynchronous_Sequential_Writer(relation_1_start, relation_1_end);
+	Thread* relation2_write    = new Asynchronous_Sequential_Writer(relation_2_start, relation_2_end);
+	Thread* noise_space_write  = new Asynchronous_Sequential_Writer(noise_space_start, noise_space_end);
 
 	relation1_write->add_follow_up_thread(relation2_write);
 	relation2_write->add_follow_up_thread(noise_space_write);
@@ -102,7 +70,7 @@ vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool u
 			Thread* grace_hash_join = new Grace_Hash_Join(	relation_1_start,	relation_1_end,
 										relation_2_start,	relation_2_end,
 										temp_space_start, temp_space_end,
-										1, use_flexible_reads, use_tagging, 32, 462);
+										use_flexible_reads, use_tagging, 32, 462);
 
 			grace_hash_join->set_experiment_thread(true);
 			preceding_thread->add_follow_up_thread(grace_hash_join);
@@ -115,22 +83,22 @@ vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool u
 	return threads;
 }
 
-vector<Thread*> grace_hash_join(int highest_lba, double IO_submission_rate) {
+vector<Thread*> grace_hash_join(int highest_lba) {
 	BLOCK_MANAGER_ID = 0;
 	return grace_hash_join(highest_lba, false, false, num_grace_hash_join_threads);
 }
 
-vector<Thread*> grace_hash_join_flex(int highest_lba, double IO_submission_rate) {
+vector<Thread*> grace_hash_join_flex(int highest_lba) {
 	BLOCK_MANAGER_ID = 0;
 	return grace_hash_join(highest_lba, true, false, num_grace_hash_join_threads);
 }
 
-vector<Thread*> grace_hash_join_tag(int highest_lba, double IO_submission_rate) {
+vector<Thread*> grace_hash_join_tag(int highest_lba) {
 	BLOCK_MANAGER_ID = 3;
 	return grace_hash_join(highest_lba, false, true, num_grace_hash_join_threads);
 }
 
-vector<Thread*> grace_hash_join_flex_tag(int highest_lba, double IO_submission_rate) {
+vector<Thread*> grace_hash_join_flex_tag(int highest_lba) {
 	BLOCK_MANAGER_ID = 3;
 	return grace_hash_join(highest_lba, true, true, num_grace_hash_join_threads);
 }
@@ -142,8 +110,8 @@ int main()
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 256;
-	BLOCK_SIZE = 64;
+	PLANE_SIZE = 64 * 2;
+	BLOCK_SIZE = 32 * 2;
 
 	PAGE_READ_DELAY = 50;
 	PAGE_WRITE_DELAY = 200;
@@ -151,21 +119,18 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 1000000;
-	//int space_min = 40;
-	//int space_max = 85;
-	//int space_inc = 5;
+	int IO_limit = 250000;
 
 	int write_threads_min = 0;
-	int write_threads_max = 5;
+	int write_threads_max = 3;
 	double used_space = .80; // overprovisioning level for variable random write threads experiment
-
 
 	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 	SCHEDULING_SCHEME = 2;
 	GREED_SCALE = 2;
+	USE_ERASE_QUEUE = false;
 
 	const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 	const int avail_pages = num_pages * used_space;
@@ -185,8 +150,9 @@ int main()
 
 		vector<vector<ExperimentResult> > exps;
 
-		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join,		  write_threads_min, write_threads_max, 1, exp_folder + "None/", "None",                  			IO_limit, used_space, avail_pages*ns+1, avail_pages) );
 		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex,	  write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads/", "Flexible reads",        IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join,		  write_threads_min, write_threads_max, 1, exp_folder + "None/", "None",                  			IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+
 		//exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_tag,      write_threads_min, write_threads_max, 1, exp_folder + "Tagging/", "Tagging",               IO_limit, used_space, avail_pages*ns+1, avail_pages) );
 		//exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex_tag, write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads_&_tagging/", "Flexible reads + tagging", IO_limit, used_space, avail_pages*ns+1, avail_pages) );
 

@@ -38,7 +38,12 @@ ssd: $(HDR) $(SRC)
 
 # All Target
 
-all: sequential grace flexible_reads #scheduling sequential_tuning sequential greediness copybacks
+all: grace #scheduling sequential_tuning sequential greediness copybacks
+
+run_test: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o run_test run_test3.cpp $(OBJ)
+	-chmod $(PERMS) $(OBJ)
+	-chmod $(EPERMS) run_test
 
 flexible_reads: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o flexible_reads exp_flexible_reads.cpp $(OBJ)

@@ -34,8 +34,9 @@ Block_manager_parent::Block_manager_parent(int num_age_classes)
    erase_queue(SSD_SIZE, queue< Event*>()),
    num_erases_scheduled_per_package(SSD_SIZE, 0),
    random_number_generator(90),
-   num_erases_up_to_date(0),
-   scheduler(NULL)
+   scheduler(NULL),
+   num_erases_up_to_date(0)
+
 {
 }
 
@@ -77,20 +78,13 @@ Address Block_manager_parent::choose_copbyback_address(Event const& write) {
 }
 
 Address Block_manager_parent::choose_flexible_read_address(Flexible_Read_Event* fr) {
-	Address a;
-//	printf("------------------\n");
-	do {
-		vector<vector<Address> > candidates = fr->get_candidates();
-		pair<bool, pair<int, int> > result = get_free_block_pointer_with_shortest_IO_queue(candidates);
-		if (!result.first) {
-			return Address();
-		}
-		pair<int, int> coor = result.second;
-
-		//return candidates[coor.first][coor.second];
-		a = fr->get_verified_candidate_address(coor.first, coor.second);//candidates[coor.first][coor.second];
-    } while (a.valid == NONE);
-	return a;
+	vector<vector<Address> > candidates = fr->get_candidates();
+	pair<bool, pair<int, int> > result = get_free_block_pointer_with_shortest_IO_queue(candidates);
+	if (!result.first) {
+		return Address();
+	}
+	pair<int, int> coor = result.second;
+	return candidates[coor.first][coor.second];
 }
 
 Address Block_manager_parent::choose_write_address(Event const& write) {
@@ -552,9 +546,12 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 	uint die_id = address.die;
 	double channel_finish_time = ssd->bus.get_channel(package_id).get_currently_executing_operation_finish_time();
 	double die_finish_time = ssd->getPackages()[package_id].getDies()[die_id].get_currently_executing_io_finish_time();
-	double max = std::max(channel_finish_time, die_finish_time);
+	double max_time = max(channel_finish_time, die_finish_time);
 
-	double time = max - event_time;
+	double time = max_time - event_time;
+
+	time = min(time, BUS_DATA_DELAY + BUS_CTRL_DELAY);
+
 	return time < 0 ? 0 : time;
 }
 

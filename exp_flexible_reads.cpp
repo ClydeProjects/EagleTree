@@ -26,7 +26,7 @@ using namespace ssd;
 // problem: some of the pointers for the 6 block managers end up in the same LUNs. This is stupid.
 // solution: have a method in bm_parent that returns a free block from the LUN with the shortest queue.
 
-vector<Thread*> flexible_reads(int highest_lba, double IO_submission_rate) {
+vector<Thread*> flexible_reads(int highest_lba) {
 	BLOCK_MANAGER_ID = 0;
 	SCHEDULING_SCHEME = 2;
 	GREED_SCALE = 2;
@@ -35,7 +35,7 @@ vector<Thread*> flexible_reads(int highest_lba, double IO_submission_rate) {
 
 	long log_space_per_thread = highest_lba / 4;
 
-	Thread* initial_write = new Asynchronous_Sequential_Thread(0, log_space_per_thread * 4, 1, WRITE, 100, 0);
+	Thread* initial_write = new Asynchronous_Sequential_Writer(0, log_space_per_thread * 4);
 
 	Thread* flexible_reads = new Flexible_Reader_Thread(0, log_space_per_thread * 1, 1000);
 
@@ -58,7 +58,7 @@ vector<Thread*> flexible_reads(int highest_lba, double IO_submission_rate) {
 	return threads;
 }
 
-vector<Thread*> synch_sequential_reads(int highest_lba, double IO_submission_rate) {
+vector<Thread*> synch_sequential_reads(int highest_lba) {
 	BLOCK_MANAGER_ID = 0;
 	SCHEDULING_SCHEME = 2;
 	GREED_SCALE = 2;
@@ -67,9 +67,10 @@ vector<Thread*> synch_sequential_reads(int highest_lba, double IO_submission_rat
 
 	long log_space_per_thread = highest_lba / 4;
 
-	Thread* initial_write = new Asynchronous_Sequential_Thread(0, log_space_per_thread * 4, 1, WRITE, 100, 0);
+	Thread* initial_write = new Asynchronous_Sequential_Writer(0, log_space_per_thread * 4);
 
-	Thread* seq_reads = new Synchronous_Sequential_Thread(0, log_space_per_thread * 1, 1000, READ);
+	Simple_Thread* seq_reads = new Synchronous_Sequential_Reader(0, log_space_per_thread * 1);
+	seq_reads->set_num_ios(1000);
 
 	Thread* random_writes1 = new Synchronous_Random_Writer(log_space_per_thread * 1 + 1, log_space_per_thread * 2, 472);
 	Thread* random_writes2 = new Synchronous_Random_Writer(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 537);

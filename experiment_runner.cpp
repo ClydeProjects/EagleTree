@@ -246,55 +246,7 @@ string Experiment_Runner::pretty_time(double time) {
 	return time_text.str();
 }
 
-double Experiment_Runner::measure_throughput(int highest_lba, double IO_submission_rate, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
-	vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
-	OperatingSystem* os = new OperatingSystem(threads);
-	os->set_num_writes_to_stop_after(IO_limit);
-	os->run();
-	int total_IOs_issued = StatisticsGatherer::get_global_instance()->total_reads() + StatisticsGatherer::get_global_instance()->total_writes();
-	return (double) total_IOs_issued / os->get_experiment_runtime();
-}
-
-double Experiment_Runner::calibrate_IO_submission_rate_queue_based(int highest_lba, int IO_limit, vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate)) {
-	double max_rate = calibration_starting_point;
-	double min_rate = 0;
-	double current_rate;
-	bool success;
-	printf("Calibrating...\n");
-
-	// Finding an upper bound
-	do {
-		printf("Finding upper bound. Current is:  %f.\n", max_rate);
-		success = true;
-		vector<Thread*> threads = experiment(highest_lba, max_rate);
-		OperatingSystem* os = new OperatingSystem(threads);
-		os->set_num_writes_to_stop_after(IO_limit);
-		try        { os->run(); }
-		catch(...) { success = false; min_rate = max_rate; max_rate *= 2; }
-		delete os;
-	} while (!success);
-
-	while ((max_rate - min_rate) > calibration_precision)
-	{
-		current_rate = min_rate + ((max_rate - min_rate) / 2); // Pick a rate just between min and max
-		printf("Optimal submission rate in range %f - %f. Trying %f.\n", min_rate, max_rate, current_rate);
-		success = true;
-		{
-			vector<Thread*> threads = experiment(highest_lba, current_rate);
-			OperatingSystem* os = new OperatingSystem(threads);
-			os->set_num_writes_to_stop_after(IO_limit);
-			try        { os->run(); }
-			catch(...) { success = false; }
-			delete os;
-		}
-		if      ( success) max_rate = current_rate;
-		else if (!success) min_rate = current_rate;
-	}
-
-	return max_rate;
-}
-
-ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit) {
+ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit) {
     ExperimentResult experiment_result(name, data_folder, "Used space (%)");
     experiment_result.start_experiment();
 
@@ -305,22 +257,18 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 		printf("%s : Experiment with max %d pct used space: Writing to no LBA higher than %d (out of %d total available)\n", name.c_str(), used_space, highest_lba, num_pages);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
-		// Calibrate IO submission rate
-		double IO_submission_rate = 10; //calibrate_IO_submission_rate_queue_based(highest_lba, IO_limit, experiment);
-		//printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
-
 		// Run experiment
-		vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
+		vector<Thread*> threads = experiment(highest_lba);
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
-		try {
+		//try {
 			os->run();
 
 			// Collect statistics from this experiment iteration (save in csv files)
 			experiment_result.collect_stats(used_space, os->get_experiment_runtime());
-		} catch(...) {
-			printf("An exception was thrown, but we continue for now\n");
-		}
+		//} catch(...) {
+		//	printf("An exception was thrown, but we continue for now\n");
+		//}
 
 
 		// Print shit
@@ -344,7 +292,7 @@ void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> thre
 	}
 }
 
-vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
+vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment(vector<Thread*> (*experiment)(int highest_lba), int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
 	mkdir(data_folder.c_str(), 0755);
 	ExperimentResult global_result       (name, data_folder,                         "Number of concurrent random write threads");
     ExperimentResult experiment_result   (name, data_folder + "Experiment_Threads/", "Number of concurrent random write threads");
@@ -361,17 +309,17 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 		printf("%s : Experiment with max %d concurrent random writes threads.\n", name.c_str(), random_write_threads);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
-		double IO_submission_rate = 10; // Whatever
-
 		// Run experiment
-		vector<Thread*> threads = experiment(num_pages * used_space, IO_submission_rate);
+		vector<Thread*> threads = experiment(num_pages * used_space);
 
 		StatisticsGatherer* experiment_statistics_gatherer = new StatisticsGatherer();
 		StatisticsGatherer* random_writes_statics_gatherer = new StatisticsGatherer();
 		unify_under_one_statistics_gatherer(threads, experiment_statistics_gatherer);
 
 		for (int i = 0; i < random_write_threads; i++) {
-			Thread* random_writes = new Random_Thread(random_writes_min_lba, random_writes_max_lba, (i*3)+537, 1, WRITE, std::numeric_limits<int>::max());
+			ulong randseed = (i*3)+537;
+			Simple_Thread* random_writes = new Synchronous_Random_Writer(random_writes_min_lba, random_writes_max_lba, randseed);
+			random_writes->set_num_ios(INFINITE);
 			//random_writes->set_experiment_thread(true);
 			random_writes->set_statistics_gatherer(random_writes_statics_gatherer);
 			threads[0]->add_follow_up_thread(random_writes);
@@ -379,26 +327,29 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
-		try {
+		//try {
 			os->run();
 
 			// Collect statistics from this experiment iteration (save in csv files)
 			global_result.collect_stats       (random_write_threads, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 			experiment_result.collect_stats   (random_write_threads, os->get_experiment_runtime(), experiment_statistics_gatherer);
 			write_threads_result.collect_stats(random_write_threads, os->get_experiment_runtime(), random_writes_statics_gatherer);
-		} catch(...) {
-			printf("An exception was thrown, but we continue for now\n");
-		}
+		//} catch(...) {
+		//	printf("An exception was thrown, but we continue for now\n");
+		//}
 
 
 		// Print shit
 		StatisticsGatherer::get_global_instance()->print();
+		//random_writes_statics_gatherer->print();
+		//StatisticsGatherer::get_global_instance()->print_gc_info();
 		if (PRINT_LEVEL >= 1) {
 			StateVisualiser::print_page_status();
 			StateVisualiser::print_block_ages();
 		}
-
 		delete os;
+		delete experiment_statistics_gatherer;
+		delete random_writes_statics_gatherer;
 	}
     global_result.end_experiment();
     experiment_result.end_experiment();
@@ -409,10 +360,11 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
     results.push_back(experiment_result);
     results.push_back(write_threads_result);
 
+
 	return results;
 }
 
-ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int used_space, int max_copybacks, string data_folder, string name, int IO_limit) {
+ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit) {
     ExperimentResult experiment_result(name, data_folder, "CopyBacks allowed before ECC check");
     experiment_result.start_experiment();
 
@@ -425,12 +377,8 @@ ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experi
 
 		MAX_REPEATED_COPY_BACKS_ALLOWED = copybacks_allowed;
 
-		// Calibrate IO submission rate
-		double IO_submission_rate = 10;//calibrate_IO_submission_rate_queue_based(highest_lba, IO_limit, experiment);
-		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
-
 		// Run experiment
-		vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
+		vector<Thread*> threads = experiment(highest_lba);
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
@@ -452,7 +400,7 @@ ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experi
 	return experiment_result;
 }
 
-ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba, double IO_submission_rate), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit) {
+ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit) {
     ExperimentResult experiment_result(name, data_folder, "Max copyback map size");
     experiment_result.start_experiment();
 
@@ -465,12 +413,8 @@ ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*ex
 
 		MAX_ITEMS_IN_COPY_BACK_MAP = copyback_map_size;
 
-		// Calibrate IO submission rate
-		double IO_submission_rate = 10;//calibrate_IO_submission_rate_queue_based(highest_lba, IO_limit, experiment);
-		printf("Using IO submission rate of %f microseconds per IO\n", IO_submission_rate);
-
 		// Run experiment
-		vector<Thread*> threads = experiment(highest_lba, IO_submission_rate);
+		vector<Thread*> threads = experiment(highest_lba);
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();

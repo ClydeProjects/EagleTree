@@ -599,17 +599,21 @@ string StatisticsFormatter::stacked_histogram_csv(vector<map<double, uint> > his
 	ss << "\"Interval\"";
 	for (uint i = 0; i < names.size(); i++) ss << ", \"" << names[i] << "\"";
 	ss << "\n";
-	vector< map<double,uint>::iterator > its;
-	for (vector<map<double,uint> >::iterator it = histograms.begin(); it != histograms.end(); ++it) {
-		its.push_back((*it).begin());
+	vector< map<double,uint>::iterator > its(histograms.size());
+	for (uint i = 0; i < histograms.size(); i++) {
+		map<double,uint>& hist = histograms[i];
+		map<double,uint>::iterator iter = hist.begin();
+		its[i] = iter;
 	}
-	double minimum;
+	double minimum = numeric_limits<double>::max();
 	bool the_end = false;
 	while (!the_end) {
 		minimum = numeric_limits<double>::max();
 		for (uint i = 0; i < its.size(); i++) {
 			if (its[i] != histograms[i].end()) {
-				minimum = min(minimum, its[i]->first);
+				map<double,uint>::iterator iter = its[i];
+				double d = iter->first;
+				minimum = min(minimum, d);
 			}
 		}
 		if (minimum == numeric_limits<double>::max()) the_end = true;
@@ -617,7 +621,7 @@ string StatisticsFormatter::stacked_histogram_csv(vector<map<double, uint> > his
 			ss << minimum;
 			for (uint i = 0; i < its.size(); i++) {
 				ss << ", " << histograms[i][minimum];
-				if (its[i]->first == minimum && its[i] != histograms[i].end()) {
+				if (its[i] != histograms[i].end() && its[i]->first == minimum) {
 					its[i]++;
 				}
 			}
@@ -644,8 +648,8 @@ string StatisticsGatherer::wait_time_histogram_appIOs_csv() {
 }
 
 string StatisticsGatherer::wait_time_histogram_all_IOs_csv() {
-	vector<map<double, uint> > histograms;
-	vector<string> names;
+	vector<map<double, uint> > histograms(0);
+	vector<string> names(0);
 	names.push_back("Application IOs, Reads+writes");
 	histograms.push_back(wait_time_histogram_appIOs_write_and_read);
 	names.push_back("Application IOs, Writes");
@@ -658,6 +662,14 @@ string StatisticsGatherer::wait_time_histogram_all_IOs_csv() {
 	histograms.push_back(wait_time_histogram_non_appIOs_write);
 	names.push_back("Internal operations, Reads");
 	histograms.push_back(wait_time_histogram_non_appIOs_read);
+
+	/*assert(wait_time_histogram_appIOs_write_and_read.size() > 0);
+	assert(wait_time_histogram_appIOs_write.size() > 0);
+	assert(wait_time_histogram_appIOs_read.size() > 0);
+	assert(wait_time_histogram_non_appIOs_all.size() > 0);
+	assert(wait_time_histogram_non_appIOs_write.size() > 0);
+	assert(wait_time_histogram_non_appIOs_read.size() > 0);*/
+
 	return StatisticsFormatter::stacked_histogram_csv(histograms, names);
 }
 

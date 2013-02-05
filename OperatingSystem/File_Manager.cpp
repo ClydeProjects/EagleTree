@@ -10,9 +10,9 @@
 
 using namespace ssd;
 
-File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, double time_breaks, double start_time, ulong randseed)
-	: Thread(start_time), min_LBA(min_LBA), max_LBA(max_LBA),
-	  num_files_to_write(num_files_to_write), time_breaks(time_breaks),
+File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, ulong randseed)
+	: Thread(), min_LBA(min_LBA), max_LBA(max_LBA),
+	  num_files_to_write(num_files_to_write),
 	  max_file_size(max_file_size),
 	  num_free_pages(max_LBA - min_LBA + 1),
 	  double_generator(randseed * 13),
@@ -109,7 +109,7 @@ void File_Manager::write_next_file(double current_time) {
 	assert(num_free_pages > 0); // deal with this problem later
 	double death_probability = double_generator() / 4;
 	//double death_probability = generate_death_probability();
-	uint size = 1 + random_number_generator() % max_file_size;
+	int size = 1 + random_number_generator() % max_file_size;
 	if (size > num_free_pages) {
 		size = num_free_pages;
 	}

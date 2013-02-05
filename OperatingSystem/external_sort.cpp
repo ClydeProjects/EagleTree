@@ -11,8 +11,8 @@
 using namespace ssd;
 
 External_Sort::External_Sort(long relation_min_LBA, long relation_max_LBA, long RAM_available,
-		long free_space_min_LBA, long free_space_max_LBA, double start_time) :
-		Thread(start_time), relation_min_LBA(relation_min_LBA), relation_max_LBA(relation_max_LBA), RAM_available(RAM_available),
+		long free_space_min_LBA, long free_space_max_LBA) :
+		Thread(), relation_min_LBA(relation_min_LBA), relation_max_LBA(relation_max_LBA), RAM_available(RAM_available),
 		free_space_min_LBA(free_space_min_LBA), free_space_max_LBA(free_space_max_LBA),
 		cursor(0), counter(0), number_finished(0), phase(FIRST_PHASE_READ)
 {

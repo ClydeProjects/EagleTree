@@ -30,17 +30,19 @@ int main() {
 	load_config();
 	print_config(NULL);
     printf("\n");
+    PRINT_LEVEL = 1;
+	vector<Thread*> threads;
+	Thread* t1 = new Asynchronous_Random_Writer(0, 99, 457); // 799
+	Thread* t2 = new Synchronous_Sequential_Writer(100, 199); // 799
+	//threads.push_back(t1);
+	t2->add_follow_up_thread(t1);
+	threads.push_back(t2);
+	OperatingSystem* os = new OperatingSystem(threads);
+	os->run();
+	//VisualTracer::get_instance()->print_horizontally_with_breaks();
+	delete os;
 
-	for (int rndseed = 0; rndseed < 1; rndseed++) {
-		printf("-----------------RANDSEED: %d-----------------\n", rndseed);
-		vector<Thread*> threads;
-		Thread* t1 = new Synchronous_Random_Thread(0, 63, 10000, rndseed, WRITE, 4); // 799
-		threads.push_back(t1);
-		OperatingSystem* os = new OperatingSystem(threads);
-		os->run();
-		//VisualTracer::get_instance()->print_horizontally_with_breaks();
-		delete os;
-	}
+	//VisualTracer::get_instance()->print_horizontally_with_breaks();
 
 	return 0;
 
@@ -67,7 +69,7 @@ int main() {
 
 	delete ssd;
 
-	VisualTracer::get_instance()->print_horizontally_with_breaks();
+	//VisualTracer::get_instance()->print_horizontally_with_breaks();
 
 	return 0;
 }

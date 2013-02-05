@@ -95,12 +95,6 @@ enum status Package::write(Event &event)
 	return data[event.get_address().die].write(event);
 }
 
-enum status Package::replace(Event &event)
-{
-	assert(data != NULL);
-	return data[event.get_replace_address().die].replace(event);
-}
-
 enum status Package::erase(Event &event)
 {
 	assert(data != NULL && event.get_address().die < size && event.get_address().valid > PACKAGE);

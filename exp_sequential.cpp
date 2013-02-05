@@ -32,7 +32,7 @@ using namespace ssd;
 // problem: some of the pointers for the 6 block managers end up in the same LUNs. This is stupid.
 // solution: have a method in bm_parent that returns a free block from the LUN with the shortest queue.
 
-vector<Thread*> sequential_experiment(int highest_lba, double IO_submission_rate) {
+vector<Thread*> sequential_experiment(int highest_lba) {
 
 	SCHEDULING_SCHEME = 2;
 	GREED_SCALE = 2;
@@ -42,7 +42,7 @@ vector<Thread*> sequential_experiment(int highest_lba, double IO_submission_rate
 	long log_space_per_thread = highest_lba / 4;
 	long max_file_size = log_space_per_thread / 7;
 
-	Thread* initial_write = new Asynchronous_Sequential_Thread(0, log_space_per_thread * 4, 1, WRITE, 100, 0);
+	Thread* initial_write = new Asynchronous_Sequential_Writer(0, log_space_per_thread * 4);
 
 	Thread* random_formatter = new Asynchronous_Random_Thread_Reader_Writer(0, log_space_per_thread * 4, highest_lba * 3, 4246);
 	//initial_write->add_follow_up_thread(random_formatter);
@@ -52,8 +52,8 @@ vector<Thread*> sequential_experiment(int highest_lba, double IO_submission_rate
 	//t1->add_follow_up_thread(random_formatter);
 
 	Thread* experiment_thread1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 472);
-	Thread* experiment_thread2 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 1000000, max_file_size, IO_submission_rate, 1, 713);
-	Thread* experiment_thread3 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, max_file_size, IO_submission_rate, 2, 5);
+	Thread* experiment_thread2 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 1000000, max_file_size, 713);
+	Thread* experiment_thread3 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, max_file_size, 5);
 
 	experiment_thread1->set_experiment_thread(true);
 	experiment_thread2->set_experiment_thread(true);
@@ -68,36 +68,36 @@ vector<Thread*> sequential_experiment(int highest_lba, double IO_submission_rate
 	return threads;
 }
 
-vector<Thread*> tagging(int highest_lba, double IO_submission_rate) {
+vector<Thread*> tagging(int highest_lba) {
 	BLOCK_MANAGER_ID = 3;
 	ENABLE_TAGGING = true;
-	return sequential_experiment(highest_lba, IO_submission_rate);
+	return sequential_experiment(highest_lba);
 }
 
-vector<Thread*> shortest_queues(int highest_lba, double IO_submission_rate) {
+vector<Thread*> shortest_queues(int highest_lba) {
 	BLOCK_MANAGER_ID = 0;
-	return sequential_experiment(highest_lba, IO_submission_rate);
+	return sequential_experiment(highest_lba);
 }
 
-vector<Thread*> detection_LUN(int highest_lba, double IO_submission_rate) {
+vector<Thread*> detection_LUN(int highest_lba) {
 	BLOCK_MANAGER_ID = 3;
 	ENABLE_TAGGING = false;
 	LOCALITY_PARALLEL_DEGREE = 2;
-	return sequential_experiment(highest_lba, IO_submission_rate);
+	return sequential_experiment(highest_lba);
 }
 
-vector<Thread*> detection_CHANNEL(int highest_lba, double IO_submission_rate) {
+vector<Thread*> detection_CHANNEL(int highest_lba) {
 	BLOCK_MANAGER_ID = 3;
 	ENABLE_TAGGING = false;
 	LOCALITY_PARALLEL_DEGREE = 1;
-	return sequential_experiment(highest_lba, IO_submission_rate);
+	return sequential_experiment(highest_lba);
 }
 
-vector<Thread*> detection_BLOCK(int highest_lba, double IO_submission_rate) {
+vector<Thread*> detection_BLOCK(int highest_lba) {
 	BLOCK_MANAGER_ID = 3;
 	ENABLE_TAGGING = false;
 	LOCALITY_PARALLEL_DEGREE = 0;
-	return sequential_experiment(highest_lba, IO_submission_rate);
+	return sequential_experiment(highest_lba);
 }
 
 int main()

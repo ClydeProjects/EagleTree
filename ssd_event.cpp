@@ -56,7 +56,8 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	tag(-1),
 	accumulated_wait_time(0),
 	experiment_io(false),
-	thread_id(UNDEFINED)
+	thread_id(UNDEFINED),
+	pure_ssd_wait_time(0)
 {
 	assert(start_time >= 0.0);
 	if (logical_address > NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE) {
@@ -86,7 +87,8 @@ Event::Event(Event& event) :
 	tag(event.tag),
 	accumulated_wait_time(0),
 	experiment_io(event.experiment_io),
-	thread_id(event.thread_id)
+	thread_id(event.thread_id),
+	pure_ssd_wait_time(0)
 {}
 
 bool Event::is_flexible_read() {
@@ -127,6 +129,7 @@ void Event::print(FILE *stream) const
 	//if(type == WRITE || type == TRIM || type == COPY_BACK)
 		//replace_address.print(stream);
 	fprintf(stream, " Time[%d, %d, %d, %d, %d, %d]", (int)start_time, (int)os_wait_time, (int)accumulated_wait_time, (int)bus_wait_time, (int)execution_time, (int)get_current_time());
+	//fprintf(stream, " Time[%d, %d, %d]", (int)start_time, (int)bus_wait_time, (int)get_current_time());
 	//fprintf(stream, "\tTime[%d, %d, %d, %d]", (int)start_time, (int) (start_time + os_wait_time),(int) bus_wait_time + (int)os_wait_time, (int) get_current_time());
 	fprintf(stream, " ID: %d ", id);
 	fprintf(stream, " appID: %d", application_io_id);
