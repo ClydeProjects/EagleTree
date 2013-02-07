@@ -1637,7 +1637,7 @@ class Sequential_IO_Pattern_Generator : public IO_Pattern_Generator
 public:
 	Sequential_IO_Pattern_Generator(long min_LBA, long max_LBA) : IO_Pattern_Generator(min_LBA, max_LBA), counter(min_LBA - 1) {};
 	~Sequential_IO_Pattern_Generator() {};
-	int next() { return counter == max_LBA ? counter = min_LBA - 1: ++counter; };
+	int next() { return counter == max_LBA ? counter = min_LBA : ++counter; };
 private:
 	long counter;
 };

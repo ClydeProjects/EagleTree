@@ -144,7 +144,6 @@ Event* Flexible_Reader_Thread::issue_next_io() {
 		vector<Address_Range> ranges;
 		ranges.push_back(Address_Range(min_LBA, max_LBA));
 		assert(os != NULL);
-		os->get_experiment_runtime();
 		flex_reader = os->create_flexible_reader(ranges);
 	}
 	if (ready_to_issue_next_write && number_of_times_to_repeat > 0) {
