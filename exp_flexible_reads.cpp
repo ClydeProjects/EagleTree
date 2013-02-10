@@ -26,7 +26,9 @@ using namespace ssd;
 // problem: some of the pointers for the 6 block managers end up in the same LUNs. This is stupid.
 // solution: have a method in bm_parent that returns a free block from the LUN with the shortest queue.
 
-vector<Thread*> flexible_reads(int highest_lba) {
+//StatisticsGatherer* noise_reads_stats = new StatisticsGatherer();
+
+vector<Thread*> set_experiment(int highest_lba, bool use_flex_reads) {
 	BLOCK_MANAGER_ID = 0;
 	SCHEDULING_SCHEME = 2;
 	GREED_SCALE = 2;
@@ -37,72 +39,60 @@ vector<Thread*> flexible_reads(int highest_lba) {
 
 	Thread* initial_write = new Asynchronous_Sequential_Writer(0, log_space_per_thread * 4);
 
-	Thread* flexible_reads = new Flexible_Reader_Thread(0, log_space_per_thread * 1, 1000);
-	flexible_reads->set_experiment_thread(true);
+	Thread* exp_reads;
+	if (use_flex_reads) {
+		exp_reads = new Flexible_Reader_Thread(0, log_space_per_thread * 1, 1000);
+	}
+	else {
+		Simple_Thread* thread_exp_reads = new Synchronous_Sequential_Reader(0, log_space_per_thread * 1);
+		thread_exp_reads->set_experiment_thread(true);
+		thread_exp_reads->set_num_ios(1000000);
+		exp_reads = thread_exp_reads;
+	}
+	exp_reads->set_experiment_thread(true);
 
 	Simple_Thread* random_writes1 = new Synchronous_Random_Writer(log_space_per_thread * 1 + 1, log_space_per_thread * 2, 472);
 	Simple_Thread* random_writes2 = new Synchronous_Random_Writer(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 537);
 	Simple_Thread* random_writes3 = new Synchronous_Random_Writer(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 246);
 
+	Simple_Thread* noise_reads1 = new Synchronous_Random_Reader(log_space_per_thread * 1 + 1, log_space_per_thread * 2, 44);
+	Simple_Thread* noise_reads2 = new Synchronous_Random_Reader(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 46);
+	Simple_Thread* noise_reads3 = new Synchronous_Random_Reader(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 48);
+
 	random_writes1->set_num_ios(INFINITE);
 	random_writes2->set_num_ios(INFINITE);
 	random_writes3->set_num_ios(INFINITE);
+	noise_reads1->set_num_ios(INFINITE);
+	noise_reads2->set_num_ios(INFINITE);
+	noise_reads3->set_num_ios(INFINITE);
 
 	random_writes1->set_experiment_thread(true);
 	random_writes2->set_experiment_thread(true);
 	random_writes3->set_experiment_thread(true);
 
-
-	initial_write->add_follow_up_thread(flexible_reads);
+	initial_write->add_follow_up_thread(exp_reads);
 	initial_write->add_follow_up_thread(random_writes1);
 	initial_write->add_follow_up_thread(random_writes2);
 	initial_write->add_follow_up_thread(random_writes3);
+	initial_write->add_follow_up_thread(noise_reads1);
+	initial_write->add_follow_up_thread(noise_reads2);
+	initial_write->add_follow_up_thread(noise_reads3);
+
+	//noise_reads1->set_statistics_gatherer(noise_reads_stats);
+	//noise_reads2->set_statistics_gatherer(noise_reads_stats);
+	//noise_reads3->set_statistics_gatherer(noise_reads_stats);
 
 	vector<Thread*> threads;
 	threads.push_back(initial_write);
 	return threads;
 }
 
+vector<Thread*> flexible_reads(int highest_lba) {
+	return set_experiment(highest_lba, true);
+}
+
 vector<Thread*> synch_sequential_reads(int highest_lba) {
-	BLOCK_MANAGER_ID = 0;
-	SCHEDULING_SCHEME = 2;
-	GREED_SCALE = 2;
-	WEARWOLF_LOCALITY_THRESHOLD = BLOCK_SIZE;
-	USE_ERASE_QUEUE = false;
-
-	long log_space_per_thread = highest_lba / 4;
-
-	Thread* initial_write = new Asynchronous_Sequential_Writer(0, log_space_per_thread * 4);
-
-	Simple_Thread* seq_reads = new Synchronous_Sequential_Reader(0, log_space_per_thread * 1);
-	seq_reads->set_experiment_thread(true);
-	seq_reads->set_num_ios(1000000);
-
-	Simple_Thread* random_writes1 = new Synchronous_Random_Writer(log_space_per_thread * 1 + 1, log_space_per_thread * 2, 472);
-	Simple_Thread* random_writes2 = new Synchronous_Random_Writer(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 537);
-	Simple_Thread* random_writes3 = new Synchronous_Random_Writer(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 246);
-
-	random_writes1->set_num_ios(INFINITE);
-	random_writes2->set_num_ios(INFINITE);
-	random_writes3->set_num_ios(INFINITE);
-
-	random_writes1->set_experiment_thread(true);
-	random_writes2->set_experiment_thread(true);
-	random_writes3->set_experiment_thread(true);
-
-	seq_reads->set_experiment_thread(true);
-	random_writes1->set_experiment_thread(true);
-	random_writes2->set_experiment_thread(true);
-	random_writes3->set_experiment_thread(true);
-
-	initial_write->add_follow_up_thread(seq_reads);
-	initial_write->add_follow_up_thread(random_writes1);
-	initial_write->add_follow_up_thread(random_writes2);
-	initial_write->add_follow_up_thread(random_writes3);
-
-	vector<Thread*> threads;
-	threads.push_back(initial_write);
-	return threads;
+	return set_experiment(highest_lba, false);
 }
 
 int main()
@@ -124,13 +114,13 @@ string exp_folder  = "exp_flexible_reads/";
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 200000;
+	int IO_limit = 250000;
 	int space_min = 65;
 	int space_max = 85;
 	int space_inc = 5;
 
 	PRINT_LEVEL = 0;
-	MAX_SSD_QUEUE_SIZE = 15;
+	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 
 	double start_time = Experiment_Runner::wall_clock_time();
@@ -139,6 +129,7 @@ string exp_folder  = "exp_flexible_reads/";
 
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(flexible_reads,			space_min, space_max, space_inc, exp_folder + "flexible_reads/",			"flexible reads", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(synch_sequential_reads,	space_min, space_max, space_inc, exp_folder + "synch_sequential_reads/",	"synch sequential reads", IO_limit) );
+
 
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write latency, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
