@@ -298,6 +298,7 @@ class Block_manager_parallel;
 class Shortest_Queue_Hot_Cold_BM;
 class Wearwolf;
 class Wearwolf_Locality;
+class Wear_Leveling_Strategy;
 
 class Sequential_Pattern_Detector;
 class Page_Hotness_Measurer;
@@ -864,13 +865,34 @@ private:
 	MTRand_int32 random_number_generator;
 };
 
+class Wear_Leveling_Strategy {
+public:
+	Wear_Leveling_Strategy(Ssd* ssd, Block_manager_parent* bm, vector<Block*> all_blocks);
+	~Wear_Leveling_Strategy() {};
+	void Wear_Level(Event const& event);
+	bool schedule_wear_leveling_op(Block* block);
+	double get_normalised_age(uint age) const;
+private:
+	double get_min_age() const;
+	void update_blocks_with_min_age(uint min_age);
+	void find_wl_candidates(double current_time);
+	set<Block*> blocks_with_min_age;
+	vector<Block*> all_blocks;
+	int num_erases_up_to_date;
+	Ssd* ssd;
+	double average_erase_cycle_time;
+	set<Block*> blocks_being_wl;
+	set<Block*> blocks_to_wl;
+	Block_manager_parent* bm;
+	int max_age;
+	MTRand_int32 random_number_generator;
+};
+
 class Block_manager_parent {
 public:
 	Block_manager_parent(int classes = 1);
 	virtual ~Block_manager_parent();
-
 	void set_all(Ssd*, FtlParent*, IOScheduler*);
-
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_command_outcome(Event const& event, enum status status);
 	virtual void register_read_transfer_outcome(Event const& event, enum status status);
@@ -887,17 +909,15 @@ public:
 	bool is_die_register_busy(Address const& addr) const;
 	void register_trim_making_gc_redundant();
 	Address choose_copbyback_address(Event const& write);
+	void schedule_gc(double time, int package_id, int die_id, int block, int klass);
 protected:
 	virtual Address choose_best_address(Event const& write) = 0;
 	virtual Address choose_any_address(Event const& write) = 0;
-
-
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	void increment_pointer(Address& pointer);
 	bool can_schedule_write_immediately(Address const& prospective_dest, double current_time);
 	bool can_write(Event const& write) const;
 
-	void schedule_gc(double time, int package_id, int die_id, int block, int klass);
 	vector<long> get_relevant_gc_candidates(int package_id, int die_id, int klass) const;
 
 	Address find_free_unused_block(uint package_id, uint die_id, enum age age, double time);
@@ -907,12 +927,9 @@ protected:
 	Address find_free_unused_block(enum age age, double time);
 
 	void return_unfilled_block(Address block_address);
-
 	pair<bool, pair<int, int> > get_free_block_pointer_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
 	Address get_free_block_pointer_with_shortest_IO_queue();
-
 	uint how_many_gc_operations_are_scheduled() const;
-
 	inline bool has_free_pages(Address const& address) const { return address.valid == PAGE && address.page < BLOCK_SIZE; }
 
 	Ssd* ssd;
@@ -924,11 +941,10 @@ protected:
 private:
 	Address find_free_unused_block(uint package_id, uint die_id, uint age_class, double time);
 	Block* choose_gc_victim(vector<long> candidates) const;
-	void update_blocks_with_min_age(uint age);
 	uint sort_into_age_class(Address const& address) const;
 	void issue_erase(Address a, double time);
 	void remove_as_gc_candidate(Address const& phys_address);
-	void Wear_Level(Event const& event);
+
 	int get_num_free_blocks(int package, int die);
 	bool copy_back_allowed_on(long logical_address);
 	Address reserve_page_on(uint package, uint die, double time);
@@ -936,15 +952,11 @@ private:
 	void register_ECC_check_on(uint logical_address);
 
 	bool schedule_queued_erase(Address location);
-	double get_min_age() const;
-	double get_normalised_age(uint age) const;
-	void find_wl_candidates(double current_time);
+
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
-	// WL structures
-	uint max_age;
+
 	int num_age_classes;
-	set<Block*> blocks_with_min_age;
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
 	map<int, int> blocks_being_garbage_collected;   // maps block physical address to the number of pages that still need to be migrated
@@ -952,17 +964,12 @@ private:
 	vector<vector<uint> > num_blocks_being_garbaged_collected_per_LUN;
 	Random_Order_Iterator order_randomiser;
 
-	set<Block*> blocks_to_wl;
-	double average_erase_cycle_time;
-	MTRand_int32 random_number_generator;
-	set<Block*> blocks_being_wl;
-	uint num_erases_up_to_date;
-
 	pair<bool, pair<int, int> > last_get_free_block_pointer_with_shortest_IO_queue_result;
 	bool IO_has_completed_since_last_shortest_queue_search;
 
 	vector<queue<Event*> > erase_queue;
 	vector<int> num_erases_scheduled_per_package;
+	Wear_Leveling_Strategy* wl;
 };
 
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation
@@ -1586,6 +1593,7 @@ public:
 	inline void set_time(double current_time) { time = current_time; }
 	inline double get_time() { return time; }
 	inline void add_follow_up_thread(Thread* thread) { threads_to_start_when_this_thread_finishes.push_back(thread); }
+	inline void add_follow_up_threads(vector<Thread*> threads) { threads_to_start_when_this_thread_finishes.insert(threads_to_start_when_this_thread_finishes.end(), threads.begin(), threads.end()); }
 	inline vector<Thread*>& get_follow_up_threads() { return threads_to_start_when_this_thread_finishes; }
 	virtual void print_thread_stats();
 	deque<Event*> register_event_completion(Event* event);

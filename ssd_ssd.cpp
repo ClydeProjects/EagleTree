@@ -18,7 +18,6 @@
 /****************************************************************************/
 
 /* Ssd class
- * Brendan Tauras 2009-11-03
  *
  * The SSD is the single main object that will be created to simulate a real
  * SSD.  Creating a SSD causes all other objects in the SSD to be created.  The
@@ -242,7 +241,7 @@ void Ssd::set_operating_system(OperatingSystem* new_os) {
 
 enum status Ssd::issue(Event *event) {
 	if (event->get_logical_address() == 0 && event->get_event_type() != ERASE && event->get_event_type() != READ_COMMAND && event->get_event_type() != READ_TRANSFER) {
-		event->print();
+		//event->print();
 	}
 	if(event -> get_event_type() == READ_COMMAND) {
 		assert(event -> get_address().valid > NONE);
@@ -252,8 +251,7 @@ enum status Ssd::issue(Event *event) {
 	else if(event -> get_event_type() == READ_TRANSFER) {
 		assert(event -> get_address().valid > NONE);
 		bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY + BUS_DATA_DELAY, *event);
-		//ssd.ram.write(*event);
-		//ssd.ram.read(*event);
+		//ssd.ram.write(*event);2w
 	}
 	else if(event -> get_event_type() == WRITE) {
 		assert(event -> get_address().valid > NONE);

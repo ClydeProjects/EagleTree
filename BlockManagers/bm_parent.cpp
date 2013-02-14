@@ -21,9 +21,7 @@ Block_manager_parent::Block_manager_parent(int num_age_classes)
    free_block_pointers(SSD_SIZE, vector<Address>(PACKAGE_SIZE)),
    free_blocks(SSD_SIZE, vector<vector<vector<Address> > >(PACKAGE_SIZE, vector<vector<Address> >(num_age_classes, vector<Address>(0)) )),
    all_blocks(0),
-   max_age(1),
    num_age_classes(num_age_classes),
-   blocks_with_min_age(),
    num_free_pages(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
    num_available_pages_for_new_writes(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
    blocks_being_garbage_collected(),
@@ -33,14 +31,12 @@ Block_manager_parent::Block_manager_parent(int num_age_classes)
    IO_has_completed_since_last_shortest_queue_search(true),
    erase_queue(SSD_SIZE, queue< Event*>()),
    num_erases_scheduled_per_package(SSD_SIZE, 0),
-   random_number_generator(90),
-   scheduler(NULL),
-   num_erases_up_to_date(0)
+   scheduler(NULL)
+{}
 
-{
+Block_manager_parent::~Block_manager_parent() {
+	delete wl;
 }
-
-Block_manager_parent::~Block_manager_parent() {}
 
 void Block_manager_parent::set_all(Ssd* new_ssd, FtlParent* new_ftl, IOScheduler* new_sched) {
 	ssd = new_ssd;
@@ -57,13 +53,13 @@ void Block_manager_parent::set_all(Ssd* new_ssd, FtlParent* new_ftl, IOScheduler
 					Block& block = plane.getBlocks()[b];
 					free_blocks[i][j][0].push_back(Address(block.get_physical_address(), PAGE));
 					all_blocks.push_back(&block);
-					blocks_with_min_age.insert(&block);
 				}
 			}
 			free_block_pointers[i][j] = free_blocks[i][j][0].back();
 			free_blocks[i][j][0].pop_back();
 		}
 	}
+	wl = new Wear_Leveling_Strategy(ssd, this, all_blocks);
 }
 
 Address Block_manager_parent::choose_copbyback_address(Event const& write) {
@@ -126,11 +122,7 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	a.page = 0;
 	Block* b = &ssd->getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 
-	if (b->get_age() > max_age) {
-		max_age = b->get_age();
-		//StateVisualiser::print_block_ages();
-	}
-	Wear_Level(event);
+	wl->Wear_Level(event);
 
 	if (USE_ERASE_QUEUE) {
 		assert(num_erases_scheduled_per_package[a.package] == 1);
@@ -177,13 +169,6 @@ void Block_manager_parent::register_write_arrival(Event const& write) {
 
 }
 
-double Block_manager_parent::get_normalised_age(uint age) const {
-	double min_age = get_min_age();
-	double normalized_age = (age - min_age) / (max_age - min_age);
-	assert(normalized_age >= 0 && normalized_age <= 1);
-	return normalized_age;
-}
-
 void Block_manager_parent::register_register_cleared() {
 	IO_has_completed_since_last_shortest_queue_search = true;
 }
@@ -191,19 +176,10 @@ void Block_manager_parent::register_register_cleared() {
 uint Block_manager_parent::sort_into_age_class(Address const& a) const {
 	Block* b = &ssd->getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 	uint age = b->get_age();
-	double normalized_age = get_normalised_age(age);
+	double normalized_age = wl->get_normalised_age(age);
 	int klass = floor(normalized_age * num_age_classes * 0.99999);
 	return klass;
 }
-
-/*bool Block_manager_parent::increment_block_pointer(Address& pointer, Address& block_written_on) {
-	if (pointer.compare(pointer) == BLOCK) {
-		Address temp = free_block_pointers[pointer.package][pointer.die];
-		temp.page = temp.page + 1;
-		pointer = temp;
-	}
-	return !has_free_pages(pointer);
-}*/
 
 void Block_manager_parent::increment_pointer(Address& pointer) {
 	Address p = pointer;
@@ -385,81 +361,6 @@ void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
 				schedule_gc(start_time, i, j, -1, -1);
 			}
 		}
-	}
-}
-
-double Block_manager_parent::get_min_age() const {
-	assert(blocks_with_min_age.size() > 0);
-	return BLOCK_ERASES - (*blocks_with_min_age.begin())->get_erases_remaining();
-}
-
-// TODO, at erase registration, there should be a check for WL queue. If not empty, see if can issue a WL operation. If cannot, issue an emergency GC.
-// if the queue is empty, check if should trigger GC.
-void Block_manager_parent::Wear_Level(Event const& event) {
-	assert(blocks_with_min_age.size() > 0);
-	num_erases_up_to_date++;
-	Address pba = event.get_address();
-	Block* b = &ssd->getPackages()[pba.package].getDies()[pba.die].getPlanes()[pba.plane].getBlocks()[pba.block];
-
-	double time_since_last_erase = event.get_current_time() - b->get_second_last_erase_time();
-	average_erase_cycle_time = average_erase_cycle_time * 0.8 + 0.2 * time_since_last_erase;
-
-	if (blocks_with_min_age.count(b) == 1 && blocks_with_min_age.size() > 1) {
-		blocks_with_min_age.erase(b);
-	}
-	else if (blocks_with_min_age.count(b) == 1 && blocks_with_min_age.size() == 1) {
-		int min_age = b->get_age() - 1;
-		blocks_with_min_age.erase(b);
-		update_blocks_with_min_age(min_age + 1);
-	}
-
-	if (blocks_being_wl.count(b) > 0) {
-		blocks_being_wl.erase(b);
-		StatisticsGatherer::get_global_instance()->print();
-	}
-
-	// looking for gc candidates every single time to update the list. This is CPU expensive, so we want to make it more seldom in the future.
-	if (ENABLE_WEAR_LEVELING /* blocks_to_wl.size() == 0 */ && blocks_being_wl.size() < MAX_ONGOING_WL_OPS && max_age > get_min_age() + WEAR_LEVEL_THRESHOLD) {
-		blocks_to_wl.clear();
-		find_wl_candidates(event.get_current_time());
-		//StateVisualiser::print_block_ages();
-		//StatisticsGatherer::get_instance()->print();
-	}
-
-	if (blocks_to_wl.size() > 0 && blocks_being_wl.size() < MAX_ONGOING_WL_OPS) {
-		int random_index = random_number_generator() % blocks_to_wl.size();
-		set<Block*>::iterator i = blocks_to_wl.begin();
-		advance(i, random_index);
-		Block* target = *i;
-		Address addr = Address(target->get_physical_address(), BLOCK);
-		if (PRINT_LEVEL > 1) {
-			printf("Scheduling WL in "); addr.print(); printf("\n");
-		}
-		schedule_gc(event.get_current_time(), addr.package, addr.die, addr.block, -1);
-	}
-}
-
-void Block_manager_parent::update_blocks_with_min_age(uint min_age) {
-	for (uint i = 0; i < all_blocks.size(); i++) {
-		uint age_ith_block = BLOCK_ERASES - all_blocks[i]->get_erases_remaining();
-		if (age_ith_block == min_age) {
-			blocks_with_min_age.insert(all_blocks[i]);
-		}
-	}
-}
-
-void Block_manager_parent::find_wl_candidates(double current_time) {
-	for (uint i = 0; i < all_blocks.size(); i++) {
-		Block* b = all_blocks[i];
-		int age = b->get_age();
-		double normalised_age = get_normalised_age(age);
-		double time_since_last_erase = current_time - b->get_last_erase_time();
-		if (b->get_state() == ACTIVE && normalised_age < 0.1 && time_since_last_erase  > average_erase_cycle_time * 10) {
-			blocks_to_wl.insert(b);
-		}
-	}
-	if (PRINT_LEVEL > 1) {
-		printf("%d elements inserted into WL queue\n", blocks_to_wl.size());
 	}
 }
 
@@ -684,8 +585,6 @@ vector<long> Block_manager_parent::get_relevant_gc_candidates(int package_id, in
 Block* Block_manager_parent::choose_gc_victim(vector<long> candidates) const {
 	uint min_valid_pages = BLOCK_SIZE;
 	Block* best_block = NULL;
-
-	// Old solution
 	for (uint i = 0; i < candidates.size(); i++) {
 		long physical_address = candidates[i];
 		Address a = Address(physical_address, BLOCK);
@@ -696,24 +595,6 @@ Block* Block_manager_parent::choose_gc_victim(vector<long> candidates) const {
 			assert(min_valid_pages < BLOCK_SIZE);
 		}
 	}
-
-// New solution introducing random tie-breaking, giving no improvement whatsoever.
-/*
-    MTRand_int32 random_number_generator(time(NULL));
-    while (candidates.size() > 0) {
-		int i = random_number_generator() % candidates.size();
-		long physical_address = candidates[i];
-		candidates.erase(candidates.begin() + i);
-
-		Address a = Address(physical_address, BLOCK);
-		Block* block = &ssd.getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
-		if (block->get_pages_valid() < min_valid_pages && block->get_state() == ACTIVE) {
-			min_valid_pages = block->get_pages_valid();
-			best_block = block;
-			assert(min_valid_pages < BLOCK_SIZE);
-		}
-	}
-*/
 	return best_block;
 }
 
@@ -820,15 +701,10 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 		return migrations;
 	}*/
 
-	if (is_wear_leveling_op) {
-		if (blocks_being_wl.size() >= MAX_ONGOING_WL_OPS) {
-			return migrations;
-		} else {
-			blocks_being_wl.insert(victim);
-		}
+	if (is_wear_leveling_op && !wl->schedule_wear_leveling_op(victim)) {
+		return migrations;
 	}
 
-	blocks_to_wl.erase(victim);
 	remove_as_gc_candidate(addr);
 
 	blocks_being_garbage_collected[victim->get_physical_address()] = victim->get_pages_valid();

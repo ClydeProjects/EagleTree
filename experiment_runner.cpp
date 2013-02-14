@@ -261,17 +261,10 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 		vector<Thread*> threads = experiment(highest_lba);
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
-		//try {
-			os->run();
+		os->run();
 
-			// Collect statistics from this experiment iteration (save in csv files)
-			experiment_result.collect_stats(used_space, os->get_experiment_runtime());
-		//} catch(...) {
-		//	printf("An exception was thrown, but we continue for now\n");
-		//}
+		experiment_result.collect_stats(used_space, os->get_experiment_runtime());
 
-
-		// Print shit
 		StatisticsGatherer::get_global_instance()->print();
 		if (PRINT_LEVEL >= 1) {
 			StateVisualiser::print_page_status();
@@ -310,38 +303,44 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
 		// Run experiment
-		vector<Thread*> threads = experiment(num_pages * used_space);
+		vector<Thread*> experiment_threads = experiment(num_pages * used_space);
 
 		StatisticsGatherer* experiment_statistics_gatherer = new StatisticsGatherer();
 		StatisticsGatherer* random_writes_statics_gatherer = new StatisticsGatherer();
-		unify_under_one_statistics_gatherer(threads, experiment_statistics_gatherer);
+		unify_under_one_statistics_gatherer(experiment_threads, experiment_statistics_gatherer);
+
+		Thread* initial_write    = new Asynchronous_Sequential_Writer(0, num_pages * used_space);
+		initial_write->add_follow_up_threads(experiment_threads);
 
 		for (int i = 0; i < random_write_threads; i++) {
 			ulong randseed = (i*3)+537;
 			Simple_Thread* random_writes = new Synchronous_Random_Writer(random_writes_min_lba, random_writes_max_lba, randseed);
+			Simple_Thread* random_reads = new Synchronous_Random_Reader(random_writes_min_lba, random_writes_max_lba, randseed+461);
 			random_writes->set_num_ios(INFINITE);
+			random_reads->set_num_ios(INFINITE);
 			//random_writes->set_experiment_thread(true);
 			random_writes->set_statistics_gatherer(random_writes_statics_gatherer);
-			threads[0]->add_follow_up_thread(random_writes);
+			random_reads->set_statistics_gatherer(random_writes_statics_gatherer);
+			//threads[0]->add_follow_up_thread(random_writes);
+			//threads[0]->add_follow_up_thread(random_reads);
+			initial_write->add_follow_up_thread(random_writes);
+			initial_write->add_follow_up_thread(random_reads);
 		}
+
+		vector<Thread*> threads;
+		threads.push_back(initial_write);
 
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
-		//try {
-			os->run();
+		os->run();
 
 			// Collect statistics from this experiment iteration (save in csv files)
-			global_result.collect_stats       (random_write_threads, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
-			experiment_result.collect_stats   (random_write_threads, os->get_experiment_runtime(), experiment_statistics_gatherer);
-			write_threads_result.collect_stats(random_write_threads, os->get_experiment_runtime(), random_writes_statics_gatherer);
-		//} catch(...) {
-		//	printf("An exception was thrown, but we continue for now\n");
-		//}
+		global_result.collect_stats       (random_write_threads, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
+		experiment_result.collect_stats   (random_write_threads, os->get_experiment_runtime(), experiment_statistics_gatherer);
+		write_threads_result.collect_stats(random_write_threads, os->get_experiment_runtime(), random_writes_statics_gatherer);
 
-
-		// Print shit
 		StatisticsGatherer::get_global_instance()->print();
-		//random_writes_statics_gatherer->print();
+		random_writes_statics_gatherer->print();
 		//StatisticsGatherer::get_global_instance()->print_gc_info();
 		if (PRINT_LEVEL >= 1) {
 			StateVisualiser::print_page_status();
@@ -386,7 +385,6 @@ ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experi
 		// Collect statistics from this experiment iteration (save in csv files)
 		experiment_result.collect_stats(copybacks_allowed, os->get_experiment_runtime());
 
-		// Print shit
 		StatisticsGatherer::get_global_instance()->print();
 		if (PRINT_LEVEL >= 1) {
 			StateVisualiser::print_page_status();

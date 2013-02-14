@@ -257,6 +257,21 @@ void IOScheduler::execute_current_waiting_ios() {
 		handle(writes);
 		handle(read_transfers);
 		//handle(copy_backs);
+	} else if (SCHEDULING_SCHEME == 4) {
+		// PURE FIFO STRATEGY
+		vector<Event*> all_ios;
+		all_ios.insert(all_ios.end(), read_commands_flexible.begin(), read_commands_flexible.end());
+		all_ios.insert(all_ios.end(), read_commands_gc.begin(), read_commands_gc.end());
+		all_ios.insert(all_ios.end(), read_commands.begin(), read_commands.end());
+		all_ios.insert(all_ios.end(), gc_writes.begin(), gc_writes.end());
+		all_ios.insert(all_ios.end(), writes.begin(), writes.end());
+		all_ios.insert(all_ios.end(), read_transfers.begin(), read_transfers.end());
+		all_ios.insert(all_ios.end(), copy_backs.begin(), copy_backs.end());
+		all_ios.insert(all_ios.end(), erases.begin(), erases.end());
+		sort(all_ios.begin(), all_ios.end(), current_wait_time_comparator);
+		handle(all_ios);
+	} else {
+		assert(false);
 	}
 
 	handle_noop_events(noop_events);
@@ -607,9 +622,9 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	//VisualTracer::get_instance()->register_completed_event(*event);
 
 	if (event->get_event_type() == READ_TRANSFER && event->get_latency() > 5500 && !event->is_garbage_collection_op()) {
-		VisualTracer::get_instance()->print_horizontally(20000);
-		event->print();
-		printf(" ");
+		//VisualTracer::get_instance()->print_horizontally(20000);
+		//event->print();
+		//printf(" ");
 	}
 
 	StatisticsGatherer::get_global_instance()->register_completed_event(*event);

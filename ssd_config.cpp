@@ -190,9 +190,9 @@ int MAX_ONGOING_WL_OPS = 1;
 /*
  * Block manager
  * 0 -> Shortest Queues
- * 1 -> Shortest Queues with Hot/Cold data deperation
+ * 1 -> Shortest Queues with Hot/Cold data seperation
  * 2 -> Wearwolf
- * 3 -> Wearwolf with Locality
+ * 3 -> SQ with Locality
  * 4 -> Round Robin
  */
 int BLOCK_MANAGER_ID = 3;

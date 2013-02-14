@@ -36,15 +36,6 @@ int num_grace_hash_join_threads;
 
 StatisticsGatherer* read_statistics_gatherer;
 
-Thread* grace_hash_join_thread(int lowest_lba, int highest_lba, bool use_flexible_reads, bool use_tagging, int randseed) {
-	int span = highest_lba - lowest_lba;
-	assert(span >= 10);
-	return new Grace_Hash_Join(lowest_lba,                lowest_lba+span*r1,
-			                   lowest_lba+span*r1+1,      lowest_lba+span*(r1+r2),
-			                   lowest_lba+span*(r1+r2)+1, lowest_lba+span*(r1+r2+fs),
-			                   use_flexible_reads, use_tagging, 32, randseed);
-}
-
 vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool use_tagging, int grace_hash_join_threads = 2, int random_read_threads = 0, int random_write_threads = 0) {
 	Grace_Hash_Join::initialize_counter();
 
@@ -57,15 +48,13 @@ vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool u
 	int noise_space_start = temp_space_end + 1;
 	int noise_space_end = highest_lba;
 
-	Thread* relation1_write    = new Asynchronous_Sequential_Writer(relation_1_start, relation_1_end);
-	Thread* relation2_write    = new Asynchronous_Sequential_Writer(relation_2_start, relation_2_end);
-	Thread* noise_space_write  = new Asynchronous_Sequential_Writer(noise_space_start, noise_space_end);
-
-	relation1_write->add_follow_up_thread(relation2_write);
-	relation2_write->add_follow_up_thread(noise_space_write);
+	Thread* first = new Grace_Hash_Join(	relation_1_start,	relation_1_end,
+											relation_2_start,	relation_2_end,
+											temp_space_start, temp_space_end,
+											use_flexible_reads, use_tagging, 32, 462);
 
 	for (int gt = 0; gt < grace_hash_join_threads; gt++) {
-		Thread* preceding_thread = noise_space_write;
+		Thread* preceding_thread = first;
 		for (int i = 0; i < 1000; i++) {
 			Thread* grace_hash_join = new Grace_Hash_Join(	relation_1_start,	relation_1_end,
 										relation_2_start,	relation_2_end,
@@ -78,7 +67,7 @@ vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool u
 		}
 	}
 	vector<Thread*> threads;
-	threads.push_back(relation1_write);
+	threads.push_back(first);
 
 	return threads;
 }
@@ -119,18 +108,22 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 250000;
+	int IO_limit = 100000;
 
 	int write_threads_min = 0;
-	int write_threads_max = 3;
+	int write_threads_max = 5;
 	double used_space = .80; // overprovisioning level for variable random write threads experiment
 
 	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 	SCHEDULING_SCHEME = 2;
+	// DEADLINES?
 	GREED_SCALE = 2;
 	USE_ERASE_QUEUE = false;
+	ENABLE_WEAR_LEVELING = false;
+
+	// SSD buffer size!!
 
 	const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 	const int avail_pages = num_pages * used_space;
