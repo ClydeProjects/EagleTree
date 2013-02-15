@@ -26,6 +26,8 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <stdio.h>  /* defines FILENAME_MAX */
+#include <unistd.h>   // chdir
+#include <sys/stat.h> // mkdir
 
 //#include <boost/filesystem.hpp>
 
@@ -60,16 +62,17 @@ const string ExperimentResult::latency_filename_prefix      = "latency-";
 const double ExperimentResult::M 							= 1000000.0; // One million
 const double ExperimentResult::K 							= 1000.0;    // One thousand
 
-ExperimentResult::ExperimentResult(string experiment_name, string data_folder_, string variable_parameter_name)
+ExperimentResult::ExperimentResult(string experiment_name, string data_folder_, string sub_folder_, string variable_parameter_name)
 :	experiment_name(experiment_name),
  	variable_parameter_name(variable_parameter_name),
  	max_age(0),
  	max_age_freq(0),
  	experiment_started(false),
- 	experiment_finished(false)
+ 	experiment_finished(false),
+	sub_folder(sub_folder_)
 {
 	working_dir = Experiment_Runner::get_working_dir();
-	data_folder = working_dir + "/" + data_folder_;
+	data_folder = working_dir + "/" + data_folder_ + sub_folder;
 	replace(data_folder_.begin(), data_folder_.end(), '/', '-');
 	graph_filename_prefix = data_folder_;
 	stats_file = NULL;
@@ -247,7 +250,7 @@ string Experiment_Runner::pretty_time(double time) {
 }
 
 ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit) {
-    ExperimentResult experiment_result(name, data_folder, "Used space (%)");
+    ExperimentResult experiment_result(name, data_folder, "", "Used space (%)");
     experiment_result.start_experiment();
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
@@ -287,9 +290,9 @@ void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> thre
 
 vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment(vector<Thread*> (*experiment)(int highest_lba), int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
 	mkdir(data_folder.c_str(), 0755);
-	ExperimentResult global_result       (name, data_folder,                         "Number of concurrent random write threads");
-    ExperimentResult experiment_result   (name, data_folder + "Experiment_Threads/", "Number of concurrent random write threads");
-    ExperimentResult write_threads_result(name, data_folder + "Noise_Threads/",      "Number of concurrent random write threads");
+	ExperimentResult global_result       (name, data_folder, "Global/",             "Number of concurrent random write threads");
+    ExperimentResult experiment_result   (name, data_folder, "Experiment_Threads/", "Number of concurrent random write threads");
+    ExperimentResult write_threads_result(name, data_folder, "Noise_Threads/",      "Number of concurrent random write threads");
 
     global_result.start_experiment();
     experiment_result.start_experiment();
@@ -339,8 +342,9 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 		experiment_result.collect_stats   (random_write_threads, os->get_experiment_runtime(), experiment_statistics_gatherer);
 		write_threads_result.collect_stats(random_write_threads, os->get_experiment_runtime(), random_writes_statics_gatherer);
 
-		StatisticsGatherer::get_global_instance()->print();
-		random_writes_statics_gatherer->print();
+		experiment_statistics_gatherer->print();
+		//StatisticsGatherer::get_global_instance()->print();
+		//random_writes_statics_gatherer->print();
 		//StatisticsGatherer::get_global_instance()->print_gc_info();
 		if (PRINT_LEVEL >= 1) {
 			StateVisualiser::print_page_status();
@@ -364,7 +368,7 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 }
 
 ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit) {
-    ExperimentResult experiment_result(name, data_folder, "CopyBacks allowed before ECC check");
+    ExperimentResult experiment_result(name, data_folder, "", "CopyBacks allowed before ECC check");
     experiment_result.start_experiment();
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
@@ -399,7 +403,7 @@ ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experi
 }
 
 ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit) {
-    ExperimentResult experiment_result(name, data_folder, "Max copyback map size");
+    ExperimentResult experiment_result(name, data_folder, "", "Max copyback map size");
     experiment_result.start_experiment();
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
@@ -420,7 +424,6 @@ ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*ex
 		// Collect statistics from this experiment iteration (save in csv files)
 		experiment_result.collect_stats(copyback_map_size, os->get_experiment_runtime());
 
-		// Print shit
 		StatisticsGatherer::get_global_instance()->print();
 		if (PRINT_LEVEL >= 1) {
 			StateVisualiser::print_page_status();
@@ -747,4 +750,48 @@ string Experiment_Runner::get_working_dir() {
 	cCurrentPath[sizeof(cCurrentPath) - 1] = '\0'; /* not really required */
 	string currentPath(cCurrentPath);
 	return currentPath;
+}
+
+void Experiment_Runner::draw_graphs(vector<vector<ExperimentResult> > exps, string exp_folder) {
+
+	int sx = 16;
+	int sy = 8;
+
+	for (int i = 0; i < exps[0][0].column_names.size(); i++) {
+		//printf("%d: %s\n", i, exps[0][0].column_names[i].c_str());
+	}
+
+	printf("chdir %s\n", exp_folder.c_str());
+	chdir(exp_folder.c_str());
+	for (int i = 0; i < exps[0].size(); ++i) { // i = 0: GLOBAL, i = 1: EXPERIMENT, i = 2: WRITE_THREADS
+		vector<ExperimentResult> exp;
+		for (int j = 0; j < exps.size(); ++j) {
+			exp.push_back(exps[j][i]);
+		}
+		cout << "chdir "<<exps[0][i].sub_folder.c_str() << "\n";
+		int error = (exps[0][i].sub_folder != "") ? mkdir(exps[0][i].sub_folder.c_str(), 0755) : 0;
+		//if (error != 0 && error != 17 /*EEXIST*/) printf("Error %d creating to folder %s\n", error, exps[0][i].data_folder.c_str());
+		error = (exps[0][i].sub_folder != "") ? chdir(exps[0][i].sub_folder.c_str()) : 0;
+		if (error != 0) printf("Error %d changing to folder %s\n", error, exps[0][i].sub_folder.c_str());
+
+		Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			24, exp/*, 30*/, UNDEFINED);
+		Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	25, exp/*, 30*/);
+		Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 		26, exp/*, 30*/);
+		Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp/*, 16000*/);
+		Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp/*, 500000*/);
+
+		Experiment_Runner::graph(sx, sy,   "Write latency, mean", 			"Write latency, mean", 		9, 	exp);
+		Experiment_Runner::graph(sx, sy,   "Write latency, max", 			"Write latency, max", 		14, exp);
+		Experiment_Runner::graph(sx, sy,   "Write latency, std", 			"Write latency, std", 		15, exp);
+
+		Experiment_Runner::graph(sx, sy,   "Read latency, mean", 			"Read latency, mean", 		16,	exp);
+		Experiment_Runner::graph(sx, sy,   "Read latency, max", 			"Read latency, max", 		21, exp);
+		Experiment_Runner::graph(sx, sy,   "Read latency, std", 			"Read latency, std", 		22, exp);
+
+		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
+		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, 1, 4);
+		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 70, 1, 4);
+		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 60, 1, 4);
+		/*if (i > 0)*/ { chdir(".."); }
+	}
 }

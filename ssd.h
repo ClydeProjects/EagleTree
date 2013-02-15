@@ -2045,7 +2045,7 @@ private:
 
 class ExperimentResult {
 public:
-	ExperimentResult(string experiment_name, string data_folder, string variable_parameter_name);
+	ExperimentResult(string experiment_name, string data_folder, string sub_folder, string variable_parameter_name);
 	~ExperimentResult();
 	void start_experiment();
 	void collect_stats(uint variable_parameter_value, double os_runtime);
@@ -2057,6 +2057,7 @@ public:
 	bool experiment_finished;
 	string experiment_name;
 	string data_folder;
+	string sub_folder;
 	string variable_parameter_name; // e.g. "Used space (%)". Becomes x-axis
 	vector<string> column_names;
 	uint max_age;
@@ -2110,7 +2111,7 @@ public:
 	static ExperimentResult copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);
 
 	static string graph_filename_prefix;
-
+	static void draw_graphs(vector<vector<ExperimentResult> > results, string exp_folder);
 private:
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
 

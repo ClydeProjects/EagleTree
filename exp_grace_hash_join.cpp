@@ -32,11 +32,9 @@ double ns = .5; // "Noise space" percentage use of addresses
 //------------;
 // total  =1.0
 
-int num_grace_hash_join_threads;
-
 StatisticsGatherer* read_statistics_gatherer;
 
-vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool use_tagging, int grace_hash_join_threads = 2, int random_read_threads = 0, int random_write_threads = 0) {
+vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool use_tagging, int grace_hash_join_threads = 1) {
 	Grace_Hash_Join::initialize_counter();
 
 	int relation_1_start = 0;
@@ -49,17 +47,17 @@ vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool u
 	int noise_space_end = highest_lba;
 
 	Thread* first = new Grace_Hash_Join(	relation_1_start,	relation_1_end,
-											relation_2_start,	relation_2_end,
-											temp_space_start, temp_space_end,
-											use_flexible_reads, use_tagging, 32, 462);
+			relation_2_start,	relation_2_end,
+			temp_space_start, temp_space_end,
+			use_flexible_reads, use_tagging, 32, 462);
 
 	for (int gt = 0; gt < grace_hash_join_threads; gt++) {
 		Thread* preceding_thread = first;
 		for (int i = 0; i < 1000; i++) {
 			Thread* grace_hash_join = new Grace_Hash_Join(	relation_1_start,	relation_1_end,
-										relation_2_start,	relation_2_end,
-										temp_space_start, temp_space_end,
-										use_flexible_reads, use_tagging, 32, 462);
+					relation_2_start,	relation_2_end,
+					temp_space_start, temp_space_end,
+					use_flexible_reads, use_tagging, 32, 462);
 
 			grace_hash_join->set_experiment_thread(true);
 			preceding_thread->add_follow_up_thread(grace_hash_join);
@@ -74,22 +72,12 @@ vector<Thread*> grace_hash_join(int highest_lba, bool use_flexible_reads, bool u
 
 vector<Thread*> grace_hash_join(int highest_lba) {
 	BLOCK_MANAGER_ID = 0;
-	return grace_hash_join(highest_lba, false, false, num_grace_hash_join_threads);
+	return grace_hash_join(highest_lba, false, false, 1);
 }
 
 vector<Thread*> grace_hash_join_flex(int highest_lba) {
 	BLOCK_MANAGER_ID = 0;
-	return grace_hash_join(highest_lba, true, false, num_grace_hash_join_threads);
-}
-
-vector<Thread*> grace_hash_join_tag(int highest_lba) {
-	BLOCK_MANAGER_ID = 3;
-	return grace_hash_join(highest_lba, false, true, num_grace_hash_join_threads);
-}
-
-vector<Thread*> grace_hash_join_flex_tag(int highest_lba) {
-	BLOCK_MANAGER_ID = 3;
-	return grace_hash_join(highest_lba, true, true, num_grace_hash_join_threads);
+	return grace_hash_join(highest_lba, true, false, 1);
 }
 
 int main()
@@ -99,8 +87,8 @@ int main()
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 64 * 2;
-	BLOCK_SIZE = 32 * 2;
+	PLANE_SIZE = 32;
+	BLOCK_SIZE = 32;
 
 	PAGE_READ_DELAY = 50;
 	PAGE_WRITE_DELAY = 200;
@@ -108,10 +96,10 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 100000;
+	int IO_limit = 1000;
 
 	int write_threads_min = 0;
-	int write_threads_max = 5;
+	int write_threads_max = 1;
 	double used_space = .80; // overprovisioning level for variable random write threads experiment
 
 	PRINT_LEVEL = 0;
@@ -123,87 +111,54 @@ int main()
 	USE_ERASE_QUEUE = false;
 	ENABLE_WEAR_LEVELING = false;
 
-	// SSD buffer size!!
-
 	const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 	const int avail_pages = num_pages * used_space;
 
-	/*num_grace_hash_join_threads = 1;
-	Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join,  0, 0, 1, "__/", "None", IO_limit, used_space, avail_pages*ns+1, avail_pages);
-	return 1;*/
+	vector<vector<ExperimentResult> > exps;
+	string exp_folder  = "exp_grace_hash_join/";
+	mkdir(exp_folder.c_str(), 0755);
+	exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex,	  write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads/", "Flexible reads",        IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+	exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join,		  write_threads_min, write_threads_max, 1, exp_folder + "None/", "None",                  			IO_limit, used_space, avail_pages*ns+1, avail_pages) );
 
-	for (num_grace_hash_join_threads = 1; num_grace_hash_join_threads <= 1; num_grace_hash_join_threads++) {
-		stringstream num_grace_hash_join_text;
-		num_grace_hash_join_text << num_grace_hash_join_threads;
+	Experiment_Runner::draw_graphs(exps, exp_folder);
 
-		string exp_folder  = "exp_grace_hash_join_" + num_grace_hash_join_text.str() + "_threads/";
-		mkdir(exp_folder.c_str(), 0755);
+	for (int i = 0; i < exps[0][0].column_names.size(); i++) {
+		//printf("%d: %s\n", i, exps[0][0].column_names[i].c_str());
+	}
 
-		double start_time = Experiment_Runner::wall_clock_time();
+	vector<int> num_write_thread_values_to_show;
+	for (int i = write_threads_min; i <= write_threads_max; i += 1)
+		num_write_thread_values_to_show.push_back(i); // Show all used spaces values in multi-graphs
 
-		vector<vector<ExperimentResult> > exps;
+	int sx = 16;
+	int sy = 8;
 
-		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex,	  write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads/", "Flexible reads",        IO_limit, used_space, avail_pages*ns+1, avail_pages) );
-		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join,		  write_threads_min, write_threads_max, 1, exp_folder + "None/", "None",                  			IO_limit, used_space, avail_pages*ns+1, avail_pages) );
+	double start_time = Experiment_Runner::wall_clock_time();
+	uint mean_pos_in_datafile = std::find(exps[0][0].column_names.begin(), exps[0][0].column_names.end(), "Write latency, mean (µs)") - exps[0][0].column_names.begin();
+	assert(mean_pos_in_datafile != exps[0][0].column_names.size());
 
-		//exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_tag,      write_threads_min, write_threads_max, 1, exp_folder + "Tagging/", "Tagging",               IO_limit, used_space, avail_pages*ns+1, avail_pages) );
-		//exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex_tag, write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads_&_tagging/", "Flexible reads + tagging", IO_limit, used_space, avail_pages*ns+1, avail_pages) );
-
-		uint mean_pos_in_datafile = std::find(exps[0][0].column_names.begin(), exps[0][0].column_names.end(), "Write latency, mean (µs)") - exps[0][0].column_names.begin();
-		assert(mean_pos_in_datafile != exps[0][0].column_names.size());
-
-		vector<int> num_write_thread_values_to_show;
-		for (int i = write_threads_min; i <= write_threads_max; i += 1)
-			num_write_thread_values_to_show.push_back(i); // Show all used spaces values in multi-graphs
-
-		int sx = 16;
-		int sy = 8;
-
-		for (int i = 0; i < exps[0][0].column_names.size(); i++) printf("%d: %s\n", i, exps[0][0].column_names[i].c_str());
-
-		chdir(exp_folder.c_str());
-		for (int i = 0; i < exps[0].size(); ++i) { // i = 0: GLOBAL, i = 1: EXPERIMENT, i = 2: WRITE_THREADS
-			vector<ExperimentResult> exp;
-			for (int j = 0; j < exps.size(); ++j) exp.push_back(exps[j][i]);
-			if      (i == 1) { mkdir("Experiment_Threads",    0755); chdir("Experiment_Threads"); }
-			else if (i == 2) { mkdir("Noise_Threads", 0755); chdir("Noise_Threads"); }
-			Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			24, exp/*, 30*/, UNDEFINED);
-			Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	25, exp/*, 30*/);
-			Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 		26, exp/*, 30*/);
-			Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp/*, 16000*/);
-			Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp/*, 500000*/);
-
-			Experiment_Runner::graph(sx, sy,   "Write latency, mean", 			"Write latency, mean", 		9, 	exp);
-			Experiment_Runner::graph(sx, sy,   "Write latency, max", 			"Write latency, max", 		14, exp);
-			Experiment_Runner::graph(sx, sy,   "Write latency, std", 			"Write latency, std", 		15, exp);
-
-			Experiment_Runner::graph(sx, sy,   "Read latency, mean", 			"Read latency, mean", 		16,	exp);
-			Experiment_Runner::graph(sx, sy,   "Read latency, max", 			"Read latency, max", 		21, exp);
-			Experiment_Runner::graph(sx, sy,   "Read latency, std", 			"Read latency, std", 		22, exp);
-
-			Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
-			Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, 1, 4);
-			Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 70, 1, 4);
-			Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 60, 1, 4);
-			if (i > 0) { chdir(".."); }
-		}
-		vector<ExperimentResult>& exp = exps[0]; // Global one
+	for (uint j = 0; j < exps.size(); j++) {
+		vector<ExperimentResult>& exp = exps[j];
+//		vector<ExperimentResult>& exp = exps[0]; // Global one
 		for (uint i = 0; i < exp.size(); i++) {
 			printf("%s\n", exp[i].data_folder.c_str());
-			chdir(exp[i].data_folder.c_str());
+			if (chdir(exp[i].data_folder.c_str()) != 0) printf("Error changing dir to %s\n", exp[i].data_folder.c_str());
 			Experiment_Runner::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
 			Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], num_write_thread_values_to_show, 1, 4);
 			Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], num_write_thread_values_to_show, true);
 			Experiment_Runner::age_histogram			(sx, sy/2, "age-histograms", exp[i], num_write_thread_values_to_show);
 			Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], num_write_thread_values_to_show);
 			Experiment_Runner::throughput_history		(sx, sy/2, "throughput_history", exp[i], num_write_thread_values_to_show);
-			chdir("../..");
+/*			if (i == 0) // Global
+				chdir("..");
+			else
+				chdir("../..");*/
 		}
-		double end_time = Experiment_Runner::wall_clock_time();
-		printf("=== Entire experiment finished in %s ===\n", Experiment_Runner::pretty_time(end_time - start_time).c_str());
-
-		chdir(".."); // Leaving
 	}
+	double end_time = Experiment_Runner::wall_clock_time();
+	printf("=== Entire experiment finished in %s ===\n", Experiment_Runner::pretty_time(end_time - start_time).c_str());
+
+	chdir(".."); // Leaving
 	return 0;
 }
 
