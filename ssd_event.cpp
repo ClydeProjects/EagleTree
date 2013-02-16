@@ -57,7 +57,8 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	accumulated_wait_time(0),
 	experiment_io(false),
 	thread_id(UNDEFINED),
-	pure_ssd_wait_time(0)
+	pure_ssd_wait_time(0),
+	copyback(false)
 {
 	assert(start_time >= 0.0);
 	if (logical_address > NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE) {
@@ -88,7 +89,8 @@ Event::Event(Event& event) :
 	accumulated_wait_time(0),
 	experiment_io(event.experiment_io),
 	thread_id(event.thread_id),
-	pure_ssd_wait_time(0)
+	pure_ssd_wait_time(0),
+	copyback(copyback)
 {}
 
 bool Event::is_flexible_read() {

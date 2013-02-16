@@ -291,7 +291,10 @@ class Ram;
 class Controller;
 class Ssd;
 
+class event_queue;
 class IOScheduler;
+class Scheduling_Strategy;
+class Simple_Scheduling_Strategy;
 
 class Block_manager_parent;
 class Block_manager_parallel;
@@ -423,10 +426,12 @@ public:
 	inline void set_garbage_collection_op(bool value) 		{ garbage_collection_op = value; }
 	inline void set_mapping_op(bool value) 					{ mapping_op = value; }
 	inline void set_age_class(int value) 					{ age_class = value; }
+	inline void set_copyback(bool value)					{ copyback = value; }
 	inline int get_age_class() const 						{ return age_class; }
 	inline bool is_garbage_collection_op() const 			{ return garbage_collection_op; }
 	inline bool is_mapping_op() const 						{ return mapping_op; }
 	inline void *get_payload() const 						{ return payload; }
+	inline bool is_copyback() const 						{ return copyback; }
 	inline void incr_bus_wait_time(double time_incr) 		{ bus_wait_time += time_incr; incr_pure_ssd_wait_time(time_incr); }
 	inline void incr_pure_ssd_wait_time(double time_incr) 	{ pure_ssd_wait_time += time_incr;}
 	inline void incr_os_wait_time(double time_incr) 		{ os_wait_time += time_incr; }
@@ -458,6 +463,7 @@ protected:
 	bool wear_leveling_op;
 	bool mapping_op;
 	bool original_application_io;
+	bool copyback;
 
 	bool experiment_io;
 
@@ -1127,6 +1133,46 @@ private:
 	int num_misses;
 };
 
+class event_queue {
+public:
+	event_queue() : events(), num_events(0) {};
+	virtual ~event_queue();
+	void push(Event*);
+	vector<Event*> get_soonest_events();
+	bool remove(Event*);
+	Event* find(long dep_code) const;
+	inline bool empty() const { return events.empty(); }
+	double get_earliest_time() const { return floor((*events.begin()).first); };
+	int size() const { return num_events; }
+private:
+	map<long, vector<Event*> > events;
+	int num_events;
+};
+
+class Scheduling_Strategy : public event_queue {
+public:
+	Scheduling_Strategy(IOScheduler* s) : event_queue(), scheduler(s) {}
+	virtual ~Scheduling_Strategy() {};
+	virtual void schedule() = 0;
+protected:
+	IOScheduler* scheduler;
+};
+
+inline bool overall_wait_time_comparator (const Event* i, const Event* j) {
+	return i->get_overall_wait_time() < j->get_overall_wait_time();
+}
+
+inline bool current_wait_time_comparator (const Event* i, const Event* j) {
+	return i->get_bus_wait_time() < j->get_bus_wait_time();
+}
+
+class Simple_Scheduling_Strategy : public Scheduling_Strategy {
+public:
+	Simple_Scheduling_Strategy(IOScheduler* s) : Scheduling_Strategy(s) {}
+	~Simple_Scheduling_Strategy() {}
+	void schedule();
+};
+
 class IOScheduler {
 public:
 	IOScheduler();
@@ -1136,6 +1182,8 @@ public:
 	void schedule_event(Event* events);
 	bool is_empty();
 	void execute_soonest_events();
+	void handle(vector<Event*>& events);
+	void handle_noop_events(vector<Event*>& events);
 private:
 	void setup_structures(deque<Event*> events);
 	enum status execute_next(Event* event);
@@ -1143,32 +1191,17 @@ private:
 	void handle_event(Event* event);
 	void handle_write(Event* event);
 	void handle_flexible_read(Event* event);
-	void handle(vector<Event*>& events);
 	void transform_copyback(Event* event);
 	void handle_finished_event(Event *event, enum status outcome);
 	void remove_redundant_events(Event* new_event);
 	bool should_event_be_scheduled(Event* event);
 	void init_event(Event* event);
-	void handle_noop_events(vector<Event*>& events);
 	void manage_operation_completion(Event* event);
 	double get_soonest_event_time(vector<Event*> const& events) const;
 
-	struct event_queue {
-		map<long, vector<Event*> > events;
-		int num_events;
-		event_queue() : events(), num_events(0) {};
-		~event_queue();
-		void push(Event*);
-		vector<Event*> get_soonest_events();
-		inline bool empty() const { return events.empty(); }
-		double get_earliest_time() const { return floor((*events.begin()).first); };
-		int size() const { return num_events; }
-		bool remove(Event*);
-		Event* find(long dep_code);
-	};
-
 	event_queue future_events;
-	event_queue current_events;
+	Scheduling_Strategy* current_events;
+
 	map<uint, deque<Event*> > dependencies;
 
 	Ssd* ssd;

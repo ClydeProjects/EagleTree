@@ -744,10 +744,12 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 				Event* read_command = new Event(READ_COMMAND, logical_address, 1, gc_event->get_start_time());
 				read_command->set_address(addr);
 				read_command->set_garbage_collection_op(true);
+				read_command->set_copyback(true);
 
 				Event* copy_back = new Event(COPY_BACK, logical_address, 1, gc_event->get_start_time());
 				copy_back->set_replace_address(addr);
 				copy_back->set_garbage_collection_op(true);
+				copy_back->set_copyback(true);
 
 				migration.push_back(read_command);
 				migration.push_back(copy_back);

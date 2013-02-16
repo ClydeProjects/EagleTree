@@ -15,14 +15,15 @@ using namespace ssd;
 
 IOScheduler::IOScheduler() :
 	future_events(),
-	current_events(),
+	current_events(new Simple_Scheduling_Strategy(this)),
 	dependencies(),
 	ssd(NULL),
 	ftl(NULL),
 	bm(NULL),
 	dependency_code_to_LBA(),
 	dependency_code_to_type()
-{}
+{
+}
 
 void IOScheduler::set_all(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent* new_bm) {
 	ssd = new_ssd;
@@ -31,6 +32,7 @@ void IOScheduler::set_all(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent
 }
 
 IOScheduler::~IOScheduler(){
+	delete current_events;
 	map<uint, deque<Event*> >::iterator i = dependencies.begin();
 	for (; i != dependencies.end(); i++) {
 		deque<Event*>& d = (*i).second;
@@ -80,8 +82,8 @@ void IOScheduler::execute_soonest_events() {
 	double current_time = get_current_time();
 	double next_events_time = current_time + 1;
 	update_current_events(current_time);
-	while (current_time < next_events_time && !current_events.empty() ) {
-		execute_current_waiting_ios();
+	while (current_time < next_events_time && !current_events->empty() ) {
+		current_events->schedule();
 		update_current_events(current_time);
 		current_time = get_current_time();
 	}
@@ -89,169 +91,7 @@ void IOScheduler::execute_soonest_events() {
 
 // this is used to signal the SSD object when all events have finished executing
 bool IOScheduler::is_empty() {
-	return !current_events.empty() || !future_events.empty();
-}
-
-inline bool overall_wait_time_comparator (const Event* i, const Event* j) {
-	return i->get_overall_wait_time() < j->get_overall_wait_time();
-}
-
-inline bool current_wait_time_comparator (const Event* i, const Event* j) {
-	return i->get_bus_wait_time() < j->get_bus_wait_time();
-}
-
-// tries to execute all current events. Some events may be put back in the queue if they cannot be executed.
-void IOScheduler::execute_current_waiting_ios() {
-	vector<Event*> events = current_events.get_soonest_events();
-
-	vector<Event*> read_commands;
-	vector<Event*> read_commands_gc;
-	vector<Event*> read_commands_copybacks;
-	vector<Event*> read_commands_flexible;
-	//vector<Event*> gc_read_commands;
-	vector<Event*> read_transfers;
-	vector<Event*> gc_writes;
-	vector<Event*> writes;
-	vector<Event*> erases;
-	vector<Event*> copy_backs;
-	vector<Event*> noop_events;
-
-	while (events.size() > 0) {
-		Event * event = events.back();
-		events.pop_back();
-
-		event_type type = event->get_event_type();
-		bool is_GC = event->is_garbage_collection_op();
-
-		if (event->get_noop()) {
-			noop_events.push_back(event);
-		}
-		else if (type == READ_COMMAND && dependency_code_to_type[event->get_application_io_id()] == COPY_BACK) {
-			read_commands_copybacks.push_back(event);
-		}
-		else if (type == READ_COMMAND && event->is_garbage_collection_op() && !event->is_original_application_io()) {
-			read_commands_gc.push_back(event);
-		}
-		else if (type == READ_COMMAND && event->is_flexible_read()) {
-			read_commands_flexible.push_back(event);
-		}
-		else if (type == READ_COMMAND) {
-			read_commands.push_back(event);
-		}
-		else if (type == READ_TRANSFER) {
-			read_transfers.push_back(event);
-		}
-		else if (type == WRITE) {
-			if (is_GC) {
-				gc_writes.push_back(event);
-			} else {
-				writes.push_back(event);
-			}
-		}
-		else if (type == ERASE) {
-			erases.push_back(event);
-		}
-		else if (type == COPY_BACK) {
-			copy_backs.push_back(event);
-		}
-		else if (type == TRIM) {
-			execute_next(event);
-		}
-	}
-	//handle_writes(copy_backs); // Copy backs should be prioritized first to avoid conflict, since they have a reserved page waiting to be written
-	//read_commands.insert(read_commands.end(), gc_read_commands.begin(), gc_read_commands.end());
-	// Intuitive scheme. Prioritize Application IOs
-	if (SCHEDULING_SCHEME == 0) {
-		read_commands.insert(read_commands.end(), read_commands_flexible.begin(), read_commands_flexible.end());
-
-		sort(erases.begin(), erases.end(), current_wait_time_comparator);
-		sort(read_commands.begin(), read_commands.end(), current_wait_time_comparator);
-		sort(writes.begin(), writes.end(), current_wait_time_comparator);
-		sort(gc_writes.begin(), gc_writes.end(), overall_wait_time_comparator);
-		sort(read_transfers.begin(), read_transfers.end(), overall_wait_time_comparator);
-
-		handle(read_commands);
-		handle(read_transfers);
-		handle(writes);
-		handle(gc_writes);
-		handle(erases);
-	}
-	// Traditional - GC PRIORITY
-	else if (SCHEDULING_SCHEME == 1) {
-		read_commands.insert(read_commands.end(), read_commands_flexible.begin(), read_commands_flexible.end());
-		//writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
-
-		handle(erases);
-		handle(gc_writes);
-		handle(read_commands);
-		handle(writes);
-		handle(read_transfers);
-	}
-	else if (SCHEDULING_SCHEME == 2) {
-		read_commands.insert(read_commands.end(), read_commands_flexible.begin(), read_commands_flexible.end());
-
-		writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
-		read_transfers.insert(read_transfers.end(), copy_backs.begin(), copy_backs.end());
-		//read_commands.insert(read_commands.end(), read_commands_copybacks.begin(), read_commands_copybacks.end());
-
-		sort(erases.begin(), erases.end(), current_wait_time_comparator);
-		sort(read_commands.begin(), read_commands.end(), overall_wait_time_comparator);
-		sort(read_commands_gc.begin(), read_commands_gc.end(), overall_wait_time_comparator);
-		sort(writes.begin(), writes.end(), current_wait_time_comparator);
-		sort(read_transfers.begin(), read_transfers.end(), overall_wait_time_comparator);
-		sort(read_commands_copybacks.begin(), read_commands_copybacks.end(), overall_wait_time_comparator);
-
-
-		handle(read_commands);
-		handle(read_commands_gc);
-		handle(read_commands_copybacks);
-		handle(erases);
-		//handle(read_commands_copybacks);
-		handle(writes);
-		handle(read_transfers);
-		//handle(copy_backs);
-	}
-
-	// FLEXIBLE READS AND WRITES EQUAL PRIORITY
-	else if (SCHEDULING_SCHEME == 3) {
-		writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
-
-		// Put flexible reads in write vector - simple but ugly way to give flexible reads and writes equal priority
-		writes.insert(writes.end(), read_commands_flexible.begin(), read_commands_flexible.end());
-		read_transfers.insert(read_transfers.end(), copy_backs.begin(), copy_backs.end());
-		//read_commands.insert(read_commands.end(), read_commands_copybacks.begin(), read_commands_copybacks.end());
-
-		sort(erases.begin(), erases.end(), current_wait_time_comparator);
-		sort(read_commands.begin(), read_commands.end(), overall_wait_time_comparator);
-		sort(writes.begin(), writes.end(), current_wait_time_comparator);
-		sort(read_transfers.begin(), read_transfers.end(), overall_wait_time_comparator);
-		sort(read_commands_copybacks.begin(), read_commands_copybacks.end(), overall_wait_time_comparator);
-
-		handle(erases);
-		handle(read_commands);
-		handle(read_commands_copybacks);
-		//handle(read_commands_copybacks);
-		handle(writes);
-		handle(read_transfers);
-		//handle(copy_backs);
-	} else if (SCHEDULING_SCHEME == 4) {
-		// PURE FIFO STRATEGY
-		vector<Event*> all_ios;
-		all_ios.insert(all_ios.end(), read_commands_flexible.begin(), read_commands_flexible.end());
-		all_ios.insert(all_ios.end(), read_commands_gc.begin(), read_commands_gc.end());
-		all_ios.insert(all_ios.end(), read_commands.begin(), read_commands.end());
-		all_ios.insert(all_ios.end(), gc_writes.begin(), gc_writes.end());
-		all_ios.insert(all_ios.end(), writes.begin(), writes.end());
-		all_ios.insert(all_ios.end(), read_transfers.begin(), read_transfers.end());
-		all_ios.insert(all_ios.end(), copy_backs.begin(), copy_backs.end());
-		all_ios.insert(all_ios.end(), erases.begin(), erases.end());
-		sort(all_ios.begin(), all_ios.end(), current_wait_time_comparator);
-		handle(all_ios);
-	} else {
-		assert(false);
-	}
-
-	handle_noop_events(noop_events);
+	return !current_events->empty() || !future_events.empty();
 }
 
 double IOScheduler::get_soonest_event_time(vector<Event*> const& events) const {
@@ -265,8 +105,8 @@ double IOScheduler::get_soonest_event_time(vector<Event*> const& events) const {
 }
 
 double IOScheduler::get_current_time() const {
-	if (!current_events.empty())
-		return current_events.get_earliest_time();
+	if (!current_events->empty())
+		return current_events->get_earliest_time();
 	else if (future_events.empty())
 		return 0;
 	else
@@ -274,7 +114,6 @@ double IOScheduler::get_current_time() const {
 }
 
 MTRand_int32 random_number_generator(42);
-int i = 0;
 
 // Generates a number between 0 and limit-1, used by the random_shuffle in update_current_events()
 ptrdiff_t random_range(ptrdiff_t limit) {
@@ -284,8 +123,8 @@ ptrdiff_t random_range(ptrdiff_t limit) {
 // goes through all the events that have just been submitted (i.e. bus_wait_time = 0)
 // in light of these new events, see if any other existing pending events are now redundant
 void IOScheduler::update_current_events(double current_time) {
-	StatisticsGatherer::get_global_instance()->register_events_queue_length(current_events.size(), current_time);
-	while (!future_events.empty() && (current_events.empty() || future_events.get_earliest_time() < current_time + 1) ) {
+	StatisticsGatherer::get_global_instance()->register_events_queue_length(current_events->size(), current_time);
+	while (!future_events.empty() && (current_events->empty() || future_events.get_earliest_time() < current_time + 1) ) {
 		vector<Event*> events = future_events.get_soonest_events();
 		random_shuffle(events.begin(), events.end(), random_range); // Process events with same timestamp in random order to prevent imbalances
 		for (uint i = 0; i < events.size(); i++) {
@@ -307,6 +146,9 @@ void IOScheduler::handle(vector<Event*>& events) {
 		else if (type == READ_COMMAND && event->is_flexible_read()) {
 			handle_flexible_read(event);
 		}
+		else if (type == TRIM) {
+			execute_next(event);
+		}
 		else {
 			handle_event(event);
 		}
@@ -323,7 +165,7 @@ void IOScheduler::handle_event(Event* event) {
 	else {
 		double bus_wait_time = can_schedule ? time : WAIT_TIME;
 		event->incr_bus_wait_time(bus_wait_time);
-		current_events.push(event);
+		current_events->push(event);
 	}
 }
 
@@ -339,7 +181,7 @@ void IOScheduler::handle_flexible_read(Event* event) {
 	if (addr.valid == PAGE && logical_address_locked) {
 
 		uint dependency_code_of_other_event = LBA_currently_executing[logical_address];
-		Event * existing_event = current_events.find(dependency_code_of_other_event);
+		Event * existing_event = current_events->find(dependency_code_of_other_event);
 		if (existing_event != NULL && existing_event->is_garbage_collection_op()) {
 			fr->set_noop(true);
 			fr->set_address(addr);
@@ -351,7 +193,7 @@ void IOScheduler::handle_flexible_read(Event* event) {
 			//fr->find_alternative_immediate_candidate(addr.package, addr.die);
 			double wait_time = WAIT_TIME;
 			fr->incr_bus_wait_time(wait_time);
-			current_events.push(fr);
+			current_events->push(fr);
 		}
 		return;
 	}
@@ -363,7 +205,7 @@ void IOScheduler::handle_flexible_read(Event* event) {
 		fr->set_logical_address(logical_address);
 		dependencies[fr->get_application_io_id()].front()->set_logical_address(fr->get_logical_address());
 		fr->register_read_commencement();
-		current_events.push(fr);
+		current_events->push(fr);
 		return;
 	}
 
@@ -383,7 +225,7 @@ void IOScheduler::handle_flexible_read(Event* event) {
 	}
 	else {
 		fr->incr_bus_wait_time(wait_time);
-		current_events.push(fr);
+		current_events->push(fr);
 	}
 }
 
@@ -405,7 +247,7 @@ void IOScheduler::handle_write(Event* event) {
 		if (event->get_event_type() == COPY_BACK && addr.valid == NONE) {
 			transform_copyback(event);
 		}
-		current_events.push(event);
+		current_events->push(event);
 	}
 }
 
@@ -585,16 +427,16 @@ void IOScheduler::init_event(Event* event) {
 	event_type type = event->get_event_type();
 
 	if (event->get_noop() && event->get_event_type() != GARBAGE_COLLECTION) {
-		current_events.push(event);
+		current_events->push(event);
 		return;
 	}
 
 	if (event->is_flexible_read() && (type == READ_COMMAND || type == READ_TRANSFER)) {
-		current_events.push(event);
+		current_events->push(event);
 	}
 	else if (type == TRIM || type == READ_COMMAND || type == READ_TRANSFER || type == WRITE || type == COPY_BACK) {
 		if (should_event_be_scheduled(event)) {
-			current_events.push(event);
+			current_events->push(event);
 		} else if (PRINT_LEVEL >= 1) {
 			printf("Event not scheduled: ");
 			event->print();
@@ -636,7 +478,7 @@ void IOScheduler::init_event(Event* event) {
 		delete event;
 	}
 	else if (type == ERASE) {
-		current_events.push(event);
+		current_events->push(event);
 	}
 }
 
@@ -653,7 +495,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	uint dependency_code_of_new_event = new_event->get_application_io_id();
 	uint common_logical_address = new_event->get_logical_address();
 	uint dependency_code_of_other_event = LBA_currently_executing[common_logical_address];
-	Event * existing_event = current_events.find(dependency_code_of_other_event);
+	Event * existing_event = current_events->find(dependency_code_of_other_event);
 
 	//bool both_events_are_gc = new_event->is_garbage_collection_op() && existing_event->is_garbage_collection_op();
 	//assert(!both_events_are_gc);
@@ -688,12 +530,12 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
 		promote_to_gc(existing_event);
 		remove_current_operation(new_event);
-		current_events.push(new_event); // Make sure the old GC READ is run, even though it is now a NOOP command
+		current_events->push(new_event); // Make sure the old GC READ is run, even though it is now a NOOP command
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 	}
 	else if (new_event->is_garbage_collection_op() && scheduled_op_code == TRIM) {
 		remove_current_operation(new_event);
-		current_events.push(new_event);
+		current_events->push(new_event);
 		bm->register_trim_making_gc_redundant();
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 	}
@@ -734,7 +576,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	else if (new_op_code == READ && (scheduled_op_code == WRITE || scheduled_op_code == COPY_BACK )) {
 		//remove_current_operation(new_event);
-		//current_events.push_back(new_event);
+		//current_events->push_back(new_event);
 		make_dependent(new_event, dependency_code_of_other_event);
 	}
 	// if there are two reads to the same address, there is no point reading the same page twice.
