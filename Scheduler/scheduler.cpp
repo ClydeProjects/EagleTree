@@ -21,8 +21,7 @@ IOScheduler::IOScheduler() :
 	ftl(NULL),
 	bm(NULL),
 	dependency_code_to_LBA(),
-	dependency_code_to_type(),
-	stats()
+	dependency_code_to_type()
 {}
 
 void IOScheduler::set_all(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent* new_bm) {
@@ -81,7 +80,7 @@ void IOScheduler::execute_soonest_events() {
 	double current_time = get_current_time();
 	double next_events_time = current_time + 1;
 	update_current_events(current_time);
-	while (current_time < next_events_time && !current_events.is_empty() ) {
+	while (current_time < next_events_time && !current_events.empty() ) {
 		execute_current_waiting_ios();
 		update_current_events(current_time);
 		current_time = get_current_time();
@@ -90,16 +89,8 @@ void IOScheduler::execute_soonest_events() {
 
 // this is used to signal the SSD object when all events have finished executing
 bool IOScheduler::is_empty() {
-	return !current_events.is_empty() || !future_events.is_empty();
+	return !current_events.empty() || !future_events.empty();
 }
-
-/*vector<Event*> IOScheduler::collect_soonest_events() {
-	vector<Event*> soonest_events = (*current_events.begin()).second;
-	current_events.erase(current_events.begin());
-	return soonest_events;
-}*/
-
-
 
 inline bool overall_wait_time_comparator (const Event* i, const Event* j) {
 	return i->get_overall_wait_time() < j->get_overall_wait_time();
@@ -274,9 +265,9 @@ double IOScheduler::get_soonest_event_time(vector<Event*> const& events) const {
 }
 
 double IOScheduler::get_current_time() const {
-	if (!current_events.is_empty())
+	if (!current_events.empty())
 		return current_events.get_earliest_time();
-	else if (!future_events.is_empty())
+	else if (future_events.empty())
 		return 0;
 	else
 		return future_events.get_earliest_time();
@@ -293,8 +284,8 @@ ptrdiff_t random_range(ptrdiff_t limit) {
 // goes through all the events that have just been submitted (i.e. bus_wait_time = 0)
 // in light of these new events, see if any other existing pending events are now redundant
 void IOScheduler::update_current_events(double current_time) {
-	StatisticsGatherer::get_global_instance()->register_events_queue_length(current_events.size(), get_current_time());
-	while (!future_events.is_empty() && (current_events.is_empty() || future_events.get_earliest_time() < current_time + 1) ) {
+	StatisticsGatherer::get_global_instance()->register_events_queue_length(current_events.size(), current_time);
+	while (!future_events.empty() && (current_events.empty() || future_events.get_earliest_time() < current_time + 1) ) {
 		vector<Event*> events = future_events.get_soonest_events();
 		random_shuffle(events.begin(), events.end(), random_range); // Process events with same timestamp in random order to prevent imbalances
 		for (uint i = 0; i < events.size(); i++) {
@@ -587,30 +578,7 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		printf("LOOK HERE ");
 		event->print();
 	}
-	/*if (event->get_event_type() == READ_TRANSFER && event->get_overall_wait_time() >= 1778) {
-		event->print();
-		VisualTracer::get_instance()->print_horizontally_with_breaks();
-		event->print();
-		StateVisualiser::print_page_status();
-	}*/
-
-	// StatisticsGatherer::get_global_instance()->register_completed_event(*event); // Commented out because this is now done from the thread implementation
-
-	/*if (event->is_original_application_io() && event->get_bus_wait_time() > 1509) {
-		event->print();
-		VisualTracer::get_instance()->print_horizontally_with_breaks();
-		event->print();
-		StateVisualiser::print_page_status();
-	}*/
 }
-
-void IOScheduler::print_stats() {
-	printf("\n");
-	printf("num_write_cancellations %d\n", stats.num_write_cancellations);
-	printf("\n");
-}
-
-
 
 void IOScheduler::init_event(Event* event) {
 	uint dep_code = event->get_application_io_id();
@@ -722,7 +690,6 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		remove_current_operation(new_event);
 		current_events.push(new_event); // Make sure the old GC READ is run, even though it is now a NOOP command
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
-		stats.num_write_cancellations++;
 	}
 	else if (new_event->is_garbage_collection_op() && scheduled_op_code == TRIM) {
 		remove_current_operation(new_event);
@@ -738,14 +705,12 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		promote_to_gc(new_event);
 		remove_current_operation(existing_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
-		stats.num_write_cancellations++;
 	}
 
 	// if two writes are scheduled, the one before is irrelevant and may as well be cancelled
 	else if (new_op_code == WRITE && scheduled_op_code == WRITE) {
 		remove_current_operation(existing_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
-		stats.num_write_cancellations++;
 		//make_dependent(new_event, dependency_code_of_other_event);
 	}
 	else if (new_op_code == WRITE && scheduled_op_code == READ && existing_event->is_mapping_op()) {

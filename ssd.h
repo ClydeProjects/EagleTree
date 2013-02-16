@@ -1136,7 +1136,6 @@ public:
 	void schedule_event(Event* events);
 	bool is_empty();
 	void execute_soonest_events();
-	void print_stats();
 private:
 	void setup_structures(deque<Event*> events);
 	enum status execute_next(Event* event);
@@ -1157,10 +1156,11 @@ private:
 	struct event_queue {
 		map<long, vector<Event*> > events;
 		int num_events;
+		event_queue() : events(), num_events(0) {};
 		~event_queue();
 		void push(Event*);
 		vector<Event*> get_soonest_events();
-		inline bool is_empty() const { return events.empty(); }
+		inline bool empty() const { return events.empty(); }
 		double get_earliest_time() const { return floor((*events.begin()).first); };
 		int size() const { return num_events; }
 		bool remove(Event*);
@@ -1168,19 +1168,14 @@ private:
 	};
 
 	event_queue future_events;
-	//vector<Event*> current_events;
 	event_queue current_events;
 	map<uint, deque<Event*> > dependencies;
 
-
-
-	//static IOScheduler *inst;
 	Ssd* ssd;
 	FtlParent* ftl;
 	Block_manager_parent* bm;
 
 	//map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations. to be removed
-
 	map<uint, uint> dependency_code_to_LBA;
 	map<uint, event_type> dependency_code_to_type;
 	map<uint, uint> LBA_currently_executing;
@@ -1192,12 +1187,6 @@ private:
 	void promote_to_gc(Event* event_to_promote);
 	void make_dependent(Event* dependent_event, uint independent_code);
 	double get_current_time() const;
-
-	struct io_scheduler_stats {
-		uint num_write_cancellations;
-		io_scheduler_stats() : num_write_cancellations(0)  {}
-	};
-	io_scheduler_stats stats;
 };
 
 class FtlParent
