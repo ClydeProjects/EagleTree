@@ -1131,23 +1131,16 @@ class IOScheduler {
 public:
 	IOScheduler();
 	~IOScheduler();
-	//void schedule_dependent_events_queue(deque<deque<Event*> > events);
-
 	void set_all(Ssd*, FtlParent*, Block_manager_parent*);
-
 	void schedule_events_queue(deque<Event*> events);
 	void schedule_event(Event* events);
 	bool is_empty();
-	void finish_all_events_until_this_time(double time);
 	void execute_soonest_events();
-	//static IOScheduler *instance();
-	//static void instance_initialize(Ssd& ssd, FtlParent& ftl);
 	void print_stats();
 private:
 	void setup_structures(deque<Event*> events);
 	enum status execute_next(Event* event);
 	void execute_current_waiting_ios();
-	vector<Event*> collect_soonest_events();
 	void handle_event(Event* event);
 	void handle_write(Event* event);
 	void handle_flexible_read(Event* event);
@@ -1158,19 +1151,28 @@ private:
 	bool should_event_be_scheduled(Event* event);
 	void init_event(Event* event);
 	void handle_noop_events(vector<Event*>& events);
-
-	bool remove_event_from_current_events(Event* event);
-
 	void manage_operation_completion(Event* event);
-
-	void push_into_current_events(Event* event);
-
 	double get_soonest_event_time(vector<Event*> const& events) const;
 
-	vector<Event*> future_events;
+	struct event_queue {
+		map<long, vector<Event*> > events;
+		int num_events;
+		~event_queue();
+		void push(Event*);
+		vector<Event*> get_soonest_events();
+		inline bool is_empty() const { return events.empty(); }
+		double get_earliest_time() const { return floor((*events.begin()).first); };
+		int size() const { return num_events; }
+		bool remove(Event*);
+		Event* find(long dep_code);
+	};
+
+	event_queue future_events;
 	//vector<Event*> current_events;
-	map<long, vector<Event*> > current_events;
+	event_queue current_events;
 	map<uint, deque<Event*> > dependencies;
+
+
 
 	//static IOScheduler *inst;
 	Ssd* ssd;
@@ -1185,9 +1187,7 @@ private:
 
 	map<uint, queue<uint> > op_code_to_dependent_op_codes;
 
-	void update_current_events();
-	long get_current_events_size();
-	Event* find_scheduled_event(uint dependency_code);
+	void update_current_events(double current_time);
 	void remove_current_operation(Event* event);
 	void promote_to_gc(Event* event_to_promote);
 	void make_dependent(Event* dependent_event, uint independent_code);
