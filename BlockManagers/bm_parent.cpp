@@ -25,17 +25,19 @@ Block_manager_parent::Block_manager_parent(int num_age_classes)
    num_free_pages(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
    num_available_pages_for_new_writes(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
    blocks_being_garbage_collected(),
-   gc_candidates(SSD_SIZE, vector<vector<set<long> > >(PACKAGE_SIZE, vector<set<long> >(num_age_classes, set<long>()))),
    num_blocks_being_garbaged_collected_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
    order_randomiser(),
    IO_has_completed_since_last_shortest_queue_search(true),
    erase_queue(SSD_SIZE, queue< Event*>()),
    num_erases_scheduled_per_package(SSD_SIZE, 0),
-   scheduler(NULL)
+   scheduler(NULL),
+   wl(NULL),
+   gc(NULL)
 {}
 
 Block_manager_parent::~Block_manager_parent() {
 	delete wl;
+	delete gc;
 }
 
 void Block_manager_parent::set_all(Ssd* new_ssd, FtlParent* new_ftl, IOScheduler* new_sched) {
@@ -60,6 +62,7 @@ void Block_manager_parent::set_all(Ssd* new_ssd, FtlParent* new_ftl, IOScheduler
 		}
 	}
 	wl = new Wear_Leveling_Strategy(ssd, this, all_blocks);
+	gc = new Garbage_Collector(ssd, this, num_age_classes);
 }
 
 Address Block_manager_parent::choose_copbyback_address(Event const& write) {
@@ -257,6 +260,7 @@ void Block_manager_parent::trim(Event const& event) {
 
 	ra.valid = BLOCK;
 	ra.page = 0;
+	assert(ra.get_linear_address() == phys_addr);
 
 	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 1) {
 		assert(blocks_being_garbage_collected[block.get_physical_address()] > 0);
@@ -266,19 +270,12 @@ void Block_manager_parent::trim(Event const& event) {
 	// TODO: fix thresholds for inserting blocks into GC lists. ALSO Revise the condition.
 	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
 			(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE) && block.get_pages_valid() < BLOCK_SIZE) {
-		remove_as_gc_candidate(ra);
-		if (PRINT_LEVEL > 1) {
-			printf("Inserting as GC candidate: %ld ", phys_addr); ra.print(); printf(" with age_class %d and valid blocks: %d\n", age_class, block.get_pages_valid());
-		}
-		gc_candidates[ra.package][ra.die][age_class].insert(phys_addr);
-		if (gc_candidates[ra.package][ra.die][age_class].size() == 1) {
-			check_if_should_trigger_more_GC(event.get_current_time());
-		}
+		gc->register_erase_completion(event, age_class);
 	}
 
 	if (blocks_being_garbage_collected.count(phys_addr) == 0 && block.get_state() == INACTIVE) {
-		remove_as_gc_candidate(ra);
-		gc_candidates[ra.package][ra.die][age_class].erase(phys_addr);
+		gc->remove_as_gc_candidate(ra);
+		//gc_candidates[ra.package][ra.die][age_class].erase(phys_addr);
 		blocks_being_garbage_collected[phys_addr] = 0;
 		num_blocks_being_garbaged_collected_per_LUN[ra.package][ra.die]++;
 		issue_erase(ra, event.get_current_time());
@@ -288,12 +285,6 @@ void Block_manager_parent::trim(Event const& event) {
 		assert(block.get_state() == INACTIVE);
 		blocks_being_garbage_collected[phys_addr]--;
 		issue_erase(ra, event.get_current_time());
-	}
-}
-
-void Block_manager_parent::remove_as_gc_candidate(Address const& phys_address) {
-	for (int i = 0; i < num_age_classes; i++) {
-		gc_candidates[phys_address.package][phys_address.die][i].erase(phys_address.get_linear_address());
 	}
 }
 
@@ -526,7 +517,7 @@ struct block_valid_pages_comparator_wearwolf {
 // schedules a garbage collection operation to occur at a given time, and optionally for a given channel, LUN or age class
 // the block to be reclaimed is chosen when the gc operation is initialised
 void Block_manager_parent::schedule_gc(double time, int package, int die, int block, int klass) {
-	Event *gc = new Event(GARBAGE_COLLECTION, 0, BLOCK_SIZE, time);
+	Event *gc_event = new Event(GARBAGE_COLLECTION, 0, BLOCK_SIZE, time);
 	Address address;
 	address.package = package;
 	address.die = die;
@@ -540,62 +531,21 @@ void Block_manager_parent::schedule_gc(double time, int package, int die, int bl
 		address.valid = DIE;
 	} else if (package >= 0 && die >= 0 && block >= 0) {
 		address.valid = BLOCK;
-		gc->set_wear_leveling_op(true);
+		gc_event->set_wear_leveling_op(true);
 	} else {
 		assert(false);
 	}
 
-	gc->set_noop(true);
-	gc->set_address(address);
-	gc->set_age_class(klass);
-	gc->set_garbage_collection_op(true);
+	gc_event->set_noop(true);
+	gc_event->set_address(address);
+	gc_event->set_age_class(klass);
+	gc_event->set_garbage_collection_op(true);
 
 	if (PRINT_LEVEL > 1) {
 		//StateTracer::print();
-		printf("scheduling gc in (%d %d %d %d)  -  ", package, die, block, klass); gc->print();
+		printf("scheduling gc in (%d %d %d %d)  -  ", package, die, block, klass); gc_event->print();
 	}
-	scheduler->schedule_event(gc);
-}
-
-vector<long> Block_manager_parent::get_relevant_gc_candidates(int package_id, int die_id, int klass) const {
-	vector<long > candidates;
-	int package = package_id == -1 ? 0 : package_id;
-	int num_packages = package_id == -1 ? SSD_SIZE : package_id + 1;
-	for (; package < num_packages; package++) {
-		int die = die_id == -1 ? 0 : die_id;
-		int num_dies = die_id == -1 ? PACKAGE_SIZE : die_id + 1;
-		for (; die < num_dies; die++) {
-			int age_class = klass == -1 ? 0 : klass;
-			int num_classes = klass == -1 ? num_age_classes : klass + 1;
-			for (; age_class < num_classes; age_class++) {
-				set<long>::iterator iter = gc_candidates[package][die][age_class].begin();
-				for (; iter != gc_candidates[package][die][age_class].end(); ++iter) {
-					long g = *iter;
-					candidates.push_back(*iter);
-				}
-			}
-		}
-	}
-	if (candidates.size() == 0 && klass != -1) {
-		candidates = get_relevant_gc_candidates(package_id, die_id, -1);
-	}
-	return candidates;
-}
-
-Block* Block_manager_parent::choose_gc_victim(vector<long> candidates) const {
-	uint min_valid_pages = BLOCK_SIZE;
-	Block* best_block = NULL;
-	for (uint i = 0; i < candidates.size(); i++) {
-		long physical_address = candidates[i];
-		Address a = Address(physical_address, BLOCK);
-		Block* block = &ssd->getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
-		if (block->get_pages_valid() < min_valid_pages && block->get_state() == ACTIVE) {
-			min_valid_pages = block->get_pages_valid();
-			best_block = block;
-			assert(min_valid_pages < BLOCK_SIZE);
-		}
-	}
-	return best_block;
+	scheduler->schedule_event(gc_event);
 }
 
 // Returns true if a copy back is allowed on a given logical address
@@ -673,8 +623,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 		victim = &ssd->getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 	}
 	else {
-		vector<long> candidates = get_relevant_gc_candidates(package_id, die_id, gc_event->get_age_class());
-		victim = choose_gc_victim(candidates);
+		victim = gc->choose_gc_victim(package_id, die_id, gc_event->get_age_class());
 	}
 
 	StatisticsGatherer::get_global_instance()->register_scheduled_gc(*gc_event);
@@ -705,7 +654,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 		return migrations;
 	}
 
-	remove_as_gc_candidate(addr);
+	gc->remove_as_gc_candidate(addr);
 
 	blocks_being_garbage_collected[victim->get_physical_address()] = victim->get_pages_valid();
 	num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die]++;

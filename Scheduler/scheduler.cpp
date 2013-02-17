@@ -171,15 +171,12 @@ void IOScheduler::handle_event(Event* event) {
 
 void IOScheduler::handle_flexible_read(Event* event) {
 	Flexible_Read_Event* fr = dynamic_cast<Flexible_Read_Event*>(event);
-
 	Address addr = bm->choose_flexible_read_address(fr);
 
 	// Check if the logical address is locked
 	ulong logical_address = fr->get_candidates_lba()[addr.package][addr.die];
-
 	bool logical_address_locked = LBA_currently_executing.count(logical_address) == 1;
 	if (addr.valid == PAGE && logical_address_locked) {
-
 		uint dependency_code_of_other_event = LBA_currently_executing[logical_address];
 		Event * existing_event = current_events->find(dependency_code_of_other_event);
 		if (existing_event != NULL && existing_event->is_garbage_collection_op()) {

@@ -1,6 +1,4 @@
-
 #include "../ssd.h"
-
 using namespace ssd;
 
 Wearwolf::Wearwolf()

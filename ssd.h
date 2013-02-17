@@ -302,6 +302,7 @@ class Shortest_Queue_Hot_Cold_BM;
 class Wearwolf;
 class Wearwolf_Locality;
 class Wear_Leveling_Strategy;
+class Garbage_Collector;
 
 class Sequential_Pattern_Detector;
 class Page_Hotness_Measurer;
@@ -916,15 +917,13 @@ public:
 	void register_trim_making_gc_redundant();
 	Address choose_copbyback_address(Event const& write);
 	void schedule_gc(double time, int package_id, int die_id, int block, int klass);
+	virtual void check_if_should_trigger_more_GC(double start_time);
 protected:
 	virtual Address choose_best_address(Event const& write) = 0;
 	virtual Address choose_any_address(Event const& write) = 0;
-	virtual void check_if_should_trigger_more_GC(double start_time);
 	void increment_pointer(Address& pointer);
 	bool can_schedule_write_immediately(Address const& prospective_dest, double current_time);
 	bool can_write(Event const& write) const;
-
-	vector<long> get_relevant_gc_candidates(int package_id, int die_id, int klass) const;
 
 	Address find_free_unused_block(uint package_id, uint die_id, enum age age, double time);
 	Address find_free_unused_block(uint package_id, uint die_id, double time);
@@ -946,10 +945,8 @@ protected:
 	map<long, uint> page_copy_back_count; // Pages that have experienced a copy-back, mapped to a count of the number of copy-backs
 private:
 	Address find_free_unused_block(uint package_id, uint die_id, uint age_class, double time);
-	Block* choose_gc_victim(vector<long> candidates) const;
 	uint sort_into_age_class(Address const& address) const;
 	void issue_erase(Address a, double time);
-	void remove_as_gc_candidate(Address const& phys_address);
 
 	int get_num_free_blocks(int package, int die);
 	bool copy_back_allowed_on(long logical_address);
@@ -962,12 +959,14 @@ private:
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 
-	int num_age_classes;
+	const int num_age_classes;
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
+	Garbage_Collector* gc;
+
 	map<int, int> blocks_being_garbage_collected;   // maps block physical address to the number of pages that still need to be migrated
-	vector<vector<vector<set<long> > > > gc_candidates;  // each age class has a vector of candidates for GC
 	vector<vector<uint> > num_blocks_being_garbaged_collected_per_LUN;
+
 	Random_Order_Iterator order_randomiser;
 
 	pair<bool, pair<int, int> > last_get_free_block_pointer_with_shortest_IO_queue_result;
@@ -976,6 +975,21 @@ private:
 	vector<queue<Event*> > erase_queue;
 	vector<int> num_erases_scheduled_per_package;
 	Wear_Leveling_Strategy* wl;
+};
+
+class Garbage_Collector {
+public:
+	Garbage_Collector(Ssd* ssd, Block_manager_parent* bm, int num_age_classes);
+	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
+	void remove_as_gc_candidate(Address const& phys_address);
+	void register_erase_completion(Event const& event, uint age_class);
+	inline void set_ssd(Ssd* new_ssd) { ssd = new_ssd; }
+private:
+	vector<long> get_relevant_gc_candidates(int package_id, int die_id, int klass) const;
+	vector<vector<vector<set<long> > > > gc_candidates;  // each age class has a vector of candidates for GC
+	Ssd* ssd;
+	Block_manager_parent* bm;
+	const int num_age_classes;
 };
 
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation
@@ -1137,7 +1151,7 @@ class event_queue {
 public:
 	event_queue() : events(), num_events(0) {};
 	virtual ~event_queue();
-	void push(Event*);
+	virtual void push(Event*);
 	vector<Event*> get_soonest_events();
 	bool remove(Event*);
 	Event* find(long dep_code) const;
@@ -1171,6 +1185,16 @@ public:
 	Simple_Scheduling_Strategy(IOScheduler* s) : Scheduling_Strategy(s) {}
 	~Simple_Scheduling_Strategy() {}
 	void schedule();
+};
+
+class Balancing_Scheduling_Strategy : public Scheduling_Strategy {
+public:
+	Balancing_Scheduling_Strategy(IOScheduler* s) : Scheduling_Strategy(s) {}
+	~Balancing_Scheduling_Strategy() {}
+	void schedule();
+	void push(Event*);
+private:
+	queue<Event*> internal_events;
 };
 
 class IOScheduler {
