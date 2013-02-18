@@ -270,7 +270,7 @@ void Block_manager_parent::trim(Event const& event) {
 	// TODO: fix thresholds for inserting blocks into GC lists. ALSO Revise the condition.
 	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
 			(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE) && block.get_pages_valid() < BLOCK_SIZE) {
-		gc->register_erase_completion(event, age_class);
+		gc->register_trim(event, age_class, block.get_pages_valid());
 	}
 
 	if (blocks_being_garbage_collected.count(phys_addr) == 0 && block.get_state() == INACTIVE) {
@@ -353,6 +353,10 @@ void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
 			}
 		}
 	}
+}
+
+double Block_manager_parent::get_average_migrations_per_gc() const {
+	return gc->get_average_live_pages_per_best_candidate();
 }
 
 // This function takes a vector of channels, each of each has a vector of dies

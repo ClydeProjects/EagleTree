@@ -398,7 +398,7 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 
 	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
 
-
+	current_events->register_event_completion(event);
 	if (event->get_event_type() == WRITE || event->get_event_type() == COPY_BACK) {
 		ftl->register_write_completion(*event, outcome);
 		bm->register_write_outcome(*event, outcome);

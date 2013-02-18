@@ -1,8 +1,10 @@
 #include "../ssd.h"
+#include "../block_management.h"
 using namespace ssd;
 
 Garbage_Collector::Garbage_Collector(Ssd* ssd, Block_manager_parent* bm, int num_age_classes)
 	:  gc_candidates(SSD_SIZE, vector<vector<set<long> > >(PACKAGE_SIZE, vector<set<long> >(num_age_classes, set<long>()))),
+	   blocks_per_lun_with_min_live_pages(SSD_SIZE, vector<pair<Address, int> >(PACKAGE_SIZE)),
 	   ssd(ssd),
 	   bm(bm),
 	   num_age_classes(num_age_classes)
@@ -11,6 +13,12 @@ Garbage_Collector::Garbage_Collector(Ssd* ssd, Block_manager_parent* bm, int num
 void Garbage_Collector::remove_as_gc_candidate(Address const& phys_address) {
 	for (int i = 0; i < num_age_classes; i++) {
 		gc_candidates[phys_address.package][phys_address.die][i].erase(phys_address.get_linear_address());
+	}
+	pair<Address, int>& map = blocks_per_lun_with_min_live_pages[phys_address.package][phys_address.die];
+	if (map.first.valid == BLOCK && map.first.compare(phys_address) == BLOCK) {
+		Block* b = choose_gc_victim(phys_address.package, phys_address.die, -1);
+		map.first = Address(b->get_physical_address(), BLOCK);
+		map.second = b->get_pages_valid();
 	}
 }
 
@@ -27,7 +35,6 @@ vector<long> Garbage_Collector::get_relevant_gc_candidates(int package_id, int d
 			for (; age_class < num_classes; age_class++) {
 				set<long>::iterator iter = gc_candidates[package][die][age_class].begin();
 				for (; iter != gc_candidates[package][die][age_class].end(); ++iter) {
-					long g = *iter;
 					candidates.push_back(*iter);
 				}
 			}
@@ -56,16 +63,37 @@ Block* Garbage_Collector::choose_gc_victim(int package_id, int die_id, int klass
 	return best_block;
 }
 
-void Garbage_Collector::register_erase_completion(Event const& event, uint age_class) {
+void Garbage_Collector::register_trim(Event const& event, uint age_class, int num_live_pages) {
 	Address ra = event.get_replace_address();
+	assert(ra.valid != NONE);
 	ra.valid = BLOCK;
 	ra.page = 0;
 	remove_as_gc_candidate(ra);
 	if (PRINT_LEVEL > 1) {
-		//printf("Inserting as GC candidate: %ld ", ra.get_linear_address()); ra.print(); printf(" with age_class %d and valid blocks: %d\n", age_class, block.get_pages_valid());
+		printf("Inserting as GC candidate: %ld ", ra.get_linear_address()); ra.print(); printf(" with age_class %d and valid blocks: %d\n", num_live_pages);
 	}
 	gc_candidates[ra.package][ra.die][age_class].insert(ra.get_linear_address());
 	if (gc_candidates[ra.package][ra.die][age_class].size() == 1) {
 		bm->check_if_should_trigger_more_GC(event.get_current_time());
 	}
+	pair<Address, int>& map = blocks_per_lun_with_min_live_pages[ra.package][ra.die];
+	if (map.first.valid != BLOCK || map.first.compare(ra) == BLOCK || map.second > num_live_pages) {
+		map.first = ra;
+		map.second = num_live_pages;
+	}
+}
+
+double Garbage_Collector::get_average_live_pages_per_best_candidate() const {
+	int total_live_pages = 0;
+	int num_blocks_considered = 0;
+	for (uint i = 0; i < BLOCK_SIZE; i++) {
+		for (uint j = 0; j < DIE_SIZE; j++) {
+			pair<Address, int> const& map = blocks_per_lun_with_min_live_pages[i][j];
+			if (map.first.valid == BLOCK) {
+				total_live_pages += map.second;
+				num_blocks_considered++;
+			}
+		}
+	}
+	return (double)total_live_pages / num_blocks_considered;
 }

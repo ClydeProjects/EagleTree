@@ -96,7 +96,7 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 1000;
+	int IO_limit = 100000;
 
 	int write_threads_min = 0;
 	int write_threads_max = 1;
