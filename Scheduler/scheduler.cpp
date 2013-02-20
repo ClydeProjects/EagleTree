@@ -11,11 +11,11 @@
 
 using namespace ssd;
 
-#define WAIT_TIME 3;
+#define WAIT_TIME 5;
 
 IOScheduler::IOScheduler() :
 	future_events(),
-	current_events(new Simple_Scheduling_Strategy(this)),
+	current_events(NULL),
 	dependencies(),
 	ssd(NULL),
 	ftl(NULL),
@@ -29,6 +29,7 @@ void IOScheduler::set_all(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent
 	ssd = new_ssd;
 	ftl = new_ftl;
 	bm = new_bm;
+	current_events = BALANCEING_SCHEME ? new Balancing_Scheduling_Strategy(this, bm) : new Simple_Scheduling_Strategy(this);
 }
 
 IOScheduler::~IOScheduler(){
@@ -388,13 +389,13 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		assert(false);
 	}
 
-	//VisualTracer::get_instance()->register_completed_event(*event);
+	/*VisualTracer::get_instance()->register_completed_event(*event);
 
-	if (event->get_event_type() == READ_TRANSFER && event->get_latency() > 5500 && !event->is_garbage_collection_op()) {
-		//VisualTracer::get_instance()->print_horizontally(20000);
-		//event->print();
-		//printf(" ");
-	}
+	if (event->is_original_application_io() && event->get_event_type() == WRITE && event->get_latency() > 3100 && !event->is_garbage_collection_op()) {
+		VisualTracer::get_instance()->print_horizontally(20000);
+		event->print();
+		printf(" ");
+	}*/
 
 	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
 

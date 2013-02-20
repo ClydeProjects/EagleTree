@@ -32,7 +32,8 @@ Block_manager_parent::Block_manager_parent(int num_age_classes)
    num_erases_scheduled_per_package(SSD_SIZE, 0),
    scheduler(NULL),
    wl(NULL),
-   gc(NULL)
+   gc(NULL),
+   migrations_num_tracker()
 {}
 
 Block_manager_parent::~Block_manager_parent() {
@@ -87,6 +88,7 @@ Address Block_manager_parent::choose_flexible_read_address(Flexible_Read_Event* 
 }
 
 Address Block_manager_parent::choose_write_address(Event const& write) {
+	//printf("num_available_pages_for_new_writes   %d\n", num_available_pages_for_new_writes);
 	bool can_write = num_available_pages_for_new_writes > 0 || write.is_garbage_collection_op();
 	if (!can_write) {
 		return Address();
@@ -279,7 +281,6 @@ void Block_manager_parent::trim(Event const& event) {
 		blocks_being_garbage_collected[phys_addr] = 0;
 		num_blocks_being_garbaged_collected_per_LUN[ra.package][ra.die]++;
 		issue_erase(ra, event.get_current_time());
-
 	}
 	else if (blocks_being_garbage_collected.count(phys_addr) == 1 && blocks_being_garbage_collected[phys_addr] == 0) {
 		assert(block.get_state() == INACTIVE);
@@ -356,7 +357,8 @@ void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
 }
 
 double Block_manager_parent::get_average_migrations_per_gc() const {
-	return gc->get_average_live_pages_per_best_candidate();
+	//return gc->get_average_live_pages_per_best_candidate();
+	return migrations_num_tracker.get_avg();
 }
 
 // This function takes a vector of channels, each of each has a vector of dies
@@ -606,7 +608,11 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 	Address a = gc_event->get_address();
 	vector<deque<Event*> > migrations;
 
-	if (how_many_gc_operations_are_scheduled() >= SSD_SIZE * PACKAGE_SIZE * 0.75) {
+	/*if (how_many_gc_operations_are_scheduled() >= SSD_SIZE * PACKAGE_SIZE * 0.75) {
+		return migrations;
+	}*/
+
+	if (how_many_gc_operations_are_scheduled() >= MAX_CONCURRENT_GC_OPS) {
 		return migrations;
 	}
 
@@ -680,7 +686,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	//deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
 	StatisticsGatherer::get_global_instance()->register_executed_gc(*gc_event, *victim);
-
+	migrations_num_tracker.register_num_live_pages(victim->get_pages_valid());
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
 		if (victim->getPages()[i].get_state() == VALID) {
@@ -731,7 +737,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 		}
 	}
 	//if (cb_migrations.size() > 0) migrations.push_back(cb_migrations);
-
+	//StateVisualiser::pr
 	return migrations;
 }
 

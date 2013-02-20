@@ -288,7 +288,7 @@ void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> thre
 	}
 }
 
-vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment(vector<Thread*> (*experiment)(int highest_lba), int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
+vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
 	mkdir(data_folder.c_str(), 0755);
 	ExperimentResult global_result       (name, data_folder, "Global/",             "Number of concurrent random write threads");
     ExperimentResult experiment_result   (name, data_folder, "Experiment_Threads/", "Number of concurrent random write threads");
@@ -306,7 +306,7 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
 		// Run experiment
-		vector<Thread*> experiment_threads = experiment(num_pages * used_space);
+		vector<Thread*> experiment_threads = workload->generate_instance();
 
 		StatisticsGatherer* experiment_statistics_gatherer = new StatisticsGatherer();
 		StatisticsGatherer* random_writes_statics_gatherer = new StatisticsGatherer();
@@ -753,14 +753,11 @@ string Experiment_Runner::get_working_dir() {
 }
 
 void Experiment_Runner::draw_graphs(vector<vector<ExperimentResult> > exps, string exp_folder) {
-
 	int sx = 16;
 	int sy = 8;
-
-	for (int i = 0; i < exps[0][0].column_names.size(); i++) {
+	//for (int i = 0; i < exps[0][0].column_names.size(); i++) {
 		//printf("%d: %s\n", i, exps[0][0].column_names[i].c_str());
-	}
-
+	//}
 	printf("chdir %s\n", exp_folder.c_str());
 	chdir(exp_folder.c_str());
 	for (int i = 0; i < exps[0].size(); ++i) { // i = 0: GLOBAL, i = 1: EXPERIMENT, i = 2: WRITE_THREADS
@@ -794,4 +791,26 @@ void Experiment_Runner::draw_graphs(vector<vector<ExperimentResult> > exps, stri
 		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 60, 1, 4);
 		/*if (i > 0)*/ { chdir(".."); }
 	}
+}
+
+void Experiment_Runner::draw_experiment_spesific_graphs(vector<vector<ExperimentResult> > exps, string exp_folder, vector<int> x_vals) {
+		int sx = 16;
+		int sy = 8;
+
+		uint mean_pos_in_datafile = std::find(exps[0][0].column_names.begin(), exps[0][0].column_names.end(), "Write latency, mean (µs)") - exps[0][0].column_names.begin();
+		assert(mean_pos_in_datafile != exps[0][0].column_names.size());
+
+		for (uint j = 0; j < exps.size(); j++) {
+			vector<ExperimentResult>& exp = exps[j];
+			for (uint i = 0; i < exp.size(); i++) {
+				printf("%s\n", exp[i].data_folder.c_str());
+				if (chdir(exp[i].data_folder.c_str()) != 0) printf("Error changing dir to %s\n", exp[i].data_folder.c_str());
+				Experiment_Runner::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
+				Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], x_vals, 1, 4);
+				Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], x_vals, true);
+				Experiment_Runner::age_histogram			(sx, sy/2, "age-histograms", exp[i], x_vals);
+				Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], x_vals);
+				Experiment_Runner::throughput_history		(sx, sy/2, "throughput_history", exp[i], x_vals);
+			}
+		}
 }

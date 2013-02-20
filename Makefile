@@ -13,7 +13,7 @@
 # classes.  It is suggested to test with the "test" make target first.
 
 CC = /usr/bin/gcc
-CFLAGS = -Wall -Wextra -g
+CFLAGS = -Wall -Wextra -g -O2
 CXX = /usr/bin/g++
 CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
@@ -24,8 +24,8 @@ HDR = ssd.h block_management.h
 VPATH = FTLs MTRand BlockManagers OperatingSystem Utilities Scheduler
 #SRC = ssd_address.cpp ssd_block.cpp ssd_bus.cpp ssd_channel.cpp ssd_config.cpp ssd_controller.cpp ssd_die.cpp ssd_event.cpp ssd_ftl.cpp ssd_gc.cpp ssd_package.cpp ssd_page.cpp ssd_plane.cpp ssd_quicksort.cpp ssd_ram.cpp ssd_ssd.cpp ssd_wl.cpp
 #OBJ = ssd_address.o ssd_block.o ssd_bus.o ssd_channel.o ssd_config.o ssd_controller.o ssd_die.o ssd_event.o ssd_ftl.o ssd_gc.o ssd_package.o ssd_page.o ssd_plane.o ssd_quicksort.o ssd_ram.o ssd_ssd.o ssd_wl.o
-SRC = Garbage_Collector.cpp Simple_Scheduling_Strategy.cpp events_queue.cpp wear_leveling_strategy.cpp grace_hash_join.cpp exp_sequential.cpp page_ftl.cpp ssd_address.cpp ssd_block.cpp ssd_bus.cpp ssd_channel.cpp ssd_config.cpp ssd_die.cpp ssd_event.cpp ssd_package.cpp ssd_page.cpp ssd_plane.cpp ssd_ram.cpp ssd_ssd.cpp dftl_ftl.cpp dftl_parent.cpp scheduler.cpp bm_shortest_queue.cpp ssd_page_hotness_measurer.cpp bm_wearwolf.cpp bm_wearwolf_locality.cpp  bm_hot_cold_seperation.cpp bm_parent.cpp ssd_visual_tracer.cpp ssd_state_visualiser.cpp ssd_statistics_gatherer.cpp operating_system.cpp thread_implementations.cpp class ssd_sequential_pattern_detector.cpp mtrand.cpp external_sort.cpp bm_round_robin.cpp File_Manager.cpp random_order_iterator.cpp experiment_runner.cpp flexible_reader.cpp
-OBJ = Garbage_Collector.o Simple_Scheduling_Strategy.o events_queue.o wear_leveling_strategy.o grace_hash_join.o page_ftl.o ssd_address.o ssd_block.o ssd_bus.o ssd_channel.o ssd_config.o ssd_die.o ssd_event.o ssd_package.o ssd_page.o ssd_plane.o ssd_ram.o ssd_ssd.o dftl_ftl.o dftl_parent.o scheduler.o bm_shortest_queue.o ssd_page_hotness_measurer.o bm_wearwolf.o bm_wearwolf_locality.o bm_hot_cold_seperation.o bm_parent.o ssd_visual_tracer.o ssd_state_visualiser.o ssd_statistics_gatherer.o operating_system.o thread_implementations.o ssd_sequential_pattern_detector.o mtrand.o external_sort.o bm_round_robin.o File_Manager.o random_order_iterator.o experiment_runner.o flexible_reader.o
+SRC = Workload_Definitions.cpp Garbage_Collector.cpp Simple_Scheduling_Strategy.cpp events_queue.cpp wear_leveling_strategy.cpp grace_hash_join.cpp exp_sequential.cpp page_ftl.cpp ssd_address.cpp ssd_block.cpp ssd_bus.cpp ssd_channel.cpp ssd_config.cpp ssd_die.cpp ssd_event.cpp ssd_package.cpp ssd_page.cpp ssd_plane.cpp ssd_ram.cpp ssd_ssd.cpp dftl_ftl.cpp dftl_parent.cpp scheduler.cpp bm_shortest_queue.cpp ssd_page_hotness_measurer.cpp bm_wearwolf.cpp bm_wearwolf_locality.cpp  bm_hot_cold_seperation.cpp bm_parent.cpp ssd_visual_tracer.cpp ssd_state_visualiser.cpp ssd_statistics_gatherer.cpp operating_system.cpp thread_implementations.cpp class ssd_sequential_pattern_detector.cpp mtrand.cpp external_sort.cpp bm_round_robin.cpp File_Manager.cpp random_order_iterator.cpp experiment_runner.cpp flexible_reader.cpp
+OBJ = Workload_Definitions.o Garbage_Collector.o Simple_Scheduling_Strategy.o events_queue.o wear_leveling_strategy.o grace_hash_join.o page_ftl.o ssd_address.o ssd_block.o ssd_bus.o ssd_channel.o ssd_config.o ssd_die.o ssd_event.o ssd_package.o ssd_page.o ssd_plane.o ssd_ram.o ssd_ssd.o dftl_ftl.o dftl_parent.o scheduler.o bm_shortest_queue.o ssd_page_hotness_measurer.o bm_wearwolf.o bm_wearwolf_locality.o bm_hot_cold_seperation.o bm_parent.o ssd_visual_tracer.o ssd_state_visualiser.o ssd_statistics_gatherer.o operating_system.o thread_implementations.o ssd_sequential_pattern_detector.o mtrand.o external_sort.o bm_round_robin.o File_Manager.o random_order_iterator.o experiment_runner.o flexible_reader.o
 LOG = log
 PERMS = 660
 EPERMS = 770

@@ -106,12 +106,11 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 		sort(read_transfers.begin(), read_transfers.end(), overall_wait_time_comparator);
 		sort(read_commands_copybacks.begin(), read_commands_copybacks.end(), overall_wait_time_comparator);
 
-
 		scheduler->handle(read_commands);
 		scheduler->handle(read_commands_gc);
 		scheduler->handle(read_commands_copybacks);
-		scheduler->handle(erases);
 		//handle(read_commands_copybacks);
+		scheduler->handle(erases);
 		scheduler->handle(writes);
 		scheduler->handle(read_transfers);
 		//handle(copy_backs);
@@ -132,11 +131,12 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 		sort(read_transfers.begin(), read_transfers.end(), overall_wait_time_comparator);
 		sort(read_commands_copybacks.begin(), read_commands_copybacks.end(), overall_wait_time_comparator);
 
-		scheduler->handle(erases);
 		scheduler->handle(read_commands);
+		scheduler->handle(read_commands_gc);
 		scheduler->handle(read_commands_copybacks);
 		//handle(read_commands_copybacks);
 		scheduler->handle(writes);
+		scheduler->handle(erases);
 		scheduler->handle(read_transfers);
 		//handle(copy_backs);
 	} else if (priorities_scheme == 4) {
@@ -168,9 +168,11 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 		scheduler->handle(read_commands_gc);
 		scheduler->handle(gc_writes);
 		scheduler->handle(read_commands);
+
 		scheduler->handle(read_commands_copybacks);
 		scheduler->handle(erases);
 		//handle(read_commands_copybacks);
+
 		scheduler->handle(writes);
 		scheduler->handle(read_transfers);
 		//handle(copy_backs);
@@ -188,38 +190,78 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 Balancing_Scheduling_Strategy::Balancing_Scheduling_Strategy(IOScheduler* s, Block_manager_parent* bm)
   : Simple_Scheduling_Strategy(s),
     bm(bm),
-    num_writes_finished_since_last_internal_event(0)
+    num_writes_finished_since_last_internal_event(0),
+    num_pending_application_writes()
 {}
 
 Balancing_Scheduling_Strategy::~Balancing_Scheduling_Strategy() {
 	while (!internal_events.empty()) {
 		Event* e = internal_events.front();
-		internal_events.pop();
+		internal_events.pop_front();
 		delete e;
 	}
 }
 
 void Balancing_Scheduling_Strategy::schedule(int priorities_scheme) {
 	Simple_Scheduling_Strategy::schedule(5);
+	int i = internal_events.size();
+	i++;
 }
 
 void Balancing_Scheduling_Strategy::push(Event* event) {
-	if (!event->is_original_application_io() && event->get_event_type() == READ_COMMAND && (event->is_garbage_collection_op() || event->is_wear_leveling_op() )) {
-		internal_events.push(event);
+	if (event->get_event_type() == WRITE && event->is_original_application_io()) {
+		num_pending_application_writes.insert(event->get_application_io_id());
+	}
+	if (!event->is_original_application_io() && event->get_event_type() == READ_COMMAND && event->get_bus_wait_time() == 0 && (event->is_garbage_collection_op() || event->is_wear_leveling_op() )) {
+		internal_events.push_back(event);
 	} else {
 		event_queue::push(event);
 	}
 }
 
 void Balancing_Scheduling_Strategy::register_event_completion(Event* e) {
-	if (e->get_event_type() == WRITE && e->is_original_application_io()) {
+	if (/*e->get_event_type() == WRITE &&*/ e->is_original_application_io()) {
 		num_writes_finished_since_last_internal_event++;
+		num_pending_application_writes.erase(e->get_application_io_id());
 	}
+	/*if (num_pending_application_writes.size() == 0 && e->is_original_application_io()) {
+		num_writes_finished_since_last_internal_event++;
+	}*/
 	double num_writes_per_gc = BLOCK_SIZE / bm->get_average_migrations_per_gc() - 1;
-	if (num_writes_finished_since_last_internal_event >= num_writes_per_gc) {
+	//printf("num_writes_per_gc  %f\n", num_writes_per_gc);
+	if (num_writes_finished_since_last_internal_event >= num_writes_per_gc && !internal_events.empty()) {
 		num_writes_finished_since_last_internal_event = 0;
 		Event* e = internal_events.front();
+		internal_events.pop_front();
 		event_queue::push(e);
 	}
+	//assert(num_pending_application_writes.size() > 0);
 }
 
+bool Balancing_Scheduling_Strategy::remove(Event* event) {
+	bool success = event_queue::remove(event);
+	if (!success) {
+		deque<Event*>::iterator iter = std::find(internal_events.begin(), internal_events.end(), event);
+		if (iter != internal_events.end()) {
+			delete (*iter);
+			internal_events.erase(iter);
+			success = true;
+		}
+	}
+	if (success && event->get_event_type() == WRITE && event->is_original_application_io()) {
+		num_pending_application_writes.erase(event->get_application_io_id());
+	}
+	return success;
+}
+
+Event* Balancing_Scheduling_Strategy::find(long dep_code) const {
+	Event* event = event_queue::find(dep_code);
+	int s =  internal_events.size();
+	for (uint i = 0; i < internal_events.size() && event == NULL; i++) {
+		assert(internal_events[i] != NULL);
+		if (internal_events[i]->get_application_io_id() == dep_code) {
+			return internal_events[i];
+		}
+	}
+	return event;
+}

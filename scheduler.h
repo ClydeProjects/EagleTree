@@ -19,8 +19,8 @@ public:
 	virtual ~event_queue();
 	virtual void push(Event*);
 	vector<Event*> get_soonest_events();
-	bool remove(Event*);
-	Event* find(long dep_code) const;
+	virtual bool remove(Event*);
+	virtual Event* find(long dep_code) const;
 	inline bool empty() const { return events.empty(); }
 	double get_earliest_time() const { return floor((*events.begin()).first); };
 	int size() const { return num_events; }
@@ -61,10 +61,13 @@ public:
 	void schedule(int priorities_scheme = UNDEFINED);
 	void push(Event*);
 	void register_event_completion(Event*);
+	bool remove(Event*);
+	Event* find(long dep_code) const;
 private:
-	queue<Event*> internal_events;
+	deque<Event*> internal_events;
 	Block_manager_parent const*const bm;
 	int num_writes_finished_since_last_internal_event;
+	set<long> num_pending_application_writes;
 };
 
 class IOScheduler {

@@ -17,8 +17,8 @@ void Garbage_Collector::remove_as_gc_candidate(Address const& phys_address) {
 	pair<Address, int>& map = blocks_per_lun_with_min_live_pages[phys_address.package][phys_address.die];
 	if (map.first.valid == BLOCK && map.first.compare(phys_address) == BLOCK) {
 		Block* b = choose_gc_victim(phys_address.package, phys_address.die, -1);
-		map.first = Address(b->get_physical_address(), BLOCK);
-		map.second = b->get_pages_valid();
+		map.first = b != NULL ? Address(b->get_physical_address(), BLOCK) : Address();
+		map.second = b != NULL ? b->get_pages_valid() : 0;
 	}
 }
 
@@ -86,8 +86,8 @@ void Garbage_Collector::register_trim(Event const& event, uint age_class, int nu
 double Garbage_Collector::get_average_live_pages_per_best_candidate() const {
 	int total_live_pages = 0;
 	int num_blocks_considered = 0;
-	for (uint i = 0; i < BLOCK_SIZE; i++) {
-		for (uint j = 0; j < DIE_SIZE; j++) {
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			pair<Address, int> const& map = blocks_per_lun_with_min_live_pages[i][j];
 			if (map.first.valid == BLOCK) {
 				total_live_pages += map.second;
@@ -95,5 +95,8 @@ double Garbage_Collector::get_average_live_pages_per_best_candidate() const {
 			}
 		}
 	}
-	return (double)total_live_pages / num_blocks_considered;
+	if (num_blocks_considered == 0)
+		return PAGE_SIZE;
+	double avg = (double)total_live_pages / num_blocks_considered;
+	return avg;
 }

@@ -13,6 +13,7 @@
 
 namespace ssd {
 
+
 class Block_manager_parent {
 public:
 	Block_manager_parent(int classes = 1);
@@ -95,6 +96,17 @@ private:
 	vector<int> num_erases_scheduled_per_package;
 	Wear_Leveling_Strategy* wl;
 	Garbage_Collector* gc;
+
+	// responsible for keeping track of the average number of migrations per GC
+	struct migrations_num_tracker {
+		migrations_num_tracker() : moving_avg(BLOCK_SIZE / 6) {}
+		double moving_avg;
+		void register_num_live_pages(double num_live_pages) {
+			moving_avg = moving_avg * 0.8 + num_live_pages * 0.2;
+		}
+		int get_avg() const { return moving_avg; }
+	};
+	migrations_num_tracker migrations_num_tracker;
 };
 
 class Wear_Leveling_Strategy {
@@ -290,6 +302,8 @@ private:
 	Block_manager_parent* bm;
 	const int num_age_classes;
 };
+
+
 
 }
 #endif /* BLOCK_MANAGEMENT_H_ */

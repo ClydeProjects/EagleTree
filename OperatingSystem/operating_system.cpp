@@ -25,6 +25,7 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	assert(threads.size() > 0);
 	for (uint i = 0; i < threads.size(); i++) {
 		threads[i]->set_os(this);
+		threads[i]->init();
 		deque<Event*> incoming = threads[i]->run();
 		events.append(i, incoming);
 	}
@@ -194,10 +195,12 @@ void OperatingSystem::register_event_completion(Event* event) {
 			threads[thread_id] = follow_up_threads[0];
 			threads[thread_id]->set_os(this);
 			threads[thread_id]->set_time(event->get_current_time());
+			threads[thread_id]->init();
 		}
 		for (uint i = 1; i < follow_up_threads.size(); i++) {
 			follow_up_threads[i]->set_time(event->get_current_time());
 			follow_up_threads[i]->set_os(this);
+			threads[thread_id]->init();
 			threads.push_back(follow_up_threads[i]);
 			deque<Event*> incoming = follow_up_threads[i]->run();
 			events.push_back();
