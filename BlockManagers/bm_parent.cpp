@@ -321,7 +321,7 @@ void Block_manager_parent::issue_erase(Address ra, double time) {
 
 int Block_manager_parent::get_num_free_blocks(int package, int die) {
 	int num_free_blocks = 0;
-	for (uint i = 0; i < num_age_classes; i++) {
+	for (int i = 0; i < num_age_classes; i++) {
 		num_free_blocks += free_blocks[package][die][i].size();
 	}
 	return num_free_blocks;
@@ -347,13 +347,16 @@ void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
 		schedule_gc(start_time, -1, -1, -1, -1);
 	}
 
+	int num_luns_with_space = SSD_SIZE * PACKAGE_SIZE;
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			if (!has_free_pages(free_block_pointers[i][j]) || get_num_free_blocks(i, j) < 1) {
+			if (!has_free_pages(free_block_pointers[i][j]) || get_num_free_blocks(i, j) < GREED_SCALE) {
 				schedule_gc(start_time, i, j, -1, -1);
+				num_luns_with_space--;
 			}
 		}
 	}
+	//printf("num_luns_with_space:  %d\n", num_luns_with_space);
 }
 
 double Block_manager_parent::get_average_migrations_per_gc() const {
@@ -683,6 +686,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 	assert(victim->get_state() != PARTIALLY_FREE);
 
 	num_available_pages_for_new_writes -= victim->get_pages_valid();
+	//printf("num_available_pages_for_new_writes:  %d\n", num_available_pages_for_new_writes);
 
 	//deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
 	StatisticsGatherer::get_global_instance()->register_executed_gc(*gc_event, *victim);
@@ -691,7 +695,7 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
 		if (victim->getPages()[i].get_state() == VALID) {
 
-			Address addr = Address(victim->physical_address, PAGE);
+			Address addr = Address(victim->get_physical_address(), PAGE);
 			addr.page = i;
 			long logical_address = ftl->get_logical_address(addr.get_linear_address());
 

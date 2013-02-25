@@ -437,7 +437,7 @@ public:
 	inline bool is_mapping_op() const 						{ return mapping_op; }
 	inline void *get_payload() const 						{ return payload; }
 	inline bool is_copyback() const 						{ return copyback; }
-	inline void incr_bus_wait_time(double time_incr) 		{ bus_wait_time += time_incr; incr_pure_ssd_wait_time(time_incr); }
+	inline void incr_bus_wait_time(double time_incr) 		{ assert(time_incr >= 0); bus_wait_time += time_incr; incr_pure_ssd_wait_time(time_incr); }
 	inline void incr_pure_ssd_wait_time(double time_incr) 	{ pure_ssd_wait_time += time_incr;}
 	inline void incr_os_wait_time(double time_incr) 		{ os_wait_time += time_incr; }
 	inline void incr_execution_time(double time_incr) 		{ execution_time += time_incr; incr_pure_ssd_wait_time(time_incr);  }
@@ -545,16 +545,14 @@ private:
 class Page 
 {
 public:
-	Page(const Block &parent, double read_delay = PAGE_READ_DELAY, double write_delay = PAGE_WRITE_DELAY);
-	~Page(void);
+	inline Page() : state(EMPTY) {}
+	inline ~Page(void) {}
 	enum status _read(Event &event);
 	enum status _write(Event &event);
-	const Block &get_parent(void) const;
 	enum page_state get_state(void) const;
 	void set_state(enum page_state state);
 private:
 	enum page_state state;
-	const Block &parent;
 };
 
 /* The block is the data storage hardware unit where erases are implemented.
@@ -562,14 +560,11 @@ private:
 class Block 
 {
 public:
-	long physical_address;
-	uint pages_invalid;
-	Block(const Plane &parent, uint size = BLOCK_SIZE, ulong erases_remaining = BLOCK_ERASES, double erase_delay = BLOCK_ERASE_DELAY, long physical_address = 0);
+	Block(long physical_address = 0);
 	~Block(void);
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status _erase(Event &event);
-	const Plane &get_parent(void) const;
 	uint get_pages_valid(void) const;
 	uint get_pages_invalid(void) const;
 	enum block_state get_state(void) const;
@@ -580,64 +575,48 @@ public:
 	double get_second_last_erase_time(void) const;
 	double get_modification_time(void) const;
 	ulong get_erases_remaining(void) const;
-	uint get_size(void) const;
 	enum status get_next_page(Address &address) const;
 	void invalidate_page(uint page);
 	long get_physical_address(void) const;
 	Block *get_pointer(void);
-	block_type get_block_type(void) const;
-	void set_block_type(block_type value);
 	const Page *getPages() const { return data; }
 	ulong get_age() const;
 private:
-	uint size;
+	long physical_address;
+	uint pages_invalid;
 	Page * const data;
-	const Plane &parent;
 	uint pages_valid;
 	enum block_state state;
 	ulong erases_remaining;
 	double last_erase_time;
 	double erase_before_last_erase_time;
 	double modification_time;
-
-	block_type btype;
 };
 
-/* The plane is the data storage hardware unit that contains blocks.
- * Plane-level merges are implemented in the plane.  Planes maintain wear
- * statistics for the FTL. */
+/* The plane is the data storage hardware unit that contains blocks.*/
 class Plane 
 {
 public:
-	Plane(const Die &parent, uint plane_size = PLANE_SIZE, double reg_read_delay = PLANE_REG_READ_DELAY, double reg_write_delay = PLANE_REG_WRITE_DELAY, long physical_address = 0);
+	Plane(double reg_read_delay = PLANE_REG_READ_DELAY, double reg_write_delay = PLANE_REG_WRITE_DELAY, long physical_address = 0);
 	~Plane(void);
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	const Die &get_parent(void) const;
 	double get_last_erase_time(const Address &address) const;
 	ulong get_erases_remaining(const Address &address) const;
-	uint get_size(void) const;
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
 	void get_free_page(Address &address) const;
-	uint get_num_free(const Address &address) const;
-	uint get_num_valid(const Address &address) const;
-	uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
 	inline Block *getBlocks() { return data; }
 private:
-	void update_wear_stats(void);
 	enum status get_next_page(void);
-	uint size;
 	Block * const data;
-	const Die &parent;
 	ulong erases_remaining;
 	double last_erase_time;
 	double reg_read_delay;
 	double reg_write_delay;
 	Address next_page;
-	uint free_blocks;
 };
 
 /* The die is the data storage hardware unit that contains planes and is a flash
@@ -645,7 +624,7 @@ private:
 class Die 
 {
 public:
-	Die(const Package &parent, Channel &channel, uint die_size = DIE_SIZE, long physical_address = 0);
+	Die(const Package &parent, Channel &channel, long physical_address = 0);
 	~Die(void);
 	enum status read(Event &event);
 	enum status write(Event &event);
@@ -657,9 +636,6 @@ public:
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
 	void get_free_page(Address &address) const;
-	uint get_num_free(const Address &address) const;
-	uint get_num_valid(const Address &address) const;
-	uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
 	inline Plane *getPlanes() { return data; }
 	void clear_register();
@@ -667,7 +643,6 @@ public:
 	bool register_is_busy();
 private:
 	void update_wear_stats(const Address &address);
-	uint size;
 	Plane * const data;
 	const Package &parent;
 	Channel &channel;
@@ -685,29 +660,21 @@ private:
 class Package 
 {
 public:
-	Package (const Ssd &parent, Channel &channel, uint package_size = PACKAGE_SIZE, long physical_address = 0);
+	Package (Channel &channel, uint package_size = PACKAGE_SIZE, long physical_address = 0);
 	~Package ();
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	const Ssd &get_parent(void) const;
 	double get_last_erase_time (const Address &address) const;
-	ulong get_erases_remaining (const Address &address) const;
 	enum page_state get_state(const Address &address) const;
 	enum block_state get_block_state(const Address &address) const;
-	void get_free_page(Address &address) const;
-	uint get_num_free(const Address &address) const;
-	uint get_num_valid(const Address &address) const;
-	uint get_num_invalid(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
 	inline Die *getDies() { return data; }
 private:
-	void update_wear_stats (const Address &address);
 	uint size;
 	Die * const data;
-	const Ssd &parent;
 	uint least_worn;
-	ulong erases_remaining;
 	double last_erase_time;
 };
 
@@ -1311,17 +1278,23 @@ public:
 
 class Grace_Hash_Join_Workload : public Workload_Definition {
 public:
-	Grace_Hash_Join_Workload(long highest_lba);
+	Grace_Hash_Join_Workload(long min_lba, long highest_lba);
 	vector<Thread*> generate_instance();
 	inline void set_use_flexible_Reads(bool val) { use_flexible_reads = val; }
 private:
-	long highest_lba;
+	long min_lba, max_lba;
 	double r1; // Relation 1 percentage use of addresses
 	double r2; // Relation 2 percentage use of addresses
 	double fs; // Free space percentage use of addresses
-	double gh; // Grace hash join(s) percentage use of addresses
-	double ns; // "Noise space" percentage use of addresses
 	bool use_flexible_reads;
+};
+
+class Random_Workload : public Workload_Definition {
+public:
+	Random_Workload(long min_lba, long highest_lba, long num_threads);
+	vector<Thread*> generate_instance();
+private:
+	long min_lba, max_lba, num_threads;
 };
 
 class Experiment_Runner {
@@ -1345,6 +1318,7 @@ public:
 	static void unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer);
 
 	static ExperimentResult overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
+	static vector<ExperimentResult> simple_experiment(Workload_Definition* workload, string data_folder, string name, int IO_limit, int& variable, int min_val, int max_val, int incr);
 	static vector<ExperimentResult> random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba);
 	static ExperimentResult copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
 	static ExperimentResult copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);

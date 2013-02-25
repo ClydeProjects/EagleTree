@@ -56,7 +56,7 @@ Ssd::Ssd(uint ssd_size):
 	}
 	for (uint i = 0; i < ssd_size; i++)
 	{
-		(void) new (&data[i]) Package(*this, bus.get_channel(i), PACKAGE_SIZE, PACKAGE_SIZE*DIE_SIZE*PLANE_SIZE*BLOCK_SIZE*i);
+		(void) new (&data[i]) Package(bus.get_channel(i), PACKAGE_SIZE, PACKAGE_SIZE*DIE_SIZE*PLANE_SIZE*BLOCK_SIZE*i);
 	}
 	this->getPackages();
 	

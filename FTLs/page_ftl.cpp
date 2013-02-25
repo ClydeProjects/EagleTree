@@ -84,6 +84,7 @@ long FtlImpl_Page::get_logical_address(uint physical_address) const {
 }
 
 Address FtlImpl_Page::get_physical_address(uint logical_address) const {
+	assert(logical_address < logical_to_physical_map.size());
 	long phys_addr = logical_to_physical_map[logical_address];
 	return phys_addr == UNDEFINED ? Address() : Address(phys_addr, PAGE);
 }

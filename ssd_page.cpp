@@ -40,13 +40,6 @@ namespace ssd {
 
 using namespace ssd;
 
-Page::Page(const Block &parent, double read_delay, double write_delay):
-	state(EMPTY),
-	parent(parent)
-{}
-
-Page::~Page() {}
-
 enum status Page::_read(Event &event)
 {
 	event.incr_execution_time(PAGE_READ_DELAY);
@@ -80,11 +73,6 @@ enum status Page::_write(Event &event)
 	}
 
 	return SUCCESS;
-}
-
-const Block &Page::get_parent(void) const
-{
-	return parent;
 }
 
 enum page_state Page::get_state(void) const
