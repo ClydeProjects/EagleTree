@@ -6,21 +6,19 @@
 using namespace ssd;
 
 
-Bus::Bus(Ssd* ssd, uint num_channels, double ctrl_delay, double data_delay, uint table_size, uint max_connections):
-	num_channels(num_channels),
-	channels((Channel *) malloc(num_channels * sizeof(Channel)))
+Bus::Bus(Ssd* ssd):
+	channels((Channel *) malloc(SSD_SIZE * sizeof(Channel)))
 {
-	for(uint i = 0; i < num_channels; i++)
-		(void) new (&channels[i]) Channel(ssd, ctrl_delay, data_delay, table_size, max_connections);
+	for(uint i = 0; i < SSD_SIZE; i++)
+		(void) new (&channels[i]) Channel(ssd);
 }
 
 /* deallocate channels */
 Bus::~Bus(void)
 {
-	for(uint i = 0; i < num_channels; i++)
+	for(uint i = 0; i < SSD_SIZE; i++)
 		channels[i].~Channel();
 	free(channels);
-	return;
 }
 
 enum status Bus::lock(uint channel, double start_time, double duration, Event &event)

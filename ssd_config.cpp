@@ -73,9 +73,6 @@ double RAM_WRITE_DELAY = 0.00000001;
  * 	number of simultaneous communication channels - defined by SSD_SIZE */
 double BUS_CTRL_DELAY = 0.000000005;
 double BUS_DATA_DELAY = 0.00000001;
-uint BUS_MAX_CONNECT = 8;
-uint BUS_TABLE_SIZE = 64;
-double BUS_CHANNEL_FREE_FLAG = -1.0;
 /* uint BUS_CHANNELS = 4; same as # of Packages, defined by SSD_SIZE */
 
 /* Ssd class:
@@ -242,10 +239,6 @@ void load_entry(char *name, double value, uint line_number) {
 		BUS_CTRL_DELAY = value;
 	else if (!strcmp(name, "BUS_DATA_DELAY"))
 		BUS_DATA_DELAY = value;
-	else if (!strcmp(name, "BUS_MAX_CONNECT"))
-		BUS_MAX_CONNECT = (uint) value;
-	else if (!strcmp(name, "BUS_TABLE_SIZE"))
-		BUS_TABLE_SIZE = (uint) value;
 	else if (!strcmp(name, "SSD_SIZE"))
 		SSD_SIZE = (uint) value;
 	else if (!strcmp(name, "PACKAGE_SIZE"))
@@ -345,8 +338,6 @@ void print_config(FILE *stream) {
 	fprintf(stream, "RAM_WRITE_DELAY: %.16lf\n", RAM_WRITE_DELAY);
 	fprintf(stream, "BUS_CTRL_DELAY: %.16lf\n", BUS_CTRL_DELAY);
 	fprintf(stream, "BUS_DATA_DELAY: %.16lf\n", BUS_DATA_DELAY);
-	fprintf(stream, "BUS_MAX_CONNECT: %u\n", BUS_MAX_CONNECT);
-	fprintf(stream, "BUS_TABLE_SIZE: %u\n", BUS_TABLE_SIZE);
 	fprintf(stream, "SSD_SIZE: %u\n", SSD_SIZE);
 	fprintf(stream, "PACKAGE_SIZE: %u\n", PACKAGE_SIZE);
 	fprintf(stream, "DIE_SIZE: %u\n", DIE_SIZE);

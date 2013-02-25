@@ -8,12 +8,10 @@
 
 using namespace ssd;
 
-Channel::Channel(Ssd* ssd, double ctrl_delay, double data_delay, uint table_size, uint max_connections):
+Channel::Channel(Ssd* ssd):
 	currently_executing_operation_finish_time(0.0),
 	ssd(ssd)
 {}
-
-Channel::~Channel(void) {}
 
 enum status Channel::lock(double start_time, double duration, Event& event) {
 	assert(start_time >= 0.0);

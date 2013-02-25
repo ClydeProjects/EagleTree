@@ -1,28 +1,3 @@
-/* Copyright 2009, 2010 Brendan Tauras */
-
-/* ssd_ssd.cpp is part of FlashSim. */
-
-/* FlashSim is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * any later version. */
-
-/* FlashSim is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details. */
-
-/* You should have received a copy of the GNU General Public License
- * along with FlashSim.  If not, see <http://www.gnu.org/licenses/>. */
-
-/****************************************************************************/
-
-/* Ssd class
- *
- * The SSD is the single main object that will be created to simulate a real
- * SSD.  Creating a SSD causes all other objects in the SSD to be created.  The
- * event_arrive method is where events will arrive from DiskSim. */
-
 #include <cmath>
 #include <new>
 #include <assert.h>
@@ -40,13 +15,10 @@ using namespace ssd;
 /* use caution when editing the initialization list - initialization actually
  * occurs in the order of declaration in the class definition and not in the
  * order listed here */
-Ssd::Ssd(uint ssd_size):
-	size(ssd_size), 
+Ssd::Ssd():
 	ram(RAM_READ_DELAY, RAM_WRITE_DELAY), 
-	bus(this, size, BUS_CTRL_DELAY, BUS_DATA_DELAY, BUS_TABLE_SIZE, BUS_MAX_CONNECT),
-	/* use a const pointer (Package * const data) to use as an array
-	 * but like a reference, we cannot reseat the pointer */
-	data((Package *) malloc(ssd_size * sizeof(Package))), 
+	bus(this),
+	data((Package *) malloc(SSD_SIZE * sizeof(Package))),
 	last_io_submission_time(0.0),
 	os(NULL)
 {
@@ -54,7 +26,7 @@ Ssd::Ssd(uint ssd_size):
 		fprintf(stderr, "Ssd error: %s: constructor unable to allocate Package data\n", __func__);
 		exit(MEM_ERR);
 	}
-	for (uint i = 0; i < ssd_size; i++)
+	for (uint i = 0; i < SSD_SIZE; i++)
 	{
 		(void) new (&data[i]) Package(bus.get_channel(i), PACKAGE_SIZE, PACKAGE_SIZE*DIE_SIZE*PLANE_SIZE*BLOCK_SIZE*i);
 	}
@@ -119,11 +91,8 @@ Ssd::~Ssd(void)
 	if (!scheduler->is_empty()) {
 		scheduler->execute_soonest_events();
 	}
-	//StateTracer::print();
 	if (PRINT_LEVEL >= 1) StatisticsGatherer::get_global_instance()->print();
-	//StatisticsGatherer::get_instance()->print_gc_info();
-	//IOScheduler::instance()->print_stats();
-	for (uint i = 0; i < size; i++)	{
+	for (uint i = 0; i < SSD_SIZE; i++)	{
 		data[i].~Package();
 	}
 	free(data);
@@ -217,20 +186,20 @@ void *Ssd::get_result_buffer()
  * 	have Package do anything but update its statistics and pass on to Die */
 enum status Ssd::read(Event &event)
 {
-	assert(data != NULL && event.get_address().package < size && event.get_address().valid >= PACKAGE);
+	assert(data != NULL && event.get_address().package < SSD_SIZE && event.get_address().valid >= PACKAGE);
 	return data[event.get_address().package].read(event);
 }
 
 enum status Ssd::write(Event &event)
 {
-	assert(data != NULL && event.get_address().package < size && event.get_address().valid >= PACKAGE);
+	assert(data != NULL && event.get_address().package < SSD_SIZE && event.get_address().valid >= PACKAGE);
 	return data[event.get_address().package].write(event);
 }
 
 
 enum status Ssd::erase(Event &event)
 {
-	assert(data != NULL && event.get_address().package < size && event.get_address().valid >= PACKAGE);
+	assert(data != NULL && event.get_address().package < SSD_SIZE && event.get_address().valid >= PACKAGE);
 	return data[event.get_address().package].erase(event);
 }
 

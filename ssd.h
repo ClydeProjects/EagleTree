@@ -365,7 +365,7 @@ public:
 };
 
 /* Class to emulate a log block with page-level mapping. */
-class LogPageBlock
+/*class LogPageBlock
 {
 public:
 	LogPageBlock(void);
@@ -380,7 +380,7 @@ public:
 
 	bool operator() (const ssd::LogPageBlock& lhs, const ssd::LogPageBlock& rhs) const;
 	bool operator() (const ssd::LogPageBlock*& lhs, const ssd::LogPageBlock*& rhs) const;
-};
+};*/
 
 
 /* Class to manage I/O requests as events for the SSD.  It was designed to keep
@@ -392,7 +392,7 @@ public:
 	Event(enum event_type type, ulong logical_address, uint size, double start_time);
 	Event();
 	Event(Event& event);
-	virtual ~Event() {}
+	inline virtual ~Event() {}
 	inline ulong get_logical_address() const 			{ return logical_address; }
 	inline void set_logical_address(ulong addr) 		{ logical_address = addr; }
 	inline const Address &get_address() const 			{ return address; }
@@ -499,11 +499,11 @@ protected:
 class Channel
 {
 public:
-	Channel(Ssd* ssd, double ctrl_delay = BUS_CTRL_DELAY, double data_delay = BUS_DATA_DELAY, uint table_size = BUS_TABLE_SIZE, uint max_connections = BUS_MAX_CONNECT);
-	~Channel(void);
+	Channel(Ssd* ssd);
+	~Channel() {}
 	enum status lock(double start_time, double duration, Event &event);
 	double get_currently_executing_operation_finish_time();
-	double ready_time(void);
+	double ready_time();
 private:
 	//void unlock(double current_time);
 
@@ -528,13 +528,12 @@ private:
 class Bus
 {
 public:
-	Bus(Ssd* ssd, uint num_channels = SSD_SIZE, double ctrl_delay = BUS_CTRL_DELAY, double data_delay = BUS_DATA_DELAY, uint table_size = BUS_TABLE_SIZE, uint max_connections = BUS_MAX_CONNECT);
+	Bus(Ssd* ssd);
 	~Bus(void);
 	enum status lock(uint channel, double start_time, double duration, Event &event);
-	inline Channel &get_channel(uint channel) { assert(channels != NULL && channel < num_channels); return channels[channel]; }
+	inline Channel &get_channel(uint channel) { assert(channels != NULL && channel < SSD_SIZE); return channels[channel]; }
 	double ready_time(uint channel);
 private:
-	uint num_channels;
 	Channel * const channels;
 };
 
@@ -1017,7 +1016,7 @@ private:
 class Ssd
 {
 public:
-	Ssd (uint ssd_size = SSD_SIZE);
+	Ssd ();
 	~Ssd();
 	void event_arrive(Event* event);
 	void event_arrive(enum event_type type, ulong logical_address, uint size, double start_time);
@@ -1037,8 +1036,6 @@ private:
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	Package &get_data(void);
-
-	uint size;
 	Ram ram;
 	Bus bus;
 	Package * const data;
