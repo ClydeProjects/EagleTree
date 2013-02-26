@@ -196,17 +196,18 @@ void IOScheduler::handle_flexible_read(Event* event) {
 		return;
 	}
 
-	Address ftl_address = ftl->get_physical_address(logical_address);
-	if (addr.valid == PAGE && ftl_address.compare(addr) != PAGE) {
-		fr->set_noop(true);
-		fr->set_address(addr);
-		fr->set_logical_address(logical_address);
-		dependencies[fr->get_application_io_id()].front()->set_logical_address(fr->get_logical_address());
-		fr->register_read_commencement();
-		current_events->push(fr);
-		return;
+	if (addr.valid > NONE) {
+		Address ftl_address = ftl->get_physical_address(logical_address);
+		if (ftl_address.compare(addr) != PAGE) {
+			fr->set_noop(true);
+			fr->set_address(addr);
+			fr->set_logical_address(logical_address);
+			dependencies[fr->get_application_io_id()].front()->set_logical_address(fr->get_logical_address());
+			fr->register_read_commencement();
+			current_events->push(fr);
+			return;
+		}
 	}
-
 	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, fr->get_current_time());
 	if ( wait_time == 0 && !bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id())) {
 		wait_time = WAIT_TIME;
@@ -376,7 +377,9 @@ void IOScheduler::manage_operation_completion(Event* event) {
 		op_code_to_dependent_op_codes[dependency_code].pop();
 		Event* dependant_event = dependencies[dependent_code].front();
 		double diff = event->get_current_time() - dependant_event->get_current_time();
-		dependant_event->incr_bus_wait_time(diff);
+		if (diff > 0) {
+			dependant_event->incr_bus_wait_time(diff);
+		}
 		dependencies[dependent_code].pop_front();
 		init_event(dependant_event);
 	}
