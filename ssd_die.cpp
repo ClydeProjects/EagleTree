@@ -30,12 +30,10 @@
 
 using namespace ssd;
 
-Die::Die(const Package &parent, Channel &channel, long physical_address):
+Die::Die(Channel &channel, long physical_address):
 	data((Plane *) malloc(DIE_SIZE * sizeof(Plane))),
-	parent(parent),
 	channel(channel),
 	least_worn(0),
-	erases_remaining(BLOCK_ERASES),
 	last_erase_time(0.0),
 	currently_executing_io_finish_time(0.0),
 	last_read_io(-1)
@@ -95,19 +93,11 @@ enum status Die::erase(Event &event)
 	//last_read_io = event.get_application_io_id();
 	enum status status = data[event.get_address().plane].erase(event);
 	currently_executing_io_finish_time = event.get_current_time();
-	/* update values if no errors */
-	if(status == SUCCESS)
-		update_wear_stats(event.get_address());
 	return status;
 }
 
 double Die::get_currently_executing_io_finish_time() {
 	return currently_executing_io_finish_time;
-}
-
-const Package &Die::get_parent(void) const
-{
-	return parent;
 }
 
 /* if given a valid Block address, call the Block's method
@@ -121,64 +111,11 @@ double Die::get_last_erase_time(const Address &address) const
 		return last_erase_time;
 }
 
-/* if given a valid Plane address, call the Plane's method
- * else return local value */
-ulong Die::get_erases_remaining(const Address &address) const
-{
-	assert(data != NULL);
-	if(address.valid > DIE && address.plane < DIE_SIZE)
-		return data[address.plane].get_erases_remaining(address);
-	else
-		return erases_remaining;
-}
-
-
-
-/* Plane with the most erases remaining is the least worn */
-void Die::update_wear_stats(const Address &address)
-{
-	assert(data != NULL);
-	uint i;
-	uint max_index = 0;
-	ulong max = data[0].get_erases_remaining(address);
-	for(i = 1; i < DIE_SIZE; i++)
-		if(data[i].get_erases_remaining(address) > max)
-			max_index = i;
-	least_worn = max_index;
-	erases_remaining = max;
-	last_erase_time = data[max_index].get_last_erase_time(address);
-	return;
-}
-
-enum page_state Die::get_state(const Address &address) const
-{  
-	assert(data != NULL && address.plane < DIE_SIZE && address.valid >= DIE);
-	return data[address.plane].get_state(address);
-}
-
-enum block_state Die::get_block_state(const Address &address) const
-{
-	assert(data != NULL && address.plane < DIE_SIZE && address.valid >= DIE);
-	return data[address.plane].get_block_state(address);
-}
-
-void Die::get_free_page(Address &address) const
-{
-	assert(address.plane < DIE_SIZE && address.valid >= PLANE);
-	data[address.plane].get_free_page(address);
-	return;
-}
-
 Block *Die::get_block_pointer(const Address & address)
 {
 	assert(address.valid >= PLANE);
 	return data[address.plane].get_block_pointer(address);
 }
-
-// Inlined for speed
-/*Plane *Die::getPlanes() {
-	return data;
-}*/
 
 int Die::get_last_read_application_io() {
 	return last_read_io;

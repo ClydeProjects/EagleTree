@@ -47,7 +47,7 @@ namespace ssd {
 
 /* Configuration file parsing for extern config variables defined below */
 void load_entry(char *name, double value, uint line_number);
-void load_config(void);
+void load_config();
 void print_config(FILE *stream);
 
 /* Ram class:
@@ -333,7 +333,7 @@ public:
 	uint page;
 	ulong real_address;
 	enum address_valid valid;
-	Address(void);
+	Address();
 	inline Address(const Address &address) { *this = address; }
 	inline Address(const Address *address) { *this = *address; }
 	Address(uint package, uint die, uint plane, uint block, uint page, enum address_valid valid);
@@ -368,8 +368,8 @@ public:
 /*class LogPageBlock
 {
 public:
-	LogPageBlock(void);
-	~LogPageBlock(void);
+	LogPageBlock();
+	~LogPageBlock();
 
 	int *pages;
 	long *aPages;
@@ -503,16 +503,7 @@ public:
 	~Channel() {}
 	enum status lock(double start_time, double duration, Event &event);
 	double get_currently_executing_operation_finish_time();
-	double ready_time();
 private:
-	//void unlock(double current_time);
-
-	struct lock_times {
-		double lock_time;
-		double unlock_time;
-		int event_id;
-	};
-
 	double currently_executing_operation_finish_time;
 	Ssd* ssd;
 };
@@ -529,10 +520,9 @@ class Bus
 {
 public:
 	Bus(Ssd* ssd);
-	~Bus(void);
+	~Bus();
 	enum status lock(uint channel, double start_time, double duration, Event &event);
 	inline Channel &get_channel(uint channel) { assert(channels != NULL && channel < SSD_SIZE); return channels[channel]; }
-	double ready_time(uint channel);
 private:
 	Channel * const channels;
 };
@@ -545,10 +535,10 @@ class Page
 {
 public:
 	inline Page() : state(EMPTY) {}
-	inline ~Page(void) {}
+	inline ~Page() {}
 	enum status _read(Event &event);
 	enum status _write(Event &event);
-	enum page_state get_state(void) const;
+	enum page_state get_state() const;
 	void set_state(enum page_state state);
 private:
 	enum page_state state;
@@ -560,24 +550,24 @@ class Block
 {
 public:
 	Block(long physical_address = 0);
-	~Block(void);
+	~Block();
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status _erase(Event &event);
-	uint get_pages_valid(void) const;
-	uint get_pages_invalid(void) const;
-	enum block_state get_state(void) const;
-	void set_state(void) const;
+	uint get_pages_valid() const;
+	uint get_pages_invalid() const;
+	enum block_state get_state() const;
+	void set_state() const;
 	enum page_state get_state(uint page) const;
 	enum page_state get_state(const Address &address) const;
-	double get_last_erase_time(void) const;
-	double get_second_last_erase_time(void) const;
-	double get_modification_time(void) const;
-	ulong get_erases_remaining(void) const;
+	double get_last_erase_time() const;
+	double get_second_last_erase_time() const;
+	double get_modification_time() const;
+	ulong get_erases_remaining() const;
 	enum status get_next_page(Address &address) const;
 	void invalidate_page(uint page);
-	long get_physical_address(void) const;
-	Block *get_pointer(void);
+	long get_physical_address() const;
+	Block *get_pointer();
 	const Page *getPages() const { return data; }
 	ulong get_age() const;
 private:
@@ -597,25 +587,16 @@ class Plane
 {
 public:
 	Plane(double reg_read_delay = PLANE_REG_READ_DELAY, double reg_write_delay = PLANE_REG_WRITE_DELAY, long physical_address = 0);
-	~Plane(void);
+	~Plane();
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	double get_last_erase_time(const Address &address) const;
-	ulong get_erases_remaining(const Address &address) const;
-	enum page_state get_state(const Address &address) const;
-	enum block_state get_block_state(const Address &address) const;
-	void get_free_page(Address &address) const;
 	Block *get_block_pointer(const Address & address);
 	inline Block *getBlocks() { return data; }
 private:
-	enum status get_next_page(void);
 	Block * const data;
-	ulong erases_remaining;
 	double last_erase_time;
-	double reg_read_delay;
-	double reg_write_delay;
-	Address next_page;
 };
 
 /* The die is the data storage hardware unit that contains planes and is a flash
@@ -623,30 +604,22 @@ private:
 class Die 
 {
 public:
-	Die(const Package &parent, Channel &channel, long physical_address = 0);
-	~Die(void);
+	Die(Channel &channel, long physical_address = 0);
+	~Die();
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	const Package &get_parent(void) const;
 	double get_last_erase_time(const Address &address) const;
-	ulong get_erases_remaining(const Address &address) const;
 	double get_currently_executing_io_finish_time();
-	enum page_state get_state(const Address &address) const;
-	enum block_state get_block_state(const Address &address) const;
-	void get_free_page(Address &address) const;
 	Block *get_block_pointer(const Address & address);
 	inline Plane *getPlanes() { return data; }
 	void clear_register();
 	int get_last_read_application_io();
 	bool register_is_busy();
 private:
-	void update_wear_stats(const Address &address);
 	Plane * const data;
-	const Package &parent;
 	Channel &channel;
 	uint least_worn;
-	ulong erases_remaining;
 	double last_erase_time;
 	double currently_executing_io_finish_time;
 	int last_read_io;
@@ -664,10 +637,8 @@ public:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	const Ssd &get_parent(void) const;
+	const Ssd &get_parent() const;
 	double get_last_erase_time (const Address &address) const;
-	enum page_state get_state(const Address &address) const;
-	enum block_state get_block_state(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
 	inline Die *getDies() { return data; }
 private:
@@ -803,7 +774,7 @@ class BloomFilter_Page_Hotness_Measurer : public Page_Hotness_Measurer {
 friend class Die_Stats;
 public:
 	BloomFilter_Page_Hotness_Measurer(uint num_bloom_filters = 4, uint bloom_filter_size = 2048, uint IOs_before_decay = 512, bool preheat = true);
-	~BloomFilter_Page_Hotness_Measurer(void);
+	~BloomFilter_Page_Hotness_Measurer();
 	void register_event(Event const& event);
 	enum write_hotness get_write_hotness(unsigned long page_address) const;
 	enum read_hotness get_read_hotness(unsigned long page_address) const;
@@ -1002,7 +973,7 @@ class Ram
 {
 public:
 	Ram(double read_delay = RAM_READ_DELAY, double write_delay = RAM_WRITE_DELAY);
-	~Ram(void);
+	~Ram();
 	enum status read(Event &event);
 	enum status write(Event &event);
 private:
@@ -1035,7 +1006,7 @@ private:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	Package &get_data(void);
+	Package &get_data();
 	Ram ram;
 	Bus bus;
 	Package * const data;
@@ -1049,7 +1020,7 @@ class RaidSsd
 {
 public:
 	RaidSsd (uint ssd_size = SSD_SIZE);
-	~RaidSsd(void);
+	~RaidSsd();
 	double event_arrive(enum event_type type, ulong logical_address, uint size, double start_time);
 	double event_arrive(enum event_type type, ulong logical_address, uint size, double start_time, void *buffer);
 	void *get_result_buffer();
@@ -1058,7 +1029,7 @@ public:
 	void reset_statistics();
 	void write_statistics(FILE *stream);
 	void write_header(FILE *stream);
-	const Controller &get_controller(void) const;
+	const Controller &get_controller() const;
 
 	void print_ftl_statistics();
 private:
