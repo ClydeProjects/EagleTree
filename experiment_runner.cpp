@@ -249,6 +249,7 @@ string Experiment_Runner::pretty_time(double time) {
 	return time_text.str();
 }
 
+
 ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit) {
     ExperimentResult experiment_result(name, data_folder, "", "Used space (%)");
     experiment_result.start_experiment();
@@ -282,10 +283,33 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 }
 
 void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer) {
-	for (int i = 0; i < threads.size(); ++i) {
+	for (uint i = 0; i < threads.size(); ++i) {
 		threads[i]->set_statistics_gatherer(statistics_gatherer);
 		unify_under_one_statistics_gatherer(threads[i]->get_follow_up_threads(), statistics_gatherer); // Recurse
 	}
+}
+
+vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definition* workload, string data_folder, string name, int IO_limit, int& variable, int min_val, int max_val, int incr) {
+	assert(workload != NULL);
+	mkdir(data_folder.c_str(), 0755);
+	ExperimentResult global_result       (name, data_folder, "Global/",             "Changing a Var");
+	global_result.start_experiment();
+	for (variable = min_val; variable <= max_val; variable += incr) {
+		printf("----------------------------------------------------------------------------------------------------------\n");
+		printf("%s :  %d \n", name.c_str(), variable);
+		printf("----------------------------------------------------------------------------------------------------------\n");
+		vector<Thread*> experiment_threads = workload->generate_instance();
+		OperatingSystem* os = new OperatingSystem(experiment_threads);
+		os->set_num_writes_to_stop_after(IO_limit);
+		os->run();
+		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
+		StatisticsGatherer::get_global_instance()->print();
+		delete os;
+	}
+	global_result.end_experiment();
+	vector<ExperimentResult> results;
+	results.push_back(global_result);
+	return results;
 }
 
 vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
@@ -298,41 +322,37 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
     experiment_result.start_experiment();
     write_threads_result.start_experiment();
 
-    const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
-
     for (int random_write_threads = write_threads_min; random_write_threads <= write_threads_max; random_write_threads += write_threads_inc) {
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		printf("%s : Experiment with max %d concurrent random writes threads.\n", name.c_str(), random_write_threads);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
-		// Run experiment
-		vector<Thread*> experiment_threads = workload->generate_instance();
-
 		StatisticsGatherer* experiment_statistics_gatherer = new StatisticsGatherer();
 		StatisticsGatherer* random_writes_statics_gatherer = new StatisticsGatherer();
-		unify_under_one_statistics_gatherer(experiment_threads, experiment_statistics_gatherer);
-
-		Thread* initial_write    = new Asynchronous_Sequential_Writer(0, num_pages * used_space);
-		initial_write->add_follow_up_threads(experiment_threads);
-
+		Thread* initial_write    = new Asynchronous_Sequential_Writer(0, used_space);
+		if (workload != NULL) {
+			vector<Thread*> experiment_threads = workload->generate_instance();
+			unify_under_one_statistics_gatherer(experiment_threads, experiment_statistics_gatherer);
+			initial_write->add_follow_up_threads(experiment_threads);
+		}
 		for (int i = 0; i < random_write_threads; i++) {
 			ulong randseed = (i*3)+537;
 			Simple_Thread* random_writes = new Synchronous_Random_Writer(random_writes_min_lba, random_writes_max_lba, randseed);
 			Simple_Thread* random_reads = new Synchronous_Random_Reader(random_writes_min_lba, random_writes_max_lba, randseed+461);
+			if (workload == NULL) {
+				random_writes->set_experiment_thread(true);
+				random_reads->set_experiment_thread(true);
+			}
 			random_writes->set_num_ios(INFINITE);
 			random_reads->set_num_ios(INFINITE);
-			//random_writes->set_experiment_thread(true);
 			random_writes->set_statistics_gatherer(random_writes_statics_gatherer);
 			random_reads->set_statistics_gatherer(random_writes_statics_gatherer);
-			//threads[0]->add_follow_up_thread(random_writes);
-			//threads[0]->add_follow_up_thread(random_reads);
 			initial_write->add_follow_up_thread(random_writes);
 			initial_write->add_follow_up_thread(random_reads);
 		}
 
 		vector<Thread*> threads;
 		threads.push_back(initial_write);
-
 		OperatingSystem* os = new OperatingSystem(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
@@ -342,10 +362,14 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 		experiment_result.collect_stats   (random_write_threads, os->get_experiment_runtime(), experiment_statistics_gatherer);
 		write_threads_result.collect_stats(random_write_threads, os->get_experiment_runtime(), random_writes_statics_gatherer);
 
-		experiment_statistics_gatherer->print();
+		if (workload == NULL) {
+			StatisticsGatherer::get_global_instance()->print();
+		} else {
+			experiment_statistics_gatherer->print();
+		}
+
 		//StatisticsGatherer::get_global_instance()->print();
 		//random_writes_statics_gatherer->print();
-		//StatisticsGatherer::get_global_instance()->print_gc_info();
 		if (PRINT_LEVEL >= 1) {
 			StateVisualiser::print_page_status();
 			StateVisualiser::print_block_ages();
@@ -362,9 +386,9 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
     results.push_back(global_result);
     results.push_back(experiment_result);
     results.push_back(write_threads_result);
-
-
-	return results;
+    if (workload != NULL)
+    	delete workload;
+    return results;
 }
 
 ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit) {

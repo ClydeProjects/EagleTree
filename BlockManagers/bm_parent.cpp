@@ -58,7 +58,8 @@ void Block_manager_parent::set_all(Ssd* new_ssd, FtlParent* new_ftl, IOScheduler
 					all_blocks.push_back(&block);
 				}
 			}
-			free_block_pointers[i][j] = free_blocks[i][j][0].back();
+			Address pointer = free_blocks[i][j][0].back();
+			free_block_pointers[i][j] = pointer;
 			free_blocks[i][j][0].pop_back();
 		}
 	}
@@ -127,7 +128,7 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	a.page = 0;
 	Block* b = &ssd->getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 
-	wl->Wear_Level(event);
+	wl->register_erase_completion(event);
 
 	if (USE_ERASE_QUEUE) {
 		assert(num_erases_scheduled_per_package[a.package] == 1);
@@ -253,12 +254,9 @@ void Block_manager_parent::trim(Event const& event) {
 	uint age_class = sort_into_age_class(ra);
 	long const phys_addr = block.get_physical_address();
 
-	assert(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE);
-
 	assert(page.get_state() == VALID);
-	if (page.get_state() == VALID) {   // TODO: determine if I should remove the if statement
-		block.invalidate_page(ra.page);
-	}
+	block.invalidate_page(ra.page);
+	assert(block.get_state() != FREE);
 
 	ra.valid = BLOCK;
 	ra.page = 0;

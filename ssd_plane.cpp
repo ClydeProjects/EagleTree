@@ -6,8 +6,7 @@
 using namespace ssd;
 
 Plane::Plane(long physical_address):
-	data((Block *) malloc(PLANE_SIZE * sizeof(Block))),
-	last_erase_time(0.0)
+	data((Block *) malloc(PLANE_SIZE * sizeof(Block)))
 {
 	if(data == NULL){
 		fprintf(stderr, "Plane error: %s: constructor unable to allocate Block data\n", __func__);
@@ -51,17 +50,6 @@ enum status Plane::erase(Event &event)
 	assert(event.get_address().block < PLANE_SIZE && event.get_address().valid > PLANE);
 	enum status status = data[event.get_address().block]._erase(event);
 	return status;
-}
-
-/* if given a valid Block address, call the Block's method
- * else return local value */
-double Plane::get_last_erase_time(const Address &address) const
-{
-	assert(data != NULL);
-	if(address.valid > PLANE && address.block < PLANE_SIZE)
-		return data[address.block].get_last_erase_time();
-	else
-		return last_erase_time;
 }
 
 Block *Plane::get_block_pointer(const Address & address)

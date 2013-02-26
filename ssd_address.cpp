@@ -31,16 +31,14 @@
 
 using namespace ssd;
 
-Address::Address(void):
+Address::Address():
 	package(0),
 	die(0),
 	plane(0),
 	block(0),
 	page(0),
 	valid(NONE)
-{
-	return;
-}
+{}
 
 // Copy constructors inlined for speed
 /*
@@ -73,39 +71,6 @@ Address::Address(uint address, enum address_valid valid):
 	valid(valid)
 {
 	set_linear_address(address);
-}
-
-/* default values for parameters are the global settings
- * see "enum address_valid" in ssd.h for details on valid status
- * note that method only checks for out-of-bounds types of errors */
-enum address_valid Address::check_valid(uint ssd_size, uint package_size, uint die_size, uint plane_size, uint block_size)
-{
-	enum address_valid tmp = NONE;
-
-	/* must check current valid status first
-	 * so we cannot expand the valid status */
-	if(valid >= PACKAGE && package < ssd_size)
-	{
-		tmp = PACKAGE;
-		if(valid >= DIE && die < package_size)
-		{
-			tmp = DIE;
-			if(valid >= PLANE && plane < die_size)
-			{
-				tmp = PLANE;
-				if(valid >= BLOCK && block < plane_size)
-				{
-					tmp = BLOCK;
-					if(valid >= PAGE && page < block_size)
-						tmp = PAGE;
-				}
-			}
-		}
-	}
-	else
-		tmp = NONE;
-	valid = tmp;
-	return valid;
 }
 
 /* returns enum indicating to what level two addresses match
@@ -145,7 +110,6 @@ void Address::print(FILE *stream) const
 
 void Address::set_linear_address(ulong address)
 {
-	real_address = address;
 	page = address % BLOCK_SIZE;
 	address /= BLOCK_SIZE;
 	block = address % PLANE_SIZE;
@@ -174,35 +138,3 @@ unsigned long Address::get_linear_address() const
 	if (valid >= PACKAGE) 	address += BLOCK_SIZE * PLANE_SIZE * DIE_SIZE * PACKAGE_SIZE * package;
 	return address;
 }
-
-void Address::operator+(int i)
-{
-	set_linear_address(real_address + i);
-}
-
-void Address::operator+(uint i)
-{
-	set_linear_address(real_address + i);
-}
-
-Address &Address::operator+=(const uint i)
-{
-	set_linear_address(real_address + i);
-	return *this;
-}
-
-
-// Inlined for speed
-/*Address &Address::operator=(const Address &rhs)
-{
-	if(this == &rhs)
-		return *this;
-	package = rhs.package;
-	die = rhs.die;
-	plane = rhs.plane;
-	block = rhs.block;
-	page = rhs.page;
-	valid = rhs.valid;
-	real_address = rhs.real_address;
-	return *this;
-}*/

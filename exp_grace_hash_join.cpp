@@ -1,19 +1,3 @@
-/* FlashSim is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * any later version. */
-
-/* FlashSim is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details. */
-
-/* You should have received a copy of the GNU General Public License
- * along with FlashSim.  If not, see <http://www.gnu.org/licenses/>. */
-
-/****************************************************************************/
-
-
 #include "ssd.h"
 #include <unistd.h>   // chdir
 #include <sys/stat.h> // mkdir
@@ -22,7 +6,7 @@
 using namespace ssd;
 
 Workload_Definition* grace_hash_join(int highest_lba) {
-	Grace_Hash_Join_Workload* workload = new Grace_Hash_Join_Workload(highest_lba);
+	Grace_Hash_Join_Workload* workload = new Grace_Hash_Join_Workload(0, highest_lba);
 	workload->set_use_flexible_Reads(false);
 	BALANCEING_SCHEME = false;
 	MAX_CONCURRENT_GC_OPS = 6;
@@ -30,7 +14,7 @@ Workload_Definition* grace_hash_join(int highest_lba) {
 }
 
 Workload_Definition* grace_hash_join_flex(int highest_lba) {
-	Grace_Hash_Join_Workload* workload = new Grace_Hash_Join_Workload(highest_lba);
+	Grace_Hash_Join_Workload* workload = new Grace_Hash_Join_Workload(0, highest_lba);
 	workload->set_use_flexible_Reads(true);
 	BALANCEING_SCHEME = false;
 	MAX_CONCURRENT_GC_OPS = 6;
@@ -69,10 +53,9 @@ int main()
 	int IO_limit = 100000;
 
 	int write_threads_min = 0;
-	int write_threads_max = 2;
-	double used_space = .80; // overprovisioning level for variable random write threads experiment
+	int write_threads_max = 4;
 
-	PRINT_LEVEL = 0;
+	//PRINT_LEVEL = 1;
 	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 	SCHEDULING_SCHEME = 2;
@@ -82,14 +65,19 @@ int main()
 	ENABLE_WEAR_LEVELING = false;
 	BLOCK_MANAGER_ID = 0;
 
+	const double used_space = .80; // overprovisioning level for variable random write threads experiment
 	const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
-	const int avail_pages = num_pages * used_space;
+	const int logical_space = num_pages * used_space;
+	const long grace_space = logical_space * 0.5;
+	const long noise_space_min = grace_space + logical_space * 0.5;
+	const long noise_space_max = logical_space;
 
 	vector<vector<ExperimentResult> > exps;
 	string exp_folder  = "exp_grace_hash_join/";
  	mkdir(exp_folder.c_str(), 0755);
-	exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex(avail_pages * used_space),	  write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads/", "Flexible reads",        IO_limit, used_space, avail_pages*ns+2, avail_pages) );
-	exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join(avail_pages * used_space),		  write_threads_min, write_threads_max, 1, exp_folder + "None/", "None",                  			IO_limit, used_space, avail_pages*ns+2, avail_pages) );
+
+	exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex(grace_space),	  write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads/", "Flexible reads",        IO_limit, logical_space, noise_space_min, noise_space_max) );
+	exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join(grace_space),		  write_threads_min, write_threads_max, 1, exp_folder + "None/", "None",                  			IO_limit, logical_space, noise_space_min, noise_space_max) );
 	//exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_flex_balancing,	  write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads_bal/", "Flexible reads bal",        IO_limit, used_space, avail_pages*ns+2, avail_pages) );
 	//exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(grace_hash_join_balancing,		  write_threads_min, write_threads_max, 1, exp_folder + "None_bal/", "None bal",                  			IO_limit, used_space, avail_pages*ns+2, avail_pages) );
 

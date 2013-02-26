@@ -125,7 +125,11 @@ void Event::print(FILE *stream) const
 		fprintf(stream, "Unknown event type: ");
 
 	fprintf(stream, "%d\t", logical_address);
-	address.print(stream);
+	if (type != TRIM) {
+		address.print(stream);
+	} else {
+		replace_address.print(stream);
+	}
 	//if(type == MERGE)
 		//merge_address.print(stream);
 	//if(type == WRITE || type == TRIM || type == COPY_BACK)

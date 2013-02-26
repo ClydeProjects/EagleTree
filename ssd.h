@@ -331,7 +331,6 @@ public:
 	uint plane;
 	uint block;
 	uint page;
-	ulong real_address;
 	enum address_valid valid;
 	Address();
 	inline Address(const Address &address) { *this = address; }
@@ -339,14 +338,14 @@ public:
 	Address(uint package, uint die, uint plane, uint block, uint page, enum address_valid valid);
 	Address(uint address, enum address_valid valid);
 	~Address() {}
-	enum address_valid check_valid(uint ssd_size = SSD_SIZE, uint package_size = PACKAGE_SIZE, uint die_size = DIE_SIZE, uint plane_size = PLANE_SIZE, uint block_size = BLOCK_SIZE);
 	enum address_valid compare(const Address &address) const;
 	void print(FILE *stream = stdout) const;
-
-	void operator+(int);
-	void operator+(uint);
-	Address &operator+=(const uint rhs);
-	inline Address &operator=(const Address &rhs) {
+	void set_linear_address(ulong address, enum address_valid valid);
+	void set_linear_address(ulong address);
+	ulong get_linear_address() const;
+	long get_block_id() const { return (get_linear_address() - PAGE) / BLOCK_SIZE; }
+	inline Address& operator=(const Address &rhs)
+	{
 		if(this == &rhs)
 			return *this;
 		package = rhs.package;
@@ -355,13 +354,8 @@ public:
 		block = rhs.block;
 		page = rhs.page;
 		valid = rhs.valid;
-		real_address = rhs.real_address;
 		return *this;
 	}
-
-	void set_linear_address(ulong address, enum address_valid valid);
-	void set_linear_address(ulong address);
-	ulong get_linear_address() const;
 };
 
 /* Class to emulate a log block with page-level mapping. */
@@ -417,9 +411,8 @@ public:
 	inline void set_tag(int new_tag) 					{ tag = new_tag; }
 	inline void set_thread_id(int new_thread_id)		{ thread_id = new_thread_id; }
 	inline void set_address(const Address &address) {
-		if (type == WRITE || type == READ || type == READ_COMMAND || type == READ_TRANSFER) {
+		if (type == WRITE || type == READ || type == READ_COMMAND || type == READ_TRANSFER)
 			assert(address.valid == PAGE);
-		}
 		this -> address = address;
 	}
 	inline void set_start_time(double time) 				{ start_time = time; }
@@ -538,8 +531,8 @@ public:
 	inline ~Page() {}
 	enum status _read(Event &event);
 	enum status _write(Event &event);
-	enum page_state get_state() const;
-	void set_state(enum page_state state);
+	inline enum page_state get_state() const { return state; }
+	inline void set_state(page_state val) { state = val; }
 private:
 	enum page_state state;
 };
@@ -549,54 +542,45 @@ private:
 class Block 
 {
 public:
-	Block(long physical_address = 0);
+	Block(long physical_address);
 	~Block();
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status _erase(Event &event);
-	uint get_pages_valid() const;
-	uint get_pages_invalid() const;
-	enum block_state get_state() const;
-	void set_state() const;
-	enum page_state get_state(uint page) const;
-	enum page_state get_state(const Address &address) const;
-	double get_last_erase_time() const;
-	double get_second_last_erase_time() const;
-	double get_modification_time() const;
-	ulong get_erases_remaining() const;
-	enum status get_next_page(Address &address) const;
+	inline uint get_pages_valid() const { return pages_valid; }
+	inline uint get_pages_invalid() const { return pages_invalid; }
+	inline enum block_state get_state() const {
+		return 	pages_invalid == BLOCK_SIZE ? INACTIVE :
+				pages_valid == BLOCK_SIZE ? FREE :
+				pages_invalid + pages_valid == BLOCK_SIZE ? ACTIVE : PARTIALLY_FREE;
+	}
+	inline ulong get_erases_remaining() const { return erases_remaining; }
 	void invalidate_page(uint page);
-	long get_physical_address() const;
-	Block *get_pointer();
-	const Page *getPages() const { return data; }
-	ulong get_age() const;
+	inline long get_physical_address() const { return physical_address; }
+	inline Block *get_pointer() { return this; }
+	inline const Page *getPages() const { return data; }
+	inline ulong get_age() const { return BLOCK_ERASES - erases_remaining; }
 private:
-	long physical_address;
 	uint pages_invalid;
+	long physical_address;
 	Page * const data;
 	uint pages_valid;
-	enum block_state state;
 	ulong erases_remaining;
-	double last_erase_time;
-	double erase_before_last_erase_time;
-	double modification_time;
 };
 
 /* The plane is the data storage hardware unit that contains blocks.*/
 class Plane 
 {
 public:
-	Plane(long physical_address = 0);
+	Plane(long physical_address);
 	~Plane();
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	double get_last_erase_time(const Address &address) const;
 	Block *get_block_pointer(const Address & address);
 	inline Block *getBlocks() { return data; }
 private:
 	Block * const data;
-	double last_erase_time;
 };
 
 /* The die is the data storage hardware unit that contains planes and is a flash
@@ -604,7 +588,7 @@ private:
 class Die 
 {
 public:
-	Die(long physical_address = 0);
+	Die(long physical_address);
 	~Die();
 	enum status read(Event &event);
 	enum status write(Event &event);
@@ -628,7 +612,7 @@ private:
 class Package 
 {
 public:
-	Package (long physical_address = 0);
+	Package (long physical_address);
 	~Package ();
 	enum status read(Event &event);
 	enum status write(Event &event);

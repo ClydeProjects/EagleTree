@@ -113,7 +113,7 @@ class Wear_Leveling_Strategy {
 public:
 	Wear_Leveling_Strategy(Ssd* ssd, Block_manager_parent* bm, vector<Block*> all_blocks);
 	~Wear_Leveling_Strategy() {};
-	void Wear_Level(Event const& event);
+	void register_erase_completion(Event const& event);
 	bool schedule_wear_leveling_op(Block* block);
 	double get_normalised_age(uint age) const;
 private:
@@ -130,6 +130,12 @@ private:
 	Block_manager_parent* bm;
 	int max_age;
 	MTRand_int32 random_number_generator;
+	struct Block_data {
+		int age;
+		double last_erase_time;
+		Block_data() : age(0), last_erase_time(0) {}
+	};
+	vector<Block_data> block_data;
 };
 
 // A BM that assigns each write to the die with the shortest queue. No hot-cold seperation
