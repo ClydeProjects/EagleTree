@@ -75,11 +75,6 @@ Address::Address(uint address, enum address_valid valid):
 	set_linear_address(address);
 }
 
-Address::~Address()
-{
-	return;
-}
-
 /* default values for parameters are the global settings
  * see "enum address_valid" in ssd.h for details on valid status
  * note that method only checks for out-of-bounds types of errors */
@@ -171,11 +166,12 @@ void Address::set_linear_address(ulong address, enum address_valid valid)
 
 unsigned long Address::get_linear_address() const
 {
-	unsigned long address = page;
-	address += BLOCK_SIZE * block;
-	address += BLOCK_SIZE * PLANE_SIZE * plane;
-	address += BLOCK_SIZE * PLANE_SIZE * DIE_SIZE * die;
-	address += BLOCK_SIZE * PLANE_SIZE * DIE_SIZE * PACKAGE_SIZE * package;
+	unsigned long 			address = 0;
+	if (valid == PAGE) 		address += page;
+	if (valid >= BLOCK) 	address += BLOCK_SIZE * block;
+	if (valid >= PLANE) 	address += BLOCK_SIZE * PLANE_SIZE * plane;
+	if (valid >= DIE) 		address += BLOCK_SIZE * PLANE_SIZE * DIE_SIZE * die;
+	if (valid >= PACKAGE) 	address += BLOCK_SIZE * PLANE_SIZE * DIE_SIZE * PACKAGE_SIZE * package;
 	return address;
 }
 

@@ -5,7 +5,7 @@
 
 using namespace ssd;
 
-Plane::Plane(double reg_read_delay, double reg_write_delay, long physical_address):
+Plane::Plane(long physical_address):
 	data((Block *) malloc(PLANE_SIZE * sizeof(Block))),
 	last_erase_time(0.0)
 {
@@ -18,9 +18,6 @@ Plane::Plane(double reg_read_delay, double reg_write_delay, long physical_addres
 	{
 		(void) new (&data[i]) Block(physical_address+(i*BLOCK_SIZE));
 	}
-
-
-	return;
 }
 
 Plane::~Plane(void)

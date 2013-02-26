@@ -338,7 +338,7 @@ public:
 	inline Address(const Address *address) { *this = *address; }
 	Address(uint package, uint die, uint plane, uint block, uint page, enum address_valid valid);
 	Address(uint address, enum address_valid valid);
-	~Address();
+	~Address() {}
 	enum address_valid check_valid(uint ssd_size = SSD_SIZE, uint package_size = PACKAGE_SIZE, uint die_size = DIE_SIZE, uint plane_size = PLANE_SIZE, uint block_size = BLOCK_SIZE);
 	enum address_valid compare(const Address &address) const;
 	void print(FILE *stream = stdout) const;
@@ -586,7 +586,7 @@ private:
 class Plane 
 {
 public:
-	Plane(double reg_read_delay = PLANE_REG_READ_DELAY, double reg_write_delay = PLANE_REG_WRITE_DELAY, long physical_address = 0);
+	Plane(long physical_address = 0);
 	~Plane();
 	enum status read(Event &event);
 	enum status write(Event &event);
@@ -604,12 +604,11 @@ private:
 class Die 
 {
 public:
-	Die(Channel &channel, long physical_address = 0);
+	Die(long physical_address = 0);
 	~Die();
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	double get_last_erase_time(const Address &address) const;
 	double get_currently_executing_io_finish_time();
 	Block *get_block_pointer(const Address & address);
 	inline Plane *getPlanes() { return data; }
@@ -618,9 +617,6 @@ public:
 	bool register_is_busy();
 private:
 	Plane * const data;
-	Channel &channel;
-	uint least_worn;
-	double last_erase_time;
 	double currently_executing_io_finish_time;
 	int last_read_io;
 };
@@ -632,20 +628,15 @@ private:
 class Package 
 {
 public:
-	Package (Channel &channel, uint package_size = PACKAGE_SIZE, long physical_address = 0);
+	Package (long physical_address = 0);
 	~Package ();
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	const Ssd &get_parent() const;
-	double get_last_erase_time (const Address &address) const;
 	Block *get_block_pointer(const Address & address);
 	inline Die *getDies() { return data; }
 private:
-	uint size;
 	Die * const data;
-	uint least_worn;
-	double last_erase_time;
 };
 
 const int UNDEFINED = -1;

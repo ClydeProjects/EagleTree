@@ -327,8 +327,6 @@ void load_config(void) {
 					line_number);
 	}
 	fclose(config_file);
-
-	return;
 }
 
 void print_config(FILE *stream) {
@@ -357,8 +355,6 @@ void print_config(FILE *stream) {
 	fprintf(stream, "RAID_NUMBER_OF_PHYSICAL_SSDS: %i\n", RAID_NUMBER_OF_PHYSICAL_SSDS);
 	fprintf(stream, "MAX_REPEATED_COPY_BACKS_ALLOWED: %i\n", MAX_REPEATED_COPY_BACKS_ALLOWED);
 	fprintf(stream, "MAX_ITEMS_IN_COPY_BACK_MAP: %i\n", MAX_ITEMS_IN_COPY_BACK_MAP);
-
-	return;
 }
 
 }

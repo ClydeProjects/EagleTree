@@ -12,9 +12,6 @@
 
 using namespace ssd;
 
-/* use caution when editing the initialization list - initialization actually
- * occurs in the order of declaration in the class definition and not in the
- * order listed here */
 Ssd::Ssd():
 	ram(RAM_READ_DELAY, RAM_WRITE_DELAY), 
 	bus(this),
@@ -28,7 +25,7 @@ Ssd::Ssd():
 	}
 	for (uint i = 0; i < SSD_SIZE; i++)
 	{
-		(void) new (&data[i]) Package(bus.get_channel(i), PACKAGE_SIZE, PACKAGE_SIZE*DIE_SIZE*PLANE_SIZE*BLOCK_SIZE*i);
+		(void) new (&data[i]) Package(PACKAGE_SIZE*DIE_SIZE*PLANE_SIZE*BLOCK_SIZE*i);
 	}
 	this->getPackages();
 	
@@ -138,15 +135,7 @@ void Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, d
  * 	request.  Remember to use the same time units as in the config file. */
 void Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, double start_time, void *buffer)
 {
-	/* allocate the event and address dynamically so that the allocator can
-	 * handle efficiency issues for us */
-	Event *event = NULL;
-
-	if((event = new Event(type, logical_address , size, start_time)) == NULL)
-	{
-		fprintf(stderr, "Ssd error: %s: could not allocate Event\n", __func__);
-		exit(MEM_ERR);
-	}
+	Event *event = new Event(type, logical_address , size, start_time);
 	event->set_payload(buffer);
 	event_arrive(event);
 }
