@@ -111,8 +111,10 @@ void OperatingSystem::run() {
 
 		if ((double)num_writes_completed / NUM_WRITES_TO_STOP_AFTER > (double)counter_for_user / 10.0) {
 			printf("finished %d%%.\t\tNum writes completed:  %d \n", counter_for_user * 10, num_writes_completed);
-			if (counter_for_user == 3) {
+			if (counter_for_user == 4) {
 				//PRINT_LEVEL = 1;
+				//VisualTracer::get_instance()->print_horizontally(10000);
+				VisualTracer::get_instance()->print_horizontally_with_breaks_last(10000);
 			}
 			counter_for_user++;
 		}

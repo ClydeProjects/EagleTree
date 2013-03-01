@@ -22,11 +22,9 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 1000;
-	int concurrent_gc_min = 1;
-	int concurrent_gc_max = 1;
+	int IO_limit = 100000;
 
-	PRINT_LEVEL = 0;
+	//PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 	SCHEDULING_SCHEME = 2;
@@ -48,10 +46,13 @@ int main()
 	//(Workload_Definition* workload, string data_folder, string name, int IO_limit, int& variable, int min_val, int max_val, int incr) {
 	vector<vector<ExperimentResult> > exps;
 
+	int concurrent_gc_min = 5;
+	int concurrent_gc_max = 5;
+
 	/*GREED_SCALE = 0;
 	exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "Greed0/", "Greed0, Max GC 0 - 6", IO_limit, MAX_CONCURRENT_GC_OPS, 1, 6, 1) );
-	*/GREED_SCALE = 1;
-	exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "Greed1/", "Greed1, Max GC 0 - 6", IO_limit, MAX_CONCURRENT_GC_OPS, concurrent_gc_min, concurrent_gc_max, 1) );
+	*/GREED_SCALE = 2;
+	exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "Greed1/", "Greed1, Max GC 0 - 6", IO_limit, MAX_CONCURRENT_GC_OPS, concurrent_gc_min, concurrent_gc_max, 4) );
 	//GREED_SCALE = 2;
 	//exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "Greed2/", "Greed2, Max GC 0 - 6", IO_limit, MAX_CONCURRENT_GC_OPS, 3, 6, 1) );
 	delete workload;
