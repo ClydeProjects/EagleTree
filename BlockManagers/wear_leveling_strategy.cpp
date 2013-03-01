@@ -47,7 +47,8 @@ void Wear_Leveling_Strategy::register_erase_completion(Event const& event) {
 	Address pba = event.get_address();
 	Block* b = &ssd->getPackages()[pba.package].getDies()[pba.die].getPlanes()[pba.plane].getBlocks()[pba.block];
 
-	Block_data& data = block_data[pba.get_block_id()];
+	int id = pba.get_block_id();
+	Block_data& data = block_data[id];
 	data.age++;
 	assert(data.age == b->get_age());
 

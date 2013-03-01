@@ -385,7 +385,7 @@ pair<bool, pair<int, int> > Block_manager_parent::get_free_block_pointer_with_sh
 			bool die_register_is_busy = ssd->getPackages()[channel_id].getDies()[die_id].register_is_busy();
 			if (die_has_free_pages && !die_register_is_busy) {
 				can_write = true;
-				double channel_finish_time = ssd->bus.get_channel(channel_id).get_currently_executing_operation_finish_time();
+				double channel_finish_time = ssd->get_currently_executing_operation_finish_time(channel_id);
 				double die_finish_time = ssd->getPackages()[channel_id].getDies()[die_id].get_currently_executing_io_finish_time();
 				double max = std::max(channel_finish_time,die_finish_time);
 
@@ -443,7 +443,7 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 
 	uint package_id = address.package;
 	uint die_id = address.die;
-	double channel_finish_time = ssd->bus.get_channel(package_id).get_currently_executing_operation_finish_time();
+	double channel_finish_time = ssd->get_currently_executing_operation_finish_time(package_id);
 	double die_finish_time = ssd->getPackages()[package_id].getDies()[die_id].get_currently_executing_io_finish_time();
 	double max_time = max(channel_finish_time, die_finish_time);
 

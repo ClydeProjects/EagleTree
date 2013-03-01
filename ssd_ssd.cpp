@@ -13,8 +13,7 @@
 using namespace ssd;
 
 Ssd::Ssd():
-	ram(RAM_READ_DELAY, RAM_WRITE_DELAY), 
-	bus(this),
+	ram(),
 	data((Package *) malloc(SSD_SIZE * sizeof(Package))),
 	last_io_submission_time(0.0),
 	os(NULL)
@@ -196,38 +195,36 @@ void Ssd::set_operating_system(OperatingSystem* new_os) {
 	os = new_os;
 }
 
+double Ssd::get_currently_executing_operation_finish_time(int package) {
+	return data[package].get_currently_executing_operation_finish_time();
+}
 
 enum status Ssd::issue(Event *event) {
-	if (event->get_logical_address() == 0 && event->get_event_type() != ERASE && event->get_event_type() != READ_COMMAND && event->get_event_type() != READ_TRANSFER) {
+	int package = event->get_address().package;
+	//if (event->get_logical_address() == 0 && event->get_event_type() != ERASE && event->get_event_type() != READ_COMMAND && event->get_event_type() != READ_TRANSFER) {
 		//event->print();
-	}
+	//}
 	if(event -> get_event_type() == READ_COMMAND) {
-		assert(event -> get_address().valid > NONE);
-		bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY, *event);
+		data[package].lock(event->get_current_time(), BUS_CTRL_DELAY, *event);
 		read(*event);
 	}
 	else if(event -> get_event_type() == READ_TRANSFER) {
-		assert(event -> get_address().valid > NONE);
-		bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY + BUS_DATA_DELAY, *event);
+		data[package].lock(event->get_current_time(), BUS_CTRL_DELAY + BUS_DATA_DELAY, *event);
 		//ssd.ram.write(*event);2w
 	}
 	else if(event -> get_event_type() == WRITE) {
-		assert(event -> get_address().valid > NONE);
-		bus.lock(event -> get_address().package, event -> get_current_time(), 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY, *event);
+		data[package].lock(event->get_current_time(), 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY, *event);
 		//ssd.ram.write(*event);
 		//ssd.ram.read(*event);
 		write(*event);
 		return SUCCESS;
 	}
 	else if(event -> get_event_type() == COPY_BACK) {
-		assert(event -> get_address().valid > NONE);
-		assert(event -> get_replace_address().valid > NONE);
-		bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY, *event);
+		data[package].lock(event->get_current_time(), BUS_CTRL_DELAY, *event);
 		write(*event);
 	}
 	else if(event -> get_event_type() == ERASE) {
-		assert(event -> get_address().valid > NONE);
-		bus.lock(event -> get_address().package, event -> get_current_time(), BUS_CTRL_DELAY, *event);
+		data[package].lock(event -> get_current_time(), BUS_CTRL_DELAY, *event);
 		erase(*event);
 	}
 	return SUCCESS;

@@ -275,8 +275,6 @@ class Address;
 class Stats;
 class Event;
 class Flexible_Read_Event;
-class Channel;
-class Bus;
 class Page;
 class Block;
 class Plane;
@@ -343,7 +341,7 @@ public:
 	void set_linear_address(ulong address, enum address_valid valid);
 	void set_linear_address(ulong address);
 	ulong get_linear_address() const;
-	long get_block_id() const { return (get_linear_address() - PAGE) / BLOCK_SIZE; }
+	long get_block_id() const { return (get_linear_address() - page) / BLOCK_SIZE; }
 	inline Address& operator=(const Address &rhs)
 	{
 		if(this == &rhs)
@@ -480,48 +478,6 @@ protected:
 	double pure_ssd_wait_time;
 };
 
-/* Single bus channel
- * Simulate multiple devices on 1 bus channel with variable bus transmission
- * durations for data and control delays with the Channel class.  Provide the 
- * delay times to send a control signal or 1 page of data across the bus
- * channel, the bus table size for the maximum number channel transmissions that
- * can be queued, and the maximum number of devices that can connect to the bus.
- * To elaborate, the table size is the size of the channel scheduling table that
- * holds start and finish times of events that have not yet completed in order
- * to determine where the next event can be scheduled for bus utilization. */
-class Channel
-{
-public:
-	Channel(Ssd* ssd);
-	~Channel() {}
-	enum status lock(double start_time, double duration, Event &event);
-	double get_currently_executing_operation_finish_time();
-private:
-	double currently_executing_operation_finish_time;
-	Ssd* ssd;
-};
-
-/* Multi-channel bus comprised of Channel class objects
- * Simulates control and data delays by allowing variable channel lock
- * durations.  The sender (controller class) should specify the delay (control,
- * data, or both) for events (i.e. read = ctrl, ctrl+data; write = ctrl+data;
- * erase or merge = ctrl).  The hardware enable signals are implicitly
- * simulated by the sender locking the appropriate bus channel through the lock
- * method, then sending to multiple devices by calling the appropriate method
- * in the Package class. */
-class Bus
-{
-public:
-	Bus(Ssd* ssd);
-	~Bus();
-	enum status lock(uint channel, double start_time, double duration, Event &event);
-	inline Channel &get_channel(uint channel) { assert(channels != NULL && channel < SSD_SIZE); return channels[channel]; }
-private:
-	Channel * const channels;
-};
-
-
-
 /* The page is the lowest level data storage unit that is the size unit of
  * requests (events).  Pages maintain their state as events modify them. */
 class Page 
@@ -619,8 +575,11 @@ public:
 	enum status erase(Event &event);
 	Block *get_block_pointer(const Address & address);
 	inline Die *getDies() { return data; }
+	enum status lock(double start_time, double duration, Event &event);
+	inline double get_currently_executing_operation_finish_time() { return currently_executing_operation_finish_time; }
 private:
 	Die * const data;
+	double currently_executing_operation_finish_time;
 };
 
 const int UNDEFINED = -1;
@@ -947,13 +906,10 @@ private:
 class Ram 
 {
 public:
-	Ram(double read_delay = RAM_READ_DELAY, double write_delay = RAM_WRITE_DELAY);
+	Ram();
 	~Ram();
 	enum status read(Event &event);
 	enum status write(Event &event);
-private:
-	double read_delay;
-	double write_delay;
 };
 
 /* The SSD is the single main object that will be created to simulate a real
@@ -977,13 +933,13 @@ public:
 	void set_operating_system(OperatingSystem* os);
 	FtlParent& get_ftl() const;
 	enum status issue(Event *event);
+	double get_currently_executing_operation_finish_time(int package);
 private:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	Package &get_data();
 	Ram ram;
-	Bus bus;
 	Package * const data;
 	double last_io_submission_time;
 	OperatingSystem* os;
@@ -1020,7 +976,8 @@ public:
 	static void init();
 	void register_completed_event(Event& event);
 	void print_horizontally(int last_how_many_characters = UNDEFINED);
-	void print_horizontally_with_breaks();
+	void print_horizontally_with_breaks(long cursor = 0);
+	void print_horizontally_with_breaks_last(long how_many_chars);
 	void print_vertically();
 private:
 	static VisualTracer *inst;

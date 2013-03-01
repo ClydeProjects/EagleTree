@@ -37,6 +37,22 @@ vector<char> get_int_as_char_vector(int num) {
 	return vec;
 }
 
+void mark_as_gc_or_app(bool gc, bool app, vector<vector<char> >& symbols) {
+	if (app) {
+		vector<char> gc_symbol(3);
+		gc_symbol[0] = 'A';
+		gc_symbol[1] = 'P';
+		gc_symbol[2] = 'P';
+		symbols.push_back(gc_symbol);
+	}
+	if (gc) {
+		vector<char> gc_symbol(2);
+		gc_symbol[0] = 'G';
+		gc_symbol[1] = 'C';
+		symbols.push_back(gc_symbol);
+	}
+}
+
 void VisualTracer::register_completed_event(Event& event) {
 	if (event.get_event_type() == TRIM) {
 		return;
@@ -52,12 +68,9 @@ void VisualTracer::register_completed_event(Event& event) {
 		vector<vector<char> > symbols;
 		vector<char> logical_address = get_int_as_char_vector(event.get_logical_address());
 		symbols.push_back(logical_address);
-		if (event.is_garbage_collection_op()) {
-			vector<char> gc_symbol(2);
-			gc_symbol[0] = 'G';
-			gc_symbol[1] = 'C';
-			symbols.push_back(gc_symbol);
-		}
+		vector<char> wait_time = get_int_as_char_vector(floor(event.get_bus_wait_time()));
+		symbols.push_back(wait_time);
+		mark_as_gc_or_app(event.is_garbage_collection_op(), event.is_original_application_io(), symbols);
 		write_with_id(add.package, add.die, 'w', PAGE_WRITE_DELAY - 1, symbols);
 	} else if (type == READ_COMMAND) {
 		write(add.package, add.die, 't', BUS_CTRL_DELAY);
@@ -65,31 +78,31 @@ void VisualTracer::register_completed_event(Event& event) {
 		vector<vector<char> > symbols;
 		vector<char> logical_address = get_int_as_char_vector(event.get_logical_address());
 		symbols.push_back(logical_address);
+		vector<char> wait_time = get_int_as_char_vector(floor(event.get_bus_wait_time()));
+		symbols.push_back(wait_time);
 		if (event.is_flexible_read()) {
 			vector<char> gc_symbol(2);
 			gc_symbol[0] = 'F';
 			gc_symbol[1] = 'X';
 			symbols.push_back(gc_symbol);
 		}
+		mark_as_gc_or_app(event.is_garbage_collection_op(), event.is_original_application_io(), symbols);
 		write_with_id(add.package, add.die, 'r', PAGE_READ_DELAY - 1, symbols);
 	} else if (type == READ_TRANSFER) {
 		//write(add.package, add.die, 't', BUS_CTRL_DELAY + BUS_DATA_DELAY - 1);
-		vector<vector<char> > symbols;
+		/*vector<vector<char> > symbols;
 		vector<char> logical_address = get_int_as_char_vector(event.get_application_io_id());
 		symbols.push_back(logical_address);
-		if (event.is_garbage_collection_op()) {
-			vector<char> gc_symbol(2);
-			gc_symbol[0] = 'G';
-			gc_symbol[1] = 'C';
-			symbols.push_back(gc_symbol);
-		}
-		write_with_id(add.package, add.die, 't', BUS_CTRL_DELAY + BUS_DATA_DELAY - 1, symbols);
+		mark_as_gc_or_app(event.is_garbage_collection_op(), event.is_original_application_io(), symbols);
+		write_with_id(add.package, add.die, 't', BUS_CTRL_DELAY + BUS_DATA_DELAY - 1, symbols);*/
+		write(add.package, add.die, 't', BUS_CTRL_DELAY + BUS_DATA_DELAY - 1);
 	} else if (type == ERASE) {
 		write(add.package, add.die, 't', BUS_CTRL_DELAY);
-		vector<vector<char> > symbols;
+		/*vector<vector<char> > symbols;
 		vector<char> logical_address = get_int_as_char_vector(event.get_id());
 		symbols.push_back(logical_address);
-		write_with_id(add.package, add.die, 'e', BLOCK_ERASE_DELAY - 1, symbols);
+		write_with_id(add.package, add.die, 'e', BLOCK_ERASE_DELAY - 1, symbols);*/
+		write(add.package, add.die, 'e', BLOCK_ERASE_DELAY - 1);
 	} else if (type == COPY_BACK) {
 		vector<vector<char> > symbols;
 		vector<char> logical_address = get_int_as_char_vector(event.get_id());
@@ -157,10 +170,9 @@ void VisualTracer::print_horizontally(int last_how_many_characters) {
 }
 
 
-void VisualTracer::print_horizontally_with_breaks() {
+void VisualTracer::print_horizontally_with_breaks(long cursor) {
 	printf("\n");
-	int chars_to_write_each_time = 200;
-	int cursor = 0;
+	int chars_to_write_each_time = 150;
 	while (cursor < trace[0][0].size()) {
 		for (uint i = 0; i < SSD_SIZE; i++) {
 			for (uint j = 0; j < PACKAGE_SIZE; j++) {
@@ -176,6 +188,10 @@ void VisualTracer::print_horizontally_with_breaks() {
 		printf("\nLine %d\n", cursor / chars_to_write_each_time);
 		cursor += chars_to_write_each_time;
 	}
+}
+
+void VisualTracer::print_horizontally_with_breaks_last(long how_many_chars) {
+	print_horizontally_with_breaks(trace[0][0].size() - how_many_chars);
 }
 
 void VisualTracer::print_vertically() {
