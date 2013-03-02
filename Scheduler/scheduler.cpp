@@ -164,7 +164,7 @@ void IOScheduler::handle_event(Event* event) {
 		execute_next(event);
 	}
 	else {
-		double bus_wait_time = can_schedule ? time : WAIT_TIME;
+		double bus_wait_time = can_schedule ? time : BUS_DATA_DELAY + BUS_CTRL_DELAY;
 		event->incr_bus_wait_time(bus_wait_time);
 		current_events->push(event);
 	}
@@ -233,7 +233,8 @@ void IOScheduler::handle_write(Event* event) {
 	Address addr = bm->choose_write_address(*event);
 	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time());
 	if ( wait_time == 0 && !bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id()))  {
-		wait_time = WAIT_TIME;
+		wait_time = BUS_DATA_DELAY + BUS_CTRL_DELAY;
+		printf("warning from handle_write.");
 	}
 	if (wait_time == 0) {
 		event->set_address(addr);
