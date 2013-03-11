@@ -87,7 +87,7 @@ Ssd::~Ssd(void)
 	if (!scheduler->is_empty()) {
 		scheduler->execute_soonest_events();
 	}
-	if (PRINT_LEVEL >= 1) StatisticsGatherer::get_global_instance()->print();
+	//if (PRINT_LEVEL >= 1) StatisticsGatherer::get_global_instance()->print();
 	for (uint i = 0; i < SSD_SIZE; i++)	{
 		data[i].~Package();
 	}
@@ -144,10 +144,11 @@ void Ssd::progress_since_os_is_waiting() {
 }
 
 void Ssd::register_event_completion(Event * event) {
-	if (event->is_original_application_io() && !event->get_noop() && (event->get_event_type() == WRITE || event->get_event_type() == READ_TRANSFER)) {
+	if (event->is_original_application_io() && !event->get_noop() && !event->is_cached_write() && (event->get_event_type() == WRITE || event->get_event_type() == READ_TRANSFER)) {
 		last_io_submission_time = max(last_io_submission_time, event->get_ssd_submission_time());
 	}
 	if (event->get_event_type() == READ_COMMAND) {
+		delete event;
 		return;
 	}
 	if (os != NULL && event->is_original_application_io()) {

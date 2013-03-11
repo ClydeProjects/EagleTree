@@ -40,7 +40,7 @@ vector<Thread*> Grace_Hash_Join_Workload::generate_instance() {
 }
 
 //*****************************************************************************************
-//				RANDOM WORKLOAD
+//				Synch RANDOM WORKLOAD
 //*****************************************************************************************
 Random_Workload::Random_Workload(long min_lba, long max_lba, long num_threads)
  : min_lba(min_lba), max_lba(max_lba), num_threads(num_threads) {}
@@ -49,8 +49,8 @@ vector<Thread*> Random_Workload::generate_instance() {
 	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
 	for (int i = 0; i < num_threads; i++) {
 		int seed = 23621 * i + 62;
-		Simple_Thread* writer = new Synchronous_Random_Writer(min_lba, max_lba, seed);
-		Simple_Thread* reader = new Synchronous_Random_Reader(min_lba, max_lba, seed * 136);
+		Simple_Thread* writer = new Synchronous_Random_Writer(min_lba, max_lba / 2, seed);
+		Simple_Thread* reader = new Synchronous_Random_Reader(min_lba, max_lba / 2, seed * 136);
 		writer->set_experiment_thread(true);
 		reader->set_experiment_thread(true);
 		init_write->add_follow_up_thread(reader);
@@ -61,3 +61,49 @@ vector<Thread*> Random_Workload::generate_instance() {
 	vector<Thread*> threads(1, init_write);
 	return threads;
 }
+
+//*****************************************************************************************
+//				Asynch RANDOM WORKLOAD
+//*****************************************************************************************
+Asynch_Random_Workload::Asynch_Random_Workload(long min_lba, long max_lba)
+ : min_lba(min_lba), max_lba(max_lba), stats(new StatisticsGatherer()) {}
+
+Asynch_Random_Workload::~Asynch_Random_Workload() {
+	//stats->print();
+	VisualTracer::get_instance()->print_horizontally(10000);
+	delete stats;
+}
+
+vector<Thread*> Asynch_Random_Workload::generate_instance() {
+	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba / 2);
+	Asynchronous_Random_Thread_Reader_Writer* thread = new Asynchronous_Random_Thread_Reader_Writer(min_lba, max_lba / 2, INFINITE, 236);
+	thread->set_statistics_gatherer(stats);
+	thread->set_experiment_thread(true);
+	init_write->add_follow_up_thread(thread);
+	//init_write->set_statistics_gatherer(stats);
+	//init_write->set_experiment_thread(true);
+	vector<Thread*> threads(1, init_write);
+	return threads;
+}
+
+//*****************************************************************************************
+//				SYNCH SEQUENTIAL WRITE
+//*****************************************************************************************
+Synch_Write::Synch_Write(long min_lba, long max_lba)
+ : min_lba(min_lba), max_lba(max_lba), stats(new StatisticsGatherer()) {}
+
+Synch_Write::~Synch_Write() {
+	stats->print();
+	VisualTracer::get_instance()->print_horizontally(10000);
+	delete stats;
+}
+
+vector<Thread*> Synch_Write::generate_instance() {
+	Simple_Thread* init_write = new Synchronous_Sequential_Writer(min_lba, max_lba);
+	//init_write->add_follow_up_thread(thread);
+	init_write->set_statistics_gatherer(stats);
+	init_write->set_experiment_thread(true);
+	vector<Thread*> threads(1, init_write);
+	return threads;
+}
+

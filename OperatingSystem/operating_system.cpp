@@ -114,7 +114,7 @@ void OperatingSystem::run() {
 			if (counter_for_user == 4) {
 				//PRINT_LEVEL = 1;
 				//VisualTracer::get_instance()->print_horizontally(10000);
-				VisualTracer::get_instance()->print_horizontally_with_breaks_last(10000);
+				//VisualTracer::get_instance()->print_horizontally_with_breaks_last(10000);
 			}
 			counter_for_user++;
 		}
@@ -186,7 +186,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	deque<Event*> incoming = thread->register_event_completion(event);
 	events.append(thread_id, incoming);
 
-	if (!event->get_noop() && event->get_event_type() == WRITE && event->is_experiment_io()) {
+	if (!event->get_noop() /*&& event->get_event_type() == WRITE*/ && event->is_experiment_io()) {
 		num_writes_completed++;
 	}
 

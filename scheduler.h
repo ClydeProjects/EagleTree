@@ -31,12 +31,13 @@ private:
 
 class Scheduling_Strategy : public event_queue {
 public:
-	Scheduling_Strategy(IOScheduler* s) : event_queue(), scheduler(s) {}
+	Scheduling_Strategy(IOScheduler* s, Ssd* ssd) : event_queue(), scheduler(s), ssd(ssd) {}
 	virtual ~Scheduling_Strategy() {};
 	virtual void register_event_completion(Event* e) {}
 	virtual void schedule(int priorities_scheme = UNDEFINED) = 0;
 protected:
 	IOScheduler* scheduler;
+	Ssd* ssd;
 };
 
 inline bool overall_wait_time_comparator (const Event* i, const Event* j) {
@@ -49,14 +50,14 @@ inline bool current_wait_time_comparator (const Event* i, const Event* j) {
 
 class Simple_Scheduling_Strategy : public Scheduling_Strategy {
 public:
-	Simple_Scheduling_Strategy(IOScheduler* s) : Scheduling_Strategy(s) {}
+	Simple_Scheduling_Strategy(IOScheduler* s, Ssd* ssd) : Scheduling_Strategy(s, ssd) {}
 	~Simple_Scheduling_Strategy() {}
 	void schedule(int priorities_scheme = UNDEFINED);
 };
 
 class Balancing_Scheduling_Strategy : public Simple_Scheduling_Strategy {
 public:
-	Balancing_Scheduling_Strategy(IOScheduler* s, Block_manager_parent* bm);
+	Balancing_Scheduling_Strategy(IOScheduler* s, Block_manager_parent* bm, Ssd* ssd);
 	~Balancing_Scheduling_Strategy();
 	void schedule(int priorities_scheme = UNDEFINED);
 	void push(Event*);
@@ -112,11 +113,24 @@ private:
 
 	map<uint, queue<uint> > op_code_to_dependent_op_codes;
 
+	struct Safe_Cache {
+		const uint size;
+		set<long> logical_addresses;
+		inline Safe_Cache(int size) : size(size), logical_addresses() {}
+		inline bool has_space() { return logical_addresses.size() < size; }
+		inline void insert(long logical_address) { logical_addresses.insert(logical_address); }
+		inline void remove(long logical_address) { logical_addresses.erase(logical_address); }
+		inline bool exists(long logical_address) { return logical_addresses.count(logical_address) == 1; }
+	};
+
+	Safe_Cache safe_cache;
+
 	void update_current_events(double current_time);
 	void remove_current_operation(Event* event);
 	void promote_to_gc(Event* event_to_promote);
 	void make_dependent(Event* dependent_event, uint independent_code);
 	double get_current_time() const;
+	void try_to_put_in_safe_cache(Event* write);
 };
 
 }

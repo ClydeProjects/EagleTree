@@ -438,7 +438,8 @@ bool Block_manager_parent::Copy_backs_in_progress(Address const& addr) {
 // gives time until both the channel and die are clear
 double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& address, double event_time) const {
 	if (address.valid == NONE) {
-		return 5;
+		//printf("warning, heren\n");
+		return BUS_DATA_DELAY + BUS_CTRL_DELAY;
 	}
 
 	uint package_id = address.package;
@@ -448,9 +449,7 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 	double max_time = max(channel_finish_time, die_finish_time);
 
 	double time = max_time - event_time;
-
 	time = min(time, BUS_DATA_DELAY + BUS_CTRL_DELAY);
-
 	return time < 0 ? 0 : time;
 }
 

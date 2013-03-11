@@ -191,6 +191,20 @@ void StatisticsGatherer::register_events_queue_length(uint queue_size, double ti
 }
 
 template <class T>
+double get_max(vector<T> const& vector)
+{
+	double max = 0;
+	int index = UNDEFINED;
+	for (uint i = 0; i < vector.size(); i++) {
+		if (vector[i] > max) {
+			max = vector[i];
+			index = i;
+		}
+	}
+    return max;
+}
+
+template <class T>
 double get_sum(vector<T> const& vector)
 {
 	double sum = 0;
@@ -270,7 +284,6 @@ void flatten(vector<vector<vector<T> > > const& vec, vector<T>& outcome)
 }
 
 
-
 void StatisticsGatherer::print() {
 	printf("\n\t");
 	printf("num writes\t");
@@ -282,8 +295,6 @@ void StatisticsGatherer::print() {
 	printf("erases\t\t");
 	printf("avg write wait\t");
 	printf("avg read wait\t");
-
-
 	printf("\n");
 
 	double avg_overall_write_wait_time = 0;
@@ -293,11 +304,9 @@ void StatisticsGatherer::print() {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 
 			double avg_write_wait_time = get_average(bus_wait_time_for_writes_per_LUN[i][j]);
-
 			avg_overall_write_wait_time += avg_write_wait_time;
 
 			double average_read_wait_time = get_average(bus_wait_time_for_reads_per_LUN[i][j]);
-
 			avg_overall_read_wait_time += average_read_wait_time;
 
 			if (num_reads_per_LUN[i][j] == 0) {
@@ -326,6 +335,17 @@ void StatisticsGatherer::print() {
 	}
 	avg_overall_write_wait_time /= SSD_SIZE * PACKAGE_SIZE;
 	avg_overall_read_wait_time /= SSD_SIZE * PACKAGE_SIZE;
+
+	vector<double> all_write_latency;
+	flatten(bus_wait_time_for_writes_per_LUN, all_write_latency);
+	double write_std = get_std(all_write_latency);
+	double max_write = get_max(all_write_latency);
+
+	vector<double> all_read_latency;
+	flatten(bus_wait_time_for_reads_per_LUN, all_read_latency);
+	double read_std = get_std(all_read_latency);
+	double max_read = get_max(all_read_latency);
+
 	printf("\nTotals:\t");
 
 	printf("%d\t\t", (int) get_sum(num_writes_per_LUN));
@@ -335,9 +355,18 @@ void StatisticsGatherer::print() {
 	printf("%d\t\t", (int) get_sum(num_gc_reads_per_LUN));
 	printf("%d\t\t", (int) get_sum(num_copy_backs_per_LUN));
 	printf("%d\t\t", (int) get_sum(num_erases_per_LUN));
-	printf("%f\t", avg_overall_write_wait_time);
+	printf("%d\t\t", (int) avg_overall_write_wait_time);
 
-	printf("%f\t\t", avg_overall_read_wait_time);
+	printf("%d\t\t", (int)avg_overall_read_wait_time);
+	printf("\n");
+
+	printf("\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t%d", (int)write_std);
+	printf("\t\t%d\t\t", (int)read_std);
+	printf("\n");
+
+	printf("\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t%d", (int)max_write);
+	printf("\t\t%d\t\t", (int)max_read);
+
 	printf("\n\n");
 	//printf("Erase avg:\t%f \n", get_average(num_erases_per_LUN));
 	//printf("Erase std:\t%f \n", get_std(num_erases_per_LUN));

@@ -250,7 +250,7 @@ string Experiment_Runner::pretty_time(double time) {
 }
 
 
-ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit) {
+/*ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit) {
     ExperimentResult experiment_result(name, data_folder, "", "Used space (%)");
     experiment_result.start_experiment();
 
@@ -280,7 +280,7 @@ ExperimentResult Experiment_Runner::overprovisioning_experiment(vector<Thread*> 
 
 	experiment_result.end_experiment();
 	return experiment_result;
-}
+}*/
 
 void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer) {
 	for (uint i = 0; i < threads.size(); ++i) {

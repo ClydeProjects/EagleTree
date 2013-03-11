@@ -48,6 +48,7 @@ namespace ssd {
 /* Configuration file parsing for extern config variables defined below */
 void load_entry(char *name, double value, uint line_number);
 void load_config();
+void set_normal_config();
 void print_config(FILE *stream);
 
 /* Ram class:
@@ -163,6 +164,8 @@ extern int BLOCK_MANAGER_ID;
 extern int GREED_SCALE;
 extern int WEARWOLF_LOCALITY_THRESHOLD;
 extern bool ENABLE_TAGGING;
+extern int WRITE_DEADLINE;
+extern int READ_DEADLINE;
 
 /*
  * Controls the level of detail of output
@@ -423,6 +426,8 @@ public:
 	inline void set_mapping_op(bool value) 					{ mapping_op = value; }
 	inline void set_age_class(int value) 					{ age_class = value; }
 	inline void set_copyback(bool value)					{ copyback = value; }
+	inline void set_cached_write(bool value)				{ cached_write = value; }
+	inline bool is_cached_write()							{ return cached_write; }
 	inline int get_age_class() const 						{ return age_class; }
 	inline bool is_garbage_collection_op() const 			{ return garbage_collection_op; }
 	inline bool is_mapping_op() const 						{ return mapping_op; }
@@ -460,6 +465,7 @@ protected:
 	bool mapping_op;
 	bool original_application_io;
 	bool copyback;
+	bool cached_write;
 
 	bool experiment_io;
 
@@ -1173,6 +1179,7 @@ public:
 
 class Workload_Definition {
 public:
+	virtual ~Workload_Definition() {};
 	virtual vector<Thread*> generate_instance() = 0;
 };
 
@@ -1197,6 +1204,26 @@ private:
 	long min_lba, max_lba, num_threads;
 };
 
+class Asynch_Random_Workload : public Workload_Definition {
+public:
+	Asynch_Random_Workload(long min_lba, long highest_lba);
+	~Asynch_Random_Workload();
+	vector<Thread*> generate_instance();
+private:
+	long min_lba, max_lba;
+	StatisticsGatherer* stats;
+};
+
+class Synch_Write : public Workload_Definition {
+public:
+	Synch_Write(long min_lba, long highest_lba);
+	~Synch_Write();
+	vector<Thread*> generate_instance();
+private:
+	long min_lba, max_lba;
+	StatisticsGatherer* stats;
+};
+
 class Experiment_Runner {
 public:
 	static double CPU_time_user();
@@ -1217,8 +1244,9 @@ public:
 
 	static void unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer);
 
-	static ExperimentResult overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
+	//static void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
 	static vector<ExperimentResult> simple_experiment(Workload_Definition* workload, string data_folder, string name, int IO_limit, int& variable, int min_val, int max_val, int incr);
+	static void simple_experiment(Workload_Definition* workload, string name, int IO_limit);
 	static vector<ExperimentResult> random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba);
 	static ExperimentResult copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
 	static ExperimentResult copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);

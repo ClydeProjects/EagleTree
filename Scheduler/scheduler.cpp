@@ -21,7 +21,8 @@ IOScheduler::IOScheduler() :
 	ftl(NULL),
 	bm(NULL),
 	dependency_code_to_LBA(),
-	dependency_code_to_type()
+	dependency_code_to_type(),
+	safe_cache(0)
 {
 }
 
@@ -29,7 +30,7 @@ void IOScheduler::set_all(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent
 	ssd = new_ssd;
 	ftl = new_ftl;
 	bm = new_bm;
-	current_events = BALANCEING_SCHEME ? new Balancing_Scheduling_Strategy(this, bm) : new Simple_Scheduling_Strategy(this);
+	current_events = BALANCEING_SCHEME ? new Balancing_Scheduling_Strategy(this, bm, ssd) : new Simple_Scheduling_Strategy(this, ssd);
 }
 
 IOScheduler::~IOScheduler(){
@@ -230,7 +231,11 @@ void IOScheduler::handle_flexible_read(Event* event) {
 
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_write(Event* event) {
+	if (event->is_cached_write()) {
+
+	}
 	Address addr = bm->choose_write_address(*event);
+	try_to_put_in_safe_cache(event);
 	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time());
 	if ( wait_time == 0 && !bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id()))  {
 		wait_time = BUS_DATA_DELAY + BUS_CTRL_DELAY;
@@ -365,7 +370,14 @@ enum status IOScheduler::execute_next(Event* event) {
 		dependencies.erase(event->get_application_io_id()); // possible memory leak here, since events are not deleted
 	}
 
-	ssd->register_event_completion(event);
+	if (safe_cache.exists(event->get_logical_address())) {
+		safe_cache.remove(event->get_logical_address());
+		//printf("removing from cache:  %d\n", event->get_logical_address());
+		delete event;
+	} else {
+		ssd->register_event_completion(event);
+	}
+
 	return result;
 }
 
@@ -461,7 +473,9 @@ void IOScheduler::init_event(Event* event) {
 		ftl->set_read_address(*event);
 	}
 	else if (type == WRITE) {
+		//printf("new event  %d    %f\n", event->get_logical_address(), event->get_bus_wait_time());
 		bm->register_write_arrival(*event);
+		try_to_put_in_safe_cache(event);
 //		ftl->set_replace_address(*event);
 	}
 	else if (type == TRIM) {
@@ -489,6 +503,17 @@ void IOScheduler::init_event(Event* event) {
 	}
 }
 
+void IOScheduler::try_to_put_in_safe_cache(Event* write) {
+	if (safe_cache.has_space() && !safe_cache.exists(write->get_logical_address()) && !write->is_garbage_collection_op() && write->is_original_application_io()) {
+		safe_cache.insert(write->get_logical_address());
+		Event* immediate_response = new Event(*write);
+		//immediate_response->print();
+		immediate_response->set_cached_write(true);
+		current_events->push(immediate_response);
+		printf("putting into cache:  %d    %f\n", write->get_logical_address(), write->get_bus_wait_time());
+	}
+}
+
 
 void IOScheduler::remove_redundant_events(Event* new_event) {
 	uint la = new_event->get_logical_address();
@@ -499,6 +524,12 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	if (LBA_currently_executing.count(la) == 1 && LBA_currently_executing[la] == new_event->get_application_io_id()) {
 		return;
 	}
+
+	if (new_event->get_event_type() == READ_COMMAND) {
+		int i = 0;
+		i++;
+	}
+
 	uint dependency_code_of_new_event = new_event->get_application_io_id();
 	uint common_logical_address = new_event->get_logical_address();
 	uint dependency_code_of_other_event = LBA_currently_executing[common_logical_address];
@@ -510,14 +541,9 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	event_type new_op_code = dependency_code_to_type[dependency_code_of_new_event];
 	event_type scheduled_op_code = dependency_code_to_type[dependency_code_of_other_event];
 
-	if (new_event->get_application_io_id() == 79667) {
-		int i = 0;
-		i++;
-	}
-
-	if (existing_event == NULL) {
+	//if (existing_event == NULL) {
 		//new_event->print();
-	}
+	//}
 	//assert (existing_event != NULL || scheduled_op_code == COPY_BACK);
 
 	// if something is to be trimmed, and a copy back is sent, the copy back is unnecessary to perform;

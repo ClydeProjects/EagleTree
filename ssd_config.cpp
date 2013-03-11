@@ -115,7 +115,7 @@ double PAGE_WRITE_DELAY = 0.00001;
  *
  */
 uint PAGE_SIZE = 4096;
-bool PAGE_ENABLE_DATA = true;
+bool PAGE_ENABLE_DATA = false;
 
 /*
  * Memory area to support pages with data.
@@ -220,6 +220,8 @@ uint MAX_ITEMS_IN_COPY_BACK_MAP = 1024;
 /* Defines the maximal length of the SSD queue  */
 int MAX_SSD_QUEUE_SIZE = 15;
 
+int WRITE_DEADLINE = 1000000;
+int READ_DEADLINE =  1000000;
 
 /* Defines the maximal number of locks that can be held by the OS  */
 uint MAX_OS_NUM_LOCKS = 1000;
@@ -294,7 +296,31 @@ void load_entry(char *name, double value, uint line_number) {
 	return;
 }
 
-void load_config(void) {
+void set_normal_config() {
+	SSD_SIZE = 4;
+	PACKAGE_SIZE = 2;
+	DIE_SIZE = 1;
+	PLANE_SIZE = 32;
+	BLOCK_SIZE = 32;
+
+	PAGE_READ_DELAY = 50;
+	PAGE_WRITE_DELAY = 200;
+	BUS_CTRL_DELAY = 5;
+	BUS_DATA_DELAY = 100;
+	BLOCK_ERASE_DELAY = 1500;
+
+	MAX_SSD_QUEUE_SIZE = 32;
+	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
+	SCHEDULING_SCHEME = 2;
+
+	USE_ERASE_QUEUE = false;
+	ENABLE_WEAR_LEVELING = false;
+	BLOCK_MANAGER_ID = 0;
+	BALANCEING_SCHEME = false;
+	MAX_CONCURRENT_GC_OPS = PACKAGE_SIZE * SSD_SIZE;
+}
+
+void load_config() {
 	const char * const config_name = "ssd.conf";
 	FILE *config_file = NULL;
 
