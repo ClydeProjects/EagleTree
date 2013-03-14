@@ -426,6 +426,7 @@ private:
 	double get_event_minimal_completion_time(Event const*const event) const;
 	bool is_LBA_locked(ulong lba);
 	void update_thread_times(double time);
+	void setup_follow_up_threads(int thread_id, double time);
 	Ssd * ssd;
 	vector<Thread*> threads;
 

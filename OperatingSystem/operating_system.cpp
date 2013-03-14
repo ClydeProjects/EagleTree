@@ -30,7 +30,7 @@ OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 		events.append(i, incoming);
 	}
 	ssd->set_operating_system(this);
-	assert(MAX_SSD_QUEUE_SIZE >= SSD_SIZE * PACKAGE_SIZE);
+	//assert(MAX_SSD_QUEUE_SIZE >= SSD_SIZE * PACKAGE_SIZE);
 }
 
 OperatingSystem::~OperatingSystem() {
@@ -111,7 +111,7 @@ void OperatingSystem::run() {
 
 		if ((double)num_writes_completed / NUM_WRITES_TO_STOP_AFTER > (double)counter_for_user / 10.0) {
 			printf("finished %d%%.\t\tNum writes completed:  %d \n", counter_for_user * 10, num_writes_completed);
-			if (counter_for_user == 4) {
+			if (counter_for_user == 7) {
 				//PRINT_LEVEL = 1;
 				//VisualTracer::get_instance()->print_horizontally(10000);
 				//VisualTracer::get_instance()->print_horizontally_with_breaks_last(10000);
@@ -169,6 +169,29 @@ void OperatingSystem::dispatch_event(int thread_id) {
 	events.append(thread_id, incoming);
 }
 
+void OperatingSystem::setup_follow_up_threads(int thread_id, double time) {
+	Thread* thread = threads[thread_id];
+	if (PRINT_LEVEL >= 1) printf("Switching to new follow up thread\n");
+	vector<Thread*> follow_up_threads = thread->get_follow_up_threads();
+	if (follow_up_threads.size() > 0) {
+		threads[thread_id] = follow_up_threads[0];
+		threads[thread_id]->set_os(this);
+		threads[thread_id]->set_time(time);
+		threads[thread_id]->init();
+	}
+	for (uint i = 1; i < follow_up_threads.size(); i++) {
+		follow_up_threads[i]->set_time(time);
+		follow_up_threads[i]->set_os(this);
+		threads[thread_id]->init();
+		threads.push_back(follow_up_threads[i]);
+		deque<Event*> incoming = follow_up_threads[i]->run();
+		events.push_back();
+		events.append(i, incoming);
+	}
+	thread->get_follow_up_threads().clear();
+	delete thread;
+}
+
 void OperatingSystem::register_event_completion(Event* event) {
 
 	bool queue_was_full = currently_executing_ios_counter == MAX_SSD_QUEUE_SIZE;
@@ -191,25 +214,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	}
 
 	if (thread->is_finished() && thread->get_follow_up_threads().size() > 0) {
-		if (PRINT_LEVEL >= 1) printf("Switching to new follow up thread\n");
-		vector<Thread*> follow_up_threads = thread->get_follow_up_threads();
-		if (follow_up_threads.size() > 0) {
-			threads[thread_id] = follow_up_threads[0];
-			threads[thread_id]->set_os(this);
-			threads[thread_id]->set_time(event->get_current_time());
-			threads[thread_id]->init();
-		}
-		for (uint i = 1; i < follow_up_threads.size(); i++) {
-			follow_up_threads[i]->set_time(event->get_current_time());
-			follow_up_threads[i]->set_os(this);
-			threads[thread_id]->init();
-			threads.push_back(follow_up_threads[i]);
-			deque<Event*> incoming = follow_up_threads[i]->run();
-			events.push_back();
-			events.append(i, incoming);
-		}
-		thread->get_follow_up_threads().clear();
-		delete thread;
+		setup_follow_up_threads(thread_id, event->get_current_time());
 	}
 
 	// we update the current time of all threads
