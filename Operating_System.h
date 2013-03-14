@@ -453,7 +453,6 @@ private:
 	// used to record which thread dispatched which IO
 	map<long, long> app_id_to_thread_id_mapping;
 
-	int currently_executing_ios_counter;
 	double last_dispatched_event_minimal_finish_time;
 
 	set<uint> currently_executing_ios;

@@ -11,7 +11,6 @@ using namespace ssd;
 OperatingSystem::OperatingSystem(vector<Thread*> new_threads)
 	: ssd(new Ssd()),
 	  events(threads.size()),
-	  currently_executing_ios_counter(0),
 	  last_dispatched_event_minimal_finish_time(1),
 	  threads(new_threads),
 	  NUM_WRITES_TO_STOP_AFTER(UNDEFINED),
@@ -88,8 +87,7 @@ void OperatingSystem::run() {
 	do {
 		int thread_id = pick_unlocked_event_with_shortest_start_time();
 		bool no_pending_event = thread_id == UNDEFINED;
-		bool queue_is_full = currently_executing_ios_counter >= MAX_SSD_QUEUE_SIZE;
-
+		bool queue_is_full = currently_executing_ios.size() >= MAX_SSD_QUEUE_SIZE;
 		if (no_pending_event || queue_is_full) {
 			if (idle_time > 100000 && idle_time % 100000 == 0) {
 				printf("Idle for %f seconds. No_pending_event=%d  Queue_is_full=%d\n", (double) idle_time / 1000000, no_pending_event, queue_is_full);
@@ -120,7 +118,7 @@ void OperatingSystem::run() {
 		}
 
 		finished_experiment = NUM_WRITES_TO_STOP_AFTER != UNDEFINED && NUM_WRITES_TO_STOP_AFTER <= num_writes_completed;
-		still_more_work = currently_executing_ios_counter > 0 || events.get_num_pending_events() > 0;
+		still_more_work = currently_executing_ios.size() > 0 || events.get_num_pending_events() > 0;
 		//printf("num_writes   %d\n", num_writes_completed);
 	} while (!finished_experiment && still_more_work);
 	printf(" ");
@@ -146,7 +144,7 @@ void OperatingSystem::dispatch_event(int thread_id) {
 		event->incr_os_wait_time(time - event->get_start_time());
 	}
 	//printf("submitting:   " ); event->print();
-	currently_executing_ios_counter++;
+
 	currently_executing_ios.insert(event->get_application_io_id());
 	app_id_to_thread_id_mapping[event->get_application_io_id()] = thread_id;
 
@@ -194,9 +192,7 @@ void OperatingSystem::setup_follow_up_threads(int thread_id, double time) {
 
 void OperatingSystem::register_event_completion(Event* event) {
 
-	bool queue_was_full = currently_executing_ios_counter == MAX_SSD_QUEUE_SIZE;
-	currently_executing_ios_counter--;
-	assert(currently_executing_ios_counter >= 0);   // there is currently a bug where this number goes below 0. need to fix it.
+	bool queue_was_full = currently_executing_ios.size() == MAX_SSD_QUEUE_SIZE;
 	currently_executing_ios.erase(event->get_application_io_id());
 
 	//printf("finished:\t"); event->print();
