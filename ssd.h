@@ -15,12 +15,12 @@
 #include <map>
 #include <set>
 #include <algorithm>
-#include <boost/multi_index_container.hpp>
+/*#include <boost/multi_index_container.hpp>
 #include <boost/multi_index/identity.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/global_fun.hpp>
-#include <boost/multi_index/random_access_index.hpp>
+#include <boost/multi_index/random_access_index.hpp>*/
 #include "bloom_filter.hpp"
 #include <sys/types.h>
 #include "MTRand/mtrand.h" // Marsenne Twister random number generator
@@ -289,8 +289,8 @@ class FtlParent;
 class FtlImpl_Page;
 class FtlImpl_Bast;
 class FtlImpl_Fast;
-class FtlImpl_DftlParent;
-class FtlImpl_Dftl;
+//class FtlImpl_DftlParent;
+//class FtlImpl_Dftl;
 class FtlImpl_BDftl;
 
 class Ram;
@@ -797,7 +797,7 @@ private:
 };
 
 
-class FtlImpl_DftlParent : public FtlParent
+/*class FtlImpl_DftlParent : public FtlParent
 {
 public:
 	FtlImpl_DftlParent(Ssd &ssd);
@@ -859,8 +859,8 @@ protected:
 
 	long num_pages_written;
 };
-
-class FtlImpl_Dftl : public FtlImpl_DftlParent
+*/
+/*class FtlImpl_Dftl : public FtlImpl_DftlParent
 {
 public:
 	FtlImpl_Dftl(Ssd &ssd);
@@ -875,9 +875,9 @@ public:
 	void set_read_address(Event& event);
 private:
 	const double over_provisioning_percentage;
-};
+};*/
 
-class FtlImpl_BDftl : public FtlImpl_DftlParent
+/*class FtlImpl_BDftl : public FtlImpl_DftlParent
 {
 public:
 	FtlImpl_BDftl(Controller &controller);
@@ -905,7 +905,7 @@ private:
 	long get_free_biftl_page(Event &event);
 	void print_ftl_statistics();
 };
-
+*/
 
 /* This is a basic implementation that only provides delay updates to events
  * based on a delay value multiplied by the size (number of pages) needed to
