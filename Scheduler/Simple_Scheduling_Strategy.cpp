@@ -6,11 +6,9 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 
 	vector<Event*> current_events = get_soonest_events();
 	vector<Event*> read_commands;
-	vector<Event*> overdue_read_commands;
 	vector<Event*> gc_read_commands;
 	vector<Event*> read_commands_copybacks;
 	vector<Event*> read_commands_flexible;
-	//vector<Event*> gc_read_commands;
 	vector<Event*> read_transfers;
 	vector<Event*> gc_writes;
 	vector<Event*> writes;
@@ -18,7 +16,7 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 	vector<Event*> copy_backs;
 	vector<Event*> noop_events;
 	vector<Event*> trims;
-	vector<Event*> overdue_writes;
+	vector<Event*> overdue_events;
 
 	while (current_events.size() > 0) {
 		Event * event = current_events.back();
@@ -41,7 +39,7 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 			gc_read_commands.push_back(event);
 		}
 		else if (type == READ_COMMAND && event->get_bus_wait_time() > READ_DEADLINE) {
-			overdue_read_commands.push_back(event);
+			overdue_events.push_back(event);
 		}
 		else if (type == READ_COMMAND && event->is_flexible_read()) {
 			read_commands_flexible.push_back(event);
@@ -49,12 +47,15 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 		else if (type == READ_COMMAND) {
 			read_commands.push_back(event);
 		}
+		else if (type == READ_TRANSFER && event->get_bus_wait_time() >= READ_TRANSFER_DEADLINE) {
+			overdue_events.push_back(event);
+		}
 		else if (type == READ_TRANSFER) {
 			read_transfers.push_back(event);
 		}
 		else if (type == WRITE) {
-			if (event->get_bus_wait_time() > WRITE_DEADLINE && event->is_original_application_io()) {
-				overdue_writes.push_back(event);
+			if (event->get_bus_wait_time() > WRITE_DEADLINE /*&& event->is_original_application_io()*/) {
+				overdue_events.push_back(event);
 			} else if (is_GC && !event->is_original_application_io()) {
 				gc_writes.push_back(event);
 			} else {
@@ -72,6 +73,10 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 		}
 	}
 
+	/*uint num_writes = writes.size() + overdue_writes.size();
+	uint num_reads = read_commands.size();
+	printf("%d\t%d\n", num_writes, num_reads);*/
+
 	scheduler->handle(trims);
 
 	//handle_writes(copy_backs); // Copy backs should be prioritized first to avoid conflict, since they have a reserved page waiting to be written
@@ -79,21 +84,21 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 	// Intuitive scheme. Prioritize Application IOs
 	if (priorities_scheme == 0) {
 		read_commands.insert(read_commands.end(), read_commands_flexible.begin(), read_commands_flexible.end());
+		read_commands.insert(read_commands.end(), gc_read_commands.begin(), gc_read_commands.end());
 
-		sort(overdue_writes.begin(), overdue_writes.end(), current_wait_time_comparator);
-		sort(read_commands.begin(), read_commands.end(), current_wait_time_comparator);
+		writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
+		read_transfers.insert(read_transfers.end(), copy_backs.begin(), copy_backs.end());
+
+		sort(read_commands.begin(), read_commands.end(), overall_wait_time_comparator);
 		sort(writes.begin(), writes.end(), current_wait_time_comparator);
-		sort(gc_read_commands.begin(), gc_read_commands.end(), current_wait_time_comparator);
-		sort(gc_writes.begin(), gc_writes.end(), overall_wait_time_comparator);
-		sort(erases.begin(), erases.end(), overall_wait_time_comparator);
+		sort(overdue_events.begin(), overdue_events.end(), current_wait_time_comparator);
+		sort(read_commands_copybacks.begin(), read_commands_copybacks.end(), overall_wait_time_comparator);
 
-		scheduler->handle(overdue_writes);
+		scheduler->handle(overdue_events);
 		scheduler->handle(read_commands);
+		scheduler->handle(read_commands_copybacks);
 		scheduler->handle(erases);
 		scheduler->handle(writes);
-		scheduler->handle(gc_read_commands);
-		scheduler->handle(gc_writes);
-		scheduler->handle(read_transfers);
 	}
 	// Traditional - GC PRIORITY
 	else if (priorities_scheme == 1) {
@@ -104,27 +109,29 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 		scheduler->handle(gc_writes);
 		scheduler->handle(read_commands);
 		scheduler->handle(writes);
-		scheduler->handle(read_transfers);
 	}
 	else if (priorities_scheme == 2) {
 		read_commands.insert(read_commands.end(), read_commands_flexible.begin(), read_commands_flexible.end());
 
 		writes.insert(writes.end(), gc_writes.begin(), gc_writes.end());
+		//read_commands.insert(read_commands.end(), gc_read_commands.begin(), gc_read_commands.end());
 		read_transfers.insert(read_transfers.end(), copy_backs.begin(), copy_backs.end());
 
 		sort(read_commands.begin(), read_commands.end(), overall_wait_time_comparator);
 		sort(gc_read_commands.begin(), gc_read_commands.end(), overall_wait_time_comparator);
 		sort(writes.begin(), writes.end(), current_wait_time_comparator);
-		sort(overdue_writes.begin(), overdue_writes.end(), current_wait_time_comparator);
+		sort(overdue_events.begin(), overdue_events.end(), current_wait_time_comparator);
 		sort(read_commands_copybacks.begin(), read_commands_copybacks.end(), overall_wait_time_comparator);
 
-		scheduler->handle(overdue_writes);
+
+		scheduler->handle(overdue_events);
 		scheduler->handle(read_commands);
 		scheduler->handle(gc_read_commands);
 		scheduler->handle(read_commands_copybacks);
+		//scheduler->handle(gc_writes);
 		scheduler->handle(erases);
 		scheduler->handle(writes);
-		scheduler->handle(read_transfers);
+
 	}
 	// FLEXIBLE READS AND WRITES EQUAL PRIORITY
 	else if (priorities_scheme == 3) {
@@ -147,7 +154,6 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 		//handle(read_commands_copybacks);
 		scheduler->handle(writes);
 		scheduler->handle(erases);
-		scheduler->handle(read_transfers);
 		//handle(copy_backs);
 	} else if (priorities_scheme == 4) {
 		// PURE FIFO STRATEGY
@@ -157,7 +163,6 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 		all_ios.insert(all_ios.end(), read_commands.begin(), read_commands.end());
 		all_ios.insert(all_ios.end(), gc_writes.begin(), gc_writes.end());
 		all_ios.insert(all_ios.end(), writes.begin(), writes.end());
-		all_ios.insert(all_ios.end(), read_transfers.begin(), read_transfers.end());
 		all_ios.insert(all_ios.end(), copy_backs.begin(), copy_backs.end());
 		all_ios.insert(all_ios.end(), erases.begin(), erases.end());
 		sort(all_ios.begin(), all_ios.end(), current_wait_time_comparator);
@@ -184,12 +189,12 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 		//handle(read_commands_copybacks);
 
 		scheduler->handle(writes);
-		scheduler->handle(read_transfers);
 		//handle(copy_backs);
 	} else {
 		assert(false);
 	}
 
+	scheduler->handle(read_transfers);
 	scheduler->handle_noop_events(noop_events);
 }
 

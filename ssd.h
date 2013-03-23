@@ -166,6 +166,7 @@ extern int WEARWOLF_LOCALITY_THRESHOLD;
 extern bool ENABLE_TAGGING;
 extern int WRITE_DEADLINE;
 extern int READ_DEADLINE;
+extern int READ_TRANSFER_DEADLINE;
 
 /*
  * Controls the level of detail of output

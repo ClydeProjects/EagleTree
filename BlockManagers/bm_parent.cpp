@@ -350,6 +350,8 @@ void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			if (!has_free_pages(free_block_pointers[i][j]) || get_num_free_blocks(i, j) < GREED_SCALE) {
 				schedule_gc(start_time, i, j, -1, -1);
+			}
+			if (!has_free_pages(free_block_pointers[i][j])) {
 				num_luns_with_space--;
 			}
 		}
@@ -608,10 +610,6 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 	Address a = gc_event->get_address();
 	vector<deque<Event*> > migrations;
 
-	/*if (how_many_gc_operations_are_scheduled() >= SSD_SIZE * PACKAGE_SIZE * 0.75) {
-		return migrations;
-	}*/
-
 	if (how_many_gc_operations_are_scheduled() >= MAX_CONCURRENT_GC_OPS) {
 		return migrations;
 	}
@@ -624,7 +622,6 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 	int block_id = a.valid >= BLOCK ? a.block : UNDEFINED;
 	int die_id = a.valid >= DIE ? a.die : UNDEFINED;
 	int package_id = a.valid >= PACKAGE ? a.package : UNDEFINED;
-
 
 	bool is_wear_leveling_op = gc_event->is_wear_leveling_op();
 

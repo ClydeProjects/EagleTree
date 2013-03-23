@@ -50,13 +50,13 @@ int main()
 	BUS_DATA_DELAY = 100;
 	BLOCK_ERASE_DELAY = 1500;
 
-	int IO_limit = 100000;
+	int IO_limit = 10000;
 
 	int write_threads_min = 0;
-	int write_threads_max = 4;
+	int write_threads_max = 2;
 
 	//PRINT_LEVEL = 1;
-	MAX_SSD_QUEUE_SIZE = 32;
+	MAX_SSD_QUEUE_SIZE = 10;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 	SCHEDULING_SCHEME = 2;
 	// DEADLINES?

@@ -367,7 +367,7 @@ void StatisticsGatherer::print() {
 	printf("\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t%d", (int)max_write);
 	printf("\t\t%d\t\t", (int)max_read);
 
-	printf("\n\n");
+	printf("\n");
 	//printf("Erase avg:\t%f \n", get_average(num_erases_per_LUN));
 	//printf("Erase std:\t%f \n", get_std(num_erases_per_LUN));
 	double milliseconds = (end_time - start_time) / 1000;

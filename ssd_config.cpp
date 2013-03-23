@@ -196,7 +196,7 @@ int MAX_CONCURRENT_GC_OPS = 1;
  */
 int BLOCK_MANAGER_ID = 3;
 
-bool GREED_SCALE = 1;
+bool GREED_SCALE = 2;
 
 /* Output level of detail:
  * 0 -> Nothing
@@ -222,6 +222,7 @@ int MAX_SSD_QUEUE_SIZE = 15;
 
 int WRITE_DEADLINE = 1000000;
 int READ_DEADLINE =  1000000;
+int READ_TRANSFER_DEADLINE = 1000000;
 
 /* Defines the maximal number of locks that can be held by the OS  */
 uint MAX_OS_NUM_LOCKS = 1000;
@@ -300,7 +301,7 @@ void set_normal_config() {
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 32;
+	PLANE_SIZE = 256;
 	BLOCK_SIZE = 32;
 
 	PAGE_READ_DELAY = 50;
@@ -318,6 +319,9 @@ void set_normal_config() {
 	BLOCK_MANAGER_ID = 0;
 	BALANCEING_SCHEME = false;
 	MAX_CONCURRENT_GC_OPS = PACKAGE_SIZE * SSD_SIZE;
+	GREED_SCALE = 2;
+
+	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY;
 }
 
 void load_config() {

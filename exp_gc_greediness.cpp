@@ -8,32 +8,9 @@ using namespace ssd;
 
 int main()
 {
-	load_config();
-
-	SSD_SIZE = 4;
-	PACKAGE_SIZE = 2;
-	DIE_SIZE = 1;
-	PLANE_SIZE = 32;
-	BLOCK_SIZE = 32;
-
-	PAGE_READ_DELAY = 50;
-	PAGE_WRITE_DELAY = 200;
-	BUS_CTRL_DELAY = 5;
-	BUS_DATA_DELAY = 100;
-	BLOCK_ERASE_DELAY = 1500;
+	set_normal_config();
 
 	int IO_limit = 100000;
-
-	//PRINT_LEVEL = 0;
-	MAX_SSD_QUEUE_SIZE = 32;
-	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
-	SCHEDULING_SCHEME = 2;
-	// DEADLINES?
-	//GREED_SCALE = 2;
-	USE_ERASE_QUEUE = false;
-	ENABLE_WEAR_LEVELING = false;
-	BLOCK_MANAGER_ID = 0;
-
 	const double used_space = .80; // overprovisioning level for variable random write threads experimentexp_balanced_scheduler
 	const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 	const int logical_space = num_pages * used_space;
@@ -41,13 +18,15 @@ int main()
 	string exp_folder  = "exp_gc/";
  	mkdir(exp_folder.c_str(), 0755);
 
-	BALANCEING_SCHEME = false;
-	Workload_Definition* workload = new Random_Workload(0, logical_space, 10);
+
+	//Workload_Definition* workload = new Synch_Write(0, 1000);
+	//Workload_Definition* workload = new Random_Workload(0, logical_space, 1);
+	Workload_Definition* workload = new Asynch_Random_Workload(0, logical_space);
 	//(Workload_Definition* workload, string data_folder, string name, int IO_limit, int& variable, int min_val, int max_val, int incr) {
 	vector<vector<ExperimentResult> > exps;
 
-	int concurrent_gc_min = 5;
-	int concurrent_gc_max = 5;
+	int concurrent_gc_min = 8;
+	int concurrent_gc_max = 8;
 
 	/*GREED_SCALE = 0;
 	exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "Greed0/", "Greed0, Max GC 0 - 6", IO_limit, MAX_CONCURRENT_GC_OPS, 1, 6, 1) );

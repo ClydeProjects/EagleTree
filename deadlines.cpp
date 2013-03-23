@@ -8,8 +8,10 @@ int main()
 {
 	set_normal_config();
 
-	int IO_limit = 10000;
-	const double used_space = .80; // overprovisioning level for variable random write threads experimentexp_balanced_scheduler
+	GREED_SCALE = 2;
+
+	int IO_limit = 300000;
+	const double used_space = .70; // overprovisioning level for variable random write threads experimentexp_balanced_scheduler
 	const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 	const int logical_space = num_pages * used_space;
 
@@ -19,11 +21,15 @@ int main()
 	Workload_Definition* workload = new Asynch_Random_Workload(0, logical_space);
 	vector<vector<ExperimentResult> > exps;
 
-	int deadline_min = 0;
-	int deadline_max = 0;
-	int incr = 200;
+	int deadline_min = 1900;
+	int deadline_max = 1900;
+	int incr = 250;
 
-	exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "deadlines/", "deadlines", IO_limit, WRITE_DEADLINE, deadline_min, deadline_max, incr) );
+	SCHEDULING_SCHEME = 0;
+	exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "read_diff/", "read_diff", IO_limit, WRITE_DEADLINE, deadline_min, deadline_max, incr) );
+	//SCHEDULING_SCHEME = 0;
+	//exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "all_equal/", "all_equal", IO_limit, WRITE_DEADLINE, deadline_min, deadline_max, incr) );
+
 	//exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "deadlines3333/", "deadlines3333/", IO_limit, WRITE_DEADLINE, deadline_min, deadline_max, incr) );
 	delete workload;
 	Experiment_Runner::draw_graphs(exps, exp_folder);

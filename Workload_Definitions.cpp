@@ -75,8 +75,8 @@ Asynch_Random_Workload::~Asynch_Random_Workload() {
 }
 
 vector<Thread*> Asynch_Random_Workload::generate_instance() {
-	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba / 2);
-	Asynchronous_Random_Thread_Reader_Writer* thread = new Asynchronous_Random_Thread_Reader_Writer(min_lba, max_lba / 2, INFINITE, 236);
+	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
+	Asynchronous_Random_Thread_Reader_Writer* thread = new Asynchronous_Random_Thread_Reader_Writer(min_lba, max_lba, INFINITE, 236);
 	thread->set_statistics_gatherer(stats);
 	thread->set_experiment_thread(true);
 	init_write->add_follow_up_thread(thread);

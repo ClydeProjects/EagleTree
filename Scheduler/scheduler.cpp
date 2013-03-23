@@ -161,13 +161,16 @@ void IOScheduler::handle(vector<Event*>& events) {
 void IOScheduler::handle_event(Event* event) {
 	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
 	bool can_schedule = bm->can_schedule_on_die(event->get_address(), event->get_event_type(), event->get_application_io_id());
-	if (can_schedule && time == 0) {
-		execute_next(event);
+	if (!can_schedule) {
+		event->incr_bus_wait_time(BUS_DATA_DELAY + BUS_CTRL_DELAY + time);
+		current_events->push(event);
+	}
+	else if (time > 0) {
+		event->incr_bus_wait_time(time);
+		current_events->push(event);
 	}
 	else {
-		double bus_wait_time = can_schedule ? time : BUS_DATA_DELAY + BUS_CTRL_DELAY;
-		event->incr_bus_wait_time(bus_wait_time);
-		current_events->push(event);
+		execute_next(event);
 	}
 }
 
@@ -231,13 +234,33 @@ void IOScheduler::handle_flexible_read(Event* event) {
 
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_write(Event* event) {
-	if (event->is_cached_write()) {
-
-	}
 	Address addr = bm->choose_write_address(*event);
 	try_to_put_in_safe_cache(event);
 	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time());
-	if ( wait_time == 0 && !bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id()))  {
+
+	if (addr.valid == NONE && event->get_event_type() == COPY_BACK) {
+		transform_copyback(event);
+	}
+	else if (addr.valid == NONE) {
+		event->incr_bus_wait_time(BUS_DATA_DELAY + BUS_CTRL_DELAY);  // actually, we never know how long to wait here. Space might clear on any LUN on the SSD any time
+		current_events->push(event);
+	}
+	else if (!bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id())) {
+		event->incr_bus_wait_time(wait_time + BUS_DATA_DELAY + BUS_CTRL_DELAY);
+		current_events->push(event);
+	}
+	else if (wait_time > 0) {
+		event->incr_bus_wait_time(wait_time);
+		current_events->push(event);
+	}
+	else {
+		event->set_address(addr);
+		ftl->set_replace_address(*event);
+		assert(addr.page < BLOCK_SIZE);
+		execute_next(event);
+	}
+
+	/*if ( wait_time == 0 && !bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id()))  {
 		wait_time = BUS_DATA_DELAY + BUS_CTRL_DELAY;
 		printf("warning from handle_write.");
 	}
@@ -253,7 +276,7 @@ void IOScheduler::handle_write(Event* event) {
 			transform_copyback(event);
 		}
 		current_events->push(event);
-	}
+	}*/
 }
 
 void IOScheduler::transform_copyback(Event* event) {
@@ -510,7 +533,7 @@ void IOScheduler::try_to_put_in_safe_cache(Event* write) {
 		//immediate_response->print();
 		immediate_response->set_cached_write(true);
 		current_events->push(immediate_response);
-		printf("putting into cache:  %d    %f\n", write->get_logical_address(), write->get_bus_wait_time());
+		//printf("putting into cache:  %d    %f\n", write->get_logical_address(), write->get_bus_wait_time());
 	}
 }
 
@@ -523,11 +546,6 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	if (LBA_currently_executing.count(la) == 1 && LBA_currently_executing[la] == new_event->get_application_io_id()) {
 		return;
-	}
-
-	if (new_event->get_event_type() == READ_COMMAND) {
-		int i = 0;
-		i++;
 	}
 
 	uint dependency_code_of_new_event = new_event->get_application_io_id();

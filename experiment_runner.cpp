@@ -49,9 +49,9 @@ double Experiment_Runner::calibration_starting_point = 15.00; // microseconds
 
 string Experiment_Runner::graph_filename_prefix      = "";
 
-const string ExperimentResult::throughput_column_name		= "Average throughput (IOs/s)"; // e.g. "Average throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
-const string ExperimentResult::write_throughput_column_name = "Average write throughput (IOs/s)";
-const string ExperimentResult::read_throughput_column_name  = "Average read throughput (IOs/s)";
+const string ExperimentResult::throughput_column_name		= "Average throughput (IOs/ms)"; // e.g. "Average throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
+const string ExperimentResult::write_throughput_column_name = "Average write throughput (IOs/ms)";
+const string ExperimentResult::read_throughput_column_name  = "Average read throughput (IOs/ms)";
 const string ExperimentResult::datafile_postfix 			= ".csv";
 const string ExperimentResult::stats_filename 				= "stats";
 const string ExperimentResult::waittime_filename_prefix 	= "waittime-";
