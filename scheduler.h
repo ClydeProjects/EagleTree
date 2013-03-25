@@ -22,7 +22,7 @@ public:
 	virtual bool remove(Event*);
 	virtual Event* find(long dep_code) const;
 	inline bool empty() const { return events.empty(); }
-	double get_earliest_time() const { return floor((*events.begin()).first); };
+	double get_earliest_time() const { return events.empty() ? 0 : floor((*events.begin()).first); };
 	int size() const { return num_events; }
 private:
 	map<long, vector<Event*> > events;
@@ -94,10 +94,12 @@ private:
 	void remove_redundant_events(Event* new_event);
 	bool should_event_be_scheduled(Event* event);
 	void init_event(Event* event);
+	void push(Event* event);
 	void manage_operation_completion(Event* event);
 	double get_soonest_event_time(vector<Event*> const& events) const;
 
 	event_queue future_events;
+	Scheduling_Strategy* overdue_events;
 	Scheduling_Strategy* current_events;
 
 	map<uint, deque<Event*> > dependencies;

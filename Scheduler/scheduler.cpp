@@ -16,6 +16,7 @@ using namespace ssd;
 IOScheduler::IOScheduler() :
 	future_events(),
 	current_events(NULL),
+	overdue_events(NULL),
 	dependencies(),
 	ssd(NULL),
 	ftl(NULL),
@@ -31,10 +32,12 @@ void IOScheduler::set_all(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent
 	ftl = new_ftl;
 	bm = new_bm;
 	current_events = BALANCEING_SCHEME ? new Balancing_Scheduling_Strategy(this, bm, ssd) : new Simple_Scheduling_Strategy(this, ssd);
+	overdue_events = new Simple_Scheduling_Strategy(this, ssd);
 }
 
 IOScheduler::~IOScheduler(){
 	delete current_events;
+	delete overdue_events;
 	map<uint, deque<Event*> >::iterator i = dependencies.begin();
 	for (; i != dependencies.end(); i++) {
 		deque<Event*>& d = (*i).second;
@@ -84,8 +87,13 @@ void IOScheduler::execute_soonest_events() {
 	double current_time = get_current_time();
 	double next_events_time = current_time + 1;
 	update_current_events(current_time);
-	while (current_time < next_events_time && !current_events->empty() ) {
-		current_events->schedule();
+	while (current_time < next_events_time && (!current_events->empty() || !overdue_events->empty())) {
+		if (!overdue_events->empty() && overdue_events->get_earliest_time() < next_events_time) {
+			overdue_events->schedule();
+		}
+		if (!current_events->empty() && current_events->get_earliest_time() < next_events_time) {
+			current_events->schedule();
+		}
 		update_current_events(current_time);
 		current_time = get_current_time();
 	}
@@ -93,7 +101,7 @@ void IOScheduler::execute_soonest_events() {
 
 // this is used to signal the SSD object when all events have finished executing
 bool IOScheduler::is_empty() {
-	return !current_events->empty() || !future_events.empty();
+	return !current_events->empty() || !future_events.empty() || !overdue_events->empty();
 }
 
 double IOScheduler::get_soonest_event_time(vector<Event*> const& events) const {
@@ -106,13 +114,32 @@ double IOScheduler::get_soonest_event_time(vector<Event*> const& events) const {
 	return earliest_time;
 }
 
-double IOScheduler::get_current_time() const {
-	if (!current_events->empty())
-		return current_events->get_earliest_time();
-	else if (future_events.empty())
-		return 0;
+void IOScheduler::push(Event* event) {
+	event_type t = event->get_event_type();
+	double wait = event->get_bus_wait_time();
+	if (t == READ_COMMAND && wait > READ_DEADLINE
+			|| t == READ_TRANSFER && wait > READ_TRANSFER_DEADLINE
+			|| t == WRITE && wait > WRITE_DEADLINE) {
+		overdue_events->push(event);
+	}
 	else
+		current_events->push(event);
+}
+
+// refactor this method. Seems like the last else clause is unreachable
+double IOScheduler::get_current_time() const {
+	double t1 = current_events->get_earliest_time();
+	double t2 = overdue_events->get_earliest_time();
+	if (!current_events->empty() && !overdue_events->empty())
+		return min(t1, t2);
+	else if (!current_events->empty())
+		return t1;
+	else if (!overdue_events->empty())
+		return t2;
+	else if (!future_events.empty())
 		return future_events.get_earliest_time();
+	else
+		return 0;
 }
 
 MTRand_int32 random_number_generator(42);
@@ -125,8 +152,8 @@ ptrdiff_t random_range(ptrdiff_t limit) {
 // goes through all the events that have just been submitted (i.e. bus_wait_time = 0)
 // in light of these new events, see if any other existing pending events are now redundant
 void IOScheduler::update_current_events(double current_time) {
-	StatisticsGatherer::get_global_instance()->register_events_queue_length(current_events->size(), current_time);
-	while (!future_events.empty() && (current_events->empty() || future_events.get_earliest_time() < current_time + 1) ) {
+	StatisticsGatherer::get_global_instance()->register_events_queue_length(current_events->size() + overdue_events->size(), current_time);
+	while (!future_events.empty() && ((current_events->empty() && overdue_events->empty()) || future_events.get_earliest_time() < current_time + 1) ) {
 		vector<Event*> events = future_events.get_soonest_events();
 		random_shuffle(events.begin(), events.end(), random_range); // Process events with same timestamp in random order to prevent imbalances
 		for (uint i = 0; i < events.size(); i++) {
@@ -163,11 +190,11 @@ void IOScheduler::handle_event(Event* event) {
 	bool can_schedule = bm->can_schedule_on_die(event->get_address(), event->get_event_type(), event->get_application_io_id());
 	if (!can_schedule) {
 		event->incr_bus_wait_time(BUS_DATA_DELAY + BUS_CTRL_DELAY + time);
-		current_events->push(event);
+		push(event);
 	}
 	else if (time > 0) {
 		event->incr_bus_wait_time(time);
-		current_events->push(event);
+		push(event);
 	}
 	else {
 		execute_next(event);
@@ -243,15 +270,15 @@ void IOScheduler::handle_write(Event* event) {
 	}
 	else if (addr.valid == NONE) {
 		event->incr_bus_wait_time(BUS_DATA_DELAY + BUS_CTRL_DELAY);  // actually, we never know how long to wait here. Space might clear on any LUN on the SSD any time
-		current_events->push(event);
+		push(event);
 	}
 	else if (!bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id())) {
 		event->incr_bus_wait_time(wait_time + BUS_DATA_DELAY + BUS_CTRL_DELAY);
-		current_events->push(event);
+		push(event);
 	}
 	else if (wait_time > 0) {
 		event->incr_bus_wait_time(wait_time);
-		current_events->push(event);
+		push(event);
 	}
 	else {
 		event->set_address(addr);
@@ -469,16 +496,16 @@ void IOScheduler::init_event(Event* event) {
 	event_type type = event->get_event_type();
 
 	if (event->get_noop() && event->get_event_type() != GARBAGE_COLLECTION) {
-		current_events->push(event);
+		push(event);
 		return;
 	}
 
 	if (event->is_flexible_read() && (type == READ_COMMAND || type == READ_TRANSFER)) {
-		current_events->push(event);
+		push(event);
 	}
 	else if (type == TRIM || type == READ_COMMAND || type == READ_TRANSFER || type == WRITE || type == COPY_BACK) {
 		if (should_event_be_scheduled(event)) {
-			current_events->push(event);
+			push(event);
 		} else if (PRINT_LEVEL >= 1) {
 			printf("Event not scheduled: ");
 			event->print();
@@ -522,7 +549,7 @@ void IOScheduler::init_event(Event* event) {
 		delete event;
 	}
 	else if (type == ERASE) {
-		current_events->push(event);
+		push(event);
 	}
 }
 
@@ -532,7 +559,7 @@ void IOScheduler::try_to_put_in_safe_cache(Event* write) {
 		Event* immediate_response = new Event(*write);
 		//immediate_response->print();
 		immediate_response->set_cached_write(true);
-		current_events->push(immediate_response);
+		push(immediate_response);
 		//printf("putting into cache:  %d    %f\n", write->get_logical_address(), write->get_bus_wait_time());
 	}
 }
@@ -551,7 +578,11 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	uint dependency_code_of_new_event = new_event->get_application_io_id();
 	uint common_logical_address = new_event->get_logical_address();
 	uint dependency_code_of_other_event = LBA_currently_executing[common_logical_address];
+
 	Event * existing_event = current_events->find(dependency_code_of_other_event);
+	if (existing_event == NULL) {
+		existing_event = overdue_events->find(dependency_code_of_other_event);
+	}
 
 	//bool both_events_are_gc = new_event->is_garbage_collection_op() && existing_event->is_garbage_collection_op();
 	//assert(!both_events_are_gc);
@@ -581,12 +612,12 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
 		promote_to_gc(existing_event);
 		remove_current_operation(new_event);
-		current_events->push(new_event); // Make sure the old GC READ is run, even though it is now a NOOP command
+		push(new_event); // Make sure the old GC READ is run, even though it is now a NOOP command
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 	}
 	else if (new_event->is_garbage_collection_op() && scheduled_op_code == TRIM) {
 		remove_current_operation(new_event);
-		current_events->push(new_event);
+		push(new_event);
 		bm->register_trim_making_gc_redundant();
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 	}

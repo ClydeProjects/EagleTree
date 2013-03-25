@@ -16,7 +16,6 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 	vector<Event*> copy_backs;
 	vector<Event*> noop_events;
 	vector<Event*> trims;
-	vector<Event*> overdue_events;
 
 	while (current_events.size() > 0) {
 		Event * event = current_events.back();
@@ -38,25 +37,17 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 		else if (type == READ_COMMAND && event->is_garbage_collection_op() && !event->is_original_application_io()) {
 			gc_read_commands.push_back(event);
 		}
-		else if (type == READ_COMMAND && event->get_bus_wait_time() > READ_DEADLINE) {
-			overdue_events.push_back(event);
-		}
 		else if (type == READ_COMMAND && event->is_flexible_read()) {
 			read_commands_flexible.push_back(event);
 		}
 		else if (type == READ_COMMAND) {
 			read_commands.push_back(event);
 		}
-		else if (type == READ_TRANSFER && event->get_bus_wait_time() >= READ_TRANSFER_DEADLINE) {
-			overdue_events.push_back(event);
-		}
 		else if (type == READ_TRANSFER) {
 			read_transfers.push_back(event);
 		}
 		else if (type == WRITE) {
-			if (event->get_bus_wait_time() > WRITE_DEADLINE /*&& event->is_original_application_io()*/) {
-				overdue_events.push_back(event);
-			} else if (is_GC && !event->is_original_application_io()) {
+			if (is_GC && !event->is_original_application_io()) {
 				gc_writes.push_back(event);
 			} else {
 				writes.push_back(event);
@@ -91,10 +82,8 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 
 		sort(read_commands.begin(), read_commands.end(), overall_wait_time_comparator);
 		sort(writes.begin(), writes.end(), current_wait_time_comparator);
-		sort(overdue_events.begin(), overdue_events.end(), current_wait_time_comparator);
 		sort(read_commands_copybacks.begin(), read_commands_copybacks.end(), overall_wait_time_comparator);
 
-		scheduler->handle(overdue_events);
 		scheduler->handle(read_commands);
 		scheduler->handle(read_commands_copybacks);
 		scheduler->handle(erases);
@@ -120,11 +109,9 @@ void Simple_Scheduling_Strategy::schedule(int priorities_scheme) {
 		sort(read_commands.begin(), read_commands.end(), overall_wait_time_comparator);
 		sort(gc_read_commands.begin(), gc_read_commands.end(), overall_wait_time_comparator);
 		sort(writes.begin(), writes.end(), current_wait_time_comparator);
-		sort(overdue_events.begin(), overdue_events.end(), current_wait_time_comparator);
 		sort(read_commands_copybacks.begin(), read_commands_copybacks.end(), overall_wait_time_comparator);
 
 
-		scheduler->handle(overdue_events);
 		scheduler->handle(read_commands);
 		scheduler->handle(gc_read_commands);
 		scheduler->handle(read_commands_copybacks);
