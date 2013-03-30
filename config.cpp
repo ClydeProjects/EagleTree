@@ -1,34 +1,3 @@
-/* Copyright 2009, 2010 Brendan Tauras */
-
-/* ssd_config.cpp is part of FlashSim. */
-
-/* FlashSim is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * any later version. */
-
-/* FlashSim is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details. */
-
-/* You should have received a copy of the GNU General Public License
- * along with FlashSim.  If not, see <http://www.gnu.org/licenses/>. */
-
-/****************************************************************************/
-
-/* Configuration loader
- * Brendan Tauras 2009-11-02
- * Matias Bjørling 2011-03
- *
- * Functions below provide basic configuration file parsing.  Config file
- * support includes skipping blank lines, comment lines (begin with a #).
- * Parsed lines consist of the variable name, a space, then the value
- * (e.g. SSD_SIZE 4 ).  Default config values (if config file is missing
- * an entry to set the value) are defined in the variable declarations below.
- *
- * A function is also provided for printing the current configuration. */
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

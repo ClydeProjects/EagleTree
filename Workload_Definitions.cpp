@@ -99,11 +99,32 @@ Synch_Write::~Synch_Write() {
 }
 
 vector<Thread*> Synch_Write::generate_instance() {
-	Simple_Thread* init_write = new Synchronous_Sequential_Writer(min_lba, max_lba);
+	/*Simple_Thread* init_write = new Synchronous_Sequential_Writer(min_lba, max_lba);
 	//init_write->add_follow_up_thread(thread);
 	init_write->set_statistics_gatherer(stats);
 	init_write->set_experiment_thread(true);
 	vector<Thread*> threads(1, init_write);
-	return threads;
+	return threads;*/
+
+
+	Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
+	int seed = 235325;
+
+	Simple_Thread* random_format = new Asynchronous_Random_Writer(min_lba, max_lba, seed);
+	random_format->set_num_ios((max_lba - min_lba) * 3);
+	init_write->add_follow_up_thread(random_format);
+
+	int num_files = 1000;
+	int max_file_size = 100;
+	Thread* fm = new File_Manager(min_lba, max_lba / 2, num_files, max_file_size, seed * 13);
+	int num_ios = 10000;
+	Thread* rand = new Asynchronous_Random_Thread_Reader_Writer(max_lba / 2 + 1, max_lba, num_ios, seed * 17);
+	random_format->add_follow_up_thread(fm);
+	random_format->add_follow_up_thread(rand);
+
+	vector<Thread*> threads(1, init_write);
+	OperatingSystem* os = new OperatingSystem(threads);
+	os->run();
+
 }
 

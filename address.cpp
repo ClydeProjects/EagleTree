@@ -1,31 +1,3 @@
-/* Copyright 2009, 2010 Brendan Tauras */
-
-/* ssd_address.cpp is part of FlashSim. */
-
-/* FlashSim is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * any later version. */
-
-/* FlashSim is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details. */
-
-/* You should have received a copy of the GNU General Public License
- * along with FlashSim.  If not, see <http://www.gnu.org/licenses/>. */
-
-/****************************************************************************/
-
-/* Address class
- * Brendan Tauras 2009-06-19
- *
- * Class to manage physical addresses for the SSD.  It was designed to have
- * public members like a struct for quick access but also have checking, 
- * printing, and assignment functionality.  An instance is created for each
- * physical address in the Event class.
- */
-
 #include <stdio.h>
 #include "ssd.h"
 
@@ -39,21 +11,6 @@ Address::Address():
 	page(0),
 	valid(NONE)
 {}
-
-// Copy constructors inlined for speed
-/*
-Address::Address(const Address &address)
-{
-	*this = address;
-	return;
-}
-
-Address::Address(const Address *address)
-{
-	*this = *address;
-	return;
-}
-*/
 
 /* see "enum address_valid" in ssd.h for details on valid status */
 Address::Address(uint package, uint die, uint plane, uint block, uint page, enum address_valid valid):
