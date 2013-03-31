@@ -35,9 +35,8 @@ Ssd::Ssd():
 		exit(MEM_ERR);
 	}
 
-	if (PAGE_ENABLE_DATA)
+	/*if (PAGE_ENABLE_DATA)
 	{
-		/* Allocate memory for data pages */
 		ulong pageSize = ((ulong)(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE)) * (ulong)PAGE_SIZE;
 		page_data = mmap64(NULL, pageSize, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1 ,0);
 
@@ -52,7 +51,7 @@ Ssd::Ssd():
 			printf("%i\n",errno);
 			exit(MEM_ERR);
 		}
-	}
+	}*/
 
 	assert(VIRTUAL_BLOCK_SIZE > 0);
 	assert(VIRTUAL_PAGE_SIZE > 0);

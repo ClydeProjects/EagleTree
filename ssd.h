@@ -118,16 +118,6 @@ extern const uint MAP_DIRECTORY_SIZE;
 extern const uint FTL_IMPLEMENTATION;
 
 /*
- * LOG page limit for BAST.
- */
-extern const uint BAST_LOG_PAGE_LIMIT;
-
-/*
- * LOG page limit for FAST.
- */
-extern const uint FAST_LOG_PAGE_LIMIT;
-
-/*
  * Number of blocks allowed to be in DFTL Cached Mapping Table.
  */
 extern const uint CACHE_DFTL_LIMIT;
@@ -147,9 +137,6 @@ extern const uint VIRTUAL_PAGE_SIZE;
 static inline uint NUMBER_OF_ADDRESSABLE_BLOCKS() {
 	return (SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE) / VIRTUAL_PAGE_SIZE;
 }
-
-/* RAISSDs: Number of physical SSDs */
-extern const uint RAID_NUMBER_OF_PHYSICAL_SSDS;
 
 /*
  * Memory area to support pages with data.
