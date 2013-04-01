@@ -13,6 +13,34 @@
 
 namespace ssd {
 
+class Priorty_Scheme {
+public:
+	Priorty_Scheme(IOScheduler* scheduler) : scheduler(scheduler) {}
+	virtual ~Priorty_Scheme() {};
+	virtual void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases) = 0;
+	void seperate_internal_external(vector<Event*> const& events, vector<Event*>& internal, vector<Event*>& external);
+protected:
+	IOScheduler* scheduler;
+};
+
+class Fifo_Priorty_Scheme : public Priorty_Scheme {
+public:
+	Fifo_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
+};
+
+class Smart_Priorty_Scheme : public Priorty_Scheme {
+public:
+	Smart_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
+};
+
+class Smart_GC_Priorty_Scheme : public Priorty_Scheme {
+public:
+	Smart_GC_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
+};
+
 class event_queue {
 public:
 	event_queue() : events(), num_events(0) {};
@@ -31,13 +59,13 @@ private:
 
 class Scheduling_Strategy : public event_queue {
 public:
-	Scheduling_Strategy(IOScheduler* s, Ssd* ssd) : event_queue(), scheduler(s), ssd(ssd) {}
+	Scheduling_Strategy(IOScheduler* s, Ssd* ssd, Priorty_Scheme* scheme) : event_queue(), scheduler(s), ssd(ssd), priorty_scheme(scheme) {}
 	virtual ~Scheduling_Strategy() {};
-	virtual void register_event_completion(Event* e) {}
-	virtual void schedule(int priorities_scheme = UNDEFINED) = 0;
+	virtual void schedule();
 protected:
 	IOScheduler* scheduler;
 	Ssd* ssd;
+	Priorty_Scheme* priorty_scheme;
 };
 
 inline bool overall_wait_time_comparator (const Event* i, const Event* j) {
@@ -48,14 +76,14 @@ inline bool current_wait_time_comparator (const Event* i, const Event* j) {
 	return i->get_bus_wait_time() < j->get_bus_wait_time();
 }
 
-class Simple_Scheduling_Strategy : public Scheduling_Strategy {
+/*class Simple_Scheduling_Strategy : public Scheduling_Strategy {
 public:
 	Simple_Scheduling_Strategy(IOScheduler* s, Ssd* ssd) : Scheduling_Strategy(s, ssd) {}
 	~Simple_Scheduling_Strategy() {}
 	void schedule(int priorities_scheme = UNDEFINED);
-};
+};*/
 
-class Balancing_Scheduling_Strategy : public Simple_Scheduling_Strategy {
+/*class Balancing_Scheduling_Strategy : public Simple_Scheduling_Strategy {
 public:
 	Balancing_Scheduling_Strategy(IOScheduler* s, Block_manager_parent* bm, Ssd* ssd);
 	~Balancing_Scheduling_Strategy();
@@ -69,7 +97,7 @@ private:
 	Block_manager_parent const*const bm;
 	int num_writes_finished_since_last_internal_event;
 	set<long> num_pending_application_writes;
-};
+};*/
 
 class IOScheduler {
 public:
@@ -98,7 +126,7 @@ private:
 	void manage_operation_completion(Event* event);
 	double get_soonest_event_time(vector<Event*> const& events) const;
 
-	event_queue future_events;
+	event_queue* future_events;
 	Scheduling_Strategy* overdue_events;
 	Scheduling_Strategy* current_events;
 

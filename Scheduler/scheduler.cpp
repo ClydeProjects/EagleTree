@@ -31,11 +31,13 @@ void IOScheduler::set_all(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent
 	ssd = new_ssd;
 	ftl = new_ftl;
 	bm = new_bm;
-	current_events = BALANCEING_SCHEME ? new Balancing_Scheduling_Strategy(this, bm, ssd) : new Simple_Scheduling_Strategy(this, ssd);
-	overdue_events = new Simple_Scheduling_Strategy(this, ssd);
+	future_events = new event_queue();
+	current_events = new Scheduling_Strategy(this, ssd, new Smart_Priorty_Scheme(this));
+	overdue_events = new Scheduling_Strategy(this, ssd, new Fifo_Priorty_Scheme(this));
 }
 
 IOScheduler::~IOScheduler(){
+	delete future_events;
 	delete current_events;
 	delete overdue_events;
 	map<uint, deque<Event*> >::iterator i = dependencies.begin();
@@ -73,7 +75,7 @@ void IOScheduler::schedule_events_queue(deque<Event*> events) {
 		dependency.push(operation_code);
 		op_code_to_dependent_op_codes[first->get_id()] = dependency;
 	}
-	future_events.push(first);
+	future_events->push(first);
 }
 
 // TODO: make this not call the schedule_events_queue method, but simply put the event in future events
@@ -101,7 +103,7 @@ void IOScheduler::execute_soonest_events() {
 
 // this is used to signal the SSD object when all events have finished executing
 bool IOScheduler::is_empty() {
-	return !current_events->empty() || !future_events.empty() || !overdue_events->empty();
+	return !current_events->empty() || !future_events->empty() || !overdue_events->empty();
 }
 
 double IOScheduler::get_soonest_event_time(vector<Event*> const& events) const {
@@ -117,9 +119,9 @@ double IOScheduler::get_soonest_event_time(vector<Event*> const& events) const {
 void IOScheduler::push(Event* event) {
 	event_type t = event->get_event_type();
 	double wait = event->get_bus_wait_time();
-	if (t == READ_COMMAND && wait > READ_DEADLINE
-			|| t == READ_TRANSFER && wait > READ_TRANSFER_DEADLINE
-			|| t == WRITE && wait > WRITE_DEADLINE) {
+	if (		(t == READ_COMMAND && wait >= READ_DEADLINE)
+			|| 	(t == READ_TRANSFER && wait >= READ_TRANSFER_DEADLINE)
+			|| 	(t == WRITE && wait >= WRITE_DEADLINE)) {
 		overdue_events->push(event);
 	}
 	else
@@ -136,8 +138,8 @@ double IOScheduler::get_current_time() const {
 		return t1;
 	else if (!overdue_events->empty())
 		return t2;
-	else if (!future_events.empty())
-		return future_events.get_earliest_time();
+	else if (!future_events->empty())
+		return future_events->get_earliest_time();
 	else
 		return 0;
 }
@@ -153,8 +155,8 @@ ptrdiff_t random_range(ptrdiff_t limit) {
 // in light of these new events, see if any other existing pending events are now redundant
 void IOScheduler::update_current_events(double current_time) {
 	StatisticsGatherer::get_global_instance()->register_events_queue_length(current_events->size() + overdue_events->size(), current_time);
-	while (!future_events.empty() && ((current_events->empty() && overdue_events->empty()) || future_events.get_earliest_time() < current_time + 1) ) {
-		vector<Event*> events = future_events.get_soonest_events();
+	while (!future_events->empty() && ((current_events->empty() && overdue_events->empty()) || future_events->get_earliest_time() < current_time + 1) ) {
+		vector<Event*> events = future_events->get_soonest_events();
 		random_shuffle(events.begin(), events.end(), random_range); // Process events with same timestamp in random order to prevent imbalances
 		for (uint i = 0; i < events.size(); i++) {
 			Event* e = events[i];
@@ -470,7 +472,6 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 
 	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
 
-	current_events->register_event_completion(event);
 	if (event->get_event_type() == WRITE || event->get_event_type() == COPY_BACK) {
 		ftl->register_write_completion(*event, outcome);
 		bm->register_write_outcome(*event, outcome);
