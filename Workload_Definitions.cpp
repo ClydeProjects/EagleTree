@@ -123,8 +123,6 @@ vector<Thread*> Synch_Write::generate_instance() {
 	random_format->add_follow_up_thread(rand);
 
 	vector<Thread*> threads(1, init_write);
-	OperatingSystem* os = new OperatingSystem(threads);
-	os->run();
-
+	return threads;
 }
 

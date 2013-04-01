@@ -287,7 +287,6 @@ class Ssd;
 class event_queue;
 class IOScheduler;
 class Scheduling_Strategy;
-class Simple_Scheduling_Strategy;
 
 class Block_manager_parent;
 class Block_manager_parallel;
