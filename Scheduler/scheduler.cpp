@@ -32,7 +32,7 @@ void IOScheduler::set_all(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent
 	ftl = new_ftl;
 	bm = new_bm;
 	future_events = new event_queue();
-	current_events = new Scheduling_Strategy(this, ssd, new Smart_GC_Priorty_Scheme(this));
+	current_events = new Scheduling_Strategy(this, ssd, new Smart_Priorty_Scheme(this));
 	overdue_events = new Scheduling_Strategy(this, ssd, new Fifo_Priorty_Scheme(this));
 }
 
