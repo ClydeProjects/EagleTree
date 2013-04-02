@@ -33,7 +33,7 @@ public:
 	bool Copy_backs_in_progress(Address const& address);
 	bool can_schedule_on_die(Address const& address, event_type type, uint app_io_id) const;
 	bool is_die_register_busy(Address const& addr) const;
-	void register_trim_making_gc_redundant();
+	void register_trim_making_gc_redundant(Event* trim);
 	Address choose_copbyback_address(Event const& write);
 	void schedule_gc(double time, int package_id, int die_id, int block, int klass);
 	virtual void check_if_should_trigger_more_GC(double start_time);
@@ -51,7 +51,7 @@ protected:
 	Address find_free_unused_block(double time);
 	Address find_free_unused_block(enum age age, double time);
 
-	void return_unfilled_block(Address block_address);
+	void return_unfilled_block(Address block_address, double current_time);
 	pair<bool, pair<int, int> > get_free_block_pointer_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
 	Address get_free_block_pointer_with_shortest_IO_queue();
 	uint how_many_gc_operations_are_scheduled() const;
@@ -70,7 +70,6 @@ private:
 
 	int get_num_free_blocks(int package, int die);
 	bool copy_back_allowed_on(long logical_address);
-	Address reserve_page_on(uint package, uint die, double time);
 	void register_copy_back_operation_on(uint logical_address);
 	void register_ECC_check_on(uint logical_address);
 
@@ -207,7 +206,7 @@ private:
 class Sequential_Pattern_Detector_Listener {
 public:
 	virtual ~Sequential_Pattern_Detector_Listener() {}
-	virtual void sequential_event_metadata_removed(long key) = 0;
+	virtual void sequential_event_metadata_removed(long key, double current_time) = 0;
 };
 
 struct sequential_writes_tracking {
@@ -246,7 +245,7 @@ public:
 	void register_write_arrival(Event const& write);
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
-	void sequential_event_metadata_removed(long key);
+	void sequential_event_metadata_removed(long key, double current_time);
 protected:
 	Address choose_best_address(Event const& write);
 	Address choose_any_address(Event const& write);

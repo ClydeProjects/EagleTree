@@ -26,7 +26,6 @@ Ssd::Ssd():
 	{
 		(void) new (&data[i]) Package(PACKAGE_SIZE*DIE_SIZE*PLANE_SIZE*BLOCK_SIZE*i);
 	}
-	this->getPackages();
 	
 	// Check for 32bit machine. We do not allow page data on 32bit machines.
 	if (PAGE_ENABLE_DATA == 1 && sizeof(void*) == 4)
@@ -68,6 +67,9 @@ Ssd::Ssd():
 		default: bm = new Block_manager_parallel(); break;
 	}
 
+	Free_Space_Meter::init();
+	Free_Space_Per_LUN_Meter::init();
+
 	ftl->set_scheduler(scheduler);
 	bm->set_all(this, ftl, scheduler);
 	scheduler->set_all(this, ftl, bm);
@@ -76,6 +78,9 @@ Ssd::Ssd():
 	StateVisualiser::init(this);
 	StatisticsGatherer::init(this);
 	SsdStatisticsExtractor::init(this);
+	Utilization_Meter::init();
+
+
 
 	Event::reset_id_generators(); // reset id generator
 }

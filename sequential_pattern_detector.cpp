@@ -112,7 +112,7 @@ void Sequential_Pattern_Detector::remove_old_sequential_writes_metadata(double t
 			sequential_writes_identification_and_data.erase(iter++);
 			//sequential_writes_identification_and_data.erase(iter);
 			if (listener != NULL) {
-				listener->sequential_event_metadata_removed(key);
+				listener->sequential_event_metadata_removed(key, time);
 			}
 			assert(sequential_writes_identification_and_data.count(key) == 0);
 			//++iter;

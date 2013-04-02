@@ -318,7 +318,7 @@ void Wearwolf_Locality::register_write_outcome(Event const& event, enum status s
 	}
 
 	if (tag != UNDEFINED && tag_map[tag].is_finished()) {
-		sequential_event_metadata_removed(tag_map[tag].key);
+		sequential_event_metadata_removed(tag_map[tag].key, event.get_current_time());
 		tag_map.erase(tag);
 	}
 
@@ -327,7 +327,7 @@ void Wearwolf_Locality::register_write_outcome(Event const& event, enum status s
 	}
 }
 
-void Wearwolf_Locality::sequential_event_metadata_removed(long key) {
+void Wearwolf_Locality::sequential_event_metadata_removed(long key, double current_time) {
 	assert(key >= 0);
 	if (seq_write_key_to_pointers_mapping.count(key) == 0) {
 		return;
@@ -337,8 +337,7 @@ void Wearwolf_Locality::sequential_event_metadata_removed(long key) {
 	for (uint i = 0; i < a.pointers.size(); i++) {
 		for (uint j = 0; j < a.pointers[i].size(); j++) {
 			Address& pointer = a.pointers[i][j];
-			//printf("  "); pointer.print(); printf("\n");
-			Block_manager_parent::return_unfilled_block(pointer);
+			Block_manager_parent::return_unfilled_block(pointer, current_time);
 		}
 	}
 	seq_write_key_to_pointers_mapping.erase(key);

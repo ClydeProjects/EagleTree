@@ -8,7 +8,6 @@ using namespace ssd;
 Workload_Definition* grace_hash_join(int highest_lba) {
 	Grace_Hash_Join_Workload* workload = new Grace_Hash_Join_Workload(0, highest_lba);
 	workload->set_use_flexible_Reads(false);
-	BALANCEING_SCHEME = false;
 	MAX_CONCURRENT_GC_OPS = 6;
 	return workload;
 }
@@ -16,7 +15,6 @@ Workload_Definition* grace_hash_join(int highest_lba) {
 Workload_Definition* grace_hash_join_flex(int highest_lba) {
 	Grace_Hash_Join_Workload* workload = new Grace_Hash_Join_Workload(0, highest_lba);
 	workload->set_use_flexible_Reads(true);
-	BALANCEING_SCHEME = false;
 	MAX_CONCURRENT_GC_OPS = 6;
 	return workload;
 }

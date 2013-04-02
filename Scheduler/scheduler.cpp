@@ -32,7 +32,7 @@ void IOScheduler::set_all(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent
 	ftl = new_ftl;
 	bm = new_bm;
 	future_events = new event_queue();
-	current_events = new Scheduling_Strategy(this, ssd, new Smart_Priorty_Scheme(this));
+	current_events = new Scheduling_Strategy(this, ssd, new Smart_GC_Priorty_Scheme(this));
 	overdue_events = new Scheduling_Strategy(this, ssd, new Fifo_Priorty_Scheme(this));
 }
 
@@ -619,12 +619,12 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	else if (new_event->is_garbage_collection_op() && scheduled_op_code == TRIM) {
 		remove_current_operation(new_event);
 		push(new_event);
-		bm->register_trim_making_gc_redundant();
+		bm->register_trim_making_gc_redundant(new_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 	}
 	else if (existing_event != NULL && existing_event->is_garbage_collection_op() && (new_op_code == WRITE || new_op_code == TRIM)) {
 		if (new_op_code == TRIM) {
-			bm->register_trim_making_gc_redundant();
+			bm->register_trim_making_gc_redundant(new_event);
 		}
 
 		promote_to_gc(new_event);
@@ -675,7 +675,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	else if (new_op_code == TRIM && scheduled_op_code == WRITE) {
 		remove_current_operation(existing_event);
 		if (existing_event->is_garbage_collection_op()) {
-			bm->register_trim_making_gc_redundant();
+			bm->register_trim_making_gc_redundant(new_event);
 		}
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 	}
@@ -691,7 +691,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	// if something is to be trimmed, and a read is sent, invalidate the read
 	else if ((new_op_code == READ || new_op_code == READ_TRANSFER || new_op_code == READ_COMMAND) && scheduled_op_code == TRIM) {
 		if (new_event->is_garbage_collection_op()) {
-			bm->register_trim_making_gc_redundant();
+			bm->register_trim_making_gc_redundant(new_event);
 			remove_current_operation(new_event);
 		}
 		//new_event->set_noop(true);

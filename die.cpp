@@ -28,48 +28,36 @@ Die::~Die(void)
 
 enum status Die::read(Event &event)
 {
-	assert(data != NULL);
-	assert(event.get_address().plane < DIE_SIZE && event.get_address().valid > DIE);
 	assert(currently_executing_io_finish_time <= event.get_current_time());
 	if (event.get_event_type() == READ_COMMAND) {
 		last_read_io = event.get_application_io_id();
 	}
-
 	enum status result = data[event.get_address().plane].read(event);
+	Utilization_Meter::register_event(currently_executing_io_finish_time, event.get_execution_time(), event, DIE);
 	currently_executing_io_finish_time = event.get_current_time();
 	return result;
 }
 
 enum status Die::write(Event &event)
 {
-	assert(data != NULL);
-	assert(event.get_address().plane < DIE_SIZE && event.get_address().valid > DIE);
 	assert(currently_executing_io_finish_time <= event.get_current_time());
-	//last_read_io = event.get_application_io_id();
 	enum status result = data[event.get_address().plane].write(event);
+	Utilization_Meter::register_event(currently_executing_io_finish_time, event.get_execution_time(), event, DIE);
 	currently_executing_io_finish_time = event.get_current_time();
 	return result;
 }
 
 enum status Die::erase(Event &event)
 {
-	assert(data != NULL);
-	assert(event.get_address().plane < DIE_SIZE && event.get_address().valid > DIE);
 	assert(currently_executing_io_finish_time <= event.get_current_time());
-
 	enum status status = data[event.get_address().plane].erase(event);
+	Utilization_Meter::register_event(currently_executing_io_finish_time, event.get_execution_time(), event, DIE);
 	currently_executing_io_finish_time = event.get_current_time();
 	return status;
 }
 
 double Die::get_currently_executing_io_finish_time() {
 	return currently_executing_io_finish_time;
-}
-
-Block *Die::get_block_pointer(const Address & address)
-{
-	assert(address.valid >= PLANE);
-	return data[address.plane].get_block_pointer(address);
 }
 
 int Die::get_last_read_application_io() {

@@ -543,7 +543,6 @@ public:
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	double get_currently_executing_io_finish_time();
-	Block *get_block_pointer(const Address & address);
 	inline Plane *getPlanes() { return data; }
 	void clear_register();
 	int get_last_read_application_io();
@@ -566,7 +565,6 @@ public:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	Block *get_block_pointer(const Address & address);
 	inline Die *getDies() { return data; }
 	enum status lock(double start_time, double duration, Event &event);
 	inline double get_currently_executing_operation_finish_time() { return currently_executing_operation_finish_time; }
@@ -1120,6 +1118,46 @@ private:
 	bool expleriment_started;
 	double start_time;
 	double end_time;
+};
+
+// Keeps track of the fraction of the time in which channels and LUNs are busy
+class Utilization_Meter {
+public:
+	static void init();
+	static void register_event(double prev_time, double duration, Event const& event, address_valid gran);
+	static void print();
+private:
+	static vector<double> channel_used;
+	static vector<double> LUNs_used;
+	static vector<double> channel_unused;
+	static vector<double> LUNs_unused;
+};
+
+// Keeps track of the fraction of the time in which there is free space in LUNs for writes
+class Free_Space_Meter {
+public:
+	static void init();
+	static void register_num_free_pages_for_app_writes(long num_free_pages_for_app_writes, double timestamp);
+	static void print();
+	static double get_current_time() { return current_time; }
+private:
+	static long prev_num_free_pages_for_app_writes;
+	static double timestamp_of_last_change, current_time;
+	static double total_time_with_free_space;
+	static double total_time_without_free_space;
+};
+
+class Free_Space_Per_LUN_Meter {
+public:
+	static void init();
+	static void mark_out_of_space(Address addr, double timestamp);
+	static void mark_new_space(Address addr, double timestamp);
+	static void print();
+private:
+	static vector<double> total_time_without_free_space;
+	static vector<double> total_time_with_free_space;
+	static vector<double> timestamp_of_last_change;
+	static vector<bool> has_free_pages;
 };
 
 class ExperimentResult {

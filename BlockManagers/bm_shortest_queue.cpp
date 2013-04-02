@@ -28,6 +28,9 @@ void Block_manager_parallel::register_erase_outcome(Event const& event, enum sta
 
 	if (!has_free_pages(free_block_pointers[a.package][a.die])) {
 		free_block_pointers[a.package][a.die] = find_free_unused_block(a.package, a.die, event.get_current_time());
+		if (has_free_pages(free_block_pointers[a.package][a.die])) {
+			Free_Space_Per_LUN_Meter::mark_new_space(a, event.get_current_time());
+		}
 	}
 }
 

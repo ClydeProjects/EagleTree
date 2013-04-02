@@ -44,15 +44,11 @@ enum status Package::erase(Event &event)
 	return status;
 }
 
-Block *Package::get_block_pointer(const Address & address)
-{
-	assert(address.valid >= DIE);
-	return data[address.die].get_block_pointer(address);
-}
-
 enum status Package::lock(double start_time, double duration, Event& event) {
 	assert(start_time >= 0.0);
 	assert(duration >= 0.0);
+
+	Utilization_Meter::register_event(currently_executing_operation_finish_time, duration, event, PACKAGE);
 
 	if (currently_executing_operation_finish_time > event.get_current_time() + 0.000001) {
 		assert(false);

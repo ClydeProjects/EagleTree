@@ -60,6 +60,7 @@ void Block_manager_parent::set_all(Ssd* new_ssd, FtlParent* new_ftl, IOScheduler
 			}
 			Address pointer = free_blocks[i][j][0].back();
 			free_block_pointers[i][j] = pointer;
+			Free_Space_Per_LUN_Meter::mark_new_space(pointer, 0);
 			free_blocks[i][j][0].pop_back();
 		}
 	}
@@ -73,6 +74,7 @@ Address Block_manager_parent::choose_copbyback_address(Event const& write) {
 		Address new_block = find_free_unused_block(ra.package, ra.die, write.get_current_time());
 		if (has_free_pages(new_block)) {
 			free_block_pointers[ra.package][ra.die] = new_block;
+			Free_Space_Per_LUN_Meter::mark_new_space(new_block, write.get_current_time());
 		}
 	}
 	return has_free_pages(free_block_pointers[ra.package][ra.die]) ? free_block_pointers[ra.package][ra.die] : Address();
@@ -104,10 +106,6 @@ Address Block_manager_parent::choose_write_address(Event const& write) {
 		return a;
 	}
 
-	/*if (write.is_garbage_collection_op() && has_free_pages(a) && can_schedule_write_immediately(a, write.get_current_time())) {
-		return a;
-	}*/
-
 	if (!write.is_garbage_collection_op() && how_many_gc_operations_are_scheduled() == 0) {
 		schedule_gc(write.get_current_time(), -1, -1, -1 ,-1);
 	}
@@ -126,7 +124,7 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	Address a = event.get_address();
 	a.valid = PAGE;
 	a.page = 0;
-	Block* b = &ssd->getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
+	//Block* b = &ssd->getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 
 	wl->register_erase_completion(event);
 
@@ -149,7 +147,7 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	free_blocks[a.package][a.die][age_class].push_back(a);
 
 
-	blocks_being_garbage_collected.erase(b->get_physical_address());
+	blocks_being_garbage_collected.erase(a.get_linear_address());
 	num_blocks_being_garbaged_collected_per_LUN[a.package][a.die]--;
 
 	if (PRINT_LEVEL > 1) {
@@ -162,8 +160,8 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 
 	num_free_pages += BLOCK_SIZE;
 	num_available_pages_for_new_writes += BLOCK_SIZE;
+	Free_Space_Meter::register_num_free_pages_for_app_writes(num_available_pages_for_new_writes, event.get_current_time());
 
-	//printf("");
 	if (blocks_being_garbage_collected.size() == 0) {
 		assert(num_free_pages == num_available_pages_for_new_writes);
 	}
@@ -204,6 +202,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	if (!event.is_garbage_collection_op()) {
 		assert(num_available_pages_for_new_writes > 0);
 		num_available_pages_for_new_writes--;
+		Free_Space_Meter::register_num_free_pages_for_app_writes(num_available_pages_for_new_writes, event.get_current_time());
 	}
 	// if there are very few pages left, need to trigger emergency GC
 	if (num_free_pages <= BLOCK_SIZE && how_many_gc_operations_are_scheduled() == 0) {
@@ -222,15 +221,8 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 			if (has_free_pages(free_pointer)) {
 				free_block_pointers[ba.package][ba.die] = free_pointer;
 			}
-			/*else if (erase_queue[ba.package].size() > 0) {
-				Event* erase = erase_queue[ba.package].front();
-				erase_queue[ba.package].pop();
-				num_erases_scheduled_per_package[ba.package]++;
-				IOScheduler::instance()->schedule_event(erase);
-			}*/
-			else { // If no free pointer could be found, schedule GC
-				//schedule_gc(event.get_current_time(), ba.package, ba.die);
-
+			else {
+				Free_Space_Per_LUN_Meter::mark_out_of_space(ba, event.get_current_time() );
 			}
 			if (PRINT_LEVEL > 1) {
 				if (free_pointer.valid == NONE) printf(", and a new unused block could not be found.\n");
@@ -567,25 +559,6 @@ bool Block_manager_parent::copy_back_allowed_on(long logical_address) {
 	else return true;
 }
 
-// Returns a reserved address from a free block on a chosen package/die
-Address Block_manager_parent::reserve_page_on(uint package, uint die, double time) {
-	// Try to find a free page on the same die (should actually be plane!), so that a fast copy back can be done
-	Address free_block = free_block_pointers[package][die];
-	if (!has_free_pages(free_block)) { // If there is no free pages left, try to find another block
-		free_block = find_free_unused_block(package, die, time);
-		if (free_block.valid == NONE) { // Another free block could not be found, schedule GC and return invalid address
-			//schedule_gc(time, package, die);
-			return Address(0, NONE);
-		}
-		assert(free_block.package == package);
-		assert(free_block.die == die);
-		free_block_pointers[package][die] = free_block;
-	}
-	increment_pointer(free_block_pointers[package][die]); // Increment pointer so the returned page is not used again in the future (it is reserved)
-	assert(has_free_pages(free_block));
-	return free_block;
-}
-
 // Updates map keeping track of performed copy backs for each logical address
 void Block_manager_parent::register_copy_back_operation_on(uint logical_address) {
 	page_copy_back_count[logical_address]++; // Increment copy back counter for target page (if address is not yet in map, it will be inserted and count will become 1)
@@ -596,11 +569,12 @@ void Block_manager_parent::register_ECC_check_on(uint logical_address) {
 	page_copy_back_count.erase(logical_address);
 }
 
-void Block_manager_parent::register_trim_making_gc_redundant() {
+void Block_manager_parent::register_trim_making_gc_redundant(Event* trim) {
 	if (PRINT_LEVEL > 1) {
 		printf("a trim made a gc event redundant\n");
 	}
 	num_available_pages_for_new_writes++;
+	Free_Space_Meter::register_num_free_pages_for_app_writes(num_available_pages_for_new_writes, trim->get_current_time());
 }
 
 // Reads and rewrites all valid pages of a block somewhere else
@@ -833,13 +807,14 @@ Address Block_manager_parent::find_free_unused_block(enum age age, double time) 
 	return Address();
 }
 
-void Block_manager_parent::return_unfilled_block(Address pba) {
+void Block_manager_parent::return_unfilled_block(Address pba, double current_time) {
 	if (has_free_pages(pba)) {
 		int age_class = sort_into_age_class(pba);
 		if (has_free_pages(free_block_pointers[pba.package][pba.die])) {
 			free_blocks[pba.package][pba.die][age_class].push_back(pba);
 		} else {
 			free_block_pointers[pba.package][pba.die] = pba;
+			Free_Space_Per_LUN_Meter::mark_new_space(pba, current_time);
 		}
 
 	}

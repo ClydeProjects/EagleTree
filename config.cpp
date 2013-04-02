@@ -148,7 +148,6 @@ bool USE_ERASE_QUEUE = false;
  * 2 ->  Smart
  */
 int SCHEDULING_SCHEME = 2;
-extern bool BALANCEING_SCHEME = false;
 
 bool ENABLE_WEAR_LEVELING = false;
 int WEAR_LEVEL_THRESHOLD = 100;
@@ -267,8 +266,8 @@ void load_entry(char *name, double value, uint line_number) {
 }
 
 void set_normal_config() {
-	SSD_SIZE = 4;
-	PACKAGE_SIZE = 2;
+	SSD_SIZE = 2;
+	PACKAGE_SIZE = 4;
 	DIE_SIZE = 1;
 	PLANE_SIZE = 256;
 	BLOCK_SIZE = 32;
@@ -286,11 +285,10 @@ void set_normal_config() {
 	USE_ERASE_QUEUE = false;
 	ENABLE_WEAR_LEVELING = false;
 	BLOCK_MANAGER_ID = 0;
-	BALANCEING_SCHEME = false;
 	MAX_CONCURRENT_GC_OPS = PACKAGE_SIZE * SSD_SIZE;
-	GREED_SCALE = 2;
+	GREED_SCALE = 3;
 
-	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY;
+	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY + 1;
 }
 
 void load_config() {
