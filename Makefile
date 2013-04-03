@@ -13,7 +13,7 @@
 # classes.  It is suggested to test with the "test" make target first.
 
 CC = /usr/bin/gcc
-CFLAGS = -Wall -Wextra -g 
+CFLAGS = -Wall -Wextra -g -O2
 CXX = /usr/bin/g++
 CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
@@ -36,12 +36,12 @@ ssd: $(HDR) $(SRC)
 
 # All Target
 
-all: deadlines grace #scheduling sequential_tuning sequential greediness copybacks
+all: deadlines #scheduling sequential_tuning sequential greediness copybacks
 
 deadlines: $(HDR) $(OBJ)
-	$(CXX) $(CXXFLAGS) -o deadlines deadlines.cpp $(OBJ)
-	-chmod $(PERMS) $(OBJ)
-	-chmod $(EPERMS) deadlines
+	$(CXX) $(CXXFLAGS) -o Experiments/deadlines Experiments/deadlines.cpp $(OBJ)
+	-chmod $(PERMS) $(OBJ) 
+	-chmod $(EPERMS) Experiments/deadlines
 
 balanced_sched: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o balanced_sched exp_balanced_scheduler.cpp $(OBJ)

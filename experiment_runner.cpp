@@ -285,6 +285,9 @@ vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definitio
 		os->run();
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 		StatisticsGatherer::get_global_instance()->print();
+		Utilization_Meter::print();
+		Free_Space_Meter::print();
+		Free_Space_Per_LUN_Meter::print();
 		delete os;
 	}
 	global_result.end_experiment();
@@ -469,7 +472,7 @@ void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filenam
     for (uint i = 0; i < experiments.size(); i++) {
     	ExperimentResult e = experiments[i];
         gleScript <<
-       	"   data   \"" << e.data_folder << subfolder << (subfolder != "" ? "/" : "") << ExperimentResult::stats_filename << ExperimentResult::datafile_postfix << "\"" << " d"<<i+1<<"=c1,c" << column+1 << endl <<
+        "   data   \"" << e.data_folder << subfolder << (subfolder != "" ? "/" : "") << ExperimentResult::stats_filename << ExperimentResult::datafile_postfix << "\"" << " d"<<i+1<<"=c1,c" << column+1 << endl <<
         "   d"<<i+1<<" line marker " << markers[i] << " key " << "\"" << e.experiment_name << "\"" << endl;
     }
 
@@ -776,19 +779,21 @@ void Experiment_Runner::draw_graphs(vector<vector<ExperimentResult> > exps, stri
 		error = (exps[0][i].sub_folder != "") ? chdir(exps[0][i].sub_folder.c_str()) : 0;
 		if (error != 0) printf("Error %d changing to folder %s\n", error, exps[0][i].sub_folder.c_str());
 
-		Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			24, exp/*, 30*/, UNDEFINED);
-		Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	25, exp/*, 30*/);
-		Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 		26, exp/*, 30*/);
+		Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			25, exp/*, 30*/, UNDEFINED);
+		Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	26, exp/*, 30*/);
+		Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 		27, exp/*, 30*/);
 		Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp/*, 16000*/);
 		Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp/*, 500000*/);
 
-		Experiment_Runner::graph(sx, sy,   "Write latency, mean", 			"Write latency, mean", 		9, 	exp);
-		Experiment_Runner::graph(sx, sy,   "Write latency, max", 			"Write latency, max", 		14, exp);
-		Experiment_Runner::graph(sx, sy,   "Write latency, std", 			"Write latency, std", 		15, exp);
+		Experiment_Runner::graph(sx, sy,   "Write latency, mean", 		"Write latency, mean", 		9, 	exp);
+		Experiment_Runner::graph(sx, sy,   "Write latency, max", 		"Write latency, max", 		14, exp);
+		Experiment_Runner::graph(sx, sy,   "Write latency, std", 		"Write latency, std", 		15, exp);
 
-		Experiment_Runner::graph(sx, sy,   "Read latency, mean", 			"Read latency, mean", 		16,	exp);
-		Experiment_Runner::graph(sx, sy,   "Read latency, max", 			"Read latency, max", 		21, exp);
-		Experiment_Runner::graph(sx, sy,   "Read latency, std", 			"Read latency, std", 		22, exp);
+		Experiment_Runner::graph(sx, sy,   "Read latency, mean", 		"Read latency, mean", 		16,	exp);
+		Experiment_Runner::graph(sx, sy,   "Read latency, max", 		"Read latency, max", 		21, exp);
+		Experiment_Runner::graph(sx, sy,   "Read latency, std", 		"Read latency, std", 		22, exp);
+
+		Experiment_Runner::graph(sx, sy,   "Channel Utilization (%)", 	"Channel utilization", 		24, exp);
 
 		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
 		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, 1, 4);

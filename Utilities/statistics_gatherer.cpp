@@ -288,7 +288,7 @@ void StatisticsGatherer::print() {
 	printf("\n\t");
 	printf("num writes\t");
 	printf("num reads\t");
-	printf("WL writes\t");
+	//printf("WL writes\t");
 	printf("GC writes\t");
 	printf("GC reads\t");
 	printf("copy backs\t");
@@ -318,7 +318,7 @@ void StatisticsGatherer::print() {
 			printf("%d\t\t", num_writes_per_LUN[i][j]);
 			printf("%d\t\t", num_reads_per_LUN[i][j]);
 
-			printf("%d\t\t", num_wl_writes_per_LUN_origin[i][j]);
+			//printf("%d\t\t", num_wl_writes_per_LUN_origin[i][j]);
 			printf("%d\t\t", num_gc_writes_per_LUN_origin[i][j]);
 			printf("%d\t\t", num_gc_reads_per_LUN[i][j]);
 			printf("%d\t\t", num_copy_backs_per_LUN[i][j]);
@@ -350,7 +350,7 @@ void StatisticsGatherer::print() {
 
 	printf("%d\t\t", (int) get_sum(num_writes_per_LUN));
 	printf("%d\t\t", (int) get_sum(num_reads_per_LUN));
-	printf("%d\t\t", (int) get_sum(num_wl_writes_per_LUN_origin));
+	//printf("%d\t\t", (int) get_sum(num_wl_writes_per_LUN_origin));
 	printf("%d\t\t", (int) get_sum(num_gc_writes_per_LUN_origin));
 	printf("%d\t\t", (int) get_sum(num_gc_reads_per_LUN));
 	printf("%d\t\t", (int) get_sum(num_copy_backs_per_LUN));
@@ -360,11 +360,11 @@ void StatisticsGatherer::print() {
 	printf("%d\t\t", (int)avg_overall_read_wait_time);
 	printf("\n");
 
-	printf("\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t%d", (int)write_std);
+	printf("\t\t\t\t\t\t\t\t\t\t\t\t\t%d", (int)write_std);
 	printf("\t\t%d\t\t", (int)read_std);
 	printf("\n");
 
-	printf("\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t%d", (int)max_write);
+	printf("\t\t\t\t\t\t\t\t\t\t\t\t\t%d", (int)max_write);
 	printf("\t\t%d\t\t", (int)max_read);
 
 	printf("\n");
@@ -483,6 +483,7 @@ vector<string> StatisticsGatherer::totals_vector_header() {
 	result.push_back("Read latency, stdev (µs)");
 
 	result.push_back("GC latency, stdev (µs)"); // 25
+	result.push_back("Channel Utilization (%)");
 
 	//result.push_back("max write wait (µs)"); // 15
 	//result.push_back("max read wait (µs)");
@@ -575,9 +576,11 @@ string StatisticsGatherer::totals_csv_line() {
 	ss << get_std(all_read_wait_times) << ", ";
 
 	//printf("read max:  %f\n", all_read_wait_times.back());
-	printf("read std:  %f\n", get_std(all_read_wait_times));
+	//printf("read std:  %f\n", get_std(all_read_wait_times));
 
-	ss << stddev_overall_gc_wait_time;
+	ss << stddev_overall_gc_wait_time << ", ";
+
+	ss << Utilization_Meter::get_avg_utilization();
 
 	return ss.str();
 }

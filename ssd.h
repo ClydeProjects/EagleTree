@@ -1126,6 +1126,7 @@ public:
 	static void init();
 	static void register_event(double prev_time, double duration, Event const& event, address_valid gran);
 	static void print();
+	static double get_avg_utilization();
 private:
 	static vector<double> channel_used;
 	static vector<double> LUNs_used;
@@ -1147,6 +1148,7 @@ private:
 	static double total_time_without_free_space;
 };
 
+// Keeps track of the fraction of the time in which there is free space in a given LUN for new writes
 class Free_Space_Per_LUN_Meter {
 public:
 	static void init();
