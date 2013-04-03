@@ -72,7 +72,7 @@ Ssd::Ssd():
 
 	ftl->set_scheduler(scheduler);
 	bm->set_all(this, ftl, scheduler);
-	scheduler->set_all(this, ftl, bm);
+	scheduler->init(this, ftl, bm);
 
 	VisualTracer::init();
 	StateVisualiser::init(this);
