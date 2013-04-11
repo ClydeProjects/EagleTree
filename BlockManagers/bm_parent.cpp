@@ -32,8 +32,7 @@ Block_manager_parent::Block_manager_parent(int num_age_classes)
    num_erases_scheduled_per_package(SSD_SIZE, 0),
    scheduler(NULL),
    wl(NULL),
-   gc(NULL),
-   migrations_num_tracker()
+   gc(NULL)
 {}
 
 Block_manager_parent::~Block_manager_parent() {
@@ -351,11 +350,6 @@ void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
 	//printf("num_luns_with_space:  %d\n", num_luns_with_space);
 }
 
-double Block_manager_parent::get_average_migrations_per_gc() const {
-	//return gc->get_average_live_pages_per_best_candidate();
-	return migrations_num_tracker.get_avg();
-}
-
 // This function takes a vector of channels, each of each has a vector of dies
 // it finds the die with the shortest queue, and returns its ID
 // if all dies are busy, the boolean field is returned as false
@@ -658,7 +652,6 @@ vector<deque<Event*> > Block_manager_parent::migrate(Event* gc_event) {
 
 	//deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
 	StatisticsGatherer::get_global_instance()->register_executed_gc(*gc_event, *victim);
-	migrations_num_tracker.register_num_live_pages(victim->get_pages_valid());
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
 		if (victim->getPages()[i].get_state() == VALID) {
