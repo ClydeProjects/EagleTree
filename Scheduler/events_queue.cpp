@@ -38,13 +38,13 @@ Event* event_queue::find(long dependency_code) const {
 }
 
 bool event_queue::remove(Event* event) {
+	if (event == NULL) return false;
 	long time = event->get_current_time();
 	vector<Event*>& events_with_time = events[time];
 	vector<Event*>::iterator iter = std::find(events_with_time.begin(), events_with_time.end(), event);
 	if (iter == events_with_time.end())
 		return false;
 	events_with_time.erase(iter);
-	delete (*iter);
 	return true;
 }
 

@@ -178,6 +178,8 @@ bool OS_LOCK = false;
 int WEARWOLF_LOCALITY_THRESHOLD = 10;
 bool ENABLE_TAGGING = false;
 
+bool ALLOW_DEFERRING_TRANSFERS = true;
+
 /* Defines the max number of copy back operations on a page before ECC check is performed.
  * Set to zero to disable copy back GC operations */
 uint MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
@@ -287,8 +289,9 @@ void set_normal_config() {
 	BLOCK_MANAGER_ID = 0;
 	MAX_CONCURRENT_GC_OPS = PACKAGE_SIZE * SSD_SIZE;
 	GREED_SCALE = 3;
+	ALLOW_DEFERRING_TRANSFERS = true;
 
-	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY + 1;
+	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY + 1;// PAGE_READ_DELAY + 1;
 }
 
 void load_config() {

@@ -112,6 +112,8 @@ extern const bool PAGE_ENABLE_DATA;
  */
 extern const uint MAP_DIRECTORY_SIZE;
 
+extern const bool ALLOW_DEFERRING_TRANSFERS;
+
 /*
  * FTL Implementation
  */

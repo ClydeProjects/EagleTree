@@ -27,12 +27,12 @@ IOScheduler::IOScheduler() :
 {
 }
 
-void IOScheduler::set_all(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent* new_bm) {
+void IOScheduler::init(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent* new_bm) {
 	ssd = new_ssd;
 	ftl = new_ftl;
 	bm = new_bm;
 	future_events = new event_queue();
-	current_events = new Scheduling_Strategy(this, ssd, new Smart_Priorty_Scheme(this));
+	current_events = new Scheduling_Strategy(this, ssd, new Fifo_Priorty_Scheme(this));
 	overdue_events = new Scheduling_Strategy(this, ssd, new Fifo_Priorty_Scheme(this));
 }
 
@@ -123,6 +123,7 @@ void IOScheduler::push(Event* event) {
 			|| 	(t == READ_TRANSFER && wait >= READ_TRANSFER_DEADLINE)
 			|| 	(t == WRITE && wait >= WRITE_DEADLINE)) {
 		overdue_events->push(event);
+		//event->print();
 	}
 	else
 		current_events->push(event);
@@ -166,7 +167,6 @@ void IOScheduler::update_current_events(double current_time) {
 }
 
 void IOScheduler::handle(vector<Event*>& events) {
-	//sort(events.begin(), events.end(), overall_wait_time_comparator);
 	while (events.size() > 0) {
 		Event* event = events.back();
 		events.pop_back();
@@ -176,6 +176,9 @@ void IOScheduler::handle(vector<Event*>& events) {
 		}
 		else if (type == READ_COMMAND && event->is_flexible_read()) {
 			handle_flexible_read(event);
+		}
+		else if (type == READ_COMMAND || type == COPY_BACK) {
+			handle_read(event);
 		}
 		else if (type == TRIM) {
 			execute_next(event);
@@ -200,6 +203,42 @@ void IOScheduler::handle_event(Event* event) {
 	}
 	else {
 		execute_next(event);
+	}
+}
+
+void IOScheduler::handle_read(Event* event) {
+	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
+	bool can_schedule = bm->can_schedule_on_die(event->get_address(), event->get_event_type(), event->get_application_io_id());
+	if (!can_schedule) {
+		event->incr_bus_wait_time(BUS_DATA_DELAY + BUS_CTRL_DELAY + time);
+		push(event);
+	}
+	else if (time > 0) {
+		event->incr_bus_wait_time(time);
+		push(event);
+	}
+	else if (ALLOW_DEFERRING_TRANSFERS) {
+		execute_next(event);
+	} else {
+		/*event->print();
+		Event* transfer = dependencies[event->get_application_io_id()].front();
+		dependencies[event->get_application_io_id()].pop_front();
+		setup_dependent_event(event, transfer);*/
+		long app_code = event->get_application_io_id();
+		//event->print();
+		execute_next(event);
+
+		Event* transfer = current_events->find(app_code);
+		current_events->remove(transfer);
+		if (transfer == NULL) {
+			transfer = overdue_events->find(app_code);
+			overdue_events->remove(transfer);
+		}
+		//transfer->print();
+		execute_next(transfer);
+
+		//transfer->print();
+		//execute_next(transfer);
 	}
 }
 
@@ -288,24 +327,6 @@ void IOScheduler::handle_write(Event* event) {
 		assert(addr.page < BLOCK_SIZE);
 		execute_next(event);
 	}
-
-	/*if ( wait_time == 0 && !bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id()))  {
-		wait_time = BUS_DATA_DELAY + BUS_CTRL_DELAY;
-		printf("warning from handle_write.");
-	}
-	if (wait_time == 0) {
-		event->set_address(addr);
-		ftl->set_replace_address(*event);
-		assert(addr.page < BLOCK_SIZE);
-		execute_next(event);
-	}
-	else {
-		event->incr_bus_wait_time(wait_time);
-		if (event->get_event_type() == COPY_BACK && addr.valid == NONE) {
-			transform_copyback(event);
-		}
-		current_events->push(event);
-	}*/
 }
 
 void IOScheduler::transform_copyback(Event* event) {
@@ -371,6 +392,24 @@ void IOScheduler::make_dependent(Event* dependent_event, uint independent_code/*
 	dependencies[dependent_code].push_front(dependent_event);
 }
 
+void IOScheduler::setup_dependent_event(Event* event, Event* dependent) {
+	int dependency_code = event->get_application_io_id();
+	LBA_currently_executing.erase(event->get_logical_address());
+	//LBA_currently_executing[dependent->get_logical_address()] = dependent->get_application_io_id();
+	dependent->set_application_io_id(dependency_code);
+	double diff = event->get_current_time() - dependent->get_current_time();
+	//dependent->incr_os_wait_time(event->get_os_wait_time());
+	dependent->incr_accumulated_wait_time(diff);
+	dependent->incr_pure_ssd_wait_time(event->get_bus_wait_time() + event->get_execution_time());
+	dependent->set_noop(event->get_noop());
+
+	// The dependent event might have a different LBA and type - record this in bookkeeping maps
+	LBA_currently_executing[dependent->get_logical_address()] = dependent->get_application_io_id();
+	dependency_code_to_LBA[dependency_code] = dependent->get_logical_address();
+	dependency_code_to_type[dependency_code] = dependent->get_event_type();
+	init_event(dependent);
+}
+
 enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd->issue(event);
 
@@ -382,25 +421,13 @@ enum status IOScheduler::execute_next(Event* event) {
 	}
 
 	handle_finished_event(event, result);
+
 	if (result == SUCCESS) {
 		int dependency_code = event->get_application_io_id();
 		if (dependencies[dependency_code].size() > 0) {
 			Event* dependent = dependencies[dependency_code].front();
-			LBA_currently_executing.erase(event->get_logical_address());
-			//LBA_currently_executing[dependent->get_logical_address()] = dependent->get_application_io_id();
-			dependent->set_application_io_id(dependency_code);
-
-			double diff = event->get_current_time() - dependent->get_current_time();
-			//dependent->incr_os_wait_time(event->get_os_wait_time());
-			dependent->incr_accumulated_wait_time(diff);
-			dependent->incr_pure_ssd_wait_time(event->get_bus_wait_time() + event->get_execution_time());
-			dependent->set_noop(event->get_noop());
 			dependencies[dependency_code].pop_front();
-			// The dependent event might have a different LBA and type - record this in bookkeeping maps
-			LBA_currently_executing[dependent->get_logical_address()] = dependent->get_application_io_id();
-			dependency_code_to_LBA[dependency_code] = dependent->get_logical_address();
-			dependency_code_to_type[dependency_code] = dependent->get_event_type();
-			init_event(dependent);
+			setup_dependent_event(event, dependent);
 		} else {
 			assert(dependencies.count(dependency_code) == 1);
 			dependencies.erase(dependency_code);

@@ -29,15 +29,21 @@ public:
 	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
 };
 
-class Smart_Priorty_Scheme : public Priorty_Scheme {
+class Re_Er_Wr_Priorty_Scheme : public Priorty_Scheme {
 public:
-	Smart_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	Re_Er_Wr_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
 	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
 };
 
-class Smart_GC_Priorty_Scheme : public Priorty_Scheme {
+class Er_gcRe_gcWr_Re_Wr_Priorty_Scheme : public Priorty_Scheme {
 public:
-	Smart_GC_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	Er_gcRe_gcWr_Re_Wr_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
+};
+
+class Smart_App_Priorty_Scheme : public Priorty_Scheme {
+public:
+	Smart_App_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
 	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
 };
 
@@ -76,34 +82,11 @@ inline bool current_wait_time_comparator (const Event* i, const Event* j) {
 	return i->get_bus_wait_time() < j->get_bus_wait_time();
 }
 
-/*class Simple_Scheduling_Strategy : public Scheduling_Strategy {
-public:
-	Simple_Scheduling_Strategy(IOScheduler* s, Ssd* ssd) : Scheduling_Strategy(s, ssd) {}
-	~Simple_Scheduling_Strategy() {}
-	void schedule(int priorities_scheme = UNDEFINED);
-};*/
-
-/*class Balancing_Scheduling_Strategy : public Simple_Scheduling_Strategy {
-public:
-	Balancing_Scheduling_Strategy(IOScheduler* s, Block_manager_parent* bm, Ssd* ssd);
-	~Balancing_Scheduling_Strategy();
-	void schedule(int priorities_scheme = UNDEFINED);
-	void push(Event*);
-	void register_event_completion(Event*);
-	bool remove(Event*);
-	Event* find(long dep_code) const;
-private:
-	deque<Event*> internal_events;
-	Block_manager_parent const*const bm;
-	int num_writes_finished_since_last_internal_event;
-	set<long> num_pending_application_writes;
-};*/
-
 class IOScheduler {
 public:
 	IOScheduler();
 	~IOScheduler();
-	void set_all(Ssd*, FtlParent*, Block_manager_parent*);
+	void init(Ssd*, FtlParent*, Block_manager_parent*);
 	void schedule_events_queue(deque<Event*> events);
 	void schedule_event(Event* events);
 	bool is_empty();
@@ -116,7 +99,9 @@ private:
 	void execute_current_waiting_ios();
 	void handle_event(Event* event);
 	void handle_write(Event* event);
+	void handle_read(Event* event);
 	void handle_flexible_read(Event* event);
+	void setup_dependent_event(Event* first, Event* dependent);
 	void transform_copyback(Event* event);
 	void handle_finished_event(Event *event, enum status outcome);
 	void remove_redundant_events(Event* new_event);
