@@ -71,8 +71,13 @@ Ssd::Ssd():
 	Free_Space_Per_LUN_Meter::init();
 
 	ftl->set_scheduler(scheduler);
-	bm->set_all(this, ftl, scheduler);
-	scheduler->init(this, ftl, bm);
+	Migrator* migrator = new Migrator();
+	Garbage_Collector* gc = new Garbage_Collector(this, bm);
+	Wear_Leveling_Strategy* wl = new Wear_Leveling_Strategy(this, migrator);
+
+	bm->init(this, ftl, scheduler, gc, wl, migrator);
+	scheduler->init(this, ftl, bm, migrator);
+	migrator->init(scheduler, bm, gc, wl, ftl, this);
 
 	VisualTracer::init();
 	StateVisualiser::init(this);
@@ -80,9 +85,7 @@ Ssd::Ssd():
 	SsdStatisticsExtractor::init(this);
 	Utilization_Meter::init();
 
-
-
-	Event::reset_id_generators(); // reset id generator
+	Event::reset_id_generators();
 }
 
 Ssd::~Ssd(void)

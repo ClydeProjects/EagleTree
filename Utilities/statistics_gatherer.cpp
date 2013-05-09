@@ -83,6 +83,7 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 	uint current_window = floor(event.get_current_time() / io_counter_window_size);
 	while (application_io_history.size() < current_window + 1) application_io_history.push_back(0);
 	while (non_application_io_history.size() < current_window + 1)non_application_io_history.push_back(0);
+
 	if (event.get_event_type() != READ_COMMAND && event.get_event_type() != TRIM) {
 		if (event.is_original_application_io()) application_io_history[current_window]++;
 		else non_application_io_history[current_window]++;
@@ -485,6 +486,8 @@ vector<string> StatisticsGatherer::totals_vector_header() {
 	result.push_back("GC latency, stdev (µs)"); // 25
 	result.push_back("Channel Utilization (%)");
 
+	result.push_back("GC Efficiency");
+
 	//result.push_back("max write wait (µs)"); // 15
 	//result.push_back("max read wait (µs)");
 	//result.push_back("max GC wait (µs)");
@@ -580,7 +583,18 @@ string StatisticsGatherer::totals_csv_line() {
 
 	ss << stddev_overall_gc_wait_time << ", ";
 
-	ss << Utilization_Meter::get_avg_utilization();
+	ss << Utilization_Meter::get_avg_utilization() << ", ";
+
+	ss << (double)num_migrations / num_gc_executed;
+
+	int total_read_IOs_issued  = total_reads();
+	int total_write_IOs_issued = total_writes();
+	long double read_throughput = (long double) (total_read_IOs_issued / os_runtime) * 1000; // IOs/sec
+	long double write_throughput = (long double) (total_write_IOs_issued / os_runtime) * 1000; // IOs/sec
+	long double total_throughput = write_throughput + read_throughput;
+
+	(*stats_file) << variable_parameter_value << ", " << statistics_gatherer->totals_csv_line() << ", " << total_throughput << ", " << write_throughput << ", " << read_throughput << "\n";
+
 
 	return ss.str();
 }

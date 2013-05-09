@@ -10,21 +10,32 @@
 using namespace ssd;
 using namespace std;
 
-Wear_Leveling_Strategy::Wear_Leveling_Strategy(Ssd* ssd, Block_manager_parent* bm, vector<Block*> all_blocks)
+Wear_Leveling_Strategy::Wear_Leveling_Strategy(Ssd* ssd, Migrator* migrator)
 	: ssd(ssd),
-	  bm(bm),
+	  migrator(migrator),
 	  num_erases_up_to_date(0),
 	  average_erase_cycle_time(0),
 	  max_age(1),
 	  blocks_with_min_age(),
-	  all_blocks(NUMBER_OF_ADDRESSABLE_BLOCKS()),
+	  all_blocks(),
 	  random_number_generator(90),
 	  block_data(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE, Block_data())
 {
-	for (int i = 0; i < all_blocks.size(); i++) {
-			blocks_with_min_age.insert(all_blocks[i]);
-			this->all_blocks[i] = all_blocks[i];
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		Package& package = ssd->getPackages()[i];
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			Die& die = package.getDies()[j];
+			for (uint t = 0; t < DIE_SIZE; t++) {
+				Plane& plane = die.getPlanes()[t];
+				for (uint b = 0; b < PLANE_SIZE; b++) {
+					Block* block = &plane.getBlocks()[b];
+					blocks_with_min_age.insert(block);
+					all_blocks.push_back(block);
+				}
+			}
+
 		}
+	}
 }
 
 double Wear_Leveling_Strategy::get_min_age() const {
@@ -92,7 +103,7 @@ void Wear_Leveling_Strategy::register_erase_completion(Event const& event) {
 		if (PRINT_LEVEL > 1) {
 			printf("Scheduling WL in "); addr.print(); printf("\n");
 		}
-		bm->schedule_gc(event.get_current_time(), addr.package, addr.die, addr.block, -1);
+		migrator->schedule_gc(event.get_current_time(), addr.package, addr.die, addr.block, -1);
 	}
 }
 
@@ -107,7 +118,8 @@ bool Wear_Leveling_Strategy::schedule_wear_leveling_op(Block* victim) {
 
 void Wear_Leveling_Strategy::update_blocks_with_min_age(uint min_age) {
 	for (uint i = 0; i < all_blocks.size(); i++) {
-		uint age_ith_block = BLOCK_ERASES - all_blocks[i]->get_erases_remaining();
+		Block* b = all_blocks[i];
+		uint age_ith_block = BLOCK_ERASES - b->get_erases_remaining();
 		if (age_ith_block == min_age) {
 			blocks_with_min_age.insert(all_blocks[i]);
 		}

@@ -171,6 +171,9 @@ void OperatingSystem::setup_follow_up_threads(int thread_id, double time) {
 	Thread* thread = threads[thread_id];
 	if (PRINT_LEVEL >= 1) printf("Switching to new follow up thread\n");
 	vector<Thread*> follow_up_threads = thread->get_follow_up_threads();
+	Utilization_Meter::init();
+	Free_Space_Meter::init();
+	Free_Space_Per_LUN_Meter::init();
 	if (follow_up_threads.size() > 0) {
 		threads[thread_id] = follow_up_threads[0];
 		threads[thread_id]->set_os(this);

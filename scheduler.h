@@ -86,7 +86,7 @@ class IOScheduler {
 public:
 	IOScheduler();
 	~IOScheduler();
-	void init(Ssd*, FtlParent*, Block_manager_parent*);
+	void init(Ssd*, FtlParent*, Block_manager_parent*, Migrator*);
 	void schedule_events_queue(deque<Event*> events);
 	void schedule_event(Event* events);
 	bool is_empty();
@@ -120,6 +120,7 @@ private:
 	Ssd* ssd;
 	FtlParent* ftl;
 	Block_manager_parent* bm;
+	Migrator* migrator;
 
 	//map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations. to be removed
 	map<uint, uint> dependency_code_to_LBA;

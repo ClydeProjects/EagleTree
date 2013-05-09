@@ -27,10 +27,11 @@ IOScheduler::IOScheduler() :
 {
 }
 
-void IOScheduler::init(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent* new_bm) {
+void IOScheduler::init(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent* new_bm, Migrator* new_migrator) {
 	ssd = new_ssd;
 	ftl = new_ftl;
 	bm = new_bm;
+	migrator = new_migrator;
 	future_events = new event_queue();
 	current_events = new Scheduling_Strategy(this, ssd, new Fifo_Priorty_Scheme(this));
 	overdue_events = new Scheduling_Strategy(this, ssd, new Fifo_Priorty_Scheme(this));
@@ -498,7 +499,7 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 	}*/
 
 	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
-
+	migrator->register_event_completion(event);
 	if (event->get_event_type() == WRITE || event->get_event_type() == COPY_BACK) {
 		ftl->register_write_completion(*event, outcome);
 		bm->register_write_outcome(*event, outcome);
@@ -560,7 +561,7 @@ void IOScheduler::init_event(Event* event) {
 		ftl->set_replace_address(*event);
 	}
 	else if (type == GARBAGE_COLLECTION) {
-		vector<deque<Event*> > migrations = bm->migrate(event);
+		vector<deque<Event*> > migrations = migrator->migrate(event);
 		while (migrations.size() > 0) {
 			// Pick first migration from deque
 			deque<Event*> migration = migrations.back();

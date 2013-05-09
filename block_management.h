@@ -13,12 +13,40 @@
 
 namespace ssd {
 
+class Migrator {
+public:
+	Migrator();
+	void init(IOScheduler*, Block_manager_parent*, Garbage_Collector*, Wear_Leveling_Strategy*, FtlParent*, Ssd*);
+	void schedule_gc(double time, int package, int die, int block, int klass);
+	vector<deque<Event*> > migrate(Event * gc_event);
+	void register_event_completion(Event* event);
+	void register_ECC_check_on(uint logical_address);
+	uint how_many_gc_operations_are_scheduled() const;
+private:
+	bool copy_back_allowed_on(long logical_address);
+	void register_copy_back_operation_on(uint logical_address);
+
+	void handle_erase_completion(Event* event);
+	void handle_trim_completion(Event* event);
+	void issue_erase(Address ra, double time);
+	IOScheduler *scheduler;
+	Block_manager_parent* bm;
+	Ssd* ssd;
+	FtlParent* ftl;
+	Garbage_Collector* gc;
+	Wear_Leveling_Strategy* wl;
+	map<long, uint> page_copy_back_count; // Pages that have experienced a copy-back, mapped to a count of the number of copy-backs
+	vector<vector<uint> > num_blocks_being_garbaged_collected_per_LUN;
+	map<int, int> blocks_being_garbage_collected;
+	vector<queue<Event*> > erase_queue;
+	vector<int> num_erases_scheduled_per_package;
+};
 
 class Block_manager_parent {
 public:
 	Block_manager_parent(int classes = 1);
 	virtual ~Block_manager_parent();
-	void set_all(Ssd*, FtlParent*, IOScheduler*);
+	void init(Ssd*, FtlParent*, IOScheduler*, Garbage_Collector*, Wear_Leveling_Strategy*, Migrator*);
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_command_outcome(Event const& event, enum status status);
 	virtual void register_read_transfer_outcome(Event const& event, enum status status);
@@ -38,12 +66,18 @@ public:
 	void schedule_gc(double time, int package_id, int die_id, int block, int klass);
 	virtual void check_if_should_trigger_more_GC(double start_time);
 	double get_average_migrations_per_gc() const;
+	int get_num_age_classes() const { return num_age_classes; }
+	int get_num_pages_available_for_new_writes() const { return num_available_pages_for_new_writes; }
+	void subtract_from_available_for_new_writes(int num) { num_available_pages_for_new_writes -= num; }
+	vector<Block*> const& get_all_blocks() const { return all_blocks; }
+	uint sort_into_age_class(Address const& address) const;
 protected:
 	virtual Address choose_best_address(Event const& write) = 0;
 	virtual Address choose_any_address(Event const& write) = 0;
 	void increment_pointer(Address& pointer);
 	bool can_schedule_write_immediately(Address const& prospective_dest, double current_time);
 	bool can_write(Event const& write) const;
+
 
 	Address find_free_unused_block(uint package_id, uint die_id, enum age age, double time);
 	Address find_free_unused_block(uint package_id, uint die_id, double time);
@@ -54,7 +88,7 @@ protected:
 	void return_unfilled_block(Address block_address, double current_time);
 	pair<bool, pair<int, int> > get_free_block_pointer_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
 	Address get_free_block_pointer_with_shortest_IO_queue();
-	uint how_many_gc_operations_are_scheduled() const;
+
 	inline bool has_free_pages(Address const& address) const { return address.valid == PAGE && address.page < BLOCK_SIZE; }
 
 	Ssd* ssd;
@@ -62,10 +96,9 @@ protected:
 	IOScheduler *scheduler;
 	vector<vector<Address> > free_block_pointers;
 
-	map<long, uint> page_copy_back_count; // Pages that have experienced a copy-back, mapped to a count of the number of copy-backs
 private:
 	Address find_free_unused_block(uint package_id, uint die_id, uint age_class, double time);
-	uint sort_into_age_class(Address const& address) const;
+
 	void issue_erase(Address a, double time);
 
 	int get_num_free_blocks(int package, int die);
@@ -83,7 +116,6 @@ private:
 	uint num_available_pages_for_new_writes;
 
 
-	map<int, int> blocks_being_garbage_collected;   // maps block physical address to the number of pages that still need to be migrated
 	vector<vector<uint> > num_blocks_being_garbaged_collected_per_LUN;
 
 	Random_Order_Iterator order_randomiser;
@@ -95,12 +127,14 @@ private:
 	vector<int> num_erases_scheduled_per_package;
 	Wear_Leveling_Strategy* wl;
 	Garbage_Collector* gc;
+	Migrator* migrator;
 };
+
 
 
 class Wear_Leveling_Strategy {
 public:
-	Wear_Leveling_Strategy(Ssd* ssd, Block_manager_parent* bm, vector<Block*> all_blocks);
+	Wear_Leveling_Strategy(Ssd* ssd, Migrator*);
 	~Wear_Leveling_Strategy() {};
 	void register_erase_completion(Event const& event);
 	bool schedule_wear_leveling_op(Block* block);
@@ -116,7 +150,7 @@ private:
 	double average_erase_cycle_time;
 	set<Block*> blocks_being_wl;
 	set<Block*> blocks_to_wl;
-	Block_manager_parent* bm;
+	Migrator* migrator;
 	int max_age;
 	MTRand_int32 random_number_generator;
 	struct Block_data {
@@ -284,11 +318,12 @@ private:
 
 class Garbage_Collector {
 public:
-	Garbage_Collector(Ssd* ssd, Block_manager_parent* bm, int num_age_classes);
+	Garbage_Collector(Ssd* ssd, Block_manager_parent* bm);
 	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
 	void remove_as_gc_candidate(Address const& phys_address);
 	void register_trim(Event const& event, uint age_class, int num_live_pages);
 	double get_average_live_pages_per_best_candidate() const;
+	void issue_erase(Address ra, double time);
 private:
 	vector<long> get_relevant_gc_candidates(int package_id, int die_id, int klass) const;
 	vector<vector<vector<set<long> > > > gc_candidates;  // each age class has a vector of candidates for GC

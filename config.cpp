@@ -180,6 +180,8 @@ bool ENABLE_TAGGING = false;
 
 bool ALLOW_DEFERRING_TRANSFERS = true;
 
+double OVER_PROVISIONING_FACTOR = 0.7;
+
 /* Defines the max number of copy back operations on a page before ECC check is performed.
  * Set to zero to disable copy back GC operations */
 uint MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
@@ -271,7 +273,7 @@ void set_normal_config() {
 	SSD_SIZE = 2;
 	PACKAGE_SIZE = 4;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 256;
+	PLANE_SIZE = 128;
 	BLOCK_SIZE = 32;
 
 	PAGE_READ_DELAY = 50;
@@ -290,6 +292,7 @@ void set_normal_config() {
 	MAX_CONCURRENT_GC_OPS = PACKAGE_SIZE * SSD_SIZE;
 	GREED_SCALE = 3;
 	ALLOW_DEFERRING_TRANSFERS = true;
+	OVER_PROVISIONING_FACTOR = 0.7;
 
 	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY + 1;// PAGE_READ_DELAY + 1;
 }

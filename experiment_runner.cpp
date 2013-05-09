@@ -83,11 +83,11 @@ void ExperimentResult::start_experiment() {
     (*stats_file) << "\"" << variable_parameter_name << "\", " << StatisticsGatherer::get_global_instance()->totals_csv_header() << ", \"" << throughput_column_name << "\", \"" << write_throughput_column_name << "\", \"" << read_throughput_column_name << "\"" << "\n";
 }
 
-void ExperimentResult::collect_stats(uint variable_parameter_value, double os_runtime) {
+void ExperimentResult::collect_stats(double variable_parameter_value, double os_runtime) {
 	collect_stats(variable_parameter_value, os_runtime, StatisticsGatherer::get_global_instance());
 }
 
-void ExperimentResult::collect_stats(uint variable_parameter_value, double os_runtime, StatisticsGatherer* statistics_gatherer) {
+void ExperimentResult::collect_stats(double variable_parameter_value, double os_runtime, StatisticsGatherer* statistics_gatherer) {
 	assert(experiment_started && !experiment_finished);
 
 	chdir(data_folder.c_str());
@@ -270,14 +270,15 @@ void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> thre
 	}
 }
 
-vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definition* workload, string data_folder, string name, int IO_limit, int& variable, int min_val, int max_val, int incr) {
+vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definition* workload, string data_folder, string name, int IO_limit, double& variable, double min_val, double max_val, double incr) {
 	assert(workload != NULL);
 	mkdir(data_folder.c_str(), 0755);
 	ExperimentResult global_result       (name, data_folder, "Global/",             "Changing a Var");
 	global_result.start_experiment();
 	for (variable = min_val; variable <= max_val; variable += incr) {
+		workload->recalculate_lba_range();
 		printf("----------------------------------------------------------------------------------------------------------\n");
-		printf("%s :  %d \n", name.c_str(), variable);
+		printf("%s :  %f \n", name.c_str(), variable);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		vector<Thread*> experiment_threads = workload->generate_instance();
 		OperatingSystem* os = new OperatingSystem(experiment_threads);
@@ -285,6 +286,7 @@ vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definitio
 		os->run();
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 		StatisticsGatherer::get_global_instance()->print();
+		StatisticsGatherer::get_global_instance()->print_gc_info();
 		Utilization_Meter::print();
 		Free_Space_Meter::print();
 		Free_Space_Per_LUN_Meter::print();
@@ -779,9 +781,9 @@ void Experiment_Runner::draw_graphs(vector<vector<ExperimentResult> > exps, stri
 		error = (exps[0][i].sub_folder != "") ? chdir(exps[0][i].sub_folder.c_str()) : 0;
 		if (error != 0) printf("Error %d changing to folder %s\n", error, exps[0][i].sub_folder.c_str());
 
-		Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			25, exp/*, 30*/, UNDEFINED);
-		Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	26, exp/*, 30*/);
-		Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 		27, exp/*, 30*/);
+		Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			26, exp/*, 30*/, UNDEFINED);
+		Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	27, exp/*, 30*/);
+		Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 		28, exp/*, 30*/);
 		Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp/*, 16000*/);
 		Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp/*, 500000*/);
 
@@ -794,6 +796,7 @@ void Experiment_Runner::draw_graphs(vector<vector<ExperimentResult> > exps, stri
 		Experiment_Runner::graph(sx, sy,   "Read latency, std", 		"Read latency, std", 		22, exp);
 
 		Experiment_Runner::graph(sx, sy,   "Channel Utilization (%)", 	"Channel utilization", 		24, exp);
+		Experiment_Runner::graph(sx, sy,   "GC Efficiency", 			"GC Efficiency", 			25, exp);
 
 		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
 		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, 1, 4);

@@ -9,18 +9,16 @@ int main()
 	set_normal_config();
 
 	int IO_limit = 200000;
-	const double used_space = .70; // overprovisioning level for variable random write threads experimentexp_balanced_scheduler
-	const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
-	const int logical_space = num_pages * used_space;
+	OVER_PROVISIONING_FACTOR = 0.7;
 
 	string exp_folder  = "deadlines_results/";
  	mkdir(exp_folder.c_str(), 0755);
 
-	Workload_Definition* workload = new Asynch_Random_Workload(0, logical_space);
+	Workload_Definition* workload = new Asynch_Random_Workload();
 	vector<vector<ExperimentResult> > exps;
 
-	int deadline_min = 1000;
-	int deadline_max = 1200;
+	int deadline_min = 10000000;
+	int deadline_max = 10000000;
 	int incr = 200;
 
 	SCHEDULING_SCHEME = 0;

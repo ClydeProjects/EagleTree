@@ -6,10 +6,24 @@
 using namespace ssd;
 
 //*****************************************************************************************
+//				Workload_Definition
+//*****************************************************************************************
+
+Workload_Definition::Workload_Definition() :
+		min_lba(0),
+		max_lba(OVER_PROVISIONING_FACTOR * NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE)
+{}
+
+void Workload_Definition::recalculate_lba_range() {
+	min_lba = 0;
+	max_lba = OVER_PROVISIONING_FACTOR * NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
+}
+
+//*****************************************************************************************
 //				GRACE HASH JOIN WORKLOAD
 //*****************************************************************************************
-Grace_Hash_Join_Workload::Grace_Hash_Join_Workload(long min_lba, long max_lba)
- : min_lba(min_lba), max_lba(max_lba), r1(0.2), r2(0.2), fs(0.6), use_flexible_reads(false) {}
+Grace_Hash_Join_Workload::Grace_Hash_Join_Workload()
+ : r1(0.2), r2(0.2), fs(0.6), use_flexible_reads(false) {}
 
 vector<Thread*> Grace_Hash_Join_Workload::generate_instance() {
 	Grace_Hash_Join::initialize_counter();
@@ -42,8 +56,8 @@ vector<Thread*> Grace_Hash_Join_Workload::generate_instance() {
 //*****************************************************************************************
 //				Synch RANDOM WORKLOAD
 //*****************************************************************************************
-Random_Workload::Random_Workload(long min_lba, long max_lba, long num_threads)
- : min_lba(min_lba), max_lba(max_lba), num_threads(num_threads) {}
+Random_Workload::Random_Workload(long num_threads)
+ : num_threads(num_threads) {}
 
 vector<Thread*> Random_Workload::generate_instance() {
 	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
@@ -65,8 +79,8 @@ vector<Thread*> Random_Workload::generate_instance() {
 //*****************************************************************************************
 //				Asynch RANDOM WORKLOAD
 //*****************************************************************************************
-Asynch_Random_Workload::Asynch_Random_Workload(long min_lba, long max_lba)
- : min_lba(min_lba), max_lba(max_lba), stats(new StatisticsGatherer()) {}
+Asynch_Random_Workload::Asynch_Random_Workload()
+ : stats(new StatisticsGatherer()) {}
 
 Asynch_Random_Workload::~Asynch_Random_Workload() {
 	//stats->print();
@@ -89,8 +103,8 @@ vector<Thread*> Asynch_Random_Workload::generate_instance() {
 //*****************************************************************************************
 //				SYNCH SEQUENTIAL WRITE
 //*****************************************************************************************
-Synch_Write::Synch_Write(long min_lba, long max_lba)
- : min_lba(min_lba), max_lba(max_lba), stats(new StatisticsGatherer()) {}
+Synch_Write::Synch_Write()
+ : stats(new StatisticsGatherer()) {}
 
 Synch_Write::~Synch_Write() {
 	stats->print();

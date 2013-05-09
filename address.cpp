@@ -62,7 +62,6 @@ enum address_valid Address::compare(const Address &address) const
 void Address::print(FILE *stream) const
 {
 	fprintf(stream, "(%d, %d, %d, %d, %d, %d)", package, die, plane, block, page, (int) valid);
-	return;
 }
 
 void Address::set_linear_address(ulong address)
