@@ -52,9 +52,6 @@ Ssd::Ssd():
 		}
 	}*/
 
-	assert(VIRTUAL_BLOCK_SIZE > 0);
-	assert(VIRTUAL_PAGE_SIZE > 0);
-
 	ftl = new FtlImpl_Page(*this);
 	scheduler = new IOScheduler();
 	Block_manager_parent* bm;
@@ -81,7 +78,7 @@ Ssd::Ssd():
 
 	VisualTracer::init();
 	StateVisualiser::init(this);
-	StatisticsGatherer::init(this);
+	StatisticsGatherer::init();
 	SsdStatisticsExtractor::init(this);
 	Utilization_Meter::init();
 

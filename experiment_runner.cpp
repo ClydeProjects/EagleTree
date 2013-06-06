@@ -270,20 +270,33 @@ void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> thre
 	}
 }
 
-vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definition* workload, string data_folder, string name, int IO_limit, double& variable, double min_val, double max_val, double incr) {
-	assert(workload != NULL);
+vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, Workload_Definition* init_workload, string data_folder, string name, int IO_limit, double& variable, double min_val, double max_val, double incr) {
+	assert(experiment_workload != NULL);
 	mkdir(data_folder.c_str(), 0755);
 	ExperimentResult global_result       (name, data_folder, "Global/",             "Changing a Var");
 	global_result.start_experiment();
 	for (variable = min_val; variable <= max_val; variable += incr) {
-		workload->recalculate_lba_range();
+		experiment_workload->recalculate_lba_range();
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		printf("%s :  %f \n", name.c_str(), variable);
 		printf("----------------------------------------------------------------------------------------------------------\n");
-		vector<Thread*> experiment_threads = workload->generate_instance();
-		OperatingSystem* os = new OperatingSystem(experiment_threads);
+
+		// run init workload
+		vector<Thread*> init_threads = init_workload->generate_instance();
+		OperatingSystem* os = new OperatingSystem();
+		os->set_threads(init_threads);
+		os->run();
+
+		StatisticsGatherer::get_global_instance()->print();
+		StatisticsGatherer::get_global_instance()->init();
+		StateVisualiser::print_page_status();
+
+		// run experiment workload
+		vector<Thread*> experiment_threads = experiment_workload->generate_instance();
+		os->set_threads(experiment_threads);
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
+
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 		StatisticsGatherer::get_global_instance()->print();
 		StatisticsGatherer::get_global_instance()->print_gc_info();
@@ -339,7 +352,8 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 
 		vector<Thread*> threads;
 		threads.push_back(initial_write);
-		OperatingSystem* os = new OperatingSystem(threads);
+		OperatingSystem* os = new OperatingSystem();
+		os->set_threads(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
 
@@ -392,7 +406,8 @@ ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experi
 
 		// Run experiment
 		vector<Thread*> threads = experiment(highest_lba);
-		OperatingSystem* os = new OperatingSystem(threads);
+		OperatingSystem* os = new OperatingSystem();
+		os->set_threads(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
 
@@ -427,7 +442,8 @@ ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*ex
 
 		// Run experiment
 		vector<Thread*> threads = experiment(highest_lba);
-		OperatingSystem* os = new OperatingSystem(threads);
+		OperatingSystem* os = new OperatingSystem();
+		os->set_threads(threads);
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
 

@@ -412,7 +412,8 @@ private:
 class OperatingSystem
 {
 public:
-	OperatingSystem(vector<Thread*> threads);
+	OperatingSystem();
+	void set_threads(vector<Thread*> threads);
 	~OperatingSystem();
 	void run();
 	void register_event_completion(Event* event);
@@ -433,7 +434,7 @@ private:
 	struct Pending_Events {
 		vector<deque<Event*> > event_queues;
 		int num_pending_events;
-		Pending_Events(int i);
+		Pending_Events(int num_threads);
 		~Pending_Events();
 		Event* peek(int i);
 		Event* pop(int i);
@@ -442,7 +443,7 @@ private:
 		inline int get_num_pending_events() { return num_pending_events; }
 		inline int size() {return event_queues.size();};
 	};
-	Pending_Events events;
+	Pending_Events* events;
 
 	map<long, queue<uint> > write_LBA_to_thread_id;
 	map<long, queue<uint> > read_LBA_to_thread_id;

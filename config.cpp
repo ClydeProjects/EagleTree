@@ -128,10 +128,10 @@ uint CACHE_DFTL_LIMIT = 8;
 uint PARALLELISM_MODE = 0;
 
 /* Virtual block size (as a multiple of the physical block size) */
-uint VIRTUAL_BLOCK_SIZE = 1;
+//uint VIRTUAL_BLOCK_SIZE = 1;
 
 /* Virtual page size (as a multiple of the physical page size) */
-uint VIRTUAL_PAGE_SIZE = 1;
+//uint VIRTUAL_PAGE_SIZE = 1;
 
 uint NUMBER_OF_ADDRESSABLE_BLOCKS = 0;
 
@@ -254,10 +254,6 @@ void load_entry(char *name, double value, uint line_number) {
 		CACHE_DFTL_LIMIT = value;
 	else if (!strcmp(name, "PARALLELISM_MODE"))
 		PARALLELISM_MODE = value;
-	else if (!strcmp(name, "VIRTUAL_BLOCK_SIZE"))
-		VIRTUAL_BLOCK_SIZE = value;
-	else if (!strcmp(name, "VIRTUAL_PAGE_SIZE"))
-		VIRTUAL_PAGE_SIZE = value;
 	else if (!strcmp(name, "RAID_NUMBER_OF_PHYSICAL_SSDS"))
 		RAID_NUMBER_OF_PHYSICAL_SSDS = value;
 	else if (!strcmp(name, "MAX_REPEATED_COPY_BACKS_ALLOWED"))
@@ -295,6 +291,12 @@ void set_normal_config() {
 	OVER_PROVISIONING_FACTOR = 0.7;
 
 	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY + 1;// PAGE_READ_DELAY + 1;
+
+	double sum = 0;
+	for (int i = 10; i >= 4; i--) {
+		sum += 1000 / i;
+	}
+	printf("%f\n", sum);
 }
 
 void load_config() {

@@ -49,6 +49,7 @@ void StateVisualiser::print_page_status() {
 	printf("num valid pages: %d\n", num_valid_pages);
 	printf("num invalid pages: %d\n", num_invalid_pages);
 	printf("num empty pages: %d\n", num_empty_pages);
+	printf("num pages total: %d\n", num_empty_pages + num_invalid_pages + num_valid_pages);
 	printf("\n");
 }
 

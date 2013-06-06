@@ -14,7 +14,7 @@ using namespace ssd;
 
 Thread::Thread() :
 		finished(false), time(1), threads_to_start_when_this_thread_finishes(), num_ios_finished(0),
-		experiment_thread(false), os(NULL), statistics_gatherer(NULL), last_IO_was_null(false), num_IOs_executing(0),
+		experiment_thread(false), os(NULL), statistics_gatherer(NULL), submitted_events(), last_IO_was_null(false), num_IOs_executing(0),
 		time_to_wait_before_starting(0) {}
 
 Thread::~Thread() {

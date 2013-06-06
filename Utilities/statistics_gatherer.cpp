@@ -16,7 +16,7 @@ StatisticsGatherer *StatisticsGatherer::inst = NULL;
 const double StatisticsGatherer::wait_time_histogram_bin_size = 1000;
 const double StatisticsGatherer::io_counter_window_size = 1000000; // second
 
-StatisticsGatherer::StatisticsGatherer(/*Ssd& ssd*/)
+StatisticsGatherer::StatisticsGatherer()
 	: num_gc_cancelled_no_candidate(0),
 	  num_gc_cancelled_not_enough_free_space(0),
 	  num_gc_cancelled_gc_already_happening(0),
@@ -29,6 +29,7 @@ StatisticsGatherer::StatisticsGatherer(/*Ssd& ssd*/)
 	  num_gc_writes_per_LUN_origin(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_gc_writes_per_LUN_destination(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_gc_scheduled_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
+	  queue_length_tracker(0),
 	  num_executed_gc_ops(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_live_pages_in_gc_exec(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  sum_gc_wait_time_per_LUN(SSD_SIZE, vector<double>(PACKAGE_SIZE, 0)),
@@ -56,10 +57,10 @@ vector<vector<int> > num_executed_gc_ops;
 
 StatisticsGatherer::~StatisticsGatherer() {}
 
-void StatisticsGatherer::init(Ssd * ssd)
+void StatisticsGatherer::init()
 {
 	if (inst != NULL) delete inst;
-	inst = new StatisticsGatherer(/**ssd*/);
+	inst = new StatisticsGatherer();
 }
 
 StatisticsGatherer *StatisticsGatherer::get_global_instance()
@@ -179,7 +180,7 @@ void StatisticsGatherer::register_events_queue_length(uint queue_size, double ti
 	if (inst != this) inst->register_events_queue_length(queue_size, time); // Do the same for global instance
 	if (time == 0) return;
 	uint current_window = floor(time / queue_length_tracker_resolution);
-	while (current_window > 0 && queue_length_tracker.size() < current_window) {
+	while (queue_length_tracker.size() > 0 && queue_length_tracker.size() < current_window) {
 		queue_length_tracker.push_back(queue_length_tracker.back());
 //		printf("-> COPIED LAST (vs=%d, window=%d)", queue_length_tracker.size(), current_window);
 	}
@@ -586,15 +587,6 @@ string StatisticsGatherer::totals_csv_line() {
 	ss << Utilization_Meter::get_avg_utilization() << ", ";
 
 	ss << (double)num_migrations / num_gc_executed;
-
-	int total_read_IOs_issued  = total_reads();
-	int total_write_IOs_issued = total_writes();
-	long double read_throughput = (long double) (total_read_IOs_issued / os_runtime) * 1000; // IOs/sec
-	long double write_throughput = (long double) (total_write_IOs_issued / os_runtime) * 1000; // IOs/sec
-	long double total_throughput = write_throughput + read_throughput;
-
-	(*stats_file) << variable_parameter_value << ", " << statistics_gatherer->totals_csv_line() << ", " << total_throughput << ", " << write_throughput << ", " << read_throughput << "\n";
-
 
 	return ss.str();
 }

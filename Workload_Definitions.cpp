@@ -19,13 +19,18 @@ void Workload_Definition::recalculate_lba_range() {
 	max_lba = OVER_PROVISIONING_FACTOR * NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 }
 
+vector<Thread*> Workload_Definition::generate_instance() {
+	recalculate_lba_range();
+	return generate();
+}
+
 //*****************************************************************************************
 //				GRACE HASH JOIN WORKLOAD
 //*****************************************************************************************
 Grace_Hash_Join_Workload::Grace_Hash_Join_Workload()
  : r1(0.2), r2(0.2), fs(0.6), use_flexible_reads(false) {}
 
-vector<Thread*> Grace_Hash_Join_Workload::generate_instance() {
+vector<Thread*> Grace_Hash_Join_Workload::generate() {
 	Grace_Hash_Join::initialize_counter();
 
 	int relation_1_start = min_lba;
@@ -59,7 +64,7 @@ vector<Thread*> Grace_Hash_Join_Workload::generate_instance() {
 Random_Workload::Random_Workload(long num_threads)
  : num_threads(num_threads) {}
 
-vector<Thread*> Random_Workload::generate_instance() {
+vector<Thread*> Random_Workload::generate() {
 	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
 	for (int i = 0; i < num_threads; i++) {
 		int seed = 23621 * i + 62;
@@ -88,11 +93,28 @@ Asynch_Random_Workload::~Asynch_Random_Workload() {
 	delete stats;
 }
 
-vector<Thread*> Asynch_Random_Workload::generate_instance() {
+vector<Thread*> Asynch_Random_Workload::generate() {
 	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
 	Asynchronous_Random_Thread_Reader_Writer* thread = new Asynchronous_Random_Thread_Reader_Writer(min_lba, max_lba, INFINITE, 236);
 	thread->set_statistics_gatherer(stats);
 	thread->set_experiment_thread(true);
+	init_write->add_follow_up_thread(thread);
+	//init_write->set_statistics_gatherer(stats);
+	//init_write->set_experiment_thread(true);
+	vector<Thread*> threads(1, init_write);
+	return threads;
+}
+
+//*****************************************************************************************
+//				Classical INIT workload
+//*****************************************************************************************
+Init_Workload::Init_Workload() {}
+
+vector<Thread*> Init_Workload::generate() {
+	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
+	Simple_Thread* thread = new Asynchronous_Random_Writer(min_lba, max_lba, 23623);
+	thread->set_num_ios(NUMBER_OF_ADDRESSABLE_PAGES() * 2);
+	//thread->set_num_ios(1000);
 	init_write->add_follow_up_thread(thread);
 	//init_write->set_statistics_gatherer(stats);
 	//init_write->set_experiment_thread(true);
@@ -112,7 +134,7 @@ Synch_Write::~Synch_Write() {
 	delete stats;
 }
 
-vector<Thread*> Synch_Write::generate_instance() {
+vector<Thread*> Synch_Write::generate() {
 	/*Simple_Thread* init_write = new Synchronous_Sequential_Writer(min_lba, max_lba);
 	//init_write->add_follow_up_thread(thread);
 	init_write->set_statistics_gatherer(stats);

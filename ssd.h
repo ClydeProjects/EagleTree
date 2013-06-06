@@ -132,14 +132,18 @@ extern const uint CACHE_DFTL_LIMIT;
 extern const uint PARALLELISM_MODE;
 
 /* Virtual block size (as a multiple of the physical block size) */
-extern const uint VIRTUAL_BLOCK_SIZE;
+//extern const uint VIRTUAL_BLOCK_SIZE;
 
 /* Virtual page size (as a multiple of the physical page size) */
-extern const uint VIRTUAL_PAGE_SIZE;
+//extern const uint VIRTUAL_PAGE_SIZE;
 
 // extern const uint NUMBER_OF_ADDRESSABLE_BLOCKS;
 static inline uint NUMBER_OF_ADDRESSABLE_BLOCKS() {
-	return (SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE) / VIRTUAL_PAGE_SIZE;
+	return SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE;
+}
+
+static inline uint NUMBER_OF_ADDRESSABLE_PAGES() {
+	return SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE;
 }
 
 /*
@@ -1024,9 +1028,9 @@ class StatisticsGatherer
 {
 public:
 	static StatisticsGatherer *get_global_instance();
-	static void init(Ssd * ssd);
+	static void init();
 
-	StatisticsGatherer(/*Ssd & ssd*/);
+	StatisticsGatherer();
 	~StatisticsGatherer();
 
 	void register_completed_event(Event const& event);
@@ -1215,7 +1219,8 @@ public:
 	Workload_Definition();
 	void recalculate_lba_range();
 	virtual ~Workload_Definition() {};
-	virtual vector<Thread*> generate_instance() = 0;
+	vector<Thread*> generate_instance();
+	virtual vector<Thread*> generate() = 0;
 	void set_lba_range(long min, long max) {min_lba = min; max_lba = max;}
 protected:
 	long min_lba, max_lba;
@@ -1224,7 +1229,7 @@ protected:
 class Grace_Hash_Join_Workload : public Workload_Definition {
 public:
 	Grace_Hash_Join_Workload();
-	vector<Thread*> generate_instance();
+	vector<Thread*> generate();
 	inline void set_use_flexible_Reads(bool val) { use_flexible_reads = val; }
 private:
 	double r1; // Relation 1 percentage use of addresses
@@ -1236,7 +1241,7 @@ private:
 class Random_Workload : public Workload_Definition {
 public:
 	Random_Workload(long num_threads);
-	vector<Thread*> generate_instance();
+	vector<Thread*> generate();
 private:
 	long num_threads;
 };
@@ -1245,16 +1250,22 @@ class Asynch_Random_Workload : public Workload_Definition {
 public:
 	Asynch_Random_Workload();
 	~Asynch_Random_Workload();
-	vector<Thread*> generate_instance();
+	vector<Thread*> generate();
 private:
 	StatisticsGatherer* stats;
+};
+
+class Init_Workload : public Workload_Definition {
+public:
+	Init_Workload();
+	vector<Thread*> generate();
 };
 
 class Synch_Write : public Workload_Definition {
 public:
 	Synch_Write();
 	~Synch_Write();
-	vector<Thread*> generate_instance();
+	vector<Thread*> generate();
 private:
 	StatisticsGatherer* stats;
 };
@@ -1280,7 +1291,7 @@ public:
 	static void unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer);
 
 	//static void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
-	static vector<ExperimentResult> simple_experiment(Workload_Definition* workload, string data_folder, string name, int IO_limit, double& variable, double min_val, double max_val, double incr);
+	static vector<ExperimentResult> simple_experiment(Workload_Definition* experiment_workload, Workload_Definition* init_workload, string data_folder, string name, int IO_limit, double& variable, double min_val, double max_val, double incr);
 	static void simple_experiment(Workload_Definition* workload, string name, int IO_limit);
 	static vector<ExperimentResult> random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba);
 	static ExperimentResult copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
