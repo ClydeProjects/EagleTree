@@ -56,7 +56,7 @@ Block* Garbage_Collector::choose_gc_victim(int package_id, int die_id, int klass
 	for (uint i = 0; i < candidates.size(); i++) {
 		long physical_address = candidates[i];
 		Address a = Address(physical_address, BLOCK);
-		Block* block = &ssd->getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
+		Block* block = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
 		if (block->get_pages_valid() < min_valid_pages && block->get_state() == ACTIVE) {
 			min_valid_pages = block->get_pages_valid();
 			best_block = block;

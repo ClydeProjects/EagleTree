@@ -9,35 +9,26 @@ using namespace ssd;
 Block::Block(long physical_address):
 			pages_invalid(0),
 			physical_address(physical_address),
-			data((Page *) malloc(BLOCK_SIZE * sizeof(Page))),
+			data(BLOCK_SIZE, Page()),
 			pages_valid(0),
 			erases_remaining(BLOCK_ERASES)
-{
-	if(data == NULL){
-		fprintf(stderr, "Block error: %s: constructor unable to allocate Page data\n", __func__);
-		exit(MEM_ERR);
-	}
-	for(uint i = 0; i < BLOCK_SIZE; i++)
-		(void) new (&data[i]) Page();
-}
+{}
 
-Block::~Block()
-{
-	assert(data != NULL);
-	for(uint i = 0; i < BLOCK_SIZE; i++)
-		data[i].~Page();
-	free(data);
-}
+Block::Block():
+			pages_invalid(0),
+			physical_address(0),
+			data(BLOCK_SIZE, Page()),
+			pages_valid(0),
+			erases_remaining(BLOCK_ERASES)
+{}
 
 enum status Block::read(Event &event)
 {
-	assert(data != NULL);
 	return data[event.get_address().page]._read(event);
 }
 
 enum status Block::write(Event &event)
 {
-	assert(data != NULL);
 	if (event.get_address().page > 0 && data[event.get_address().page - 1].get_state() == EMPTY) {
 		printf("\n");
 		event.print();
@@ -54,8 +45,6 @@ enum status Block::write(Event &event)
  * returns 1 for success, 0 for failure */
 enum status Block::_erase(Event &event)
 {
-	assert(data != NULL);
-
 	if(erases_remaining < 1)
 	{
 		fprintf(stderr, "Block error: %s: No erases remaining when attempting to erase\n", __func__);

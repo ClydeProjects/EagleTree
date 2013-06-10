@@ -793,8 +793,8 @@ uint SsdStatisticsExtractor::max_age() {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			for (uint k = 0; k < DIE_SIZE; k++) {
 				for (uint t = 0; t < PLANE_SIZE; t++) {
-					Block const& block = get_instance()->ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
-					uint age = BLOCK_ERASES - block.get_erases_remaining();
+					Block* block = get_instance()->ssd.get_package(i)->get_die(j)->get_plane(k)->get_block(t);
+					uint age = BLOCK_ERASES - block->get_erases_remaining();
 					max_age = max(age, max_age);
 				}
 			}
@@ -810,8 +810,8 @@ uint SsdStatisticsExtractor::max_age_freq() {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			for (uint k = 0; k < DIE_SIZE; k++) {
 				for (uint t = 0; t < PLANE_SIZE; t++) {
-					Block const& block = get_instance()->ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
-					uint age = BLOCK_ERASES - block.get_erases_remaining();
+					Block* block = get_instance()->ssd.get_package(i)->get_die(j)->get_plane(k)->get_block(t);
+					uint age = BLOCK_ERASES - block->get_erases_remaining();
 					age_histogram[floor((double) age / age_histogram_bin_size)*age_histogram_bin_size]++;
 				}
 			}
@@ -831,8 +831,8 @@ string SsdStatisticsExtractor::age_histogram_csv() {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			for (uint k = 0; k < DIE_SIZE; k++) {
 				for (uint t = 0; t < PLANE_SIZE; t++) {
-					Block const& block = get_instance()->ssd.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
-					uint age = BLOCK_ERASES - block.get_erases_remaining();
+					Block* block = get_instance()->ssd.get_package(i)->get_die(j)->get_plane(k)->get_block(t);
+					uint age = BLOCK_ERASES - block->get_erases_remaining();
 					age_histogram[floor((double) age / age_histogram_bin_size)*age_histogram_bin_size]++;
 				}
 			}

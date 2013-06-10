@@ -6,25 +6,21 @@
 using namespace ssd;
 
 Die::Die(long physical_address):
-	data((Plane *) malloc(DIE_SIZE * sizeof(Plane))),
+	data(),
 	currently_executing_io_finish_time(0.0),
 	last_read_io(UNDEFINED)
 {
-	if(data == NULL){
-		fprintf(stderr, "Die error: %s: constructor unable to allocate Plane data\n", __func__);
-		exit(MEM_ERR);
+	for(uint i = 0; i < DIE_SIZE; i++) {
+		int a = physical_address + (PLANE_SIZE * BLOCK_SIZE * i);
+		Plane p = Plane(a);
+		data.push_back(p);
 	}
-	for(uint i = 0; i < DIE_SIZE; i++)
-		(void) new (&data[i]) Plane(physical_address+(PLANE_SIZE*BLOCK_SIZE*i));
 }
 
-Die::~Die(void)
-{
-	assert(data != NULL);
-	for(uint i = 0; i < DIE_SIZE; i++)
-		data[i].~Plane();
-	free(data);
-}
+Die::Die() :
+	data(),
+	currently_executing_io_finish_time(0.0),
+	last_read_io(UNDEFINED) {}
 
 enum status Die::read(Event &event)
 {

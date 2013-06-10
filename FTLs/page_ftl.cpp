@@ -25,10 +25,16 @@
 
 using namespace ssd;
 
-FtlImpl_Page::FtlImpl_Page(Ssd &ssd):
+FtlImpl_Page::FtlImpl_Page(Ssd *ssd):
 	FtlParent(ssd),
-	logical_to_physical_map(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE, UNDEFINED),
-	physical_to_logical_map(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE, UNDEFINED)
+	logical_to_physical_map(NUMBER_OF_ADDRESSABLE_PAGES(), UNDEFINED),
+	physical_to_logical_map(NUMBER_OF_ADDRESSABLE_PAGES(), UNDEFINED)
+{}
+
+FtlImpl_Page::FtlImpl_Page() :
+	FtlParent(NULL),
+	logical_to_physical_map(NUMBER_OF_ADDRESSABLE_PAGES(), UNDEFINED),
+	physical_to_logical_map(NUMBER_OF_ADDRESSABLE_PAGES(), UNDEFINED)
 {}
 
 FtlImpl_Page::~FtlImpl_Page(void)

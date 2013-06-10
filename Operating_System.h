@@ -314,7 +314,7 @@ private:
 	void write_next_file(double time);
 	void assign_new_range();
 	void randomly_delete_files(double current_time);
-	Event* issue_trim();
+	//Event* issue_trim();
 	Event* issue_write();
 	void reclaim_file_space(File* file);
 	void delete_file(File* victim, double current_time);
@@ -333,7 +333,6 @@ private:
 
 	MTRand_int32 random_number_generator;
 	MTRand_open double_generator;
-	set<long> addresses_to_trim;
 	const long max_file_size;
 	//Throughput_Moderator throughout_moderator;
 };
@@ -421,6 +420,12 @@ public:
 	double get_experiment_runtime() const;
 	Flexible_Reader* create_flexible_reader(vector<Address_Range>);
 	void submit(Event* event);
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & ssd;
+    }
 private:
 	int pick_unlocked_event_with_shortest_start_time();
 	void dispatch_event(int thread_id);

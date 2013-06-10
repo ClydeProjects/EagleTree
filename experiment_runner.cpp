@@ -270,39 +270,66 @@ void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> thre
 	}
 }
 
-vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, Workload_Definition* init_workload, string data_folder, string name, int IO_limit, double& variable, double min_val, double max_val, double incr) {
+void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_workload, Workload_Definition* init_workload, string name, int IO_limit, OperatingSystem* os) {
+	experiment_workload->recalculate_lba_range();
+
+	// run init workload
+	vector<Thread*> init_threads = init_workload->generate_instance();
+	os->set_threads(init_threads);
+	os->run();
+
+	printf("Finished calibration\n");
+	StatisticsGatherer::get_global_instance()->init();
+
+	// run experiment workload
+	vector<Thread*> experiment_threads = experiment_workload->generate_instance();
+	os->set_threads(experiment_threads);
+	os->set_num_writes_to_stop_after(IO_limit);
+	os->run();
+
+	StatisticsGatherer::get_global_instance()->print();
+	//StatisticsGatherer::get_global_instance()->print_gc_info();
+	Utilization_Meter::print();
+	//Free_Space_Meter::print();
+	Free_Space_Per_LUN_Meter::print();
+}
+
+vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, Workload_Definition* init_workload, string data_folder, string name, long IO_limit, double& variable, double min_val, double max_val, double incr) {
 	assert(experiment_workload != NULL);
 	mkdir(data_folder.c_str(), 0755);
-	ExperimentResult global_result       (name, data_folder, "Global/",             "Changing a Var");
+	ExperimentResult global_result(name, data_folder, "Global/", "Changing a Var");
 	global_result.start_experiment();
+
 	for (variable = min_val; variable <= max_val; variable += incr) {
-		experiment_workload->recalculate_lba_range();
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		printf("%s :  %f \n", name.c_str(), variable);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
-		// run init workload
-		vector<Thread*> init_threads = init_workload->generate_instance();
 		OperatingSystem* os = new OperatingSystem();
-		os->set_threads(init_threads);
-		os->run();
-
-		StatisticsGatherer::get_global_instance()->print();
-		StatisticsGatherer::get_global_instance()->init();
-		StateVisualiser::print_page_status();
-
-		// run experiment workload
-		vector<Thread*> experiment_threads = experiment_workload->generate_instance();
-		os->set_threads(experiment_threads);
-		os->set_num_writes_to_stop_after(IO_limit);
-		os->run();
-
+		run_single_measurment(experiment_workload, init_workload, name, IO_limit, os);
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
-		StatisticsGatherer::get_global_instance()->print();
-		StatisticsGatherer::get_global_instance()->print_gc_info();
-		Utilization_Meter::print();
-		Free_Space_Meter::print();
-		Free_Space_Per_LUN_Meter::print();
+		delete os;
+	}
+	global_result.end_experiment();
+	vector<ExperimentResult> results;
+	results.push_back(global_result);
+	return results;
+}
+
+vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, Workload_Definition* init_workload, string data_folder, string name, long IO_limit, long& variable, long min_val, long max_val, long incr) {
+	assert(experiment_workload != NULL);
+	mkdir(data_folder.c_str(), 0755);
+	ExperimentResult global_result(name, data_folder, "Global/", "Changing a Var");
+	global_result.start_experiment();
+
+	for (variable = min_val; variable <= max_val; variable += incr) {
+		printf("----------------------------------------------------------------------------------------------------------\n");
+		printf("%s :  %d \n", name.c_str(), variable);
+		printf("----------------------------------------------------------------------------------------------------------\n");
+
+		OperatingSystem* os = new OperatingSystem();
+		run_single_measurment(experiment_workload, init_workload, name, IO_limit, os);
+		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 		delete os;
 	}
 	global_result.end_experiment();
@@ -842,4 +869,21 @@ void Experiment_Runner::draw_experiment_spesific_graphs(vector<vector<Experiment
 				Experiment_Runner::throughput_history		(sx, sy/2, "throughput_history", exp[i], x_vals);
 			}
 		}
+}
+
+void Experiment_Runner::save_state(Ssd* ssd) {
+	std::ofstream file("/home/niv/Desktop/EagleTree/Experiments/archive.txt");
+	boost::archive::text_oarchive oa(file);
+	oa.register_type<FtlImpl_Page>( );
+	oa << ssd;
+}
+
+Ssd* Experiment_Runner::load_state() {
+	std::ifstream file("/home/niv/Desktop/EagleTree/Experiments/archive.txt");
+	boost::archive::text_iarchive ia(file);
+	ia.register_type<FtlImpl_Page>( );
+	Ssd* ssd;
+	ia >> ssd;
+	ssd->get_ftl().set_scheduler(ssd->get_scheduler());
+	return ssd;
 }

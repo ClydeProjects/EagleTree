@@ -14,17 +14,14 @@ using namespace ssd;
 
 Ssd::Ssd():
 	ram(),
-	data((Package *) malloc(SSD_SIZE * sizeof(Package))),
+	data(),
 	last_io_submission_time(0.0),
 	os(NULL)
 {
-	if(data == NULL){
-		fprintf(stderr, "Ssd error: %s: constructor unable to allocate Package data\n", __func__);
-		exit(MEM_ERR);
-	}
-	for (uint i = 0; i < SSD_SIZE; i++)
-	{
-		(void) new (&data[i]) Package(PACKAGE_SIZE*DIE_SIZE*PLANE_SIZE*BLOCK_SIZE*i);
+	for(uint i = 0; i < SSD_SIZE; i++) {
+		int a = PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE * i;
+		Package p = Package(a);
+		data.push_back(p);
 	}
 	
 	// Check for 32bit machine. We do not allow page data on 32bit machines.
@@ -52,14 +49,14 @@ Ssd::Ssd():
 		}
 	}*/
 
-	ftl = new FtlImpl_Page(*this);
+	ftl = new FtlImpl_Page(this);
 	scheduler = new IOScheduler();
 	Block_manager_parent* bm;
 
 	switch ( BLOCK_MANAGER_ID ) {
 		case 1: bm = new Shortest_Queue_Hot_Cold_BM(); break;
 		case 2: bm = new Wearwolf(); break;
-		case 3: bm = new Block_manager_parallel(); break;
+		case 3: bm = new Wearwolf_Locality(); break;
 		case 4: bm = new Block_manager_roundrobin(); break;
 		default: bm = new Block_manager_parallel(); break;
 	}
@@ -83,19 +80,51 @@ Ssd::Ssd():
 	Utilization_Meter::init();
 
 	Event::reset_id_generators();
+
+	/*{
+		std::ofstream ofs("ssd_state");
+		boost::archive::text_oarchive oa(ofs);
+		//boost::archive::xml_oarchive oa(ofs);
+		oa.register_type<FtlImpl_Page>();
+		//oa << BOOST_SERIALIZATION_NVP(ftl);
+		oa << ftl;
+	}
+
+	FtlParent* loaded;
+	{
+		std::ifstream ifs("ssd_state");
+	    boost::archive::text_iarchive ia(ifs);
+	    ia.register_type<FtlImpl_Page>();
+	    ia >> BOOST_SERIALIZATION_NVP(loaded);
+	}*/
+
+
+	/*Die loaded;
+	{
+	  std::ifstream file("archive.xml");
+	  boost::archive::xml_iarchive ia(file);
+	  //ia.register_type<FtlImpl_Page>( );
+	  ia >> BOOST_SERIALIZATION_NVP(loaded);
+	}*/
+
+	/*{
+	  std::ifstream file("archive.xml");
+	  boost::archive::xml_iarchive ia(file);
+	  ia.register_type<FtlImpl_Page>( );
+	  FtlParent *dr;
+	  ia >> BOOST_SERIALIZATION_NVP(dr);
+	  FtlImpl_Page* dr2 = dynamic_cast<FtlImpl_Page*> (dr);
+	}*/
+
 }
 
-Ssd::~Ssd(void)
+Ssd::~Ssd()
 {
 	//VisualTracer::get_instance()->print_horizontally(2000);
 	if (!scheduler->is_empty()) {
 		scheduler->execute_soonest_events();
 	}
-	//if (PRINT_LEVEL >= 1) StatisticsGatherer::get_global_instance()->print();
-	for (uint i = 0; i < SSD_SIZE; i++)	{
-		data[i].~Package();
-	}
-	free(data);
+	//if (PRINT_LEVEL >= 1) StatisticsGatherer::get_global_instance()->print()
 
 	if (PAGE_ENABLE_DATA) {
 		ulong pageSize = ((ulong)(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE)) * (ulong)PAGE_SIZE;
@@ -179,20 +208,20 @@ void *Ssd::get_result_buffer()
  * 	have Package do anything but update its statistics and pass on to Die */
 enum status Ssd::read(Event &event)
 {
-	assert(data != NULL && event.get_address().package < SSD_SIZE && event.get_address().valid >= PACKAGE);
+	assert(event.get_address().package < SSD_SIZE && event.get_address().valid >= PACKAGE);
 	return data[event.get_address().package].read(event);
 }
 
 enum status Ssd::write(Event &event)
 {
-	assert(data != NULL && event.get_address().package < SSD_SIZE && event.get_address().valid >= PACKAGE);
+	assert(event.get_address().package < SSD_SIZE && event.get_address().valid >= PACKAGE);
 	return data[event.get_address().package].write(event);
 }
 
 
 enum status Ssd::erase(Event &event)
 {
-	assert(data != NULL && event.get_address().package < SSD_SIZE && event.get_address().valid >= PACKAGE);
+	assert(event.get_address().package < SSD_SIZE && event.get_address().valid >= PACKAGE);
 	return data[event.get_address().package].erase(event);
 }
 

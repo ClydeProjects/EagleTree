@@ -124,8 +124,8 @@ void OperatingSystem::run() {
 
 		if ((double)num_writes_completed / NUM_WRITES_TO_STOP_AFTER > (double)counter_for_user / 10.0) {
 			printf("finished %d%%.\t\tNum writes completed:  %d \n", counter_for_user * 10, num_writes_completed);
-			if (counter_for_user == 7) {
-				//PRINT_LEVEL = 1;
+			if (counter_for_user == 9) {
+				PRINT_LEVEL = 1;
 				//VisualTracer::get_instance()->print_horizontally(10000);
 				//VisualTracer::get_instance()->print_horizontally_with_breaks_last(10000);
 			}
@@ -136,7 +136,6 @@ void OperatingSystem::run() {
 		still_more_work = currently_executing_ios.size() > 0 || events->get_num_pending_events() > 0;
 		//printf("num_writes   %d\n", num_writes_completed);
 	} while (!finished_experiment && still_more_work);
-	printf("\nfinished\n");
 }
 
 int OperatingSystem::pick_unlocked_event_with_shortest_start_time() {

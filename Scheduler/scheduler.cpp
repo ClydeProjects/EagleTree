@@ -33,7 +33,16 @@ void IOScheduler::init(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent* n
 	bm = new_bm;
 	migrator = new_migrator;
 	future_events = new event_queue();
-	current_events = new Scheduling_Strategy(this, ssd, new Fifo_Priorty_Scheme(this));
+
+	Priorty_Scheme* ps;
+
+	if (SCHEDULING_SCHEME == 0) {
+		ps = new Fifo_Priorty_Scheme(this);
+	} else {
+		ps = new Smart_App_Priorty_Scheme(this);
+	}
+
+	current_events = new Scheduling_Strategy(this, ssd, ps);
 	overdue_events = new Scheduling_Strategy(this, ssd, new Fifo_Priorty_Scheme(this));
 }
 
@@ -351,10 +360,10 @@ bool IOScheduler::should_event_be_scheduled(Event* event) {
 void IOScheduler::remove_current_operation(Event* event) {
 	event->set_noop(true);
 	if (event->get_event_type() == READ_TRANSFER) {
-		ssd->getPackages()[event->get_address().package].getDies()[event->get_address().die].clear_register();
+		ssd->get_package(event->get_address().package)->get_die(event->get_address().die)->clear_register();
 		bm->register_register_cleared();
 	} else if (event->get_event_type() == COPY_BACK) {
-		ssd->getPackages()[event->get_replace_address().package].getDies()[event->get_replace_address().die].clear_register();
+		ssd->get_package(event->get_replace_address().package)->get_die(event->get_replace_address().die)->clear_register();
 		bm->register_register_cleared();
 	}
 }
@@ -485,7 +494,7 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		assert(false);
 	}
 
-	VisualTracer::get_instance()->register_completed_event(*event);
+	//VisualTracer::get_instance()->register_completed_event(*event);
 
 	if (event->get_event_type() == READ_COMMAND && event->is_original_application_io()) {
 		//event->print();

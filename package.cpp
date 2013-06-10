@@ -6,40 +6,35 @@
 using namespace ssd;
 
 Package::Package(long physical_address):
-	data((Die *) malloc(PACKAGE_SIZE * sizeof(Die))),
+	data(),
 	currently_executing_operation_finish_time(0)
 {
-	if(data == NULL){
-		fprintf(stderr, "Package error: %s: constructor unable to allocate Die data\n", __func__);
-		exit(MEM_ERR);
+	for(uint i = 0; i < PACKAGE_SIZE; i++) {
+		int a = physical_address + (DIE_SIZE * PLANE_SIZE * BLOCK_SIZE * i);
+		Die p = Die(a);
+		data.push_back(p);
 	}
-	for(uint i = 0; i < PACKAGE_SIZE; i++)
-		(void) new (&data[i]) Die(physical_address+(DIE_SIZE*PLANE_SIZE*BLOCK_SIZE*i));
 }
 
-Package::~Package()
-{
-	assert(data != NULL);
-	for(uint i = 0; i < PACKAGE_SIZE; i++)
-		data[i].~Die();
-	free(data);
-}
+Package::Package():
+	data(),
+	currently_executing_operation_finish_time(0) {}
 
 enum status Package::read(Event &event)
 {
-	assert(data != NULL && event.get_address().die < PACKAGE_SIZE && event.get_address().valid > PACKAGE);
+	assert(event.get_address().die < PACKAGE_SIZE && event.get_address().valid > PACKAGE);
 	return data[event.get_address().die].read(event);
 }
 
 enum status Package::write(Event &event)
 {
-	assert(data != NULL && event.get_address().die < PACKAGE_SIZE && event.get_address().valid > PACKAGE);
+	assert(event.get_address().die < PACKAGE_SIZE && event.get_address().valid > PACKAGE);
 	return data[event.get_address().die].write(event);
 }
 
 enum status Package::erase(Event &event)
 {
-	assert(data != NULL && event.get_address().die < PACKAGE_SIZE && event.get_address().valid > PACKAGE);
+	assert(event.get_address().die < PACKAGE_SIZE && event.get_address().valid > PACKAGE);
 	enum status status = data[event.get_address().die].erase(event);
 	return status;
 }
