@@ -5,27 +5,17 @@
 
 using namespace ssd;
 
-Plane::Plane(long physical_address):
-	data((Block *) malloc(PLANE_SIZE * sizeof(Block)))
+Plane::Plane(long physical_address) : data()
 {
-	if(data == NULL){
-		fprintf(stderr, "Plane error: %s: constructor unable to allocate Block data\n", __func__);
-		exit(MEM_ERR);
-	}
-
 	for(uint i = 0; i < PLANE_SIZE; i++)
 	{
-		(void) new (&data[i]) Block(physical_address+(i*BLOCK_SIZE));
+		int address = physical_address + ( i * BLOCK_SIZE);
+		Block b = Block(address);
+		data.push_back(b);
 	}
 }
 
-Plane::~Plane(void)
-{
-	assert(data != NULL);
-	for(uint i = 0; i < PLANE_SIZE; i++)
-		data[i].~Block();
-	free(data);
-}
+Plane::Plane() : data() {}
 
 enum status Plane::read(Event &event)
 {
@@ -50,11 +40,5 @@ enum status Plane::erase(Event &event)
 	assert(event.get_address().block < PLANE_SIZE && event.get_address().valid > PLANE);
 	enum status status = data[event.get_address().block]._erase(event);
 	return status;
-}
-
-Block *Plane::get_block_pointer(const Address & address)
-{
-	assert(address.valid >= PLANE);
-	return data[address.block].get_pointer();
 }
 

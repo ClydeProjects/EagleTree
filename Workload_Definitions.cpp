@@ -94,14 +94,14 @@ Asynch_Random_Workload::~Asynch_Random_Workload() {
 }
 
 vector<Thread*> Asynch_Random_Workload::generate() {
-	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
+	//Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
 	Asynchronous_Random_Thread_Reader_Writer* thread = new Asynchronous_Random_Thread_Reader_Writer(min_lba, max_lba, INFINITE, 236);
 	thread->set_statistics_gatherer(stats);
 	thread->set_experiment_thread(true);
-	init_write->add_follow_up_thread(thread);
+	//init_write->add_follow_up_thread(thread);
 	//init_write->set_statistics_gatherer(stats);
 	//init_write->set_experiment_thread(true);
-	vector<Thread*> threads(1, init_write);
+	vector<Thread*> threads(1, thread);
 	return threads;
 }
 
@@ -159,6 +159,35 @@ vector<Thread*> Synch_Write::generate() {
 	random_format->add_follow_up_thread(rand);
 
 	vector<Thread*> threads(1, init_write);
+	return threads;
+}
+
+//*****************************************************************************************
+//				File System With Noise
+//*****************************************************************************************
+
+File_System_With_Noise::File_System_With_Noise() {
+
+}
+
+vector<Thread*> File_System_With_Noise::generate() {
+
+	long log_space_per_thread = max_lba / 4;
+	long max_file_size = log_space_per_thread / 7;
+
+	Thread* experiment_thread1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 472);
+	Thread* experiment_thread2 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 1000000, max_file_size, 713);
+	Thread* experiment_thread3 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, max_file_size, 5);
+
+	experiment_thread1->set_experiment_thread(true);
+	experiment_thread2->set_experiment_thread(true);
+	experiment_thread3->set_experiment_thread(true);
+
+	vector<Thread*> threads;
+	threads.push_back(experiment_thread1);
+	threads.push_back(experiment_thread2);
+	threads.push_back(experiment_thread3);
+
 	return threads;
 }
 

@@ -46,15 +46,15 @@ void Block_manager_parent::init(Ssd* new_ssd, FtlParent* new_ftl, IOScheduler* n
 	scheduler = new_sched;
 
 	for (uint i = 0; i < SSD_SIZE; i++) {
-		Package& package = ssd->getPackages()[i];
+		Package* package = ssd->get_package(i);
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			Die& die = package.getDies()[j];
+			Die* die = package->get_die(j);
 			for (uint t = 0; t < DIE_SIZE; t++) {
-				Plane& plane = die.getPlanes()[t];
+				Plane* plane = die->get_plane(t);
 				for (uint b = 0; b < PLANE_SIZE; b++) {
-					Block& block = plane.getBlocks()[b];
-					free_blocks[i][j][0].push_back(Address(block.get_physical_address(), PAGE));
-					all_blocks.push_back(&block);
+					Block* block = plane->get_block(b);
+					free_blocks[i][j][0].push_back(Address(block->get_physical_address(), PAGE));
+					all_blocks.push_back(block);
 				}
 			}
 			Address pointer = free_blocks[i][j][0].back();
@@ -124,7 +124,7 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	Address a = event.get_address();
 	a.valid = PAGE;
 	a.page = 0;
-	//Block* b = &ssd->getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
+	//Block* b = &ssd->get_package()[a.package]->get_die()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 
 	wl->register_erase_completion(event);
 
@@ -166,7 +166,7 @@ void Block_manager_parent::register_register_cleared() {
 }
 
 uint Block_manager_parent::sort_into_age_class(Address const& a) const {
-	Block* b = &ssd->getPackages()[a.package].getDies()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
+	Block* b = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
 	uint age = b->get_age();
 	double normalized_age = wl->get_normalised_age(age);
 	int klass = floor(normalized_age * num_age_classes * 0.99999);
@@ -285,11 +285,11 @@ pair<bool, pair<int, int> > Block_manager_parent::get_free_block_pointer_with_sh
 			bool die_has_free_pages = has_free_pages(pointer);
 			uint channel_id = pointer.package;
 			uint die_id = pointer.die;
-			bool die_register_is_busy = ssd->getPackages()[channel_id].getDies()[die_id].register_is_busy();
+			bool die_register_is_busy = ssd->get_package(channel_id)->get_die(die_id)->register_is_busy();
 			if (die_has_free_pages && !die_register_is_busy) {
 				can_write = true;
 				double channel_finish_time = ssd->get_currently_executing_operation_finish_time(channel_id);
-				double die_finish_time = ssd->getPackages()[channel_id].getDies()[die_id].get_currently_executing_io_finish_time();
+				double die_finish_time = ssd->get_package(channel_id)->get_die(die_id)->get_currently_executing_io_finish_time();
 				double max = std::max(channel_finish_time,die_finish_time);
 
 				if (die_finish_time < earliest_die_finish_time) {
@@ -340,7 +340,7 @@ Thorsgade, Copenhagen, Capital Region of Denmark
 Delete
 Hanna
 4 days ago
-Hey Niv, Thanks that sounds fairy easy! A& block = ssd.getPackages()[addr.package].getDies()[addr.die].getPlanes()[addr.plane].getBlocks()[addr.block];
+Hey Niv, Thanks that sounds fairy easy! A& block = ssd.get_package()[addr.package]->get_die()[addr.die].getPlanes()[addr.plane].getBlocks()[addr.block];
 		Page const& page_before = block.getPages()[addr.page - 1];
 		return page_before.get_state() == EMPTY;
 	}*/
@@ -357,7 +357,7 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 	uint package_id = address.package;
 	uint die_id = address.die;
 	double channel_finish_time = ssd->get_currently_executing_operation_finish_time(package_id);
-	double die_finish_time = ssd->getPackages()[package_id].getDies()[die_id].get_currently_executing_io_finish_time();
+	double die_finish_time = ssd->get_package(package_id)->get_die(die_id)->get_currently_executing_io_finish_time();
 	double max_time = max(channel_finish_time, die_finish_time);
 
 	double time = max_time - event_time;
@@ -368,18 +368,18 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 bool Block_manager_parent::can_schedule_on_die(Address const& address, event_type type, uint app_io_id) const {
 	uint package_id = address.package;
 	uint die_id = address.die;
-	bool busy = ssd->getPackages()[package_id].getDies()[die_id].register_is_busy();
+	bool busy = ssd->get_package(package_id)->get_die(die_id)->register_is_busy();
 	if (!busy) {
 		return true;
 	}
-	uint application_io = ssd->getPackages()[package_id].getDies()[die_id].get_last_read_application_io();
+	uint application_io = ssd->get_package(package_id)->get_die(die_id)->get_last_read_application_io();
 	return (type == READ_TRANSFER || type == COPY_BACK ) && application_io == app_io_id;
 }
 
 bool Block_manager_parent::is_die_register_busy(Address const& addr) const {
 	uint package_id = addr.package;
 	uint die_id = addr.die;
-	return ssd->getPackages()[package_id].getDies()[die_id].register_is_busy();
+	return ssd->get_package(package_id)->get_die(die_id)->register_is_busy();
 }
 
 bool Block_manager_parent::can_schedule_write_immediately(Address const& prospective_dest, double current_time) {

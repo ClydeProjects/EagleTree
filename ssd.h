@@ -15,6 +15,20 @@
 #include <map>
 #include <set>
 #include <algorithm>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/base_object.hpp>
+
+#include <boost/archive/xml_iarchive.hpp>
+#include <boost/archive/xml_oarchive.hpp>
+
+#include <iostream>
+
+#include <boost/serialization/export.hpp>
+
+
+
 /*#include <boost/multi_index_container.hpp>
 #include <boost/multi_index/identity.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -114,7 +128,7 @@ extern double OVER_PROVISIONING_FACTOR;
  */
 extern const uint MAP_DIRECTORY_SIZE;
 
-extern const bool ALLOW_DEFERRING_TRANSFERS;
+extern bool ALLOW_DEFERRING_TRANSFERS;
 
 /*
  * FTL Implementation
@@ -159,7 +173,7 @@ extern int BLOCK_MANAGER_ID;
 extern int GREED_SCALE;
 extern int WEARWOLF_LOCALITY_THRESHOLD;
 extern bool ENABLE_TAGGING;
-extern int WRITE_DEADLINE;
+extern long WRITE_DEADLINE;
 extern int READ_DEADLINE;
 extern int READ_TRANSFER_DEADLINE;
 
@@ -492,6 +506,12 @@ public:
 	enum status _write(Event &event);
 	inline enum page_state get_state() const { return state; }
 	inline void set_state(page_state val) { state = val; }
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+        ar & BOOST_SERIALIZATION_NVP(state);
+    }
 private:
 	enum page_state state;
 };
@@ -502,7 +522,8 @@ class Block
 {
 public:
 	Block(long physical_address);
-	~Block();
+	Block();
+	~Block() {}
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status _erase(Event &event);
@@ -517,12 +538,22 @@ public:
 	void invalidate_page(uint page);
 	inline long get_physical_address() const { return physical_address; }
 	inline Block *get_pointer() { return this; }
-	inline const Page *getPages() const { return data; }
+	inline Page const& get_page(int i) const { return data[i]; }
 	inline ulong get_age() const { return BLOCK_ERASES - erases_remaining; }
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & BOOST_SERIALIZATION_NVP(pages_invalid);
+    	ar & BOOST_SERIALIZATION_NVP(physical_address);
+    	ar & BOOST_SERIALIZATION_NVP(data);
+    	ar & BOOST_SERIALIZATION_NVP(pages_valid);
+    	ar & BOOST_SERIALIZATION_NVP(erases_remaining);
+    }
 private:
 	uint pages_invalid;
 	long physical_address;
-	Page * const data;
+	vector<Page> data;
 	uint pages_valid;
 	ulong erases_remaining;
 };
@@ -532,14 +563,20 @@ class Plane
 {
 public:
 	Plane(long physical_address);
-	~Plane();
+	Plane();
+	~Plane() {}
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	Block *get_block_pointer(const Address & address);
-	inline Block *getBlocks() { return data; }
+	inline Block *get_block(int i) { return &data[i]; }
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+        ar & BOOST_SERIALIZATION_NVP(data);
+    }
 private:
-	Block * const data;
+	vector<Block> data;
 };
 
 /* The die is the data storage hardware unit that contains planes and is a flash
@@ -548,17 +585,24 @@ class Die
 {
 public:
 	Die(long physical_address);
-	~Die();
+	Die();
+	~Die() {}
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	double get_currently_executing_io_finish_time();
-	inline Plane *getPlanes() { return data; }
+	inline Plane *get_plane(int i) { return &data[i]; }
 	void clear_register();
 	int get_last_read_application_io();
 	bool register_is_busy();
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & BOOST_SERIALIZATION_NVP(data);
+    }
 private:
-	Plane * const data;
+	vector<Plane> data;
 	double currently_executing_io_finish_time;
 	int last_read_io;
 };
@@ -571,15 +615,22 @@ class Package
 {
 public:
 	Package (long physical_address);
-	~Package ();
+	Package();
+	~Package () {}
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
-	inline Die *getDies() { return data; }
+	inline Die *get_die(int i) { return &data[i]; }
 	enum status lock(double start_time, double duration, Event &event);
 	inline double get_currently_executing_operation_finish_time() { return currently_executing_operation_finish_time; }
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & BOOST_SERIALIZATION_NVP(data);
+    }
 private:
-	Die * const data;
+	vector<Die> data;
 	double currently_executing_operation_finish_time;
 };
 
@@ -751,7 +802,8 @@ private:
 class FtlParent
 {
 public:
-	FtlParent(Ssd &ssd) : ssd(ssd), scheduler(NULL) {};
+	FtlParent(Ssd *ssd) : ssd(ssd), scheduler(NULL) {};
+	FtlParent() : ssd(NULL), scheduler(NULL) {};
 	inline void set_scheduler(IOScheduler* sched) { scheduler = sched; }
 	virtual ~FtlParent () {};
 	virtual void read(Event *event) = 0;
@@ -764,15 +816,53 @@ public:
 	virtual Address get_physical_address(uint logical_address) const = 0;
 	virtual void set_replace_address(Event& event) const = 0;
 	virtual void set_read_address(Event& event) = 0;
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & ssd;
+    }
 protected:
-	Ssd &ssd;
+	Ssd *ssd;
 	IOScheduler *scheduler;
+};
+
+class A {
+public:
+	A(): field1(0) {}
+	virtual ~A() {}
+	A(int i): field1(i) {}
+	virtual void method() {}
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & BOOST_SERIALIZATION_NVP(field1);
+    }
+protected:
+	int field1;
+};
+
+class B : public A {
+public:
+	B(int i, int j): A(i), field2(j) {}
+	B(): A(), field2(0) {}
+private:
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & boost::serialization::base_object<A>(*this);
+    	ar & BOOST_SERIALIZATION_NVP(field2);
+    }
+	int field2;
 };
 
 class FtlImpl_Page : public FtlParent
 {
 public:
-	FtlImpl_Page(Ssd &ssd);
+	FtlImpl_Page(Ssd *ssd);
+	FtlImpl_Page();
 	~FtlImpl_Page();
 	void read(Event *event);
 	void write(Event *event);
@@ -784,12 +874,20 @@ public:
 	Address get_physical_address(uint logical_address) const;
 	void set_replace_address(Event& event) const;
 	void set_read_address(Event& event);
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & boost::serialization::base_object<FtlParent>(*this);
+    	ar & BOOST_SERIALIZATION_NVP(logical_to_physical_map);
+    	ar & BOOST_SERIALIZATION_NVP(physical_to_logical_map);
+    }
+
 private:
 	Address get_physical_address(Event const& event) const;
 	vector<long> logical_to_physical_map;
 	vector<long> physical_to_logical_map;
 };
-
 
 /*class FtlImpl_DftlParent : public FtlParent
 {
@@ -930,18 +1028,26 @@ public:
 	friend class Controller;
 	friend class IOScheduler;
 	friend class Block_manager_parent;
-	inline Package* getPackages() { return data; }
+	inline Package* get_package(int i) { return &data[i]; }
 	void set_operating_system(OperatingSystem* os);
 	FtlParent& get_ftl() const;
 	enum status issue(Event *event);
 	double get_currently_executing_operation_finish_time(int package);
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & BOOST_SERIALIZATION_NVP(data);
+    	ar & BOOST_SERIALIZATION_NVP(ftl);
+    }
+    IOScheduler* get_scheduler() { return scheduler; }
 private:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	Package &get_data();
 	Ram ram;
-	Package * const data;
+	vector<Package> data;
 	double last_io_submission_time;
 	OperatingSystem* os;
 	FtlParent *ftl;
@@ -1238,6 +1344,13 @@ private:
 	bool use_flexible_reads;
 };
 
+class File_System_With_Noise : public Workload_Definition {
+public:
+	File_System_With_Noise();
+	vector<Thread*> generate();
+
+};
+
 class Random_Workload : public Workload_Definition {
 public:
 	Random_Workload(long num_threads);
@@ -1291,7 +1404,9 @@ public:
 	static void unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer);
 
 	//static void overprovisioning_experiment(vector<Thread*> (*experiment)(int highest_lba), int space_min, int space_max, int space_inc, string data_folder, string name, int IO_limit);
-	static vector<ExperimentResult> simple_experiment(Workload_Definition* experiment_workload, Workload_Definition* init_workload, string data_folder, string name, int IO_limit, double& variable, double min_val, double max_val, double incr);
+	static void run_single_measurment(Workload_Definition* experiment_workload, Workload_Definition* init_workload, string name, int IO_limit, OperatingSystem* os);
+	static vector<ExperimentResult> simple_experiment(Workload_Definition* experiment_workload, Workload_Definition* init_workload, string data_folder, string name, long IO_limit, double& variable, double min_val, double max_val, double incr);
+	static vector<ExperimentResult> simple_experiment(Workload_Definition* experiment_workload, Workload_Definition* init_workload, string data_folder, string name, long IO_limit, long& variable, long min_val, long max_val, long incr);
 	static void simple_experiment(Workload_Definition* workload, string name, int IO_limit);
 	static vector<ExperimentResult> random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba);
 	static ExperimentResult copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
@@ -1300,6 +1415,8 @@ public:
 	static string graph_filename_prefix;
 	static void draw_graphs(vector<vector<ExperimentResult> > results, string exp_folder);
 	static void draw_experiment_spesific_graphs(vector<vector<ExperimentResult> > results, string exp_folder, vector<int> x_vals);
+	static void save_state(Ssd* ssd);
+	static Ssd* load_state();
 private:
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
 

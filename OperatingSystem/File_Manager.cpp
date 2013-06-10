@@ -33,19 +33,14 @@ File_Manager::~File_Manager() {
 }
 
 Event* File_Manager::issue_next_io() {
-	if (addresses_to_trim.size() > 0) {
+	/*if (addresses_to_trim.size() > 0) {
 		return issue_trim();
-	} else if (!current_file->has_issued_last_io() && !current_file->needs_new_range()) {
+	} else */
+	if (!current_file->has_issued_last_io() && !current_file->needs_new_range()) {
 		return issue_write();
 	} else {
 		return NULL;
 	}
-}
-
-Event* File_Manager::issue_trim() {
-	long lba = *addresses_to_trim.begin();
-	addresses_to_trim.erase(lba);
-	return new Event(TRIM, lba, 1, time);
 }
 
 Event* File_Manager::issue_write() {
@@ -161,7 +156,9 @@ void File_Manager::schedule_to_trim_file(File* file) {
 	for (uint i = 0; i < freed_ranges.size(); i++) {
 		Address_Range range = freed_ranges[i];
 		for (uint j = range.min; j <= range.max; j++) {
-			addresses_to_trim.insert(j);
+			//addresses_to_trim.insert(j);
+			Event* trim = new Event(TRIM, j, 1, time);
+			submit(trim);
 		}
 	}
 }

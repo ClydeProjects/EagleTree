@@ -192,7 +192,7 @@ uint MAX_ITEMS_IN_COPY_BACK_MAP = 1024;
 /* Defines the maximal length of the SSD queue  */
 int MAX_SSD_QUEUE_SIZE = 15;
 
-int WRITE_DEADLINE = 1000000;
+long WRITE_DEADLINE = 1000000;
 int READ_DEADLINE =  1000000;
 int READ_TRANSFER_DEADLINE = 1000000;
 
@@ -266,21 +266,21 @@ void load_entry(char *name, double value, uint line_number) {
 }
 
 void set_normal_config() {
-	SSD_SIZE = 2;
+	SSD_SIZE = 4;
 	PACKAGE_SIZE = 4;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 128;
+	PLANE_SIZE = 64;
 	BLOCK_SIZE = 32;
 
-	PAGE_READ_DELAY = 50;
-	PAGE_WRITE_DELAY = 200;
+	PAGE_READ_DELAY = 115;
+	PAGE_WRITE_DELAY = 1600;
 	BUS_CTRL_DELAY = 5;
-	BUS_DATA_DELAY = 100;
-	BLOCK_ERASE_DELAY = 1500;
+	BUS_DATA_DELAY = 350;
+	BLOCK_ERASE_DELAY = 3000;
 
 	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
-	SCHEDULING_SCHEME = 2;
+	SCHEDULING_SCHEME = 0;  // FIFO
 
 	USE_ERASE_QUEUE = false;
 	ENABLE_WEAR_LEVELING = false;
@@ -288,15 +288,9 @@ void set_normal_config() {
 	MAX_CONCURRENT_GC_OPS = PACKAGE_SIZE * SSD_SIZE;
 	GREED_SCALE = 3;
 	ALLOW_DEFERRING_TRANSFERS = true;
-	OVER_PROVISIONING_FACTOR = 0.7;
+	OVER_PROVISIONING_FACTOR = 0.6;
 
 	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY + 1;// PAGE_READ_DELAY + 1;
-
-	double sum = 0;
-	for (int i = 10; i >= 4; i--) {
-		sum += 1000 / i;
-	}
-	printf("%f\n", sum);
 }
 
 void load_config() {

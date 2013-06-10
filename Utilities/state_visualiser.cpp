@@ -26,7 +26,7 @@ void StateVisualiser::print_page_status() {
 			for (uint k = 0; k < DIE_SIZE; k++) {
 				for (uint t = 0; t < PLANE_SIZE; t++) {
 					for (uint y = 0; y < BLOCK_SIZE; y++) {
-						Page const& page = ssd_ref.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t].getPages()[y];
+						Page const& page = ssd_ref.get_package(i)->get_die(j)->get_plane(k)->get_block(t)->get_page(y);
 						if (page.get_state() == EMPTY) {
 							printf(" ");
 							num_empty_pages++;
@@ -65,8 +65,8 @@ void StateVisualiser::print_block_ages() {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			for (uint k = 0; k < DIE_SIZE; k++) {
 				for (uint t = 0; t < PLANE_SIZE; t++) {
-					Block const& block = ssd_ref.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
-					uint age = block.get_age();
+					Block* block = ssd_ref.get_package(i)->get_die(j)->get_plane(k)->get_block(t);
+					uint age = block->get_age();
 					printf("% 7d|", age);
 					total_age += age;
 					oldest_age = max(oldest_age, age);
@@ -84,8 +84,8 @@ void StateVisualiser::print_block_ages() {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			for (uint k = 0; k < DIE_SIZE; k++) {
 				for (uint t = 0; t < PLANE_SIZE; t++) {
-					Block const& block = ssd_ref.getPackages()[i].getDies()[j].getPlanes()[k].getBlocks()[t];
-					uint age = BLOCK_ERASES - block.get_erases_remaining();
+					Block* block = ssd_ref.get_package(i)->get_die(j)->get_plane(k)->get_block(t);
+					uint age = BLOCK_ERASES - block->get_erases_remaining();
 					standard_age_deviation += pow(age - average_age, 2);
 				}
 			}

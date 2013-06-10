@@ -22,18 +22,17 @@ Wear_Leveling_Strategy::Wear_Leveling_Strategy(Ssd* ssd, Migrator* migrator)
 	  block_data(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE, Block_data())
 {
 	for (uint i = 0; i < SSD_SIZE; i++) {
-		Package& package = ssd->getPackages()[i];
+		Package* package = ssd->get_package(i);
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			Die& die = package.getDies()[j];
+			Die* die = package->get_die(j);
 			for (uint t = 0; t < DIE_SIZE; t++) {
-				Plane& plane = die.getPlanes()[t];
+				Plane* plane = die->get_plane(t);
 				for (uint b = 0; b < PLANE_SIZE; b++) {
-					Block* block = &plane.getBlocks()[b];
+					Block* block = plane->get_block(b);
 					blocks_with_min_age.insert(block);
 					all_blocks.push_back(block);
 				}
 			}
-
 		}
 	}
 }
@@ -56,7 +55,7 @@ void Wear_Leveling_Strategy::register_erase_completion(Event const& event) {
 	assert(blocks_with_min_age.size() > 0);
 	num_erases_up_to_date++;
 	Address pba = event.get_address();
-	Block* b = &ssd->getPackages()[pba.package].getDies()[pba.die].getPlanes()[pba.plane].getBlocks()[pba.block];
+	Block* b = ssd->get_package(pba.package)->get_die(pba.die)->get_plane(pba.plane)->get_block(pba.block);
 
 	int id = pba.get_block_id();
 	Block_data& data = block_data[id];
