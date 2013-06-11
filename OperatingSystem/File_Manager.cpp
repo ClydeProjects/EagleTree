@@ -60,7 +60,13 @@ void File_Manager::handle_event_completion(Event* event) {
 	}
 	//time_breaks += throughout_moderator.register_event_completion(*event);
 
-	if (current_file->is_finished() && (live_files.size() == 0 || live_files.back() != current_file)) {
+	if (current_file->is_finished() && (live_files.size() == 0 || live_files.back() != current_file) && num_pending_trims == 0) {
+		if (live_files.size() > 0) {
+			int id1 = live_files.back()->id;
+			int id2 = current_file->id;
+			int i = 0;
+			i++;
+		}
 		handle_file_completion(event->get_current_time());
 		//time = max(time, event->get_current_time());
 	}
@@ -114,6 +120,11 @@ void File_Manager::write_next_file(double current_time) {
 	}
 	num_free_pages -= size;
 	current_file = new File(size, death_probability, current_time);
+	if (current_file->id == 255) {
+		int i = 0;
+		i++;
+		//PRINT_LEVEL = 1;
+	}
 	printf("Writing file  %d  of size  %d.   Num free pages down to %d \n", current_file->id, current_file->size, num_free_pages);
 	files_history.push_back(current_file);
 	assign_new_range();
@@ -147,7 +158,7 @@ void File_Manager::randomly_delete_files(double current_time) {
 	for (uint i = 0; i < live_files.size(); ) {
 		File* file = live_files[i];
 		double random_num = double_generator();
-		if (file->death_probability > random_num) {
+		if (file->death_probability > random_num && file != live_files.back()) {
 			delete_file(file, current_time);
 			live_files.erase(live_files.begin() + i);
 		} else {

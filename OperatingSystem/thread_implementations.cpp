@@ -30,13 +30,10 @@ deque<Event*> Thread::run() {
 	deque<Event*> empty;
 	swap(empty, submitted_events);
 	if (finished) return empty;
-	Event* event = NULL;
-	if (!finished) {
-		event = issue_next_io();
-	}
-	if (event != NULL) {
+	Event* event = issue_next_io();
+	/*if (event != NULL) {
 		submitted_events.push_back(event);
-	}
+	}*/
 	for (uint i = 0; i < submitted_events.size() && is_experiment_thread(); i++) {
 		Event* e = submitted_events[i];
 		if (e != NULL) e->set_experiment_io(true);
