@@ -34,7 +34,7 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/global_fun.hpp>
-#include <boost/multi_index/random_access_index.hpp>*/
+#include <boost/multi_index/random_access<_index.hpp>*/
 #include "bloom_filter.hpp"
 #include <sys/types.h>
 #include "MTRand/mtrand.h" // Marsenne Twister random number generator

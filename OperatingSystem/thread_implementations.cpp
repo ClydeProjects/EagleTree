@@ -93,7 +93,7 @@ void Thread::set_os(OperatingSystem*  op_sys) {
 
 void Thread::submit(Event* event) {
 	event->set_start_time(event->get_current_time());
-	submitted_events.push_front(event);
+	submitted_events.push_back(event);
 }
 
 void Thread::init() {

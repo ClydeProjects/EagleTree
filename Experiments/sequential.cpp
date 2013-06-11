@@ -41,6 +41,8 @@ int main()
 	string exp_folder  = "exp_sequential/";
 	mkdir(exp_folder.c_str(), 0755);
 
+	//PRINT_LEVEL = 1;
+
 	set_normal_config();
 
 	int IO_limit = 200000;

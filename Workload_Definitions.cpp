@@ -113,7 +113,7 @@ Init_Workload::Init_Workload() {}
 vector<Thread*> Init_Workload::generate() {
 	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
 	Simple_Thread* thread = new Asynchronous_Random_Writer(min_lba, max_lba, 23623);
-	thread->set_num_ios(NUMBER_OF_ADDRESSABLE_PAGES() * 2);
+	thread->set_num_ios(NUMBER_OF_ADDRESSABLE_PAGES() * 0.1);
 	//thread->set_num_ios(1000);
 	init_write->add_follow_up_thread(thread);
 	//init_write->set_statistics_gatherer(stats);
@@ -175,18 +175,18 @@ vector<Thread*> File_System_With_Noise::generate() {
 	long log_space_per_thread = max_lba / 4;
 	long max_file_size = log_space_per_thread / 7;
 
-	Thread* experiment_thread1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 472);
+	//Thread* experiment_thread1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 472);
 	Thread* experiment_thread2 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 1000000, max_file_size, 713);
-	Thread* experiment_thread3 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, max_file_size, 5);
+	//Thread* experiment_thread3 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, max_file_size, 5);
 
-	experiment_thread1->set_experiment_thread(true);
+	//experiment_thread1->set_experiment_thread(true);
 	experiment_thread2->set_experiment_thread(true);
-	experiment_thread3->set_experiment_thread(true);
+	//experiment_thread3->set_experiment_thread(true);
 
 	vector<Thread*> threads;
-	threads.push_back(experiment_thread1);
+	//threads.push_back(experiment_thread1);
 	threads.push_back(experiment_thread2);
-	threads.push_back(experiment_thread3);
+	//threads.push_back(experiment_thread3);
 
 	return threads;
 }

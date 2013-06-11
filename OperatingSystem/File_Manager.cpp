@@ -16,11 +16,12 @@ File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, 
 	  max_file_size(max_file_size),
 	  num_free_pages(max_LBA - min_LBA + 1),
 	  double_generator(randseed * 13),
-	  random_number_generator(randseed)
+	  random_number_generator(randseed),
+	  num_pending_trims(0)
 {
 	Address_Range free_range(min_LBA, max_LBA);
 	free_ranges.push_front(free_range);
-	write_next_file(0);
+	printf("num_free_pages  %d\n", num_free_pages);
 }
 
 File_Manager::~File_Manager() {
@@ -33,17 +34,13 @@ File_Manager::~File_Manager() {
 }
 
 Event* File_Manager::issue_next_io() {
-	/*if (addresses_to_trim.size() > 0) {
-		return issue_trim();
-	} else */
-	if (!current_file->has_issued_last_io() && !current_file->needs_new_range()) {
-		return issue_write();
-	} else {
-		return NULL;
+	if (files_history.size() == 0) {
+		//PRINT_LEVEL = 1;
+		write_next_file(0);
 	}
 }
 
-Event* File_Manager::issue_write() {
+void File_Manager::issue_write() {
 	long lba = current_file->get_next_lba_to_be_written();
 	long size = ENABLE_TAGGING ? current_file->size : 1;
 	Event* event = new Event(WRITE, lba, size, time);
@@ -52,22 +49,28 @@ Event* File_Manager::issue_write() {
 	}
 	//time += time_breaks;
 	time += 1;
-	return event;
+	submit(event);
 }
 
-void File_Manager::handle_event_completion(Event*event) {
-	if (event->get_event_type() == TRIM)
-		return;
+void File_Manager::handle_event_completion(Event* event) {
+	if (event->get_event_type() == TRIM) {
+		num_pending_trims--;
+	} else if (event->get_event_type() == WRITE) {
+		current_file->register_write_completion();
+	}
 	//time_breaks += throughout_moderator.register_event_completion(*event);
-	current_file->register_write_completion();
-	if (current_file->is_finished()) {
+
+	if (current_file->is_finished() && (live_files.size() == 0 || live_files.back() != current_file)) {
 		handle_file_completion(event->get_current_time());
-		time = max(time, event->get_current_time());
+		//time = max(time, event->get_current_time());
 	}
-	else if (current_file->needs_new_range()) {
-		assign_new_range();
-		time = max(time, event->get_current_time());
+	if (current_file->is_finished() && live_files.size() > 0 && live_files.back() == current_file && num_pending_trims == 0) {
+		write_next_file(event->get_current_time());
 	}
+	//else if (current_file->needs_new_range()) {
+		//assign_new_range();
+		//time = max(time, event->get_current_time());
+	//}
 }
 
 void File_Manager::handle_file_completion(double current_time) {
@@ -85,7 +88,8 @@ void File_Manager::handle_file_completion(double current_time) {
 	if (PRINT_FILE_MANAGER_INFO) {
 		StatisticsGatherer::get_global_instance()->print();
 	}
-	write_next_file(current_time);
+
+
 }
 
 double File_Manager::generate_death_probability() {
@@ -110,19 +114,31 @@ void File_Manager::write_next_file(double current_time) {
 	}
 	num_free_pages -= size;
 	current_file = new File(size, death_probability, current_time);
+	printf("Writing file  %d  of size  %d.   Num free pages down to %d \n", current_file->id, current_file->size, num_free_pages);
 	files_history.push_back(current_file);
 	assign_new_range();
+
+	while (!current_file->has_issued_last_io()) {
+		if (current_file->needs_new_range()) {
+			assign_new_range();
+		}
+		issue_write();
+	}
 }
 
 void File_Manager::assign_new_range() {
+	assert(free_ranges.size() > 0);
 	Address_Range range = free_ranges.front();
 	free_ranges.pop_front();
 	long num_pages_left_to_write = current_file->get_num_pages_left_to_allocate();
 	if (num_pages_left_to_write < range.get_size()) {
 		Address_Range sub_range = range.split(num_pages_left_to_write);
+		assert(range.min <= range.max);
 		free_ranges.push_front(range);
 		current_file->register_new_range(sub_range);
+		printf("  assigning range: %d  %d\n", sub_range.min, sub_range.max);
 	} else {
+		printf("  assigning range: %d  %d\n", range.min, range.max);
 		current_file->register_new_range(range);
 	}
 }
@@ -145,13 +161,16 @@ void File_Manager::delete_file(File* victim, double current_time) {
 		printf("deleting file  %d\n", victim->id);
 	}
 	num_free_pages += victim->size;
+	printf("delete file %d. Num free files up to: %d\n", victim->id, num_free_pages);
 	schedule_to_trim_file(victim);
 	reclaim_file_space(victim);
+	assert(free_ranges.size() > 0);
 	victim->time_deleted = current_time;
 }
 
 // merges the
 void File_Manager::schedule_to_trim_file(File* file) {
+	num_pending_trims += file->size;
 	deque<Address_Range> freed_ranges = file->ranges_comprising_file;
 	for (uint i = 0; i < freed_ranges.size(); i++) {
 		Address_Range range = freed_ranges[i];
@@ -172,18 +191,35 @@ void File_Manager::reclaim_file_space(File* file) {
 		return;
 	}
 	uint i = 0, j = 0;
+	printf("has  %d  ranges\n", freed_ranges.size());
+
+	int sum_free_pages = 0;
+	for (int i = 0; i < freed_ranges.size(); i++) {
+		sum_free_pages += freed_ranges[i].get_size();
+	}
+	for (int i = 0; i < free_ranges.size(); i++) {
+		sum_free_pages += free_ranges[i].get_size();
+	}
+
 	while (i < freed_ranges.size() || j < free_ranges.size()) {
-		Address_Range& freed_range = freed_ranges[i];
-		Address_Range& existing_range = free_ranges[j];
+
 		if (j == free_ranges.size()) {
-			new_list.push_back(freed_range);
+			//printf("    pushing  %")
+			new_list.push_back(freed_ranges[i]);
 			i++;
+			continue;
 		}
 		else if (i == freed_ranges.size()) {
-			new_list.push_back(existing_range);
+			new_list.push_back(free_ranges[j]);
 			j++;
+			continue;
 		}
-		else if (existing_range.is_contiguously_followed_by(freed_range)) {
+
+		Address_Range& freed_range = freed_ranges[i];
+		printf("  freeing range  %d  %d\n", freed_range.min, freed_range.max);
+		Address_Range& existing_range = free_ranges[j];
+
+		if (existing_range.is_contiguously_followed_by(freed_range)) {
 			freed_range.merge(existing_range);
 			j++;
 		}
@@ -204,6 +240,14 @@ void File_Manager::reclaim_file_space(File* file) {
 		}
 	}
 	free_ranges = new_list;
+
+	int new_sum = 0;
+	for (int i = 0; i < new_list.size(); i++) {
+		new_sum += new_list[i].get_size();
+	}
+	assert(new_sum == sum_free_pages);
+	assert(new_sum == num_free_pages);
+
 }
 
 /*void File_Manager::print_thread_stats() {
@@ -279,6 +323,7 @@ bool File_Manager::File::is_finished() const {
 }
 
 void File_Manager::File::register_write_completion() {
+	//printf("num_pages_written:  %d\n", num_pages_written);
 	num_pages_written++;
 }
 
@@ -306,7 +351,7 @@ void File_Manager::File::register_new_range(Address_Range range) {
 		printf("new range for file: %d    (%d - %d)  in total: %d\n", id, range.min, range.max, range.get_size());
 	}
 	assert(logical_addresses_to_be_written_in_current_range.size() == 0);
-	if (num_pages_written > 0) {
+	if (num_pages_allocated_so_far > 0) {
 		ranges_comprising_file.push_back(current_range_being_written);
 		assert(range.max > current_range_being_written.min);
 	}

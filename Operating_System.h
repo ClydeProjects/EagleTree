@@ -315,7 +315,7 @@ private:
 	void assign_new_range();
 	void randomly_delete_files(double current_time);
 	//Event* issue_trim();
-	Event* issue_write();
+	void issue_write();
 	void reclaim_file_space(File* file);
 	void delete_file(File* victim, double current_time);
 	void handle_file_completion(double current_time);
@@ -334,6 +334,7 @@ private:
 	MTRand_int32 random_number_generator;
 	MTRand_open double_generator;
 	const long max_file_size;
+	int num_pending_trims;
 	//Throughput_Moderator throughout_moderator;
 };
 
