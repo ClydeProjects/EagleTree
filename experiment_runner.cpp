@@ -290,6 +290,7 @@ void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_wo
 	StatisticsGatherer::get_global_instance()->print();
 	//StatisticsGatherer::get_global_instance()->print_gc_info();
 	Utilization_Meter::print();
+	Individual_Threads_Statistics::print();
 	//Free_Space_Meter::print();
 	Free_Space_Per_LUN_Meter::print();
 }

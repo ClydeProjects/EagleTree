@@ -78,7 +78,6 @@ Ssd::Ssd():
 	StatisticsGatherer::init();
 	SsdStatisticsExtractor::init(this);
 	Utilization_Meter::init();
-
 	Event::reset_id_generators();
 
 	/*{
@@ -134,7 +133,7 @@ Ssd::~Ssd()
 	delete scheduler;
 }
 
-void Ssd::event_arrive(Event* event) {
+void Ssd::submit(Event* event) {
 	//printf("submitted: %d\n",  event->get_id());
 	// Print error and terminate if start time of event is less than IO submission time
 	// assert(event->get_start_time() >= last_io_submission_time);
@@ -169,7 +168,7 @@ void Ssd::event_arrive(enum event_type type, ulong logical_address, uint size, d
 {
 	Event *event = new Event(type, logical_address , size, start_time);
 	event->set_payload(buffer);
-	event_arrive(event);
+	submit(event);
 }
 
 void Ssd::progress_since_os_is_waiting() {

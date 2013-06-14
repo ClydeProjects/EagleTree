@@ -21,7 +21,6 @@ File_Manager::File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, 
 {
 	Address_Range free_range(min_LBA, max_LBA);
 	free_ranges.push_front(free_range);
-	printf("num_free_pages  %d\n", num_free_pages);
 }
 
 File_Manager::~File_Manager() {
@@ -33,22 +32,18 @@ File_Manager::~File_Manager() {
 	}
 }
 
-Event* File_Manager::issue_next_io() {
-	if (files_history.size() == 0) {
-		//PRINT_LEVEL = 1;
-		write_next_file(0);
-	}
+void File_Manager::issue_first_IOs() {
+	write_next_file(0);
 }
 
 void File_Manager::issue_write() {
 	long lba = current_file->get_next_lba_to_be_written();
 	long size = ENABLE_TAGGING ? current_file->size : 1;
-	Event* event = new Event(WRITE, lba, size, time);
+	Event* event = new Event(WRITE, lba, size, get_current_time());
 	if (ENABLE_TAGGING) {
 		event->set_tag(current_file->id);
 	}
 	//time += time_breaks;
-	time += 1;
 	submit(event);
 }
 
@@ -120,12 +115,7 @@ void File_Manager::write_next_file(double current_time) {
 	}
 	num_free_pages -= size;
 	current_file = new File(size, death_probability, current_time);
-	if (current_file->id == 255) {
-		int i = 0;
-		i++;
-		//PRINT_LEVEL = 1;
-	}
-	printf("Writing file  %d  of size  %d.   Num free pages down to %d \n", current_file->id, current_file->size, num_free_pages);
+	//printf("Writing file  %d  of size  %d.   Num free pages down to %d \n", current_file->id, current_file->size, num_free_pages);
 	files_history.push_back(current_file);
 	assign_new_range();
 
@@ -147,9 +137,9 @@ void File_Manager::assign_new_range() {
 		assert(range.min <= range.max);
 		free_ranges.push_front(range);
 		current_file->register_new_range(sub_range);
-		printf("  assigning range: %d  %d\n", sub_range.min, sub_range.max);
+		//printf("  assigning range: %d  %d\n", sub_range.min, sub_range.max);
 	} else {
-		printf("  assigning range: %d  %d\n", range.min, range.max);
+		//printf("  assigning range: %d  %d\n", range.min, range.max);
 		current_file->register_new_range(range);
 	}
 }
@@ -172,7 +162,7 @@ void File_Manager::delete_file(File* victim, double current_time) {
 		printf("deleting file  %d\n", victim->id);
 	}
 	num_free_pages += victim->size;
-	printf("delete file %d. Num free files up to: %d\n", victim->id, num_free_pages);
+	//printf("delete file %d. Num free files up to: %d\n", victim->id, num_free_pages);
 	schedule_to_trim_file(victim);
 	reclaim_file_space(victim);
 	assert(free_ranges.size() > 0);
@@ -187,7 +177,7 @@ void File_Manager::schedule_to_trim_file(File* file) {
 		Address_Range range = freed_ranges[i];
 		for (uint j = range.min; j <= range.max; j++) {
 			//addresses_to_trim.insert(j);
-			Event* trim = new Event(TRIM, j, 1, time);
+			Event* trim = new Event(TRIM, j, 1, get_current_time());
 			submit(trim);
 		}
 	}
@@ -202,7 +192,7 @@ void File_Manager::reclaim_file_space(File* file) {
 		return;
 	}
 	uint i = 0, j = 0;
-	printf("has  %d  ranges\n", freed_ranges.size());
+	//printf("has  %d  ranges\n", freed_ranges.size());
 
 	int sum_free_pages = 0;
 	for (int i = 0; i < freed_ranges.size(); i++) {
@@ -227,7 +217,7 @@ void File_Manager::reclaim_file_space(File* file) {
 		}
 
 		Address_Range& freed_range = freed_ranges[i];
-		printf("  freeing range  %d  %d\n", freed_range.min, freed_range.max);
+		//printf("  freeing range  %d  %d\n", freed_range.min, freed_range.max);
 		Address_Range& existing_range = free_ranges[j];
 
 		if (existing_range.is_contiguously_followed_by(freed_range)) {

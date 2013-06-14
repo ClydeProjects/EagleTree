@@ -11,9 +11,7 @@ using namespace ssd;
 
 #include <algorithm> // random_shuffle
 
-Random_Order_Iterator::Random_Order_Iterator()
- : random_number_generator(134) {}
-
+MTRand_int32 Random_Order_Iterator::random_number_generator = MTRand_int32(23652362462462462);
 
 void Random_Order_Iterator::shuffle (std::vector<int> & order)
 {

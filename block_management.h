@@ -98,14 +98,11 @@ protected:
 
 private:
 	Address find_free_unused_block(uint package_id, uint die_id, uint age_class, double time);
-
 	void issue_erase(Address a, double time);
-
 	int get_num_free_blocks(int package, int die);
 	bool copy_back_allowed_on(long logical_address);
 	void register_copy_back_operation_on(uint logical_address);
 	void register_ECC_check_on(uint logical_address);
-
 	bool schedule_queued_erase(Address location);
 
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
@@ -117,8 +114,6 @@ private:
 
 
 	vector<vector<uint> > num_blocks_being_garbaged_collected_per_LUN;
-
-	Random_Order_Iterator order_randomiser;
 
 	pair<bool, pair<int, int> > last_get_free_block_pointer_with_shortest_IO_queue_result;
 	bool IO_has_completed_since_last_shortest_queue_search;

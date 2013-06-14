@@ -53,21 +53,18 @@ int main()
 	Workload_Definition* init = new Init_Workload();
 	Workload_Definition* experiment = new File_System_With_Noise();
 
-	double start_time = Experiment_Runner::wall_clock_time();
+	Experiment_Runner::wall_clock_time();
 
 	vector<vector<ExperimentResult> > exps;
 	BLOCK_MANAGER_ID = 0;
 	exps.push_back( Experiment_Runner::simple_experiment(experiment, init, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc) );
-
 
 	SCHEDULING_SCHEME = 0;
 	BLOCK_MANAGER_ID = 3;
 	GREED_SCALE = 2;
 	WEARWOLF_LOCALITY_THRESHOLD = BLOCK_SIZE;
 
-
 	exps.push_back( Experiment_Runner::simple_experiment(experiment, init, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc) );
-
 
 	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
 	//exp.push_back( Experiment_Runner::simple_experiment(experiment, Init_Workload, space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );

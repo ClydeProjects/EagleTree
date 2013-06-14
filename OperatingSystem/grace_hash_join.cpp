@@ -67,16 +67,15 @@ void Grace_Hash_Join::create_flexible_reader(int start, int finish) {
 	flex_reader = os->create_flexible_reader(ranges);
 }
 
-Event* Grace_Hash_Join::issue_next_io() {
+void Grace_Hash_Join::issue_first_IOs() {
 	if (phase == BUILD) {
 		execute_build_phase();
 	}
-	return NULL;
 }
 
 void Grace_Hash_Join::handle_event_completion(Event* event) {
 	if (phase == PROBE_SYNCH && event->get_event_type() != TRIM) {
-		Event* trim = new Event(TRIM, event->get_logical_address(), 1, time);
+		Event* trim = new Event(TRIM, event->get_logical_address(), 1, get_current_time());
 		submit(trim);
 	}
 
@@ -145,6 +144,7 @@ void Grace_Hash_Join::execute_build_phase() {
 		// Read new content to input buffer
 		reads_in_progress_set.insert(input_cursor);
 		reads_in_progress++;
+		double time = get_current_time();
 		Event* event = use_flexible_reads ? flex_reader->read_next(time) : new Event(READ, input_cursor, 1, time);
 		input_cursor++;
 		submit(event);
@@ -170,7 +170,7 @@ void Grace_Hash_Join::flush_buffer(int buffer_id) {
 	bool at_relation_A = (input_cursor >= relation_A_min_LBA && input_cursor <= relation_A_max_LBA);
 	int estimated_tag_size = 1;// at_relation_A ? relation_A_size / num_partitions : relation_B_size / num_partitions;
 	int lba = output_cursors[buffer_id]++;
-	Event* write = new Event(WRITE, lba, estimated_tag_size, time);
+	Event* write = new Event(WRITE, lba, estimated_tag_size, get_current_time());
 	//if (use_tagging) write->set_tag(buffer_id * 2 + at_relation_A);
 	//if (use_tagging) write->set_tag(1234);
 	output_buffers[buffer_id] = 0;
@@ -238,6 +238,7 @@ void Grace_Hash_Join::read_smaller_bucket() {
 	for (int i = small_bucket_begin; i <= small_bucket_end; i++) {
 		reads_in_progress_set.insert(i);
 		reads_in_progress++;
+		double time = get_current_time();
 		Event* event = use_flexible_reads ? flex_reader->read_next(time) : new Event(READ, i, 1, time);
 		submit(event);
 	}
@@ -248,7 +249,7 @@ void Grace_Hash_Join::trim_smaller_bucket() {
 	//printf("smaller buck:   %d\n", small_bucket_end - small_bucket_begin);
 	for (int i = small_bucket_begin; i <= small_bucket_end; i++) {
 		reads_in_progress_set.insert(i);
-		Event* event = new Event(TRIM, i, 1, time);
+		Event* event = new Event(TRIM, i, 1, get_current_time());
 		submit(event);
 	}
 	finished_trimming_smaller_bucket = true;
@@ -260,6 +261,7 @@ void Grace_Hash_Join::read_next_in_larger_bucket() {
 	if (use_flexible_reads && large_bucket_cursor == large_bucket_begin) { // First time in this range
 		create_flexible_reader(large_bucket_cursor, large_bucket_end);
 	}
+	double time = get_current_time();
 	Event* read = use_flexible_reads ? flex_reader->read_next(time) : new Event(READ, large_bucket_cursor, 1, time);
 	large_bucket_cursor++;
 	submit(read);

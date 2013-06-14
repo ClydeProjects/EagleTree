@@ -82,7 +82,7 @@ private:
   unsigned long twiddle(unsigned long, unsigned long); // used by gen_state()
   void gen_state(); // generate new state
 // make copy constructor and assignment operator unavailable, they don't make sense
-  MTRand_int32(const MTRand_int32&); // copy constructor not defined
+  //MTRand_int32(const MTRand_int32&); // copy constructor not defined
   void operator=(const MTRand_int32&); // assignment operator not defined
 };
 

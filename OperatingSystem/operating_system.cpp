@@ -39,8 +39,7 @@ void OperatingSystem::set_threads(vector<Thread*> new_threads) {
 	for (uint i = 0; i < new_threads.size(); i++) {
 		Thread* t = new_threads[i];
 		t->set_os(this);
-		t->init();
-		deque<Event*> incoming = t->run();
+		deque<Event*> incoming = t->init();
 		events->append(i, incoming);
 		threads.push_back(t);
 	}
@@ -176,9 +175,9 @@ void OperatingSystem::dispatch_event(int thread_id) {
 		time_of_experiment_start = event->get_current_time();
 	}
 
-	ssd->event_arrive(event);
-	deque<Event*> incoming = threads[thread_id]->run();
-	events->append(thread_id, incoming);
+	ssd->submit(event);
+	//deque<Event*> incoming = threads[thread_id]->init();
+	//events->append(thread_id, incoming);
 }
 
 void OperatingSystem::setup_follow_up_threads(int thread_id, double time) {
@@ -192,14 +191,14 @@ void OperatingSystem::setup_follow_up_threads(int thread_id, double time) {
 		threads[thread_id] = follow_up_threads[0];
 		threads[thread_id]->set_os(this);
 		threads[thread_id]->set_time(time);
-		threads[thread_id]->init();
+		deque<Event*> incoming = follow_up_threads[thread_id]->init();
+		events->append(thread_id, incoming);
 	}
 	for (uint i = 1; i < follow_up_threads.size(); i++) {
 		follow_up_threads[i]->set_time(time);
 		follow_up_threads[i]->set_os(this);
-		threads[thread_id]->init();
 		threads.push_back(follow_up_threads[i]);
-		deque<Event*> incoming = follow_up_threads[i]->run();
+		deque<Event*> incoming = follow_up_threads[i]->init();
 		events->push_back();
 		events->append(i, incoming);
 	}
@@ -235,10 +234,10 @@ void OperatingSystem::register_event_completion(Event* event) {
 	time = max(time, new_time);
 	update_thread_times(time);
 
-	if (events->peek(thread_id) == NULL) {
-		deque<Event*> incoming = threads[thread_id]->run();
+	/*(thread_id) == NULL) {
+		deque<Event*> incoming = threads[thread_id]->init();
 		events->append(thread_id, incoming);
-	}
+	}*/
 
 	time_of_last_event_completed = max(time_of_last_event_completed, event->get_current_time());
 

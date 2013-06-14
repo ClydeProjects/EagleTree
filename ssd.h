@@ -792,11 +792,11 @@ private:
 
 class Random_Order_Iterator {
 public:
-	Random_Order_Iterator();
-	vector<int> get_iterator(int needed_length);
+	static vector<int> get_iterator(int needed_length);
 private:
-	void shuffle(vector<int>&);
-	MTRand_int32 random_number_generator;
+	Random_Order_Iterator() {}
+	static void shuffle(vector<int>&);
+	static MTRand_int32 random_number_generator;
 };
 
 class FtlParent
@@ -1019,7 +1019,7 @@ class Ssd
 public:
 	Ssd ();
 	~Ssd();
-	void event_arrive(Event* event);
+	void submit(Event* event);
 	void event_arrive(enum event_type type, ulong logical_address, uint size, double start_time);
 	void event_arrive(enum event_type type, ulong logical_address, uint size, double start_time, void *buffer);
 	void progress_since_os_is_waiting();
@@ -1278,6 +1278,16 @@ private:
 	static vector<bool> has_free_pages;
 };
 
+class Individual_Threads_Statistics {
+public:
+	static void init();
+	static void print();
+	static void register_thread(Thread*, string name);
+private:
+	static vector<Thread*> threads;
+	static vector<string> thread_names;
+};
+
 class ExperimentResult {
 public:
 	ExperimentResult(string experiment_name, string data_folder, string sub_folder, string variable_parameter_name);
@@ -1348,7 +1358,6 @@ class File_System_With_Noise : public Workload_Definition {
 public:
 	File_System_With_Noise();
 	vector<Thread*> generate();
-
 };
 
 class Random_Workload : public Workload_Definition {

@@ -25,7 +25,6 @@ Block_manager_parent::Block_manager_parent(int num_age_classes)
    num_free_pages(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
    num_available_pages_for_new_writes(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
    num_blocks_being_garbaged_collected_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
-   order_randomiser(),
    IO_has_completed_since_last_shortest_queue_search(true),
    erase_queue(SSD_SIZE, queue< Event*>()),
    num_erases_scheduled_per_package(SSD_SIZE, 0),
@@ -408,7 +407,7 @@ void Block_manager_parent::register_trim_making_gc_redundant(Event* trim) {
 
 // finds and returns a free block from anywhere in the SSD. Returns Address(0, NONE) is there is no such block
 Address Block_manager_parent::find_free_unused_block(double time) {
-	vector<int> order = order_randomiser.get_iterator(SSD_SIZE);
+	vector<int> order = Random_Order_Iterator::get_iterator(SSD_SIZE);
 	while (order.size() > 0) {
 		int index = order.back();
 		order.pop_back();
@@ -422,7 +421,7 @@ Address Block_manager_parent::find_free_unused_block(double time) {
 
 Address Block_manager_parent::find_free_unused_block(uint package_id, double time) {
 	assert(package_id < SSD_SIZE);
-	vector<int> order = order_randomiser.get_iterator(PACKAGE_SIZE);
+	vector<int> order = Random_Order_Iterator::get_iterator(PACKAGE_SIZE);
 	while (order.size() > 0) {
 		int index = order.back();
 		order.pop_back();
@@ -437,7 +436,7 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, double tim
 // finds and returns a free block from a particular die in the SSD
 Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_id, double time) {
 	assert(package_id < SSD_SIZE && die_id < PACKAGE_SIZE);
-	vector<int> order = order_randomiser.get_iterator(num_age_classes);
+	vector<int> order = Random_Order_Iterator::get_iterator(num_age_classes);
 	while (order.size() > 0) {
 		int index = order.back();
 		order.pop_back();
@@ -485,10 +484,10 @@ Address Block_manager_parent::find_free_unused_block(uint package, uint die, enu
 }
 
 Address Block_manager_parent::find_free_unused_block(enum age age, double time) {
-	vector<int> order1 = order_randomiser.get_iterator(SSD_SIZE);
+	vector<int> order1 = Random_Order_Iterator::get_iterator(SSD_SIZE);
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		int package = order1[i];
-		vector<int> order2 = order_randomiser.get_iterator(PACKAGE_SIZE);
+		vector<int> order2 = Random_Order_Iterator::get_iterator(PACKAGE_SIZE);
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			int die = order2[j];
 			Address block = find_free_unused_block(package, die, age, time);

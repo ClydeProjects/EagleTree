@@ -14,7 +14,7 @@ using namespace ssd;
 
 Thread::Thread() :
 		finished(false), time(1), threads_to_start_when_this_thread_finishes(), num_ios_finished(0),
-		experiment_thread(false), os(NULL), statistics_gatherer(NULL), submitted_events(), last_IO_was_null(false), num_IOs_executing(0),
+		experiment_thread(false), os(NULL), internal_statistics_gatherer(new StatisticsGatherer()), external_statistics_gatherer(NULL), submitted_events(), num_IOs_executing(0),
 		time_to_wait_before_starting(0) {}
 
 Thread::~Thread() {
@@ -24,22 +24,18 @@ Thread::~Thread() {
 			delete t;
 		}
 	}
+	delete internal_statistics_gatherer;
 }
 
-deque<Event*> Thread::run() {
+deque<Event*> Thread::init() {
+	time += time_to_wait_before_starting;
 	deque<Event*> empty;
 	swap(empty, submitted_events);
 	if (finished) return empty;
-	Event* event = issue_next_io();
-	/*if (event != NULL) {
-		submitted_events.push_back(event);
-	}*/
+	issue_first_IOs();
 	for (uint i = 0; i < submitted_events.size() && is_experiment_thread(); i++) {
 		Event* e = submitted_events[i];
 		if (e != NULL) e->set_experiment_io(true);
-	}
-	if (submitted_events.size() == 0) {
-		last_IO_was_null = true;
 	}
 	num_IOs_executing += submitted_events.size();
 	//printf("num_IOs_executing:  %d\n", num_IOs_executing);
@@ -50,21 +46,18 @@ deque<Event*> Thread::register_event_completion(Event* event) {
 	deque<Event*> empty;
 	swap(empty, submitted_events);
 	num_IOs_executing--;
-	if (statistics_gatherer != NULL) {
-		statistics_gatherer->register_completed_event(*event);
+	internal_statistics_gatherer->register_completed_event(*event);
+	if (external_statistics_gatherer != NULL) {
+		external_statistics_gatherer->register_completed_event(*event);
 	}
-	if (last_IO_was_null) {
-		time = event->get_current_time();
-	}
+	time = event->get_current_time();
 	if (!finished) {
 		handle_event_completion(event);
 	}
 	for (uint i = 0; i < submitted_events.size() && is_experiment_thread(); i++) {
 		Event* e = submitted_events[i];
-		if (e != NULL) {
-			e->set_start_time(event->get_current_time());
-			if (experiment_thread) e->set_experiment_io(true);
-		}
+		e->set_start_time(event->get_current_time());
+		if (experiment_thread) e->set_experiment_io(true);
 	}
 	if (!event->get_noop() && event->get_event_type() != TRIM) {
 		num_ios_finished++;
@@ -93,18 +86,18 @@ void Thread::submit(Event* event) {
 	submitted_events.push_back(event);
 }
 
-void Thread::init() {
-	time += time_to_wait_before_starting;
+void Thread::set_statistics_gatherer(StatisticsGatherer* new_statistics_gatherer) {
+	external_statistics_gatherer = new_statistics_gatherer;
 }
 
 // =================  Simple_Thread  =============================
 
-Simple_Thread::Simple_Thread(IO_Pattern_Generator* generator, int MAX_IOS, event_type type)
+Simple_Thread::Simple_Thread(IO_Pattern_Generator* generator, int MAX_IOS, IO_Mode_Generator* mode_gen)
 	: Thread(),
-	  type(type),
 	  num_ongoing_IOs(0),
 	  MAX_IOS(MAX_IOS),
-	  io_gen(generator)
+	  io_gen(generator),
+	  io_type_gen(mode_gen)
 {
 	assert(MAX_IOS > 0);
 	number_of_times_to_repeat = generator->max_LBA - generator->min_LBA + 1;
@@ -114,20 +107,26 @@ Simple_Thread::~Simple_Thread() {
 	delete io_gen;
 }
 
-Event* Simple_Thread::issue_next_io() {
-	bool issue = num_ongoing_IOs < MAX_IOS && number_of_times_to_repeat > 0;
-	if (issue) {
+void Simple_Thread::generate_io() {
+	while (num_ongoing_IOs < MAX_IOS && number_of_times_to_repeat > 0) {
 		num_ongoing_IOs++;
 		number_of_times_to_repeat--;
-		Event* e = new Event(type, io_gen->next(), 1, time);
+		Event* e = new Event(io_type_gen->next(), io_gen->next(), 1, get_current_time());
 		submit(e);
 	}
-	return NULL;
+
+}
+
+void Simple_Thread::issue_first_IOs() {
+	generate_io();
 }
 
 void Simple_Thread::handle_event_completion(Event* event) {
 	num_ongoing_IOs--;
 	finished = number_of_times_to_repeat == 0 && num_ongoing_IOs == 0;
+	if (!finished) {
+		generate_io();
+	}
 }
 
 // =================  Flexible_Reader_Thread  =============================
@@ -141,7 +140,7 @@ Flexible_Reader_Thread::Flexible_Reader_Thread(long min_LBA, long max_LBA, int r
 	  flex_reader(NULL)
 {}
 
-Event* Flexible_Reader_Thread::issue_next_io() {
+void Flexible_Reader_Thread::issue_first_IOs() {
 	if (flex_reader == NULL) {
 		vector<Address_Range> ranges;
 		ranges.push_back(Address_Range(min_LBA, max_LBA));
@@ -150,9 +149,8 @@ Event* Flexible_Reader_Thread::issue_next_io() {
 	}
 	if (ready_to_issue_next_write && number_of_times_to_repeat > 0) {
 		ready_to_issue_next_write = false;
-		return flex_reader->read_next(time);
-	} else {
-		return NULL;
+		Event* e = flex_reader->read_next(get_current_time());
+		submit(e);
 	}
 }
 
@@ -173,7 +171,7 @@ void Flexible_Reader_Thread::handle_event_completion(Event* event) {
 
 // =================  Asynchronous_Random_Thread_Reader_Writer  =============================
 
-Asynchronous_Random_Thread_Reader_Writer::Asynchronous_Random_Thread_Reader_Writer(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed)
+/*Asynchronous_Random_Thread_Reader_Writer::Asynchronous_Random_Thread_Reader_Writer(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed)
 	: Thread(),
 	  min_LBA(min_LBA),
 	  max_LBA(max_LBA),
@@ -197,7 +195,7 @@ Event* Asynchronous_Random_Thread_Reader_Writer::issue_next_io() {
 		finished = true;
 	}
 	return event;
-}
+}*/
 
 // =================  Collision_Free_Asynchronous_Random_Writer  =============================
 
@@ -210,7 +208,7 @@ Collision_Free_Asynchronous_Random_Thread::Collision_Free_Asynchronous_Random_Th
 	  random_number_generator(randseed)
 {}
 
-Event* Collision_Free_Asynchronous_Random_Thread::issue_next_io() {
+void Collision_Free_Asynchronous_Random_Thread::issue_first_IOs() {
 	Event* event;
 	if (0 < number_of_times_to_repeat) {
 		long address;
@@ -219,7 +217,7 @@ Event* Collision_Free_Asynchronous_Random_Thread::issue_next_io() {
 		} while (logical_addresses_submitted.count(address) == 1);
 		printf("num events submitted:  %d\n", logical_addresses_submitted.size());
 		logical_addresses_submitted.insert(address);
-		event =  new Event(type, address, 1, time);
+		event =  new Event(type, address, 1, get_current_time());
 	} else {
 		event = NULL;
 	}
@@ -227,7 +225,7 @@ Event* Collision_Free_Asynchronous_Random_Thread::issue_next_io() {
 	if (number_of_times_to_repeat == 0) {
 		finished = true;
 	}
-	return event;
+	//return event;
 }
 
 void Collision_Free_Asynchronous_Random_Thread::handle_event_completion(Event* event) {
