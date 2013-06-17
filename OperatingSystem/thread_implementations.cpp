@@ -13,9 +13,9 @@ using namespace ssd;
 // =================  Thread =============================
 
 Thread::Thread() :
-		finished(false), time(1), threads_to_start_when_this_thread_finishes(), num_ios_finished(0),
-		experiment_thread(false), os(NULL), internal_statistics_gatherer(new StatisticsGatherer()), external_statistics_gatherer(NULL), submitted_events(), num_IOs_executing(0),
-		time_to_wait_before_starting(0) {}
+		finished(false), time(1), threads_to_start_when_this_thread_finishes(),
+		experiment_thread(false), os(NULL), internal_statistics_gatherer(new StatisticsGatherer()),
+		external_statistics_gatherer(NULL), num_IOs_executing(0), queue() {}
 
 Thread::~Thread() {
 	for (uint i = 0; i < threads_to_start_when_this_thread_finishes.size(); i++) {
@@ -27,24 +27,33 @@ Thread::~Thread() {
 	delete internal_statistics_gatherer;
 }
 
-deque<Event*> Thread::init() {
-	time += time_to_wait_before_starting;
-	deque<Event*> empty;
-	swap(empty, submitted_events);
-	if (finished) return empty;
-	issue_first_IOs();
-	for (uint i = 0; i < submitted_events.size() && is_experiment_thread(); i++) {
-		Event* e = submitted_events[i];
-		if (e != NULL) e->set_experiment_io(true);
+Event* Thread::next() {
+	if (queue.size() == 0) {
+		return NULL;
+	} else {
+		Event* next = queue.front();
+		queue.pop_front();
+		return next;
 	}
-	num_IOs_executing += submitted_events.size();
-	//printf("num_IOs_executing:  %d\n", num_IOs_executing);
-	return submitted_events;
 }
 
-deque<Event*> Thread::register_event_completion(Event* event) {
-	deque<Event*> empty;
-	swap(empty, submitted_events);
+void Thread::init(OperatingSystem* new_os, double new_time) {
+	os = new_os;
+	time = new_time;
+	//deque<Event*> empty;
+	//swap(empty, submitted_events);
+	issue_first_IOs();
+	/*for (uint i = 0; i < submitted_events.size() && is_experiment_thread(); i++) {
+		Event* e = submitted_events[i];
+		if (e != NULL) e->set_experiment_io(true);
+	}*/
+	//num_IOs_executing += submitted_events.size();
+	//queue.insert(queue.begin(), submitted_events.begin(), submitted_events.end());
+}
+
+void Thread::register_event_completion(Event* event) {
+	//deque<Event*> empty;
+	//swap(empty, submitted_events);
 	num_IOs_executing--;
 	internal_statistics_gatherer->register_completed_event(*event);
 	if (external_statistics_gatherer != NULL) {
@@ -53,37 +62,34 @@ deque<Event*> Thread::register_event_completion(Event* event) {
 	time = event->get_current_time();
 	if (!finished) {
 		handle_event_completion(event);
+		if (num_IOs_executing == 0) {
+			handle_no_IOs_left();
+			if (num_IOs_executing == 0) {
+				finished = true;
+			}
+		}
 	}
-	for (uint i = 0; i < submitted_events.size() && is_experiment_thread(); i++) {
-		Event* e = submitted_events[i];
-		e->set_start_time(event->get_current_time());
-		if (experiment_thread) e->set_experiment_io(true);
-	}
-	if (!event->get_noop() && event->get_event_type() != TRIM) {
-		num_ios_finished++;
-	}
-	//printf("num_IOs_executing:  %d\n", num_IOs_executing);
-	num_IOs_executing += submitted_events.size();
-	assert(num_IOs_executing >= 0);
-	return submitted_events;
 }
 
 bool Thread::is_finished() {
 	return finished && num_IOs_executing == 0;
 }
 
-void Thread::print_thread_stats() {
-	printf("IOs finished by thread:  %d\n", num_ios_finished);
-}
-
-void Thread::set_os(OperatingSystem*  op_sys) {
-	os = op_sys;
-	op_sys->get_experiment_runtime();
+bool Thread::can_submit_more() {
+	return queue.size() < NUMBER_OF_ADDRESSABLE_PAGES();
 }
 
 void Thread::submit(Event* event) {
 	event->set_start_time(event->get_current_time());
-	submitted_events.push_back(event);
+	queue.push_back(event);
+	num_IOs_executing++;
+	if (is_experiment_thread()) {
+		event->set_experiment_io(true);
+	}
+	if (!can_submit_more()) {
+		printf("Reached the maximum of events that can be submitted at the same time: %d\n", queue.size());
+		assert(false);
+	}
 }
 
 void Thread::set_statistics_gatherer(StatisticsGatherer* new_statistics_gatherer) {
@@ -91,6 +97,17 @@ void Thread::set_statistics_gatherer(StatisticsGatherer* new_statistics_gatherer
 }
 
 // =================  Simple_Thread  =============================
+
+Simple_Thread::Simple_Thread(IO_Pattern_Generator* generator, IO_Mode_Generator* mode_gen, int MAX_OUTSTANDING_IOS, long num_IOs)
+	: Thread(),
+	  num_ongoing_IOs(0),
+	  MAX_IOS(MAX_OUTSTANDING_IOS),
+	  io_gen(generator),
+	  io_type_gen(mode_gen),
+	  number_of_times_to_repeat(num_IOs)
+{
+	assert(MAX_IOS > 0);
+}
 
 Simple_Thread::Simple_Thread(IO_Pattern_Generator* generator, int MAX_IOS, IO_Mode_Generator* mode_gen)
 	: Thread(),
@@ -105,6 +122,7 @@ Simple_Thread::Simple_Thread(IO_Pattern_Generator* generator, int MAX_IOS, IO_Mo
 
 Simple_Thread::~Simple_Thread() {
 	delete io_gen;
+	delete io_type_gen;
 }
 
 void Simple_Thread::generate_io() {
@@ -123,8 +141,7 @@ void Simple_Thread::issue_first_IOs() {
 
 void Simple_Thread::handle_event_completion(Event* event) {
 	num_ongoing_IOs--;
-	finished = number_of_times_to_repeat == 0 && num_ongoing_IOs == 0;
-	if (!finished) {
+	if (number_of_times_to_repeat > 0) {
 		generate_io();
 	}
 }
@@ -161,7 +178,7 @@ void Flexible_Reader_Thread::handle_event_completion(Event* event) {
 		delete flex_reader;
 		flex_reader = NULL;
 		if (--number_of_times_to_repeat == 0) {
-			finished = true;
+			//finished = true;
 			//StateVisualiser::print_page_status();
 		}
 	}
@@ -222,9 +239,6 @@ void Collision_Free_Asynchronous_Random_Thread::issue_first_IOs() {
 		event = NULL;
 	}
 	number_of_times_to_repeat--;
-	if (number_of_times_to_repeat == 0) {
-		finished = true;
-	}
 	//return event;
 }
 

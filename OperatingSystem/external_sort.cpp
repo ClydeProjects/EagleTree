@@ -103,7 +103,7 @@ void External_Sort::handle_event_completion(Event* event) {
 	}
 	else if (phase == THIRD_PHASE && number_finished == relation_max_LBA - relation_min_LBA + 1) {
 		phase = FINISHED;
-		finished = true;
+		//finished = true;
 	}
 }
 

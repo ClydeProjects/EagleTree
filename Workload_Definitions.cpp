@@ -48,7 +48,6 @@ vector<Thread*> Grace_Hash_Join_Workload::generate() {
 				temp_space_start, temp_space_end,
 				use_flexible_reads, false, 32, 31 * i + 1);
 
-		if (i == 0) grace_hash_join->set_time_to_wait_before_starting(10000);
 
 		grace_hash_join->set_experiment_thread(true);
 		preceding_thread->add_follow_up_thread(grace_hash_join);
@@ -114,7 +113,6 @@ vector<Thread*> Init_Workload::generate() {
 	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
 	Simple_Thread* thread = new Asynchronous_Random_Writer(min_lba, max_lba, 23623);
 	thread->set_num_ios(NUMBER_OF_ADDRESSABLE_PAGES() * 2);
-	//thread->set_num_ios(1000);
 	init_write->add_follow_up_thread(thread);
 	//init_write->set_statistics_gatherer(stats);
 	//init_write->set_experiment_thread(true);
@@ -166,9 +164,9 @@ vector<Thread*> File_System_With_Noise::generate() {
 	long log_space_per_thread = max_lba / 4;
 	long max_file_size = log_space_per_thread / 7;
 
-	Thread* experiment_thread1 = new Asynchronous_Random_Reader_Writer(0, log_space_per_thread * 2, 35722);
-	Thread* experiment_thread2 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, 1000000, max_file_size, 713);
-	Thread* experiment_thread3 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, 1000000, max_file_size, 5);
+	Simple_Thread* experiment_thread1 = new Asynchronous_Random_Reader_Writer(0, log_space_per_thread * 2, 35722);
+	Thread* experiment_thread2 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, INFINITE, max_file_size, 713);
+	Thread* experiment_thread3 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, INFINITE, max_file_size, 5);
 
 	experiment_thread1->set_experiment_thread(true);
 	experiment_thread2->set_experiment_thread(true);

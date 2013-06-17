@@ -81,7 +81,7 @@ void Grace_Hash_Join::handle_event_completion(Event* event) {
 
 	if (victim_buffer == num_partitions - 1 && reads_in_progress == 0) {
 		phase = DONE;
-		finished = true;
+		//finished = true;
 		grace_counter++;
 	}
 

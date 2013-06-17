@@ -281,6 +281,8 @@ void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_wo
 	printf("Finished calibration\n");
 	StatisticsGatherer::get_global_instance()->init();
 
+	PRINT_LEVEL = 0;
+
 	// run experiment workload
 	vector<Thread*> experiment_threads = experiment_workload->generate_instance();
 	os->set_threads(experiment_threads);
@@ -289,10 +291,10 @@ void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_wo
 
 	StatisticsGatherer::get_global_instance()->print();
 	//StatisticsGatherer::get_global_instance()->print_gc_info();
-	Utilization_Meter::print();
+	//Utilization_Meter::print();
 	Individual_Threads_Statistics::print();
 	//Free_Space_Meter::print();
-	Free_Space_Per_LUN_Meter::print();
+	//Free_Space_Per_LUN_Meter::print();
 }
 
 vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, Workload_Definition* init_workload, string data_folder, string name, long IO_limit, double& variable, double min_val, double max_val, double incr) {
