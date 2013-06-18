@@ -10,6 +10,19 @@
 using namespace ssd;
 using namespace std;
 
+Wear_Leveling_Strategy::Wear_Leveling_Strategy()
+	: ssd(NULL),
+	  migrator(NULL),
+	  num_erases_up_to_date(0),
+	  average_erase_cycle_time(0),
+	  max_age(1),
+	  blocks_with_min_age(),
+	  all_blocks(),
+	  random_number_generator(90),
+	  block_data(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE, Block_data()) {
+
+}
+
 Wear_Leveling_Strategy::Wear_Leveling_Strategy(Ssd* ssd, Migrator* migrator)
 	: ssd(ssd),
 	  migrator(migrator),
@@ -21,20 +34,24 @@ Wear_Leveling_Strategy::Wear_Leveling_Strategy(Ssd* ssd, Migrator* migrator)
 	  random_number_generator(90),
 	  block_data(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE, Block_data())
 {
+	init();
+}
+
+void Wear_Leveling_Strategy::init() {
 	for (uint i = 0; i < SSD_SIZE; i++) {
-		Package* package = ssd->get_package(i);
-		for (uint j = 0; j < PACKAGE_SIZE; j++) {
-			Die* die = package->get_die(j);
-			for (uint t = 0; t < DIE_SIZE; t++) {
-				Plane* plane = die->get_plane(t);
-				for (uint b = 0; b < PLANE_SIZE; b++) {
-					Block* block = plane->get_block(b);
-					blocks_with_min_age.insert(block);
-					all_blocks.push_back(block);
+			Package* package = ssd->get_package(i);
+			for (uint j = 0; j < PACKAGE_SIZE; j++) {
+				Die* die = package->get_die(j);
+				for (uint t = 0; t < DIE_SIZE; t++) {
+					Plane* plane = die->get_plane(t);
+					for (uint b = 0; b < PLANE_SIZE; b++) {
+						Block* block = plane->get_block(b);
+						blocks_with_min_age.insert(block);
+						all_blocks.push_back(block);
+					}
 				}
 			}
 		}
-	}
 }
 
 double Wear_Leveling_Strategy::get_min_age() const {

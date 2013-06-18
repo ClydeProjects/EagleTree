@@ -18,6 +18,8 @@
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/serialization/vector.hpp>
+#include <boost/serialization/set.hpp>
+#include <boost/serialization/utility.hpp>
 #include <boost/serialization/base_object.hpp>
 
 #include <boost/archive/xml_iarchive.hpp>
@@ -368,6 +370,17 @@ public:
 		valid = rhs.valid;
 		return *this;
 	}
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & package;
+    	ar & die;
+    	ar & plane;
+    	ar & block;
+    	ar & page;
+    	ar & valid;
+    }
 };
 
 /* Class to emulate a log block with page-level mapping. */
@@ -510,7 +523,7 @@ public:
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
     {
-        ar & BOOST_SERIALIZATION_NVP(state);
+        ar & state;
     }
 private:
 	enum page_state state;
@@ -821,41 +834,11 @@ public:
     void serialize(Archive & ar, const unsigned int version)
     {
     	ar & ssd;
+    	ar & scheduler;
     }
 protected:
 	Ssd *ssd;
 	IOScheduler *scheduler;
-};
-
-class A {
-public:
-	A(): field1(0) {}
-	virtual ~A() {}
-	A(int i): field1(i) {}
-	virtual void method() {}
-    friend class boost::serialization::access;
-    template<class Archive>
-    void serialize(Archive & ar, const unsigned int version)
-    {
-    	ar & BOOST_SERIALIZATION_NVP(field1);
-    }
-protected:
-	int field1;
-};
-
-class B : public A {
-public:
-	B(int i, int j): A(i), field2(j) {}
-	B(): A(), field2(0) {}
-private:
-    friend class boost::serialization::access;
-    template<class Archive>
-    void serialize(Archive & ar, const unsigned int version)
-    {
-    	ar & boost::serialization::base_object<A>(*this);
-    	ar & BOOST_SERIALIZATION_NVP(field2);
-    }
-	int field2;
 };
 
 class FtlImpl_Page : public FtlParent
@@ -879,8 +862,8 @@ public:
     void serialize(Archive & ar, const unsigned int version)
     {
     	ar & boost::serialization::base_object<FtlParent>(*this);
-    	ar & BOOST_SERIALIZATION_NVP(logical_to_physical_map);
-    	ar & BOOST_SERIALIZATION_NVP(physical_to_logical_map);
+    	ar & logical_to_physical_map;
+    	ar & physical_to_logical_map;
     }
 
 private:
@@ -1030,17 +1013,20 @@ public:
 	friend class Block_manager_parent;
 	inline Package* get_package(int i) { return &data[i]; }
 	void set_operating_system(OperatingSystem* os);
-	FtlParent& get_ftl() const;
+	FtlParent* get_ftl() const;
 	enum status issue(Event *event);
 	double get_currently_executing_operation_finish_time(int package);
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
     {
-    	ar & BOOST_SERIALIZATION_NVP(data);
-    	ar & BOOST_SERIALIZATION_NVP(ftl);
+    	ar & data;
+    	ar & ftl;
+    	ar & os;
+    	ar & scheduler;
     }
     IOScheduler* get_scheduler() { return scheduler; }
+    void execute_all_remaining_events();
 private:
 	enum status read(Event &event);
 	enum status write(Event &event);
@@ -1424,8 +1410,8 @@ public:
 	static string graph_filename_prefix;
 	static void draw_graphs(vector<vector<ExperimentResult> > results, string exp_folder);
 	static void draw_experiment_spesific_graphs(vector<vector<ExperimentResult> > results, string exp_folder, vector<int> x_vals);
-	static void save_state(Ssd* ssd);
-	static Ssd* load_state();
+	static void save_state(OperatingSystem* os);
+	static OperatingSystem* load_state();
 private:
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
 

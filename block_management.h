@@ -22,6 +22,17 @@ public:
 	void register_event_completion(Event* event);
 	void register_ECC_check_on(uint logical_address);
 	uint how_many_gc_operations_are_scheduled() const;
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & scheduler;
+    	ar & bm;
+    	ar & ssd;
+    	ar & ftl;
+    	ar & gc;
+    	ar & wl;
+    }
 private:
 	bool copy_back_allowed_on(long logical_address);
 	void register_copy_back_operation_on(uint logical_address);
@@ -71,6 +82,26 @@ public:
 	void subtract_from_available_for_new_writes(int num) { num_available_pages_for_new_writes -= num; }
 	vector<Block*> const& get_all_blocks() const { return all_blocks; }
 	uint sort_into_age_class(Address const& address) const;
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & ssd;
+    	ar & ftl;
+    	ar & scheduler;
+    	ar & free_block_pointers;
+
+    	ar & free_blocks;
+    	ar & all_blocks;
+    	ar & num_age_classes;
+    	ar & num_free_pages;
+    	ar & num_available_pages_for_new_writes;
+    	ar & free_block_pointers;
+
+    	ar & wl;
+    	ar & gc;
+    	ar & migrator;
+    }
 protected:
 	virtual Address choose_best_address(Event const& write) = 0;
 	virtual Address choose_any_address(Event const& write) = 0;
@@ -108,12 +139,9 @@ private:
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 
-	const int num_age_classes;
+	int num_age_classes;
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
-
-
-	vector<vector<uint> > num_blocks_being_garbaged_collected_per_LUN;
 
 	pair<bool, pair<int, int> > last_get_free_block_pointer_with_shortest_IO_queue_result;
 	bool IO_has_completed_since_last_shortest_queue_search;
@@ -129,12 +157,30 @@ private:
 
 class Wear_Leveling_Strategy {
 public:
+	Wear_Leveling_Strategy();
 	Wear_Leveling_Strategy(Ssd* ssd, Migrator*);
 	~Wear_Leveling_Strategy() {};
 	void register_erase_completion(Event const& event);
 	bool schedule_wear_leveling_op(Block* block);
 	double get_normalised_age(uint age) const;
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & blocks_with_min_age;
+    	ar & all_blocks;
+    	ar & num_erases_up_to_date;
+    	ar & ssd;
+    	ar & average_erase_cycle_time;
+    	ar & blocks_being_wl;
+    	ar & blocks_to_wl;
+    	ar & migrator;
+
+    	ar & max_age;
+    	ar & block_data;
+    }
 private:
+    void init();
 	double get_min_age() const;
 	void update_blocks_with_min_age(uint min_age);
 	void find_wl_candidates(double current_time);
@@ -152,6 +198,13 @@ private:
 		int age;
 		double last_erase_time;
 		Block_data() : age(0), last_erase_time(0) {}
+	    friend class boost::serialization::access;
+	    template<class Archive>
+	    void serialize(Archive & ar, const unsigned int version)
+	    {
+	    	ar & age;
+	    	ar & last_erase_time;
+	    }
 	};
 	vector<Block_data> block_data;
 };
@@ -163,6 +216,12 @@ public:
 	~Block_manager_parallel() {}
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & boost::serialization::base_object<Block_manager_parent>(*this);
+    }
 protected:
 	Address choose_best_address(Event const& write);
 	Address choose_any_address(Event const& write);
@@ -313,19 +372,30 @@ private:
 
 class Garbage_Collector {
 public:
+	Garbage_Collector();
 	Garbage_Collector(Ssd* ssd, Block_manager_parent* bm);
 	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
 	void remove_as_gc_candidate(Address const& phys_address);
 	void register_trim(Event const& event, uint age_class, int num_live_pages);
 	double get_average_live_pages_per_best_candidate() const;
 	void issue_erase(Address ra, double time);
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & gc_candidates;
+    	ar & blocks_per_lun_with_min_live_pages;
+    	ar & ssd;
+    	ar & bm;
+    	ar & num_age_classes;
+    }
 private:
 	vector<long> get_relevant_gc_candidates(int package_id, int die_id, int klass) const;
 	vector<vector<vector<set<long> > > > gc_candidates;  // each age class has a vector of candidates for GC
 	vector<vector<pair<Address, int> > > blocks_per_lun_with_min_live_pages;
 	Ssd* ssd;
 	Block_manager_parent* bm;
-	const int num_age_classes;
+	int num_age_classes;
 };
 
 

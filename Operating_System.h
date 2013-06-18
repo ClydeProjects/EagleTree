@@ -472,6 +472,7 @@ public:
 	double get_experiment_runtime() const;
 	Flexible_Reader* create_flexible_reader(vector<Address_Range>);
 	void submit(Event* event);
+	Ssd* get_ssd() { return ssd; }
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)

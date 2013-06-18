@@ -119,18 +119,21 @@ Ssd::Ssd():
 
 Ssd::~Ssd()
 {
+	execute_all_remaining_events();
 	//VisualTracer::get_instance()->print_horizontally(2000);
-	if (!scheduler->is_empty()) {
-		scheduler->execute_soonest_events();
-	}
 	//if (PRINT_LEVEL >= 1) StatisticsGatherer::get_global_instance()->print()
-
 	if (PAGE_ENABLE_DATA) {
 		ulong pageSize = ((ulong)(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE)) * (ulong)PAGE_SIZE;
 		munmap(page_data, pageSize);
 	}
 	delete ftl;
 	delete scheduler;
+}
+
+void Ssd::execute_all_remaining_events() {
+	while (!scheduler->is_empty()) {
+		scheduler->execute_soonest_events();
+	}
 }
 
 void Ssd::submit(Event* event) {
@@ -263,6 +266,6 @@ enum status Ssd::issue(Event *event) {
 	return SUCCESS;
 }
 
-FtlParent& Ssd::get_ftl() const {
-	return *ftl;
+FtlParent* Ssd::get_ftl() const {
+	return ftl;
 }

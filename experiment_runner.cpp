@@ -272,16 +272,17 @@ void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> thre
 
 void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_workload, Workload_Definition* init_workload, string name, int IO_limit, OperatingSystem* os) {
 	experiment_workload->recalculate_lba_range();
-
-	// run init workload
 	vector<Thread*> init_threads = init_workload->generate_instance();
 	os->set_threads(init_threads);
 	os->run();
 
+	os->get_ssd()->execute_all_remaining_events();
+	save_state(os);
+	delete os;
+	os = load_state();
 	printf("Finished calibration\n");
 	StatisticsGatherer::get_global_instance()->init();
-
-	PRINT_LEVEL = 0;
+	Utilization_Meter::init();
 
 	// run experiment workload
 	vector<Thread*> experiment_threads = experiment_workload->generate_instance();
@@ -291,7 +292,7 @@ void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_wo
 
 	StatisticsGatherer::get_global_instance()->print();
 	//StatisticsGatherer::get_global_instance()->print_gc_info();
-	//Utilization_Meter::print();
+	Utilization_Meter::print();
 	Individual_Threads_Statistics::print();
 	//Free_Space_Meter::print();
 	//Free_Space_Per_LUN_Meter::print();
@@ -874,19 +875,27 @@ void Experiment_Runner::draw_experiment_spesific_graphs(vector<vector<Experiment
 		}
 }
 
-void Experiment_Runner::save_state(Ssd* ssd) {
+void Experiment_Runner::save_state(OperatingSystem* os) {
 	std::ofstream file("/home/niv/Desktop/EagleTree/Experiments/archive.txt");
 	boost::archive::text_oarchive oa(file);
 	oa.register_type<FtlImpl_Page>( );
-	oa << ssd;
+	oa.register_type<Block_manager_parallel>( );
+	oa << os;
 }
 
-Ssd* Experiment_Runner::load_state() {
+OperatingSystem* Experiment_Runner::load_state() {
 	std::ifstream file("/home/niv/Desktop/EagleTree/Experiments/archive.txt");
 	boost::archive::text_iarchive ia(file);
 	ia.register_type<FtlImpl_Page>( );
-	Ssd* ssd;
-	ia >> ssd;
-	ssd->get_ftl().set_scheduler(ssd->get_scheduler());
-	return ssd;
+	ia.register_type<Block_manager_parallel>();
+	OperatingSystem* os;
+	ia >> os;
+	Ssd* ssd = os->get_ssd();
+	FtlParent* ftl = os->get_ssd()->get_ftl();
+	IOScheduler* sch = os->get_ssd()->get_scheduler();
+	Migrator* mg = sch->get_migrator();
+	os->get_ssd()->get_scheduler()->init()
+	//Ssd* ssd = os->get_ssd();
+	//ssd->get_ftl().set_scheduler(ssd->get_scheduler());
+	return os;
 }

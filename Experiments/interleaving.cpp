@@ -39,13 +39,14 @@ int main()
 	//exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "all_equal/", "all_equal", IO_limit, WRITE_DEADLINE, deadline_min, deadline_max, incr) );
 
 	//exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "deadlines3333/", "deadlines3333/", IO_limit, WRITE_DEADLINE, deadline_min, deadline_max, incr) );
+	delete init;
 	delete workload;
-	Experiment_Runner::draw_graphs(exps, exp_folder);
+	/*Experiment_Runner::draw_graphs(exps, exp_folder);
 	vector<int> num_write_thread_values_to_show(0);
 	for (int i = op_min; i <= op_max; i += incr)
 		num_write_thread_values_to_show.push_back(i); // Show all used spaces values in multi-graphs
 	Experiment_Runner::draw_experiment_spesific_graphs(exps, exp_folder, num_write_thread_values_to_show);
-	chdir(".."); // Leaving
+	chdir(".."); // Leaving*/
 	return 0;
 }
 

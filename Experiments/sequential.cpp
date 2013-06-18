@@ -48,7 +48,7 @@ int main()
 	int IO_limit = 200000;
 	double space_min = 0.6;
 	double space_max = 0.6;
-	double space_inc = 0.5;
+	double space_inc = 0.05;
 
 	Workload_Definition* init = new Init_Workload();
 	Workload_Definition* experiment = new File_System_With_Noise();
@@ -57,13 +57,11 @@ int main()
 
 	vector<vector<ExperimentResult> > exps;
 	BLOCK_MANAGER_ID = 0;
-	exps.push_back( Experiment_Runner::simple_experiment(experiment, init, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc) );
+	//exps.push_back( Experiment_Runner::simple_experiment(experiment, init, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc) );
 
 	SCHEDULING_SCHEME = 0;
 	BLOCK_MANAGER_ID = 3;
-	GREED_SCALE = 2;
 	WEARWOLF_LOCALITY_THRESHOLD = BLOCK_SIZE;
-
 	exps.push_back( Experiment_Runner::simple_experiment(experiment, init, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc) );
 
 	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );

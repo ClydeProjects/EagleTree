@@ -2,15 +2,21 @@
 #include "../block_management.h"
 using namespace ssd;
 
+Garbage_Collector::Garbage_Collector()
+	:  gc_candidates(SSD_SIZE, vector<vector<set<long> > >(PACKAGE_SIZE, vector<set<long> >(1, set<long>()))),
+	   blocks_per_lun_with_min_live_pages(SSD_SIZE, vector<pair<Address, int> >(PACKAGE_SIZE)),
+	   ssd(NULL),
+	   bm(NULL),
+	   num_age_classes(1)
+{}
+
 Garbage_Collector::Garbage_Collector(Ssd* ssd, Block_manager_parent* bm)
 	:  gc_candidates(SSD_SIZE, vector<vector<set<long> > >(PACKAGE_SIZE, vector<set<long> >(bm->get_num_age_classes(), set<long>()))),
 	   blocks_per_lun_with_min_live_pages(SSD_SIZE, vector<pair<Address, int> >(PACKAGE_SIZE)),
 	   ssd(ssd),
 	   bm(bm),
 	   num_age_classes(bm->get_num_age_classes())
-{
-	gc_candidates[1][1][0].insert(100);
-}
+{}
 
 void Garbage_Collector::remove_as_gc_candidate(Address const& phys_address) {
 	//phys_address.print();

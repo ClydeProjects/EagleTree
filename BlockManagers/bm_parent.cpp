@@ -24,7 +24,6 @@ Block_manager_parent::Block_manager_parent(int num_age_classes)
    num_age_classes(num_age_classes),
    num_free_pages(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
    num_available_pages_for_new_writes(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
-   num_blocks_being_garbaged_collected_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
    IO_has_completed_since_last_shortest_queue_search(true),
    erase_queue(SSD_SIZE, queue< Event*>()),
    num_erases_scheduled_per_package(SSD_SIZE, 0),

@@ -68,6 +68,7 @@ public:
 	Scheduling_Strategy(IOScheduler* s, Ssd* ssd, Priorty_Scheme* scheme) : event_queue(), scheduler(s), ssd(ssd), priorty_scheme(scheme) {}
 	virtual ~Scheduling_Strategy() {};
 	virtual void schedule();
+    friend class boost::serialization::access;
 protected:
 	IOScheduler* scheduler;
 	Ssd* ssd;
@@ -93,6 +94,15 @@ public:
 	void execute_soonest_events();
 	void handle(vector<Event*>& events);
 	void handle_noop_events(vector<Event*>& events);
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & ssd;
+    	ar & ftl;
+    	ar & bm;
+    	ar & migrator;
+    }
 private:
 	void setup_structures(deque<Event*> events);
 	enum status execute_next(Event* event);
@@ -110,6 +120,7 @@ private:
 	void push(Event* event);
 	void manage_operation_completion(Event* event);
 	double get_soonest_event_time(vector<Event*> const& events) const;
+	Migrator* get_migrator() { return migrator; }
 
 	event_queue* future_events;
 	Scheduling_Strategy* overdue_events;
