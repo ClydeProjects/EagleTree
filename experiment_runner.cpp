@@ -890,12 +890,6 @@ OperatingSystem* Experiment_Runner::load_state() {
 	ia.register_type<Block_manager_parallel>();
 	OperatingSystem* os;
 	ia >> os;
-	Ssd* ssd = os->get_ssd();
-	FtlParent* ftl = os->get_ssd()->get_ftl();
-	IOScheduler* sch = os->get_ssd()->get_scheduler();
-	Migrator* mg = sch->get_migrator();
-	os->get_ssd()->get_scheduler()->init()
-	//Ssd* ssd = os->get_ssd();
-	//ssd->get_ftl().set_scheduler(ssd->get_scheduler());
+	os->get_ssd()->get_scheduler()->init();
 	return os;
 }

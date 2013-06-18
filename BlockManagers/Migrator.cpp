@@ -8,6 +8,20 @@ Migrator::Migrator() :
 		num_erases_scheduled_per_package(SSD_SIZE)
 {}
 
+Migrator::~Migrator() {
+	/*for (int i = 0; i < num_blocks_being_garbaged_collected_per_LUN.size(); i++) {
+		for (int j = 0; j < num_blocks_being_garbaged_collected_per_LUN[i].size(); j++) {
+			int num = num_blocks_being_garbaged_collected_per_LUN[i][j];
+			printf("num_blocks_being_garbaged_collected_per_LUN  %d  %d:  %d\n", i, j, num);
+		}
+	}
+	map<int, int>::iterator it = blocks_being_garbage_collected.begin();
+	while (it != blocks_being_garbage_collected.end()) {
+		printf("blocks_being_garbage_collected    %d:  %d\n", (*it).first, (*it).second);
+		it++;
+	}*/
+}
+
 void Migrator::init(IOScheduler* new_s, Block_manager_parent* new_bm, Garbage_Collector* new_gc, Wear_Leveling_Strategy* new_wl, FtlParent* new_ftl, Ssd* new_ssd) {
 	scheduler = new_s;
 	bm = new_bm;
@@ -15,15 +29,13 @@ void Migrator::init(IOScheduler* new_s, Block_manager_parent* new_bm, Garbage_Co
 	wl = new_wl;
 	ftl = new_ftl;
 	ssd = new_ssd;
-
 }
-
 
 void Migrator::register_event_completion(Event* event) {
 	if (event->get_event_type() == ERASE) {
 		handle_erase_completion(event);
 	}
-	else if (event->get_event_type() == TRIM || event->get_event_type() == WRITE && event->get_replace_address().valid != NONE) {
+	else if (event->get_event_type() == TRIM || (event->get_event_type() == WRITE && event->get_replace_address().valid != NONE)) {
 		handle_trim_completion(event);
 	}
 }

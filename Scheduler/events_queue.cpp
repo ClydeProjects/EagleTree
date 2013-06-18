@@ -38,6 +38,7 @@ Event* event_queue::find(long dependency_code) const {
 }
 
 bool event_queue::remove(Event* event) {
+	num_events--;
 	if (event == NULL) return false;
 	long time = event->get_current_time();
 	vector<Event*>& events_with_time = events[time];
@@ -45,6 +46,9 @@ bool event_queue::remove(Event* event) {
 	if (iter == events_with_time.end())
 		return false;
 	events_with_time.erase(iter);
+	if (events_with_time.size() == 0) {
+		events.erase(time);
+	}
 	return true;
 }
 
@@ -53,6 +57,7 @@ event_queue::~event_queue() {
 	for (; k != events.end(); k++) {
 		vector<Event*>& events = (*k).second;
 		for (uint j = 0; j < events.size(); j++) {
+			events[j]->print();
 			delete events[j];
 		}
 	}

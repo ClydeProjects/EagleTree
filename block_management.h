@@ -16,6 +16,7 @@ namespace ssd {
 class Migrator {
 public:
 	Migrator();
+	~Migrator();
 	void init(IOScheduler*, Block_manager_parent*, Garbage_Collector*, Wear_Leveling_Strategy*, FtlParent*, Ssd*);
 	void schedule_gc(double time, int package, int die, int block, int klass);
 	vector<deque<Event*> > migrate(Event * gc_event);
@@ -36,7 +37,6 @@ public:
 private:
 	bool copy_back_allowed_on(long logical_address);
 	void register_copy_back_operation_on(uint logical_address);
-
 	void handle_erase_completion(Event* event);
 	void handle_trim_completion(Event* event);
 	void issue_erase(Address ra, double time);
@@ -167,7 +167,7 @@ public:
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
     {
-    	ar & blocks_with_min_age;
+    	ar & age_distribution;
     	ar & all_blocks;
     	ar & num_erases_up_to_date;
     	ar & ssd;
@@ -182,9 +182,10 @@ public:
 private:
     void init();
 	double get_min_age() const;
-	void update_blocks_with_min_age(uint min_age);
+	//void update_blocks_with_min_age(uint min_age);
 	void find_wl_candidates(double current_time);
-	set<Block*> blocks_with_min_age;
+	//set<Block*> blocks_with_min_age;
+	map<int, int> age_distribution;  // maps block ages to the number of blocks with this age
 	vector<Block*> all_blocks;
 	int num_erases_up_to_date;
 	Ssd* ssd;

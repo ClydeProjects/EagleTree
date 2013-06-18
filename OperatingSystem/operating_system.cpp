@@ -308,8 +308,8 @@ double OperatingSystem::get_experiment_runtime() const {
 }
 
 Flexible_Reader* OperatingSystem::create_flexible_reader(vector<Address_Range> ranges) {
-	FtlParent const& ftl = ssd->get_ftl();
-	Flexible_Reader* reader = new Flexible_Reader(ftl, ranges);
+	FtlParent* ftl = ssd->get_ftl();
+	Flexible_Reader* reader = new Flexible_Reader(*ftl, ranges);
 	return reader;
 }
 

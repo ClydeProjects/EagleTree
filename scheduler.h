@@ -68,7 +68,6 @@ public:
 	Scheduling_Strategy(IOScheduler* s, Ssd* ssd, Priorty_Scheme* scheme) : event_queue(), scheduler(s), ssd(ssd), priorty_scheme(scheme) {}
 	virtual ~Scheduling_Strategy() {};
 	virtual void schedule();
-    friend class boost::serialization::access;
 protected:
 	IOScheduler* scheduler;
 	Ssd* ssd;
@@ -88,6 +87,7 @@ public:
 	IOScheduler();
 	~IOScheduler();
 	void init(Ssd*, FtlParent*, Block_manager_parent*, Migrator*);
+	void init();
 	void schedule_events_queue(deque<Event*> events);
 	void schedule_event(Event* events);
 	bool is_empty();
@@ -120,7 +120,6 @@ private:
 	void push(Event* event);
 	void manage_operation_completion(Event* event);
 	double get_soonest_event_time(vector<Event*> const& events) const;
-	Migrator* get_migrator() { return migrator; }
 
 	event_queue* future_events;
 	Scheduling_Strategy* overdue_events;

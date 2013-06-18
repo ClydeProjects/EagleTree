@@ -34,8 +34,9 @@ Block_manager_parent::Block_manager_parent(int num_age_classes)
 {}
 
 Block_manager_parent::~Block_manager_parent() {
-	delete wl;
-	delete gc;
+	if (wl != NULL) delete wl;
+	if (gc != NULL) delete gc;
+	if (migrator != NULL) delete migrator;
 }
 
 void Block_manager_parent::init(Ssd* new_ssd, FtlParent* new_ftl, IOScheduler* new_sched, Garbage_Collector* new_gc, Wear_Leveling_Strategy* new_wl, Migrator* new_migrator) {

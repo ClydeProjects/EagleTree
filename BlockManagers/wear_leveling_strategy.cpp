@@ -16,7 +16,7 @@ Wear_Leveling_Strategy::Wear_Leveling_Strategy()
 	  num_erases_up_to_date(0),
 	  average_erase_cycle_time(0),
 	  max_age(1),
-	  blocks_with_min_age(),
+	  age_distribution(),
 	  all_blocks(),
 	  random_number_generator(90),
 	  block_data(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE, Block_data()) {
@@ -29,7 +29,7 @@ Wear_Leveling_Strategy::Wear_Leveling_Strategy(Ssd* ssd, Migrator* migrator)
 	  num_erases_up_to_date(0),
 	  average_erase_cycle_time(0),
 	  max_age(1),
-	  blocks_with_min_age(),
+	  age_distribution(),
 	  all_blocks(),
 	  random_number_generator(90),
 	  block_data(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE, Block_data())
@@ -38,6 +38,7 @@ Wear_Leveling_Strategy::Wear_Leveling_Strategy(Ssd* ssd, Migrator* migrator)
 }
 
 void Wear_Leveling_Strategy::init() {
+	age_distribution[0] = NUMBER_OF_ADDRESSABLE_BLOCKS();
 	for (uint i = 0; i < SSD_SIZE; i++) {
 			Package* package = ssd->get_package(i);
 			for (uint j = 0; j < PACKAGE_SIZE; j++) {
@@ -46,7 +47,6 @@ void Wear_Leveling_Strategy::init() {
 					Plane* plane = die->get_plane(t);
 					for (uint b = 0; b < PLANE_SIZE; b++) {
 						Block* block = plane->get_block(b);
-						blocks_with_min_age.insert(block);
 						all_blocks.push_back(block);
 					}
 				}
@@ -55,8 +55,9 @@ void Wear_Leveling_Strategy::init() {
 }
 
 double Wear_Leveling_Strategy::get_min_age() const {
-	assert(blocks_with_min_age.size() > 0);
-	return BLOCK_ERASES - (*blocks_with_min_age.begin())->get_erases_remaining();
+	map<int, int>::const_iterator it = age_distribution.begin();
+	int age = (*it).first;
+	return age;
 }
 
 double Wear_Leveling_Strategy::get_normalised_age(uint age) const {
@@ -69,7 +70,6 @@ double Wear_Leveling_Strategy::get_normalised_age(uint age) const {
 // TODO, at erase registration, there should be a check for WL queue. If not empty, see if can issue a WL operation. If cannot, issue an emergency GC.
 // if the queue is empty, check if should trigger GC.
 void Wear_Leveling_Strategy::register_erase_completion(Event const& event) {
-	assert(blocks_with_min_age.size() > 0);
 	num_erases_up_to_date++;
 	Address pba = event.get_address();
 	Block* b = ssd->get_package(pba.package)->get_die(pba.die)->get_plane(pba.plane)->get_block(pba.block);
@@ -87,14 +87,13 @@ void Wear_Leveling_Strategy::register_erase_completion(Event const& event) {
 	data.last_erase_time = event.get_current_time();
 
 	average_erase_cycle_time = average_erase_cycle_time * 0.8 + 0.2 * time_since_last_erase;
-
-	if (blocks_with_min_age.count(b) == 1 && blocks_with_min_age.size() > 1) {
-		blocks_with_min_age.erase(b);
-	}
-	else if (blocks_with_min_age.count(b) == 1 && blocks_with_min_age.size() == 1) {
-		int min_age = b->get_age() - 1;
-		blocks_with_min_age.erase(b);
-		update_blocks_with_min_age(min_age + 1);
+	int age = data.age - 1;
+	if (age_distribution.count(age - 1) == 1) {
+		age_distribution[age - 1]--;
+		age_distribution[age]--;
+		if (age_distribution[age - 1] == 0) {
+			age_distribution.erase(age - 1);
+		}
 	}
 
 	if (blocks_being_wl.count(b) > 0) {
@@ -132,7 +131,7 @@ bool Wear_Leveling_Strategy::schedule_wear_leveling_op(Block* victim) {
 	blocks_to_wl.erase(victim);
 }
 
-void Wear_Leveling_Strategy::update_blocks_with_min_age(uint min_age) {
+/*void Wear_Leveling_Strategy::update_blocks_with_min_age(uint min_age) {
 	for (uint i = 0; i < all_blocks.size(); i++) {
 		Block* b = all_blocks[i];
 		uint age_ith_block = BLOCK_ERASES - b->get_erases_remaining();
@@ -140,7 +139,7 @@ void Wear_Leveling_Strategy::update_blocks_with_min_age(uint min_age) {
 			blocks_with_min_age.insert(all_blocks[i]);
 		}
 	}
-}
+}*/
 
 void Wear_Leveling_Strategy::find_wl_candidates(double current_time) {
 	for (uint i = 0; i < all_blocks.size(); i++) {

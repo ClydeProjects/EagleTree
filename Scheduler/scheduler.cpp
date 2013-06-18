@@ -32,16 +32,17 @@ void IOScheduler::init(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent* n
 	ftl = new_ftl;
 	bm = new_bm;
 	migrator = new_migrator;
+	init();
+}
+
+void IOScheduler::init() {
 	future_events = new event_queue();
-
 	Priorty_Scheme* ps;
-
 	if (SCHEDULING_SCHEME == 0) {
 		ps = new Fifo_Priorty_Scheme(this);
 	} else {
 		ps = new Smart_App_Priorty_Scheme(this);
 	}
-
 	current_events = new Scheduling_Strategy(this, ssd, ps);
 	overdue_events = new Scheduling_Strategy(this, ssd, new Fifo_Priorty_Scheme(this));
 }
@@ -113,7 +114,7 @@ void IOScheduler::execute_soonest_events() {
 
 // this is used to signal the SSD object when all events have finished executing
 bool IOScheduler::is_empty() {
-	return !current_events->empty() || !future_events->empty() || !overdue_events->empty();
+	return current_events->empty() && future_events->empty() && overdue_events->empty();
 }
 
 double IOScheduler::get_soonest_event_time(vector<Event*> const& events) const {
@@ -423,7 +424,7 @@ void IOScheduler::setup_dependent_event(Event* event, Event* dependent) {
 enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd->issue(event);
 
-	if (PRINT_LEVEL > 0 && event->is_original_application_io()) {
+	if (PRINT_LEVEL > 0) {
 		event->print();
 		if (event->is_flexible_read()) {
 			//printf("FLEX\n");
