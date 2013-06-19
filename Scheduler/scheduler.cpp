@@ -21,6 +21,7 @@ IOScheduler::IOScheduler() :
 	ssd(NULL),
 	ftl(NULL),
 	bm(NULL),
+	migrator(NULL),
 	dependency_code_to_LBA(),
 	dependency_code_to_type(),
 	safe_cache(0)
@@ -495,7 +496,7 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		assert(false);
 	}
 
-	//VisualTracer::get_instance()->register_completed_event(*event);
+	VisualTracer::get_instance()->register_completed_event(*event);
 
 	if (event->get_event_type() == READ_COMMAND && event->is_original_application_io()) {
 		//event->print();

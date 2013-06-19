@@ -266,11 +266,11 @@ void load_entry(char *name, double value, uint line_number) {
 }
 
 void set_normal_config() {
-	SSD_SIZE = 4;
-	PACKAGE_SIZE = 4;
+	SSD_SIZE = 1;				// 8
+	PACKAGE_SIZE = 8;			// 8
 	DIE_SIZE = 1;
-	PLANE_SIZE = 64;
-	BLOCK_SIZE = 32;
+	PLANE_SIZE = 128;			// 1024
+	BLOCK_SIZE = 128;			// 128
 
 	PAGE_READ_DELAY = 115;
 	PAGE_WRITE_DELAY = 1600;

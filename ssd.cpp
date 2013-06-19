@@ -119,7 +119,7 @@ Ssd::Ssd():
 
 Ssd::~Ssd()
 {
-	execute_all_remaining_events();
+	//execute_all_remaining_events();
 	//VisualTracer::get_instance()->print_horizontally(2000);
 	//if (PRINT_LEVEL >= 1) StatisticsGatherer::get_global_instance()->print()
 	if (PAGE_ENABLE_DATA) {
