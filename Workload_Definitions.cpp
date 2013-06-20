@@ -87,8 +87,6 @@ Asynch_Random_Workload::Asynch_Random_Workload()
  : stats(new StatisticsGatherer()) {}
 
 Asynch_Random_Workload::~Asynch_Random_Workload() {
-	//stats->print();
-	VisualTracer::get_instance()->print_horizontally(10000);
 	delete stats;
 }
 
@@ -128,7 +126,7 @@ Synch_Write::Synch_Write()
 
 Synch_Write::~Synch_Write() {
 	stats->print();
-	VisualTracer::get_instance()->print_horizontally(10000);
+	VisualTracer::print_horizontally(10000);
 	delete stats;
 }
 

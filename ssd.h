@@ -22,6 +22,7 @@
 #include <boost/serialization/map.hpp>
 #include <boost/serialization/utility.hpp>
 #include <boost/serialization/base_object.hpp>
+#include <sstream>
 
 #include <boost/archive/xml_iarchive.hpp>
 #include <boost/archive/xml_oarchive.hpp>
@@ -1066,20 +1067,22 @@ private:
 class VisualTracer
 {
 public:
-	static VisualTracer *get_instance();
 	static void init();
-	void register_completed_event(Event& event);
-	void print_horizontally(int last_how_many_characters = UNDEFINED);
-	void print_horizontally_with_breaks(long cursor = 0);
-	void print_horizontally_with_breaks_last(long how_many_chars);
-	void print_vertically();
+	static void init(string file_name);
+	static void register_completed_event(Event& event);
+	static void print_horizontally(int last_how_many_characters = UNDEFINED);
+	static void print_horizontally_with_breaks(ulong cursor = 0);
+	static void print_horizontally_with_breaks_last(long how_many_chars);
+	static string get_as_string(ulong cursor, ulong max, int chars_per_line);
+	static void print_vertically();
+	static void write_file();
 private:
-	static VisualTracer *inst;
-	VisualTracer();
-	~VisualTracer();
-	void write(int package, int die, char symbol, int length);
-	void write_with_id(int package, int die, char symbol, int length, vector<vector<char> > symbols);
-	vector<vector<vector<char> > > trace;
+	static void write(int package, int die, char symbol, int length);
+	static void write_with_id(int package, int die, char symbol, int length, vector<vector<char> > symbols);
+	static vector<vector<vector<char> > > trace;
+	static string file_name;
+	static bool write_to_file;
+	static long amount_written_to_file;
 };
 
 class StateVisualiser

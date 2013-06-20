@@ -13,9 +13,8 @@ int main()
 	string exp_folder  = "interleaving_exp/";
  	mkdir(exp_folder.c_str(), 0755);
 
-
 	Workload_Definition* workload = new Asynch_Random_Workload();
-	int IO_limit = 200000;
+	int IO_limit = 500000;
 	double op_min = 0.60;
 	double op_max = 0.60;
 	double incr = 0.1;
@@ -34,7 +33,7 @@ int main()
 
 	SCHEDULING_SCHEME = 0;
 	ALLOW_DEFERRING_TRANSFERS = true;
-	exps.push_back( Experiment_Runner::simple_experiment(workload, exp_folder + "split/", "split", IO_limit, OVER_PROVISIONING_FACTOR, op_min, op_max, incr, calibrated_file) );
+	//exps.push_back( Experiment_Runner::simple_experiment(workload, exp_folder + "split/", "split", IO_limit, OVER_PROVISIONING_FACTOR, op_min, op_max, incr, calibrated_file) );
 
 	SCHEDULING_SCHEME = 1;
 	ALLOW_DEFERRING_TRANSFERS = true;

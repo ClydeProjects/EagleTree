@@ -73,7 +73,12 @@ vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definitio
 		printf("%s :  %f \n", name.c_str(), variable);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		OperatingSystem* os = load_state(calibration_file);
+
+		string a = "/";
+		string trace_file = get_current_dir_name() + a + "trace.txt";
+		VisualTracer::init(trace_file.c_str());
 		run_single_measurment(experiment_workload, name, IO_limit, os);
+
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 		delete os;
 	}

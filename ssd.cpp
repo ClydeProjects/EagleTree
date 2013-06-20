@@ -73,7 +73,7 @@ Ssd::Ssd():
 	scheduler->init(this, ftl, bm, migrator);
 	migrator->init(scheduler, bm, gc, wl, ftl, this);
 
-	VisualTracer::init();
+	//VisualTracer::init();
 	StateVisualiser::init(this);
 	StatisticsGatherer::init();
 	SsdStatisticsExtractor::init(this);

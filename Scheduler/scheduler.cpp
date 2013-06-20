@@ -49,6 +49,7 @@ void IOScheduler::init() {
 }
 
 IOScheduler::~IOScheduler(){
+	//VisualTracer::print_horizontally(100000);
 	delete future_events;
 	delete current_events;
 	delete overdue_events;
@@ -496,18 +497,7 @@ void IOScheduler::handle_finished_event(Event *event, enum status outcome) {
 		assert(false);
 	}
 
-	VisualTracer::get_instance()->register_completed_event(*event);
-
-	if (event->get_event_type() == READ_COMMAND && event->is_original_application_io()) {
-		//event->print();
-		//VisualTracer::get_instance()->print_horizontally(2000);
-	}
-
-	/*if (event->is_original_application_io() && event->get_event_type() == WRITE && event->get_latency() > 3100 && !event->is_garbage_collection_op()) {
-		VisualTracer::get_instance()->print_horizontally(20000);
-		event->print();
-		printf(" ");
-	}*/
+	VisualTracer::register_completed_event(*event);
 
 	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
 	migrator->register_event_completion(event);

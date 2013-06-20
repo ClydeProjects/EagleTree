@@ -8,23 +8,30 @@
 #include "../ssd.h"
 using namespace ssd;
 
-VisualTracer *VisualTracer::inst = NULL;
-
-VisualTracer::VisualTracer()
-  : trace(SSD_SIZE, std::vector<std::vector<char> >(PACKAGE_SIZE, std::vector<char>(0) ))
-{}
-
-VisualTracer::~VisualTracer() {}
+vector<vector<vector<char> > > VisualTracer::trace = vector<vector<vector<char> > >(SSD_SIZE, std::vector<std::vector<char> >(PACKAGE_SIZE, std::vector<char>(0) ));
+string VisualTracer::file_name = "";
+bool VisualTracer::write_to_file = false;
+long VisualTracer::amount_written_to_file = 0;
 
 void VisualTracer::init()
 {
-	if (inst != NULL) delete inst;
-	inst = new VisualTracer();
+	trace = vector<vector<vector<char> > >(SSD_SIZE, std::vector<std::vector<char> >(PACKAGE_SIZE, std::vector<char>(0) ));
+	write_to_file = false;
+	file_name = "";
+	amount_written_to_file = 0;
 }
 
-VisualTracer *VisualTracer::get_instance()
+void VisualTracer::init(string file_name)
 {
-	return inst;
+	init();
+	VisualTracer::file_name = file_name;
+	write_to_file = true;
+
+	// overwrite the file if it exists
+	printf("%s\n", file_name.c_str());
+	ofstream file(file_name.c_str());
+	file << "";
+	file.close();
 }
 
 vector<char> get_int_as_char_vector(int num) {
@@ -59,7 +66,7 @@ void VisualTracer::register_completed_event(Event& event) {
 	}
 	Address add = event.get_address();
 
-	int i = event.get_current_time() - event.get_execution_time() - trace[add.package][add.die].size();
+	int i = event.get_current_time() - event.get_execution_time() - trace[add.package][add.die].size() - amount_written_to_file;
 	write(add.package, add.die, ' ', i);
 
 	event_type type = event.get_event_type();
@@ -120,6 +127,15 @@ void VisualTracer::register_completed_event(Event& event) {
 		write_with_id(add.package, add.die, 'w', PAGE_WRITE_DELAY - 1, symbols);
 	}
 	trace[add.package][add.die].push_back('|');
+	/*if (trace[add.package][add.die].size() > 1000) {
+
+	}*/
+
+	if (trace[add.package][add.die].size() > 100000 && write_to_file) {
+		write_file();
+	}
+
+
 }
 
 
@@ -170,7 +186,7 @@ void VisualTracer::print_horizontally(int last_how_many_characters) {
 }
 
 
-void VisualTracer::print_horizontally_with_breaks(long cursor) {
+void VisualTracer::print_horizontally_with_breaks(ulong cursor) {
 	printf("\n");
 	int chars_to_write_each_time = 150;
 	while (cursor < trace[0][0].size()) {
@@ -188,6 +204,79 @@ void VisualTracer::print_horizontally_with_breaks(long cursor) {
 		printf("\nLine %d\n", cursor / chars_to_write_each_time);
 		cursor += chars_to_write_each_time;
 	}
+}
+
+void VisualTracer::write_file() {
+	int chars_per_line = 300;
+	// figure out how much to write
+	int min_size = INFINITE;
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			int size = trace[i][j].size();
+			if (size < min_size) {
+				min_size = size;
+			}
+		}
+	}
+	int how_many_full_lines_can_we_write = min_size / chars_per_line;
+	int num_chars_to_write = how_many_full_lines_can_we_write * chars_per_line;
+
+	 ofstream file;
+	 printf("%s\n", file_name.c_str());
+	 file.open(file_name.c_str(), ios::app);
+	 string trace_str = get_as_string(0, num_chars_to_write, chars_per_line);
+	 file << trace_str << endl;
+	 file.close();
+
+	/*string trace_str = get_as_string(0, num_chars_to_write, chars_per_line);
+	 FILE* pFileTXT = fopen (file_name.c_str(),"a");
+	 fprintf (pFileTXT, trace_str.c_str() );
+	 fclose (pFileTXT);
+*/
+	 /*fstream file2;
+	 file2.open(file_name.c_str(), ios::out | ios::app);
+	 file2 << "EXPERIMRGWSEG" << endl;
+	 file2.close();*/
+
+	 // clear space
+	 //vector<vector<vector<char> > > new_trace = vector<vector<vector<char> > >(SSD_SIZE, std::vector<std::vector<char> >(PACKAGE_SIZE, std::vector<char>(0) ));
+
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			vector<char>& vec = trace[i][j];
+			//printf("%d\n", vec.size());
+			vec.erase(vec.begin(), vec.begin() + num_chars_to_write);
+			//printf("%d\n", trace[i][j].size());
+		}
+	}
+	amount_written_to_file += num_chars_to_write;
+	print_horizontally_with_breaks(0);
+
+}
+
+string VisualTracer::get_as_string(ulong cursor, ulong max, int chars_per_line) {
+	printf("\n");
+	stringstream ss;
+	while (cursor < trace[0][0].size() && cursor < max) {
+		for (uint i = 0; i < SSD_SIZE; i++) {
+			for (uint j = 0; j < PACKAGE_SIZE; j++) {
+				ss << "p" << i << " d" << j << " :";
+				//printf("p%d d%d :", i, j);
+				for (uint c = 0; c < chars_per_line; c++) {
+					if (trace[i][j].size() > cursor + c) {
+						//printf("%c", trace[i][j][cursor + c]);
+						ss << trace[i][j][cursor + c];
+					}
+				}
+				ss << "\n";
+				//printf("\n");
+			}
+		}
+		ss << "\nLine " << cursor / chars_per_line << "\n";
+		//printf("\nLine %d\n", cursor / chars_to_write_each_time);
+		cursor += chars_per_line;
+	}
+	return ss.str();
 }
 
 void VisualTracer::print_horizontally_with_breaks_last(long how_many_chars) {
