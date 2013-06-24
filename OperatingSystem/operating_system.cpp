@@ -46,6 +46,7 @@ void OperatingSystem::set_threads(vector<Thread*> new_threads) {
 }
 
 OperatingSystem::~OperatingSystem() {
+	delete ssd;
 	for (uint i = 0; i < threads.size(); i++) {
 		Thread* t = threads[i];
 		if (t != NULL) {
@@ -54,7 +55,6 @@ OperatingSystem::~OperatingSystem() {
 	}
 	threads.clear();
 	delete events;
-	delete ssd;
 }
 
 OperatingSystem::Pending_Events::Pending_Events(int num_threads)
@@ -134,6 +134,10 @@ void OperatingSystem::run() {
 		still_more_work = currently_executing_ios.size() > 0 || events->get_num_pending_events() > 0;
 		//printf("num_writes   %d\n", num_writes_completed);
 	} while (!finished_experiment && still_more_work);
+
+	for (uint i = 0; i < threads.size(); i++) {
+		threads[i]->set_finished();
+	}
 }
 
 int OperatingSystem::pick_unlocked_event_with_shortest_start_time() {
@@ -226,7 +230,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	thread->register_event_completion(event);
 	get_next_ios(thread_id);
 
-	if (!event->get_noop() /*&& event->get_event_type() == WRITE*/ && event->is_experiment_io()) {
+	if (!event->get_noop() /*&& event->get_event_type() == WRITE*/ && event->is_experiment_io() && event->get_event_type() != TRIM) {
 		num_writes_completed++;
 	}
 

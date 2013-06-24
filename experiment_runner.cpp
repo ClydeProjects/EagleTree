@@ -35,20 +35,7 @@ void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> thre
 	}
 }
 
-void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_workload, string name, int IO_limit, OperatingSystem* os) {
-	/*experiment_workload->recalculate_lba_range();
-	vector<Thread*> init_threads = init_workload->generate_instance();
-	os->set_threads(init_threads);
-	os->run();
-
-	os->get_ssd()->execute_all_remaining_events();
-	save_state(os);
-	delete os;
-	os = load_state();
-	printf("Finished calibration\n");
-	StatisticsGatherer::get_global_instance()->init();
-	Utilization_Meter::init();*/
-	// run experiment workload
+void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_workload, int IO_limit, OperatingSystem* os) {
 	vector<Thread*> experiment_threads = experiment_workload->generate_instance();
 	os->set_threads(experiment_threads);
 	os->set_num_writes_to_stop_after(IO_limit);
@@ -77,7 +64,7 @@ vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definitio
 		string a = "/";
 		string trace_file = get_current_dir_name() + a + "trace.txt";
 		VisualTracer::init(trace_file.c_str());
-		run_single_measurment(experiment_workload, name, IO_limit, os);
+		run_single_measurment(experiment_workload, IO_limit, os);
 
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 		delete os;
@@ -100,7 +87,7 @@ vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definitio
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
 		OperatingSystem* os = load_state(calibration_file);
-		run_single_measurment(experiment_workload, name, IO_limit, os);
+		run_single_measurment(experiment_workload, IO_limit, os);
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 		delete os;
 	}
@@ -264,13 +251,14 @@ ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*ex
 
 // currently, this method checks if there if a file already exists, and if so, assumes it is valid.
 // ideally, a check should be made to ensure the saved SSD state matches with the state of the current global parameters
-void Experiment_Runner::calibrate_and_save(string file_name, Workload_Definition* workload) {
+void Experiment_Runner::calibrate_and_save(string file_name, Workload_Definition* workload, bool force) {
 	std::ifstream ifile(file_name.c_str());
-	if (ifile) {
+	if (ifile && !force) {
 		return; // file exists
 	}
 	printf("Creating calibrated SSD state.\n");
 	OperatingSystem* os = new OperatingSystem();
+	os->set_num_writes_to_stop_after(NUMBER_OF_ADDRESSABLE_PAGES() * 2);
 	vector<Thread*> init_threads = workload->generate_instance();
 	os->set_threads(init_threads);
 	os->run();
@@ -284,6 +272,7 @@ void Experiment_Runner::save_state(OperatingSystem* os, string file_name) {
 	boost::archive::text_oarchive oa(file);
 	oa.register_type<FtlImpl_Page>( );
 	oa.register_type<Block_manager_parallel>( );
+	oa.register_type<Sequential_Locality_BM>( );
 	oa << os;
 }
 
@@ -292,8 +281,20 @@ OperatingSystem* Experiment_Runner::load_state(string file_name) {
 	boost::archive::text_iarchive ia(file);
 	ia.register_type<FtlImpl_Page>( );
 	ia.register_type<Block_manager_parallel>();
+	ia.register_type<Sequential_Locality_BM>( );
 	OperatingSystem* os;
 	ia >> os;
-	os->get_ssd()->get_scheduler()->init();
+
+	IOScheduler* scheduler = os->get_ssd()->get_scheduler();
+	scheduler->init();
+	Block_manager_parent* bm = Block_manager_parent::get_new_instance();
+	bm->copy_state(scheduler->get_bm());
+	delete scheduler->get_bm();
+	scheduler->set_block_manager(bm);
+	Migrator* m = scheduler->get_migrator();
+	m->set_block_manager(bm);
+	Garbage_Collector* gc = m->get_garbage_collector();
+	gc->set_block_manager(bm);
+
 	return os;
 }

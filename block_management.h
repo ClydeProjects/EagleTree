@@ -16,6 +16,7 @@ namespace ssd {
 class Migrator {
 public:
 	Migrator();
+	//Migrator(Migrator&);
 	~Migrator();
 	void init(IOScheduler*, Block_manager_parent*, Garbage_Collector*, Wear_Leveling_Strategy*, FtlParent*, Ssd*);
 	void schedule_gc(double time, int package, int die, int block, int klass);
@@ -23,6 +24,8 @@ public:
 	void register_event_completion(Event* event);
 	void register_ECC_check_on(uint logical_address);
 	uint how_many_gc_operations_are_scheduled() const;
+	void set_block_manager(Block_manager_parent* b) { bm = b; }
+	Garbage_Collector* get_garbage_collector() { return gc; }
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
@@ -82,6 +85,8 @@ public:
 	void subtract_from_available_for_new_writes(int num) { num_available_pages_for_new_writes -= num; }
 	vector<Block*> const& get_all_blocks() const { return all_blocks; }
 	uint sort_into_age_class(Address const& address) const;
+	void copy_state(Block_manager_parent* bm);
+	static Block_manager_parent* get_new_instance();
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
@@ -158,6 +163,7 @@ private:
 class Wear_Leveling_Strategy {
 public:
 	Wear_Leveling_Strategy();
+	//Wear_Leveling_Strategy(Wear_Leveling_Strategy&);
 	Wear_Leveling_Strategy(Ssd* ssd, Migrator*);
 	~Wear_Leveling_Strategy() {};
 	void register_erase_completion(Event const& event);
@@ -317,14 +323,20 @@ private:
 	ulong io_num;
 };
 
-class Wearwolf_Locality : public Block_manager_parallel, public Sequential_Pattern_Detector_Listener {
+class Sequential_Locality_BM : public Block_manager_parallel, public Sequential_Pattern_Detector_Listener {
 public:
-	Wearwolf_Locality();
-	~Wearwolf_Locality();
+	Sequential_Locality_BM();
+	~Sequential_Locality_BM();
 	void register_write_arrival(Event const& write);
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
 	void sequential_event_metadata_removed(long key, double current_time);
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & boost::serialization::base_object<Block_manager_parent>(*this);
+    }
 protected:
 	Address choose_best_address(Event const& write);
 	Address choose_any_address(Event const& write);
@@ -374,12 +386,14 @@ private:
 class Garbage_Collector {
 public:
 	Garbage_Collector();
+	//Garbage_Collector(Garbage_Collector&);
 	Garbage_Collector(Ssd* ssd, Block_manager_parent* bm);
 	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
 	void remove_as_gc_candidate(Address const& phys_address);
 	void register_trim(Event const& event, uint age_class, int num_live_pages);
 	double get_average_live_pages_per_best_candidate() const;
 	void issue_erase(Address ra, double time);
+	void set_block_manager(Block_manager_parent* b) { bm = b; }
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)

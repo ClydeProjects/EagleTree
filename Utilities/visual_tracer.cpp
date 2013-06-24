@@ -28,7 +28,7 @@ void VisualTracer::init(string file_name)
 	write_to_file = true;
 
 	// overwrite the file if it exists
-	printf("%s\n", file_name.c_str());
+	//printf("%s\n", file_name.c_str());
 	ofstream file(file_name.c_str());
 	file << "";
 	file.close();
@@ -61,7 +61,7 @@ void mark_as_gc_or_app(bool gc, bool app, vector<vector<char> >& symbols) {
 }
 
 void VisualTracer::register_completed_event(Event& event) {
-	if (event.get_event_type() == TRIM) {
+	if (event.get_event_type() == TRIM || !write_to_file) {
 		return;
 	}
 	Address add = event.get_address();
@@ -222,40 +222,22 @@ void VisualTracer::write_file() {
 	int num_chars_to_write = how_many_full_lines_can_we_write * chars_per_line;
 
 	 ofstream file;
-	 printf("%s\n", file_name.c_str());
 	 file.open(file_name.c_str(), ios::app);
 	 string trace_str = get_as_string(0, num_chars_to_write, chars_per_line);
 	 file << trace_str << endl;
 	 file.close();
 
-	/*string trace_str = get_as_string(0, num_chars_to_write, chars_per_line);
-	 FILE* pFileTXT = fopen (file_name.c_str(),"a");
-	 fprintf (pFileTXT, trace_str.c_str() );
-	 fclose (pFileTXT);
-*/
-	 /*fstream file2;
-	 file2.open(file_name.c_str(), ios::out | ios::app);
-	 file2 << "EXPERIMRGWSEG" << endl;
-	 file2.close();*/
-
-	 // clear space
-	 //vector<vector<vector<char> > > new_trace = vector<vector<vector<char> > >(SSD_SIZE, std::vector<std::vector<char> >(PACKAGE_SIZE, std::vector<char>(0) ));
-
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			vector<char>& vec = trace[i][j];
-			//printf("%d\n", vec.size());
 			vec.erase(vec.begin(), vec.begin() + num_chars_to_write);
-			//printf("%d\n", trace[i][j].size());
 		}
 	}
 	amount_written_to_file += num_chars_to_write;
-	print_horizontally_with_breaks(0);
 
 }
 
 string VisualTracer::get_as_string(ulong cursor, ulong max, int chars_per_line) {
-	printf("\n");
 	stringstream ss;
 	while (cursor < trace[0][0].size() && cursor < max) {
 		for (uint i = 0; i < SSD_SIZE; i++) {

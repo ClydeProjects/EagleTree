@@ -121,31 +121,14 @@ vector<Thread*> Init_Workload::generate() {
 //*****************************************************************************************
 //				SYNCH SEQUENTIAL WRITE
 //*****************************************************************************************
-Synch_Write::Synch_Write()
- : stats(new StatisticsGatherer()) {}
-
-Synch_Write::~Synch_Write() {
-	stats->print();
-	VisualTracer::print_horizontally(10000);
-	delete stats;
-}
 
 vector<Thread*> Synch_Write::generate() {
-	Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
 	int seed = 235325;
-
-	Simple_Thread* random_format = new Asynchronous_Random_Writer(min_lba, max_lba, seed);
-	random_format->set_num_ios((max_lba - min_lba) * 3);
-	init_write->add_follow_up_thread(random_format);
-
-	int num_files = 1000;
-	int max_file_size = 100;
-	Thread* fm = new File_Manager(min_lba, max_lba / 2, num_files, max_file_size, seed * 13);
-	Simple_Thread* rand = new Asynchronous_Random_Reader_Writer(max_lba / 2 + 1, max_lba, seed * 17);
-	random_format->add_follow_up_thread(fm);
-	random_format->add_follow_up_thread(rand);
-
-	vector<Thread*> threads(1, init_write);
+	int num_files = INFINITE;
+	int max_file_size = 1000;
+	Thread* fm = new File_Manager(min_lba, max_lba, num_files, max_file_size, seed * 13);
+	fm->set_experiment_thread(true);
+	vector<Thread*> threads(1, fm);
 	return threads;
 }
 
@@ -160,9 +143,9 @@ File_System_With_Noise::File_System_With_Noise() {
 vector<Thread*> File_System_With_Noise::generate() {
 
 	long log_space_per_thread = max_lba / 4;
-	long max_file_size = log_space_per_thread / 7;
+	long max_file_size = log_space_per_thread / 4;
 
-	Simple_Thread* experiment_thread1 = new Asynchronous_Random_Reader_Writer(0, log_space_per_thread * 2, 35722);
+	Simple_Thread* experiment_thread1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 35722);
 	Thread* experiment_thread2 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, INFINITE, max_file_size, 713);
 	Thread* experiment_thread3 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, INFINITE, max_file_size, 5);
 

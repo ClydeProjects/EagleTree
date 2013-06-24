@@ -307,7 +307,6 @@ class FtlImpl_Fast;
 class FtlImpl_BDftl;
 
 class Ram;
-class Controller;
 class Ssd;
 
 class event_queue;
@@ -318,7 +317,7 @@ class Block_manager_parent;
 class Block_manager_parallel;
 class Shortest_Queue_Hot_Cold_BM;
 class Wearwolf;
-class Wearwolf_Locality;
+class Sequential_Locality_BM;
 class Wear_Leveling_Strategy;
 class Garbage_Collector;
 class Migrator;
@@ -1010,9 +1009,6 @@ public:
 	void progress_since_os_is_waiting();
 	void register_event_completion(Event * event);
 	void *get_result_buffer();
-	friend class Controller;
-	friend class IOScheduler;
-	friend class Block_manager_parent;
 	inline Package* get_package(int i) { return &data[i]; }
 	void set_operating_system(OperatingSystem* os);
 	FtlParent* get_ftl() const;
@@ -1050,12 +1046,10 @@ public:
 	double event_arrive(enum event_type type, ulong logical_address, uint size, double start_time);
 	double event_arrive(enum event_type type, ulong logical_address, uint size, double start_time, void *buffer);
 	void *get_result_buffer();
-	friend class Controller;
 	void print_statistics();
 	void reset_statistics();
 	void write_statistics(FILE *stream);
 	void write_header(FILE *stream);
-	const Controller &get_controller() const;
 
 	void print_ftl_statistics();
 private:
@@ -1375,11 +1369,7 @@ public:
 
 class Synch_Write : public Workload_Definition {
 public:
-	Synch_Write();
-	~Synch_Write();
 	vector<Thread*> generate();
-private:
-	StatisticsGatherer* stats;
 };
 
 class Experiment_Runner {
@@ -1400,7 +1390,7 @@ public:
 	static void throughput_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
 	static string get_working_dir();
 	static void unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer);
-	static void run_single_measurment(Workload_Definition* experiment_workload, string name, int IO_limit, OperatingSystem* os);
+	static void run_single_measurment(Workload_Definition* experiment_workload, int IO_limit, OperatingSystem* os);
 	static vector<ExperimentResult> simple_experiment(Workload_Definition* experiment_workload, string data_folder, string name, long IO_limit, double& variable, double min_val, double max_val, double incr, string calibration_file);
 	static vector<ExperimentResult> simple_experiment(Workload_Definition* experiment_workload, string data_folder, string name, long IO_limit, long& variable, long min_val, long max_val, long incr, string calibration_file);
 	static void simple_experiment(Workload_Definition* workload, string name, int IO_limit);
@@ -1413,7 +1403,7 @@ public:
 	static void draw_experiment_spesific_graphs(vector<vector<ExperimentResult> > results, string exp_folder, vector<int> x_vals);
 	static void save_state(OperatingSystem* os, string file_name);
 	static OperatingSystem* load_state(string file_name);
-	static void calibrate_and_save(string file_name, Workload_Definition*);
+	static void calibrate_and_save(string file_name, Workload_Definition*, bool force = false);
 private:
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
 

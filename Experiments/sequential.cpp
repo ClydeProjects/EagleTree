@@ -41,28 +41,33 @@ int main()
 	string exp_folder  = "exp_sequential/";
 	mkdir(exp_folder.c_str(), 0755);
 
-	//PRINT_LEVEL = 1;
-
 	set_normal_config();
 
-	int IO_limit = 200000;
-	double space_min = 0.6;
-	double space_max = 0.6;
+	int IO_limit = 100000;
+	double space_min = OVER_PROVISIONING_FACTOR;
+	double space_max = OVER_PROVISIONING_FACTOR;
 	double space_inc = 0.05;
 
-	Workload_Definition* init = new Init_Workload();
+	Workload_Definition* init_workload = new File_System_With_Noise();
+
+	string a = "/" + exp_folder;
+	string calibration_file = get_current_dir_name() + a + "calibrated_state.txt";
+	Experiment_Runner::calibrate_and_save(calibration_file, init_workload, true);
+
 	Workload_Definition* experiment = new File_System_With_Noise();
 
 	Experiment_Runner::wall_clock_time();
 
 	vector<vector<ExperimentResult> > exps;
 	BLOCK_MANAGER_ID = 0;
-	//exps.push_back( Experiment_Runner::simple_experiment(experiment, init, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc) );
+	vector<ExperimentResult> res1 = Experiment_Runner::simple_experiment(experiment, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc, calibration_file);
+	exps.push_back(res1);
 
-	SCHEDULING_SCHEME = 0;
 	BLOCK_MANAGER_ID = 3;
-	WEARWOLF_LOCALITY_THRESHOLD = BLOCK_SIZE;
-	exps.push_back( Experiment_Runner::simple_experiment(experiment, init, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc) );
+	ENABLE_TAGGING = true;
+	Experiment_Runner::calibrate_and_save(calibration_file, init_workload, true);
+	vector<ExperimentResult> er = Experiment_Runner::simple_experiment(experiment, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc, calibration_file);
+	exps.push_back(er);
 
 	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
 	//exp.push_back( Experiment_Runner::simple_experiment(experiment, Init_Workload, space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );

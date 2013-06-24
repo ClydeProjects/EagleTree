@@ -34,9 +34,6 @@ Block_manager_parent::Block_manager_parent(int num_age_classes)
 {}
 
 Block_manager_parent::~Block_manager_parent() {
-	if (wl != NULL) delete wl;
-	if (gc != NULL) delete gc;
-	if (migrator != NULL) delete migrator;
 }
 
 void Block_manager_parent::init(Ssd* new_ssd, FtlParent* new_ftl, IOScheduler* new_sched, Garbage_Collector* new_gc, Wear_Leveling_Strategy* new_wl, Migrator* new_migrator) {
@@ -508,7 +505,34 @@ void Block_manager_parent::return_unfilled_block(Address pba, double current_tim
 			free_block_pointers[pba.package][pba.die] = pba;
 			Free_Space_Per_LUN_Meter::mark_new_space(pba, current_time);
 		}
-
 	}
 }
 
+void Block_manager_parent::copy_state(Block_manager_parent* bm) {
+	free_block_pointers = bm->free_block_pointers;
+	free_blocks = bm->free_blocks;
+	all_blocks = bm->all_blocks;
+	num_age_classes = bm->num_age_classes;
+	num_free_pages = bm->num_free_pages;
+	num_available_pages_for_new_writes = bm->num_available_pages_for_new_writes;
+	erase_queue = bm->erase_queue;
+	num_erases_scheduled_per_package = bm->num_erases_scheduled_per_package;
+	ssd = bm->ssd;
+	ftl = bm->ftl;
+	scheduler = bm->scheduler;
+	wl = bm->wl;
+	gc = bm->gc;
+	migrator = bm->migrator;
+}
+
+Block_manager_parent* Block_manager_parent::get_new_instance() {
+	Block_manager_parent* bm;
+	switch ( BLOCK_MANAGER_ID ) {
+		case 1: bm = new Shortest_Queue_Hot_Cold_BM(); break;
+		case 2: bm = new Wearwolf(); break;
+		case 3: bm = new Sequential_Locality_BM(); break;
+		case 4: bm = new Block_manager_roundrobin(); break;
+		default: bm = new Block_manager_parallel(); break;
+	}
+	return bm;
+}

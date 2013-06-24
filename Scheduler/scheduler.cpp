@@ -63,6 +63,7 @@ IOScheduler::~IOScheduler(){
 	}
 	dependencies.clear();
 	delete bm;
+	delete migrator;
 }
 
 // assumption is that all events within an operation have the same LBA
@@ -426,7 +427,7 @@ void IOScheduler::setup_dependent_event(Event* event, Event* dependent) {
 enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd->issue(event);
 
-	if (PRINT_LEVEL > 0) {
+	if (PRINT_LEVEL > 0 && event->is_original_application_io()) {
 		event->print();
 		if (event->is_flexible_read()) {
 			//printf("FLEX\n");

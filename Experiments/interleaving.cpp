@@ -25,8 +25,6 @@ int main()
 	string calibrated_file = get_current_dir_name() + a + "interleaving_calibrated_state.txt";
 	Experiment_Runner::calibrate_and_save(calibrated_file, init);
 
-	Experiment_Runner::load_state(calibrated_file);
-
 	SCHEDULING_SCHEME = 0;
 	ALLOW_DEFERRING_TRANSFERS = false;
 	exps.push_back( Experiment_Runner::simple_experiment(workload, exp_folder + "no_split/", "no split", IO_limit, OVER_PROVISIONING_FACTOR, op_min, op_max, incr, calibrated_file) );

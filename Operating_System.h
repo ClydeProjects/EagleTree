@@ -36,6 +36,7 @@ public:
 	StatisticsGatherer* get_internal_statistics_gatherer() { return internal_statistics_gatherer; }
 	StatisticsGatherer* get_external_statistics_gatherer() { return internal_statistics_gatherer; }
 	void set_statistics_gatherer(StatisticsGatherer* new_statistics_gatherer);
+	void set_finished() { finished = true; }
 protected:
 	virtual void issue_first_IOs() = 0;
 	virtual void handle_event_completion(Event* event) = 0;

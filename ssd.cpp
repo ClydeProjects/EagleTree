@@ -51,15 +51,7 @@ Ssd::Ssd():
 
 	ftl = new FtlImpl_Page(this);
 	scheduler = new IOScheduler();
-	Block_manager_parent* bm;
-
-	switch ( BLOCK_MANAGER_ID ) {
-		case 1: bm = new Shortest_Queue_Hot_Cold_BM(); break;
-		case 2: bm = new Wearwolf(); break;
-		case 3: bm = new Wearwolf_Locality(); break;
-		case 4: bm = new Block_manager_roundrobin(); break;
-		default: bm = new Block_manager_parallel(); break;
-	}
+	Block_manager_parent* bm = Block_manager_parent::get_new_instance();
 
 	Free_Space_Meter::init();
 	Free_Space_Per_LUN_Meter::init();
@@ -73,53 +65,16 @@ Ssd::Ssd():
 	scheduler->init(this, ftl, bm, migrator);
 	migrator->init(scheduler, bm, gc, wl, ftl, this);
 
-	//VisualTracer::init();
 	StateVisualiser::init(this);
 	StatisticsGatherer::init();
 	SsdStatisticsExtractor::init(this);
 	Utilization_Meter::init();
 	Event::reset_id_generators();
-
-	/*{
-		std::ofstream ofs("ssd_state");
-		boost::archive::text_oarchive oa(ofs);
-		//boost::archive::xml_oarchive oa(ofs);
-		oa.register_type<FtlImpl_Page>();
-		//oa << BOOST_SERIALIZATION_NVP(ftl);
-		oa << ftl;
-	}
-
-	FtlParent* loaded;
-	{
-		std::ifstream ifs("ssd_state");
-	    boost::archive::text_iarchive ia(ifs);
-	    ia.register_type<FtlImpl_Page>();
-	    ia >> BOOST_SERIALIZATION_NVP(loaded);
-	}*/
-
-
-	/*Die loaded;
-	{
-	  std::ifstream file("archive.xml");
-	  boost::archive::xml_iarchive ia(file);
-	  //ia.register_type<FtlImpl_Page>( );
-	  ia >> BOOST_SERIALIZATION_NVP(loaded);
-	}*/
-
-	/*{
-	  std::ifstream file("archive.xml");
-	  boost::archive::xml_iarchive ia(file);
-	  ia.register_type<FtlImpl_Page>( );
-	  FtlParent *dr;
-	  ia >> BOOST_SERIALIZATION_NVP(dr);
-	  FtlImpl_Page* dr2 = dynamic_cast<FtlImpl_Page*> (dr);
-	}*/
-
 }
 
 Ssd::~Ssd()
 {
-	//execute_all_remaining_events();
+	execute_all_remaining_events();
 	//VisualTracer::get_instance()->print_horizontally(2000);
 	//if (PRINT_LEVEL >= 1) StatisticsGatherer::get_global_instance()->print()
 	if (PAGE_ENABLE_DATA) {

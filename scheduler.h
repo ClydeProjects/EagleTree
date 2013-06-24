@@ -103,6 +103,9 @@ public:
     	ar & bm;
     	ar & migrator;
     }
+    Block_manager_parent* get_bm() { return bm; }
+    void set_block_manager(Block_manager_parent* b) {bm = b;}
+    Migrator* get_migrator() { return migrator; }
 private:
 	void setup_structures(deque<Event*> events);
 	enum status execute_next(Event* event);

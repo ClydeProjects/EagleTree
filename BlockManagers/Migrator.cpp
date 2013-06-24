@@ -20,6 +20,8 @@ Migrator::~Migrator() {
 		printf("blocks_being_garbage_collected    %d:  %d\n", (*it).first, (*it).second);
 		it++;
 	}*/
+	delete gc;
+	delete wl;
 }
 
 void Migrator::init(IOScheduler* new_s, Block_manager_parent* new_bm, Garbage_Collector* new_gc, Wear_Leveling_Strategy* new_wl, FtlParent* new_ftl, Ssd* new_ssd) {
