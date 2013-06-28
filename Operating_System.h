@@ -23,7 +23,8 @@ public:
 	virtual ~Thread();
 	void init(OperatingSystem* os, double time);
 	void register_event_completion(Event* event);
-	Event* next();
+	Event* peek();
+	Event* pop();
 
 	bool is_finished();
 	inline void set_time(double current_time) { time = current_time; }
@@ -31,8 +32,6 @@ public:
 	inline void add_follow_up_thread(Thread* thread) { threads_to_start_when_this_thread_finishes.push_back(thread); }
 	inline void add_follow_up_threads(vector<Thread*> threads) { threads_to_start_when_this_thread_finishes.insert(threads_to_start_when_this_thread_finishes.end(), threads.begin(), threads.end()); }
 	inline vector<Thread*>& get_follow_up_threads() { return threads_to_start_when_this_thread_finishes; }
-	inline void set_experiment_thread(bool val) { experiment_thread = val; }
-	inline bool is_experiment_thread() { return experiment_thread; }
 	StatisticsGatherer* get_internal_statistics_gatherer() { return internal_statistics_gatherer; }
 	StatisticsGatherer* get_external_statistics_gatherer() { return internal_statistics_gatherer; }
 	void set_statistics_gatherer(StatisticsGatherer* new_statistics_gatherer);
@@ -48,11 +47,10 @@ protected:
 	bool can_submit_more();
 private:
 	double time;
-	bool experiment_thread;
 	StatisticsGatherer* internal_statistics_gatherer;
 	StatisticsGatherer* external_statistics_gatherer;
 	int num_IOs_executing;
-	deque<Event*> queue;
+	queue<Event*> io_queue;
 	bool finished;
 };
 
@@ -165,7 +163,7 @@ class Asynchronous_Random_Writer : public Simple_Thread
 {
 public:
 	Asynchronous_Random_Writer(long min_LBA, long max_LBA, ulong randseed)
-		: Simple_Thread(new Random_IO_Pattern_Generator(min_LBA, max_LBA, randseed), new WRITES(), 32, INFINITE) {}
+		: Simple_Thread(new Random_IO_Pattern_Generator(min_LBA, max_LBA, randseed), new WRITES(), MAX_SSD_QUEUE_SIZE, INFINITE) {}
 };
 
 class Synchronous_Sequential_Writer : public Simple_Thread
@@ -179,7 +177,7 @@ class Asynchronous_Sequential_Writer : public Simple_Thread
 {
 public:
 	Asynchronous_Sequential_Writer(long min_LBA, long max_LBA)
-		: Simple_Thread(new Sequential_IO_Pattern_Generator(min_LBA, max_LBA), 32, new WRITES()) {
+		: Simple_Thread(new Sequential_IO_Pattern_Generator(min_LBA, max_LBA), MAX_SSD_QUEUE_SIZE, new WRITES()) {
 	}
 };
 
@@ -187,7 +185,7 @@ class Asynchronous_Sequential_Trimmer : public Simple_Thread
 {
 public:
 	Asynchronous_Sequential_Trimmer(long min_LBA, long max_LBA)
-		: Simple_Thread(new Sequential_IO_Pattern_Generator(min_LBA, max_LBA), 32, new TRIMS()) {
+		: Simple_Thread(new Sequential_IO_Pattern_Generator(min_LBA, max_LBA), MAX_SSD_QUEUE_SIZE, new TRIMS()) {
 	}
 };
 
@@ -202,14 +200,14 @@ class Asynchronous_Sequential_Reader : public Simple_Thread
 {
 public:
 	Asynchronous_Sequential_Reader(long min_LBA, long max_LBA )
-		: Simple_Thread(new Sequential_IO_Pattern_Generator(min_LBA, max_LBA), 32, new READS()) {}
+		: Simple_Thread(new Sequential_IO_Pattern_Generator(min_LBA, max_LBA), MAX_SSD_QUEUE_SIZE, new READS()) {}
 };
 
 class Asynchronous_Random_Reader_Writer : public Simple_Thread
 {
 public:
 	Asynchronous_Random_Reader_Writer(long min_LBA, long max_LBA, ulong seed, double writes_probability = 0.5 )
-		: Simple_Thread(new Sequential_IO_Pattern_Generator(min_LBA, max_LBA), new READS_OR_WRITES(seed, writes_probability), 32, INFINITE) {}
+		: Simple_Thread(new Sequential_IO_Pattern_Generator(min_LBA, max_LBA), new READS_OR_WRITES(seed, writes_probability), MAX_SSD_QUEUE_SIZE, INFINITE) {}
 };
 
 /*class Asynchronous_Random_Reader_Writer : public Thread
@@ -224,7 +222,7 @@ private:
 	MTRand_int32 random_number_generator;
 };*/
 
-class Collision_Free_Asynchronous_Random_Thread : public Thread
+/*class Collision_Free_Asynchronous_Random_Thread : public Thread
 {
 public:
 	Collision_Free_Asynchronous_Random_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed = 0, event_type type = WRITE);
@@ -236,7 +234,7 @@ private:
 	MTRand_int32 random_number_generator;
 	event_type type;
 	set<long> logical_addresses_submitted;
-};
+};*/
 
 // assuming the relation is made of contigouse pages
 // RAM_available is the number of pages that fit into RAM
@@ -481,53 +479,36 @@ public:
     	ar & ssd;
     }
 private:
-	int pick_unlocked_event_with_shortest_start_time();
+	int pick_event_with_shortest_start_time();
 	void dispatch_event(int thread_id);
 	double get_event_minimal_completion_time(Event const*const event) const;
-	bool is_LBA_locked(ulong lba);
+	//bool is_LBA_locked(ulong lba);
 	void update_thread_times(double time);
 	void setup_follow_up_threads(int thread_id, double time);
-	void get_next_ios(int thread_id);
+	//void get_next_ios(int thread_id);
 	Ssd * ssd;
-	vector<Thread*> threads;
+	map<int, Thread*> threads;
 
-	struct Pending_Events {
-		vector<deque<Event*> > event_queues;
-		int num_pending_events;
-		Pending_Events(int num_threads);
-		~Pending_Events();
-		Event* peek(int i);
-		Event* pop(int i);
-		void append(int i, Event* event);
-		int get_num_pending_ios_for_thread(int i) {return event_queues[i].size(); }
-		void push_back() { event_queues.push_back(deque<Event*>()); }
-		inline int get_num_pending_events() { return num_pending_events; }
-		inline int size() {return event_queues.size();};
-	};
-	Pending_Events* events;
-
-	map<long, queue<uint> > write_LBA_to_thread_id;
+	/*map<long, queue<uint> > write_LBA_to_thread_id;
 	map<long, queue<uint> > read_LBA_to_thread_id;
 	map<long, queue<uint> > trim_LBA_to_thread_id;
 	void lock(Event* event, int thread_id);
-	void release_lock(Event*);
+	void release_lock(Event*);*/
 
 	// used to record which thread dispatched which IO
 	map<long, long> app_id_to_thread_id_mapping;
-
-	double last_dispatched_event_minimal_finish_time;
 
 	set<uint> currently_executing_ios;
 	long NUM_WRITES_TO_STOP_AFTER;
 	long num_writes_completed;
 
-	double time_of_experiment_start;
 	double time_of_last_event_completed;
 
 	int counter_for_user;
 	int idle_time;
 	double time;
 	const int MAX_OUTSTANDING_IOS_PER_THREAD;
+	static int thread_id_generator;
 };
 
 }

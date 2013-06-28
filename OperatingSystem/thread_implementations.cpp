@@ -14,8 +14,8 @@ using namespace ssd;
 
 Thread::Thread() :
 		finished(false), time(1), threads_to_start_when_this_thread_finishes(),
-		experiment_thread(false), os(NULL), internal_statistics_gatherer(new StatisticsGatherer()),
-		external_statistics_gatherer(NULL), num_IOs_executing(0), queue() {}
+		os(NULL), internal_statistics_gatherer(new StatisticsGatherer()),
+		external_statistics_gatherer(NULL), num_IOs_executing(0), io_queue() {}
 
 Thread::~Thread() {
 	for (uint i = 0; i < threads_to_start_when_this_thread_finishes.size(); i++) {
@@ -27,14 +27,18 @@ Thread::~Thread() {
 	delete internal_statistics_gatherer;
 }
 
-Event* Thread::next() {
-	if (queue.size() == 0) {
+Event* Thread::pop() {
+	if (io_queue.size() == 0) {
 		return NULL;
 	} else {
-		Event* next = queue.front();
-		queue.pop_front();
+		Event* next = io_queue.front();
+		io_queue.pop();
 		return next;
 	}
+}
+
+Event* Thread::peek() {
+	return io_queue.size() == 0 ? NULL : io_queue.front();
 }
 
 void Thread::init(OperatingSystem* new_os, double new_time) {
@@ -76,18 +80,15 @@ bool Thread::is_finished() {
 }
 
 bool Thread::can_submit_more() {
-	return queue.size() < NUMBER_OF_ADDRESSABLE_PAGES();
+	return io_queue.size() < NUMBER_OF_ADDRESSABLE_PAGES();
 }
 
 void Thread::submit(Event* event) {
 	event->set_start_time(event->get_current_time());
-	queue.push_back(event);
+	io_queue.push(event);
 	num_IOs_executing++;
-	if (is_experiment_thread()) {
-		event->set_experiment_io(true);
-	}
 	if (!can_submit_more()) {
-		printf("Reached the maximum of events that can be submitted at the same time: %d\n", queue.size());
+		printf("Reached the maximum of events that can be submitted at the same time: %d\n", io_queue.size());
 		assert(false);
 	}
 }
@@ -184,39 +185,9 @@ void Flexible_Reader_Thread::handle_event_completion(Event* event) {
 	}
 }
 
-
-
-// =================  Asynchronous_Random_Thread_Reader_Writer  =============================
-
-/*Asynchronous_Random_Thread_Reader_Writer::Asynchronous_Random_Thread_Reader_Writer(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed)
-	: Thread(),
-	  min_LBA(min_LBA),
-	  max_LBA(max_LBA),
-	  number_of_times_to_repeat(num_ios_to_issue),
-	  random_number_generator(randseed)
-{}
-
-Event* Asynchronous_Random_Thread_Reader_Writer::issue_next_io() {
-	Event* event;
-	if (0 < number_of_times_to_repeat) {
-		event_type type = random_number_generator() % 2 == 0 ? WRITE : READ;
-		long lba = min_LBA + random_number_generator() % (max_LBA - min_LBA + 1);
-		event =  new Event(type, lba, 1, time);
-		//printf("Creating:  %d,  %s   ", numeric_limits<int>::max() - number_of_times_to_repeat, event->get_event_type() == WRITE ? "W" : "R"); event->print();
-		time += 1;
-	} else {
-		event = NULL;
-	}
-	number_of_times_to_repeat--;
-	if (number_of_times_to_repeat == 0) {
-		finished = true;
-	}
-	return event;
-}*/
-
 // =================  Collision_Free_Asynchronous_Random_Writer  =============================
 
-Collision_Free_Asynchronous_Random_Thread::Collision_Free_Asynchronous_Random_Thread(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed, event_type type)
+/*Collision_Free_Asynchronous_Random_Thread::Collision_Free_Asynchronous_Random_Thread(long min_LBA, long max_LBA, int num_ios_to_issue, ulong randseed, event_type type)
 	: Thread(),
 	  min_LBA(min_LBA),
 	  max_LBA(max_LBA),
@@ -244,4 +215,4 @@ void Collision_Free_Asynchronous_Random_Thread::issue_first_IOs() {
 
 void Collision_Free_Asynchronous_Random_Thread::handle_event_completion(Event* event) {
 	logical_addresses_submitted.erase(event->get_logical_address());
-}
+}*/

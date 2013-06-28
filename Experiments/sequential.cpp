@@ -52,6 +52,7 @@ int main()
 
 	string a = "/" + exp_folder;
 	string calibration_file = get_current_dir_name() + a + "calibrated_state.txt";
+	VisualTracer::init("");
 	Experiment_Runner::calibrate_and_save(calibration_file, init_workload, true);
 
 	Workload_Definition* experiment = new File_System_With_Noise();
@@ -65,9 +66,9 @@ int main()
 
 	BLOCK_MANAGER_ID = 3;
 	ENABLE_TAGGING = true;
-	Experiment_Runner::calibrate_and_save(calibration_file, init_workload, true);
-	vector<ExperimentResult> er = Experiment_Runner::simple_experiment(experiment, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc, calibration_file);
-	exps.push_back(er);
+	//Experiment_Runner::calibrate_and_save(calibration_file, init_workload, true);
+	// vector<ExperimentResult> er = Experiment_Runner::simple_experiment(experiment, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc, calibration_file);
+	//exps.push_back(er);
 
 	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
 	//exp.push_back( Experiment_Runner::simple_experiment(experiment, Init_Workload, space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );

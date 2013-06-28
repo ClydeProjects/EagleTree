@@ -169,7 +169,6 @@ ptrdiff_t random_range(ptrdiff_t limit) {
 // goes through all the events that have just been submitted (i.e. bus_wait_time = 0)
 // in light of these new events, see if any other existing pending events are now redundant
 void IOScheduler::update_current_events(double current_time) {
-	StatisticsGatherer::get_global_instance()->register_events_queue_length(current_events->size() + overdue_events->size(), current_time);
 	while (!future_events->empty() && ((current_events->empty() && overdue_events->empty()) || future_events->get_earliest_time() < current_time + 1) ) {
 		vector<Event*> events = future_events->get_soonest_events();
 		random_shuffle(events.begin(), events.end(), random_range); // Process events with same timestamp in random order to prevent imbalances
@@ -178,6 +177,8 @@ void IOScheduler::update_current_events(double current_time) {
 			init_event(e);
 		}
 	}
+	StatisticsGatherer::get_global_instance()->register_events_queue_length(current_events->size() + overdue_events->size(), current_time);
+	Queue_Length_Statistics::register_queue_size(current_events->size() + overdue_events->size(), current_time);
 }
 
 void IOScheduler::handle(vector<Event*>& events) {

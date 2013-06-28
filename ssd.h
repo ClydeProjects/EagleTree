@@ -432,8 +432,6 @@ public:
 	inline bool get_noop() const 						{ return noop; }
 	inline uint get_id() const 							{ return id; }
 	inline int get_tag() const 							{ return tag; }
-	inline bool is_experiment_io() const 				{ return experiment_io; }
-	inline void set_experiment_io(bool val) 			{ experiment_io = val; }
 	inline void set_tag(int new_tag) 					{ tag = new_tag; }
 	inline void set_thread_id(int new_thread_id)		{ thread_id = new_thread_id; }
 	inline void set_address(const Address &address) {
@@ -491,8 +489,6 @@ protected:
 	bool original_application_io;
 	bool copyback;
 	bool cached_write;
-
-	bool experiment_io;
 
 	// an ID for a single IO to the chip. This is not actually used for any logical purpose
 	static uint id_generator;
@@ -1061,8 +1057,7 @@ private:
 class VisualTracer
 {
 public:
-	static void init();
-	static void init(string file_name);
+	static void init(bool write_to_file);
 	static void register_completed_event(Event& event);
 	static void print_horizontally(int last_how_many_characters = UNDEFINED);
 	static void print_horizontally_with_breaks(ulong cursor = 0);
@@ -1071,6 +1066,7 @@ public:
 	static void print_vertically();
 	static void write_file();
 private:
+	static void trim_from_start(int num_characters_from_start);
 	static void write(int package, int die, char symbol, int length);
 	static void write_with_id(int package, int die, char symbol, int length, vector<vector<char> > symbols);
 	static vector<vector<vector<char> > > trace;
@@ -1272,6 +1268,17 @@ private:
 	static vector<string> thread_names;
 };
 
+class Queue_Length_Statistics {
+public:
+	static void init();
+	static void register_queue_size(int queue_size, double current_time);
+	static void print_avg();
+	static void print_distribution();
+private:
+	static map<int, long> distribution; // maps from queue size to the amount of time in which this queue size took place
+	static double last_registry_time;
+};
+
 class ExperimentResult {
 public:
 	ExperimentResult(string experiment_name, string data_folder, string sub_folder, string variable_parameter_name);
@@ -1354,11 +1361,7 @@ private:
 
 class Asynch_Random_Workload : public Workload_Definition {
 public:
-	Asynch_Random_Workload();
-	~Asynch_Random_Workload();
 	vector<Thread*> generate();
-private:
-	StatisticsGatherer* stats;
 };
 
 class Init_Workload : public Workload_Definition {
@@ -1404,6 +1407,7 @@ public:
 	static void save_state(OperatingSystem* os, string file_name);
 	static OperatingSystem* load_state(string file_name);
 	static void calibrate_and_save(string file_name, Workload_Definition*, bool force = false);
+	//static void write_config_file();
 private:
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
 
