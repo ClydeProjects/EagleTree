@@ -116,7 +116,7 @@ private:
 	void handle_flexible_read(Event* event);
 	void setup_dependent_event(Event* first, Event* dependent);
 	void transform_copyback(Event* event);
-	void handle_finished_event(Event *event, enum status outcome);
+	void handle_finished_event(Event *event);
 	void remove_redundant_events(Event* new_event);
 	bool should_event_be_scheduled(Event* event);
 	void init_event(Event* event);
@@ -127,6 +127,7 @@ private:
 	event_queue* future_events;
 	Scheduling_Strategy* overdue_events;
 	Scheduling_Strategy* current_events;
+	event_queue* completed_events;
 
 	map<uint, deque<Event*> > dependencies;
 
@@ -135,11 +136,9 @@ private:
 	Block_manager_parent* bm;
 	Migrator* migrator;
 
-	//map<uint, uint> LBA_to_dependencies;  // maps LBAs to dependency codes of GC operations. to be removed
 	map<uint, uint> dependency_code_to_LBA;
 	map<uint, event_type> dependency_code_to_type;
 	map<uint, uint> LBA_currently_executing;
-
 	map<uint, queue<uint> > op_code_to_dependent_op_codes;
 
 	struct Safe_Cache {

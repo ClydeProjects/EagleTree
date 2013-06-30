@@ -164,13 +164,12 @@ void OperatingSystem::register_event_completion(Event* event) {
 		delete threads[thread_id];
 	}
 
-	if (event->get_application_io_id() == 2475) {
-		int i = 0;
-		i++;
-	}
-
 	// we update the current time of all threads
+	//time = max(time, event->get_current_time());
+	//event->print();
+	assert(time <= event->get_current_time() + 1);
 	time = max(time, event->get_current_time());
+
 	//double new_time = queue_was_full ? event->get_current_time() : event->get_ssd_submission_time();
 	//time = max(time, new_time);
 	//update_thread_times(time);
