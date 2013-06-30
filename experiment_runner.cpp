@@ -36,6 +36,7 @@ void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> thre
 }
 
 void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_workload, int IO_limit, OperatingSystem* os) {
+	Queue_Length_Statistics::init();
 	vector<Thread*> experiment_threads = experiment_workload->generate_instance();
 	os->set_threads(experiment_threads);
 	os->set_num_writes_to_stop_after(IO_limit);
@@ -45,6 +46,8 @@ void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_wo
 	//StatisticsGatherer::get_global_instance()->print_gc_info();
 	Utilization_Meter::print();
 	Individual_Threads_Statistics::print();
+	//Queue_Length_Statistics::print_distribution();
+	Queue_Length_Statistics::print_avg();
 	//Free_Space_Meter::print();
 	//Free_Space_Per_LUN_Meter::print();
 }
@@ -59,13 +62,9 @@ vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definitio
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		printf("%s :  %f \n", name.c_str(), variable);
 		printf("----------------------------------------------------------------------------------------------------------\n");
+		VisualTracer::init(true);
 		OperatingSystem* os = load_state(calibration_file);
-
-		string a = "/";
-		string trace_file = get_current_dir_name() + a + "trace.txt";
-		VisualTracer::init(trace_file.c_str());
 		run_single_measurment(experiment_workload, IO_limit, os);
-
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 		delete os;
 	}
@@ -80,12 +79,12 @@ vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definitio
 	mkdir(data_folder.c_str(), 0755);
 	ExperimentResult global_result(name, data_folder, "Global/", "Changing a Var");
 	global_result.start_experiment();
-
+	assert(incr > 0);
 	for (variable = min_val; variable <= max_val; variable += incr) {
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		printf("%s :  %d \n", name.c_str(), variable);
 		printf("----------------------------------------------------------------------------------------------------------\n");
-
+		VisualTracer::init(true);
 		OperatingSystem* os = load_state(calibration_file);
 		run_single_measurment(experiment_workload, IO_limit, os);
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
@@ -124,10 +123,10 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
 			ulong randseed = (i*3)+537;
 			Simple_Thread* random_writes = new Synchronous_Random_Writer(random_writes_min_lba, random_writes_max_lba, randseed);
 			Simple_Thread* random_reads = new Synchronous_Random_Reader(random_writes_min_lba, random_writes_max_lba, randseed+461);
-			if (workload == NULL) {
+			/*if (workload == NULL) {
 				random_writes->set_experiment_thread(true);
 				random_reads->set_experiment_thread(true);
-			}
+			}*/
 			random_writes->set_num_ios(INFINITE);
 			random_reads->set_num_ios(INFINITE);
 			random_writes->set_statistics_gatherer(random_writes_statics_gatherer);
@@ -256,6 +255,7 @@ void Experiment_Runner::calibrate_and_save(string file_name, Workload_Definition
 	if (ifile && !force) {
 		return; // file exists
 	}
+	VisualTracer::init(false);
 	printf("Creating calibrated SSD state.\n");
 	OperatingSystem* os = new OperatingSystem();
 	os->set_num_writes_to_stop_after(NUMBER_OF_ADDRESSABLE_PAGES() * 2);
@@ -266,6 +266,11 @@ void Experiment_Runner::calibrate_and_save(string file_name, Workload_Definition
 	save_state(os, file_name);
 	delete os;
 }
+
+/*void Experiment_Runner::write_config_file(string file_name) {
+	File* file = fopen(file_name , "w");
+	print_config(file);
+}*/
 
 void Experiment_Runner::save_state(OperatingSystem* os, string file_name) {
 	std::ofstream file(file_name.c_str());

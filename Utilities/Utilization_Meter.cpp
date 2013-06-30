@@ -20,7 +20,7 @@ void Utilization_Meter::register_event(double prev_time, double duration, Event 
 		channel_used[id] += duration;
 		double unused_time = event.get_current_time() - prev_time;
 		if (unused_time > 0) {
-			//VisualTracer::get_instance()->print_horizontally(2000);
+			//VisualTracer::print_horizontally(1000);
 			//event.print();
 		}
 		channel_unused[id] += unused_time;
@@ -37,11 +37,11 @@ void Utilization_Meter::print() {
 		double util = channel_used[i] / (channel_used[i] + channel_unused[i]);
 		printf("C%d\t%f\n", i, util);
 	}
-	printf("\nLUN Utilization\n");
+	/*printf("\nLUN Utilization\n");
 	for (uint i = 0; i < SSD_SIZE * PACKAGE_SIZE; i++) {
 		double util = LUNs_used[i] / (LUNs_used[i] + LUNs_unused[i]);
 		printf("L%d\t%f\n", i, util);
-	}
+	}*/
 }
 
 double Utilization_Meter::get_avg_utilization() {

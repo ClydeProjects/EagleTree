@@ -177,6 +177,7 @@ void StatisticsGatherer::register_executed_gc(Event const& gc, Block const& vict
 }
 
 void StatisticsGatherer::register_events_queue_length(uint queue_size, double time) {
+
 	if (inst != this) inst->register_events_queue_length(queue_size, time); // Do the same for global instance
 	if (time == 0) return;
 	uint current_window = floor(time / queue_length_tracker_resolution);
@@ -185,6 +186,7 @@ void StatisticsGatherer::register_events_queue_length(uint queue_size, double ti
 //		printf("-> COPIED LAST (vs=%d, window=%d)", queue_length_tracker.size(), current_window);
 	}
 	if (queue_length_tracker.size() == current_window) {
+		//printf("queue length %d\n", queue_size);
 		queue_length_tracker.push_back(queue_size);
 //		printf("Q: %f\t: %d\t (%d)", time, queue_size, queue_length_tracker.size() * queue_length_tracker_resolution);
 //		printf("-> SAMPLED");
@@ -374,6 +376,8 @@ void StatisticsGatherer::print() {
 	//printf("Erase std:\t%f \n", get_std(num_erases_per_LUN));
 	double milliseconds = (end_time - start_time) / 1000;
 	printf("Time taken (ms):\t%d\n", (int)milliseconds);
+	double queue_length = get_average(queue_length_tracker);
+	printf("avg queue length: %d\n", queue_length);
 	printf("\n\n");
 }
 

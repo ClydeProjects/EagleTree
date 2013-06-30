@@ -264,21 +264,26 @@ void load_entry(char *name, double value, uint line_number) {
 		fprintf(stderr, "Config file parsing error on line %u\n", line_number);
 	return;
 }
-
 void set_normal_config() {
-	SSD_SIZE = 1;				// 8
-	PACKAGE_SIZE = 8;			// 8
+	SSD_SIZE = 2;				// 8
+	PACKAGE_SIZE = 2;			// 8
 	DIE_SIZE = 1;
 	PLANE_SIZE = 128;			// 1024
-	BLOCK_SIZE = 128;			// 128
+	BLOCK_SIZE = 64;			// 128
 
-	PAGE_READ_DELAY = 115;
-	PAGE_WRITE_DELAY = 1600;
-	BUS_CTRL_DELAY = 5;
-	BUS_DATA_DELAY = 350;
-	BLOCK_ERASE_DELAY = 3000;
+	/*PAGE_READ_DELAY = 115 ;
+	PAGE_WRITE_DELAY = 1600 ;
+	BUS_CTRL_DELAY = 5 ;
+	BUS_DATA_DELAY = 350 ;
+	BLOCK_ERASE_DELAY = 3000 ;
+*/
+	PAGE_READ_DELAY = 115 / 5;
+	PAGE_WRITE_DELAY = 1600 / 5;
+	BUS_CTRL_DELAY = 5 / 5;
+	BUS_DATA_DELAY = 350 / 5;
+	BLOCK_ERASE_DELAY = 3000 / 5;
 
-	MAX_SSD_QUEUE_SIZE = 32;
+	MAX_SSD_QUEUE_SIZE = 500;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 	SCHEDULING_SCHEME = 0;  // FIFO
 
@@ -331,29 +336,36 @@ void load_config() {
 void print_config(FILE *stream) {
 	if (stream == NULL)
 		stream = stdout;
-	fprintf(stream, "RAM_READ_DELAY: %.16lf\n", RAM_READ_DELAY);
-	fprintf(stream, "RAM_WRITE_DELAY: %.16lf\n", RAM_WRITE_DELAY);
-	fprintf(stream, "BUS_CTRL_DELAY: %.16lf\n", BUS_CTRL_DELAY);
-	fprintf(stream, "BUS_DATA_DELAY: %.16lf\n", BUS_DATA_DELAY);
-	fprintf(stream, "SSD_SIZE: %u\n", SSD_SIZE);
-	fprintf(stream, "PACKAGE_SIZE: %u\n", PACKAGE_SIZE);
-	fprintf(stream, "DIE_SIZE: %u\n", DIE_SIZE);
-	fprintf(stream, "PLANE_SIZE: %u\n", PLANE_SIZE);
-	fprintf(stream, "PLANE_REG_READ_DELAY: %.16lf\n", PLANE_REG_READ_DELAY);
-	fprintf(stream, "PLANE_REG_WRITE_DELAY: %.16lf\n", PLANE_REG_WRITE_DELAY);
-	fprintf(stream, "BLOCK_SIZE: %u\n", BLOCK_SIZE);
-	fprintf(stream, "BLOCK_ERASES: %u\n", BLOCK_ERASES);
-	fprintf(stream, "BLOCK_ERASE_DELAY: %.16lf\n", BLOCK_ERASE_DELAY);
-	fprintf(stream, "PAGE_READ_DELAY: %.16lf\n", PAGE_READ_DELAY);
-	fprintf(stream, "PAGE_WRITE_DELAY: %.16lf\n", PAGE_WRITE_DELAY);
-	fprintf(stream, "PAGE_SIZE: %u\n", PAGE_SIZE);
-	fprintf(stream, "PAGE_ENABLE_DATA: %i\n", PAGE_ENABLE_DATA);
-	fprintf(stream, "MAP_DIRECTORY_SIZE: %i\n", MAP_DIRECTORY_SIZE);
-	fprintf(stream, "FTL_IMPLEMENTATION: %i\n", FTL_IMPLEMENTATION);
-	fprintf(stream, "PARALLELISM_MODE: %i\n", PARALLELISM_MODE);
-	fprintf(stream, "RAID_NUMBER_OF_PHYSICAL_SSDS: %i\n", RAID_NUMBER_OF_PHYSICAL_SSDS);
-	fprintf(stream, "MAX_REPEATED_COPY_BACKS_ALLOWED: %i\n", MAX_REPEATED_COPY_BACKS_ALLOWED);
-	fprintf(stream, "MAX_ITEMS_IN_COPY_BACK_MAP: %i\n", MAX_ITEMS_IN_COPY_BACK_MAP);
+
+	fprintf(stream, "Operation Timings:\n\n");
+	fprintf(stream, "\tBUS_CTRL_DELAY:\t%.16lf\n", BUS_CTRL_DELAY);
+	fprintf(stream, "\tBUS_DATA_DELAY:\t%.16lf\n", BUS_DATA_DELAY);
+	fprintf(stream, "\tPAGE_READ_DELAY:\t%.16lf\n", PAGE_READ_DELAY);
+	fprintf(stream, "\tPAGE_WRITE_DELAY:\t%.16lf\n", PAGE_WRITE_DELAY);
+	fprintf(stream, "\tBLOCK_ERASE_DELAY:\t%.16lf\n", BLOCK_ERASE_DELAY);
+
+	fprintf(stream, "SSD Architecture:\n\n");
+	fprintf(stream, "\tSSD_SIZE:\t%u\n", SSD_SIZE);
+	fprintf(stream, "\tPACKAGE_SIZE:\t%u\n", PACKAGE_SIZE);
+	fprintf(stream, "\tDIE_SIZE:\t%u\n", DIE_SIZE);
+	fprintf(stream, "\tPLANE_SIZE:\t%u\n", PLANE_SIZE);
+	fprintf(stream, "\tBLOCK_SIZE:\t%u\n", BLOCK_SIZE);
+	fprintf(stream, "\tPAGE_SIZE:\t%u\n", PAGE_SIZE);
+
+	fprintf(stream, "\tMAX_SSD_QUEUE_SIZE:\t%u\n", MAX_SSD_QUEUE_SIZE);
+	fprintf(stream, "\tOVER_PROVISIONING_FACTOR:\t%u\n", OVER_PROVISIONING_FACTOR);
+
+	fprintf(stream, "Controller:\n\n");
+	fprintf(stream, "\tBLOCK_MANAGER_ID:\t%u\n", BLOCK_MANAGER_ID);
+	fprintf(stream, "\tGREED_SCALE:\t%u\n", GREED_SCALE);
+	fprintf(stream, "\tMAX_CONCURRENT_GC_OPS:\t%u\n", MAX_CONCURRENT_GC_OPS);
+	fprintf(stream, "\tFTL_IMPLEMENTATION: %i\n", FTL_IMPLEMENTATION);
+	fprintf(stream, "\tMAX_REPEATED_COPY_BACKS_ALLOWED: %i\n", MAX_REPEATED_COPY_BACKS_ALLOWED);
+	fprintf(stream, "\tMAX_ITEMS_IN_COPY_BACK_MAP: %i\n", MAX_ITEMS_IN_COPY_BACK_MAP);
+
+	fprintf(stream, "Scheduler:\n\n");
+	fprintf(stream, "\tALLOW_DEFERRING_TRANSFERS: %i\n", ALLOW_DEFERRING_TRANSFERS);
+	fprintf(stream, "\tSCHEDULING_SCHEME: %i\n", SCHEDULING_SCHEME);
 }
 
 }

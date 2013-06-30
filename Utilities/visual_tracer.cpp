@@ -13,25 +13,21 @@ string VisualTracer::file_name = "";
 bool VisualTracer::write_to_file = false;
 long VisualTracer::amount_written_to_file = 0;
 
-void VisualTracer::init()
+
+void VisualTracer::init(bool write)
 {
 	trace = vector<vector<vector<char> > >(SSD_SIZE, std::vector<std::vector<char> >(PACKAGE_SIZE, std::vector<char>(0) ));
-	write_to_file = false;
-	file_name = "";
+	write_to_file = write;
 	amount_written_to_file = 0;
-}
 
-void VisualTracer::init(string file_name)
-{
-	init();
-	VisualTracer::file_name = file_name;
-	write_to_file = true;
+	string name = "/trace.txt";
+	file_name = get_current_dir_name() + name;
 
-	// overwrite the file if it exists
-	//printf("%s\n", file_name.c_str());
-	ofstream file(file_name.c_str());
-	file << "";
-	file.close();
+	if (write_to_file) {
+		ofstream file(file_name.c_str());
+		file << "";
+		file.close();
+	}
 }
 
 vector<char> get_int_as_char_vector(int num) {
@@ -61,6 +57,7 @@ void mark_as_gc_or_app(bool gc, bool app, vector<vector<char> >& symbols) {
 }
 
 void VisualTracer::register_completed_event(Event& event) {
+	write_to_file = false;
 	if (event.get_event_type() == TRIM || !write_to_file) {
 		return;
 	}
@@ -131,10 +128,15 @@ void VisualTracer::register_completed_event(Event& event) {
 
 	}*/
 
-	if (trace[add.package][add.die].size() > 100000 && write_to_file) {
-		write_file();
+	if (trace[add.package][add.die].size() > 100000) {
+		//print_horizontally(10000);
+		//Utilization_Meter::print();
+		if (write_to_file) {
+			write_file();
+		} else {
+			trim_from_start(100000 / 2);
+		}
 	}
-
 
 }
 
@@ -227,14 +229,18 @@ void VisualTracer::write_file() {
 	 file << trace_str << endl;
 	 file.close();
 
+	 trim_from_start(num_chars_to_write);
+	amount_written_to_file += num_chars_to_write;
+}
+
+void VisualTracer::trim_from_start(int num_characters_from_start) {
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			vector<char>& vec = trace[i][j];
-			vec.erase(vec.begin(), vec.begin() + num_chars_to_write);
+			int to_remove = min(num_characters_from_start, (int)vec.size());
+			vec.erase(vec.begin(), vec.begin() + to_remove);
 		}
 	}
-	amount_written_to_file += num_chars_to_write;
-
 }
 
 string VisualTracer::get_as_string(ulong cursor, ulong max, int chars_per_line) {
