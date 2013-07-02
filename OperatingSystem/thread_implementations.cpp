@@ -51,6 +51,7 @@ void Thread::init(OperatingSystem* new_os, double new_time) {
 		Event* e = submitted_events[i];
 		if (e != NULL) e->set_experiment_io(true);
 	}*/
+	//
 	//num_IOs_executing += submitted_events.size();
 	//queue.insert(queue.begin(), submitted_events.begin(), submitted_events.end());
 }
@@ -64,15 +65,16 @@ void Thread::register_event_completion(Event* event) {
 		external_statistics_gatherer->register_completed_event(*event);
 	}
 	time = event->get_current_time();
-	//if (!finished) {
-		handle_event_completion(event);
+	if (finished) {
+		return;
+	}
+	handle_event_completion(event);
+	if (num_IOs_executing == 0) {
+		handle_no_IOs_left();
 		if (num_IOs_executing == 0) {
-			handle_no_IOs_left();
-			if (num_IOs_executing == 0) {
-				finished = true;
-			}
+			finished = true;
 		}
-	//}
+	}
 }
 
 bool Thread::is_finished() {
@@ -87,6 +89,7 @@ void Thread::submit(Event* event) {
 	event->set_start_time(event->get_current_time());
 	io_queue.push(event);
 	num_IOs_executing++;
+	//printf("io_queue.size()  %d\n", io_queue.size() );
 	if (!can_submit_more()) {
 		printf("Reached the maximum of events that can be submitted at the same time: %d\n", io_queue.size());
 		assert(false);
@@ -101,7 +104,6 @@ void Thread::set_statistics_gatherer(StatisticsGatherer* new_statistics_gatherer
 
 Simple_Thread::Simple_Thread(IO_Pattern* generator, IO_Mode_Generator* mode_gen, int MAX_OUTSTANDING_IOS, long num_IOs)
 	: Thread(),
-	  num_ongoing_IOs(0),
 	  MAX_IOS(MAX_OUTSTANDING_IOS),
 	  io_gen(generator),
 	  io_type_gen(mode_gen),
@@ -112,7 +114,6 @@ Simple_Thread::Simple_Thread(IO_Pattern* generator, IO_Mode_Generator* mode_gen,
 
 Simple_Thread::Simple_Thread(IO_Pattern* generator, int MAX_IOS, IO_Mode_Generator* mode_gen)
 	: Thread(),
-	  num_ongoing_IOs(0),
 	  MAX_IOS(MAX_IOS),
 	  io_gen(generator),
 	  io_type_gen(mode_gen)
@@ -127,8 +128,7 @@ Simple_Thread::~Simple_Thread() {
 }
 
 void Simple_Thread::generate_io() {
-	while (num_ongoing_IOs < MAX_IOS && number_of_times_to_repeat > 0) {
-		num_ongoing_IOs++;
+	while (get_num_ongoing_IOs() < MAX_IOS && number_of_times_to_repeat > 0) {
 		number_of_times_to_repeat--;
 		Event* e = new Event(io_type_gen->next(), io_gen->next(), 1, get_current_time());
 		submit(e);
@@ -141,7 +141,6 @@ void Simple_Thread::issue_first_IOs() {
 }
 
 void Simple_Thread::handle_event_completion(Event* event) {
-	num_ongoing_IOs--;
 	if (number_of_times_to_repeat > 0) {
 		generate_io();
 	}

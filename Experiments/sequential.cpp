@@ -53,11 +53,9 @@ int main()
 	string a = "/" + exp_folder;
 	string calibration_file = get_current_dir_name() + a + "calibrated_state.txt";
 	VisualTracer::init("");
-	Experiment_Runner::calibrate_and_save(calibration_file, init_workload, true);
+	Experiment_Runner::calibrate_and_save(calibration_file, init_workload, false);
 
 	Workload_Definition* experiment = new File_System_With_Noise();
-
-	Experiment_Runner::wall_clock_time();
 
 	vector<vector<ExperimentResult> > exps;
 	BLOCK_MANAGER_ID = 0;

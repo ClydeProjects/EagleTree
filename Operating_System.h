@@ -45,6 +45,7 @@ protected:
 	OperatingSystem* os;
 	void submit(Event* event);
 	bool can_submit_more();
+	int get_num_ongoing_IOs() { return num_IOs_executing; }
 private:
 	double time;
 	StatisticsGatherer* internal_statistics_gatherer;
@@ -139,7 +140,6 @@ public:
 	inline void set_num_ios(ulong num_ios) { number_of_times_to_repeat = num_ios; }
 private:
 	long number_of_times_to_repeat;
-	int num_ongoing_IOs;
 	const int MAX_IOS;
 	IO_Pattern* io_gen;
 	IO_Mode_Generator* io_type_gen;
@@ -163,7 +163,7 @@ class Asynchronous_Random_Writer : public Simple_Thread
 {
 public:
 	Asynchronous_Random_Writer(long min_LBA, long max_LBA, ulong randseed)
-		: Simple_Thread(new Random_IO_Pattern(min_LBA, max_LBA, randseed), new WRITES(), MAX_SSD_QUEUE_SIZE, INFINITE) {}
+		: Simple_Thread(new Random_IO_Pattern(min_LBA, max_LBA, randseed), new WRITES(), MAX_SSD_QUEUE_SIZE * 2, INFINITE) {}
 };
 
 class Synchronous_Sequential_Writer : public Simple_Thread
@@ -177,7 +177,7 @@ class Asynchronous_Sequential_Writer : public Simple_Thread
 {
 public:
 	Asynchronous_Sequential_Writer(long min_LBA, long max_LBA)
-		: Simple_Thread(new Sequential_IO_Pattern(min_LBA, max_LBA), MAX_SSD_QUEUE_SIZE, new WRITES()) {
+		: Simple_Thread(new Sequential_IO_Pattern(min_LBA, max_LBA), MAX_SSD_QUEUE_SIZE * 2, new WRITES()) {
 	}
 };
 
@@ -185,7 +185,7 @@ class Asynchronous_Sequential_Trimmer : public Simple_Thread
 {
 public:
 	Asynchronous_Sequential_Trimmer(long min_LBA, long max_LBA)
-		: Simple_Thread(new Sequential_IO_Pattern(min_LBA, max_LBA), MAX_SSD_QUEUE_SIZE, new TRIMS()) {
+		: Simple_Thread(new Sequential_IO_Pattern(min_LBA, max_LBA), MAX_SSD_QUEUE_SIZE * 2, new TRIMS()) {
 	}
 };
 
@@ -200,27 +200,15 @@ class Asynchronous_Sequential_Reader : public Simple_Thread
 {
 public:
 	Asynchronous_Sequential_Reader(long min_LBA, long max_LBA )
-		: Simple_Thread(new Sequential_IO_Pattern(min_LBA, max_LBA), MAX_SSD_QUEUE_SIZE, new READS()) {}
+		: Simple_Thread(new Sequential_IO_Pattern(min_LBA, max_LBA), MAX_SSD_QUEUE_SIZE * 2, new READS()) {}
 };
 
 class Asynchronous_Random_Reader_Writer : public Simple_Thread
 {
 public:
 	Asynchronous_Random_Reader_Writer(long min_LBA, long max_LBA, ulong seed, double writes_probability = 0.5 )
-		: Simple_Thread(new Random_IO_Pattern(min_LBA, max_LBA, seed), new READS_OR_WRITES(seed, writes_probability), MAX_SSD_QUEUE_SIZE, INFINITE) {}
+		: Simple_Thread(new Random_IO_Pattern(min_LBA, max_LBA, seed), new READS_OR_WRITES(seed, writes_probability), MAX_SSD_QUEUE_SIZE * 2, INFINITE) {}
 };
-
-/*class Asynchronous_Random_Reader_Writer : public Thread
-{
-public:
-	Asynchronous_Random_Thread_Reader_Writer(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed = 0);
-	Event* issue_next_io();
-	void handle_event_completion(Event* event) {};
-private:
-	long min_LBA, max_LBA;
-	int number_of_times_to_repeat;
-	MTRand_int32 random_number_generator;
-};*/
 
 /*class Collision_Free_Asynchronous_Random_Thread : public Thread
 {
@@ -459,6 +447,25 @@ private:
 	Flexible_Reader* flex_reader;
 };
 
+class OS_Scheduler {
+public:
+	virtual ~OS_Scheduler() {}
+	virtual int pick(map<int, Thread*> const& threads) = 0;
+};
+
+class FIFO_OS_Scheduler : public OS_Scheduler {
+public:
+	int pick(map<int, Thread*> const& threads);
+};
+
+class FAIR_OS_Scheduler : public OS_Scheduler {
+public:
+	FAIR_OS_Scheduler() : last_id(UNDEFINED) {}
+	int pick(map<int, Thread*> const& threads);
+private:
+	int last_id;
+};
+
 class OperatingSystem
 {
 public:
@@ -479,10 +486,8 @@ public:
     	ar & ssd;
     }
 private:
-	int pick_event_with_shortest_start_time();
 	void dispatch_event(int thread_id);
 	double get_event_minimal_completion_time(Event const*const event) const;
-	//void update_thread_times(double time);
 	void setup_follow_up_threads(int thread_id, double time);
 	Ssd * ssd;
 	map<int, Thread*> threads;
@@ -492,12 +497,11 @@ private:
 	long NUM_WRITES_TO_STOP_AFTER;
 	long num_writes_completed;
 
-	double time_of_last_event_completed;
-
 	int counter_for_user;
 	int idle_time;
 	double time;
 	static int thread_id_generator;
+	OS_Scheduler* scheduler;
 };
 
 }

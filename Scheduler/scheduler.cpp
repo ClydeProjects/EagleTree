@@ -386,15 +386,23 @@ void IOScheduler::handle_noop_events(vector<Event*>& events) {
 			Event *e = dependents.front();
 			e->incr_bus_wait_time(event->get_bus_wait_time());
 			dependents.pop_front();
-			//ssd->register_event_completion(e);
-			completed_events->push(e);
+			e->set_noop(true);
+			if (event->is_original_application_io()) {
+				completed_events->push(e);
+			} else {
+				ssd->register_event_completion(e);
+			}
 		}
 		dependencies.erase(dependency_code);
 		dependency_code_to_LBA.erase(dependency_code);
 		dependency_code_to_type.erase(dependency_code);
 		manage_operation_completion(event);
 		//ssd->register_event_completion(event);
-		completed_events->push(event);
+		if (event->is_original_application_io()) {
+			completed_events->push(event);
+		} else {
+			ssd->register_event_completion(event);
+		}
 	}
 }
 
@@ -465,12 +473,26 @@ enum status IOScheduler::execute_next(Event* event) {
 		manage_operation_completion(event);
 	}
 
+	if (event->get_application_io_id() == 98976) {
+			int i = 1;
+			i++;
+		}
+
+	if (event->get_application_io_id() == 105531) {
+			int i = 1;
+			i++;
+		}
+
 	if (safe_cache.exists(event->get_logical_address())) {
 		safe_cache.remove(event->get_logical_address());
 		//printf("removing from cache:  %d\n", event->get_logical_address());
 		delete event;
 	} else {
-		completed_events->push(event);
+		if (event->is_original_application_io()) {
+			completed_events->push(event);
+		} else {
+			ssd->register_event_completion(event);
+		}
 		if (completed_events->size() >= MAX_SSD_QUEUE_SIZE) {
 			vector<Event*> events_that_finished_soonest = completed_events->get_soonest_events();
 			for (uint i = 0; i < events_that_finished_soonest.size(); i++) {

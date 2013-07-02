@@ -89,6 +89,7 @@ void Ssd::execute_all_remaining_events() {
 	while (!scheduler->is_empty()) {
 		scheduler->execute_soonest_events();
 	}
+
 }
 
 void Ssd::submit(Event* event) {

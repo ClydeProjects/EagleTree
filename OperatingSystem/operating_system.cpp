@@ -15,10 +15,10 @@ OperatingSystem::OperatingSystem()
 	  threads(),
 	  NUM_WRITES_TO_STOP_AFTER(UNDEFINED),
 	  num_writes_completed(0),
-	  time_of_last_event_completed(1),
 	  counter_for_user(1),
 	  idle_time(0),
-	  time(0)
+	  time(0),
+	  scheduler(new FAIR_OS_Scheduler())
 {
 	ssd->set_operating_system(this);
 	thread_id_generator = 0;
@@ -55,7 +55,7 @@ void OperatingSystem::run() {
 	const int idle_limit = 5000000;
 	bool finished_experiment, still_more_work;
 	do {
-		int thread_id = pick_event_with_shortest_start_time();
+		int thread_id = scheduler->pick(threads);
 		bool no_pending_event = thread_id == UNDEFINED;
 		bool queue_is_full = currently_executing_ios.size() >= MAX_SSD_QUEUE_SIZE;
 		if (no_pending_event || queue_is_full) {
@@ -99,20 +99,6 @@ void OperatingSystem::run() {
 	}
 }
 
-int OperatingSystem::pick_event_with_shortest_start_time() {
-	double soonest_time = numeric_limits<double>::max();
-	int thread_id = UNDEFINED;
-	map<int, Thread*>::iterator i = threads.begin();
-	for (; i != threads.end(); i++) {
-		Thread* t = (*i).second;
-		Event* e = t->peek();
-		if (e != NULL && e->get_start_time() < soonest_time ) {
-			soonest_time = e->get_start_time();
-			thread_id = (*i).first;
-		}
-	}
-	return thread_id;
-}
 
 void OperatingSystem::dispatch_event(int thread_id) {
 	idle_time = 0;
@@ -170,13 +156,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	assert(time <= event->get_current_time() + 1);
 	time = max(time, event->get_current_time());
 
-	//double new_time = queue_was_full ? event->get_current_time() : event->get_ssd_submission_time();
-	//time = max(time, new_time);
-	//update_thread_times(time);
-
-	time_of_last_event_completed = max(time_of_last_event_completed, event->get_current_time());
-
-	int thread_with_soonest_event = pick_event_with_shortest_start_time();
+	int thread_with_soonest_event = scheduler->pick(threads);
 	if (thread_with_soonest_event != UNDEFINED) {
 		dispatch_event(thread_with_soonest_event);
 	}
@@ -200,7 +180,7 @@ void OperatingSystem::set_num_writes_to_stop_after(long num_writes) {
 }
 
 double OperatingSystem::get_experiment_runtime() const {
-	return time_of_last_event_completed;
+	return time;
 }
 
 Flexible_Reader* OperatingSystem::create_flexible_reader(vector<Address_Range> ranges) {
