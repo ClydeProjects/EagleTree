@@ -1057,6 +1057,7 @@ private:
 class VisualTracer
 {
 public:
+	static void init();
 	static void init(string folder);
 	static void register_completed_event(Event& event);
 	static void print_horizontally(int last_how_many_characters = UNDEFINED);

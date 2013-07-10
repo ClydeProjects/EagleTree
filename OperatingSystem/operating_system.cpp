@@ -99,7 +99,6 @@ void OperatingSystem::run() {
 	}
 }
 
-
 void OperatingSystem::dispatch_event(int thread_id) {
 	idle_time = 0;
 	Event* event = threads[thread_id]->pop();
@@ -147,7 +146,6 @@ void OperatingSystem::register_event_completion(Event* event) {
 	if (thread->is_finished()) {
 		setup_follow_up_threads(thread_id, event->get_current_time());
 		threads.erase(thread_id);
-		//delete threads[thread_id];
 	}
 
 	assert(time <= event->get_current_time() + 1);
@@ -161,16 +159,6 @@ void OperatingSystem::register_event_completion(Event* event) {
 	delete event;
 }
 
-/*void OperatingSystem::update_thread_times(double time) {
-	map<int, Thread*>::iterator i = threads.begin();
-	while (i != threads.end()) {
-		Thread* t = (*i).second;
-		if (!t->is_finished() && t->get_time() < time) {
-			t->set_time(time);
-		}
-		i++;
-	}
-}*/
 
 void OperatingSystem::set_num_writes_to_stop_after(long num_writes) {
 	NUM_WRITES_TO_STOP_AFTER = num_writes;

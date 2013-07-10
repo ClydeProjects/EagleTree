@@ -37,7 +37,7 @@ Event* Thread::pop() {
 	}
 }
 
-Event* Thread::peek() {
+Event* Thread::peek() const {
 	return io_queue.size() == 0 ? NULL : io_queue.front();
 }
 
@@ -89,7 +89,6 @@ void Thread::submit(Event* event) {
 	event->set_start_time(event->get_current_time());
 	io_queue.push(event);
 	num_IOs_executing++;
-	//printf("io_queue.size()  %d\n", io_queue.size() );
 	if (!can_submit_more()) {
 		printf("Reached the maximum of events that can be submitted at the same time: %d\n", io_queue.size());
 		assert(false);

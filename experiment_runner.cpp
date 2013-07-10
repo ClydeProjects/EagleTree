@@ -260,7 +260,7 @@ void Experiment_Runner::calibrate_and_save(string file_name, Workload_Definition
 	if (ifile && !force) {
 		return; // file exists
 	}
-	VisualTracer::init(false);
+	VisualTracer::init();
 	printf("Creating calibrated SSD state.\n");
 	OperatingSystem* os = new OperatingSystem();
 	os->set_num_writes_to_stop_after(NUMBER_OF_ADDRESSABLE_PAGES() * 2);
@@ -284,9 +284,9 @@ void Experiment_Runner::write_results_file(string folder_name) {
 	FILE* file = fopen(file_name.c_str() , "w");
 	StatisticsGatherer::get_global_instance()->print_simple(file);
 	double channel_util = Utilization_Meter::get_avg_channel_utilization();
-	fprintf(file, "channel util:\t%d\n", channel_util);
+	fprintf(file, "channel util:\t%f\n", channel_util);
 	double LUN_util = Utilization_Meter::get_avg_LUN_utilization();
-	fprintf(file, "LUN util:\t%d\n", LUN_util);
+	fprintf(file, "LUN util:\t%f\n", LUN_util);
 }
 
 void Experiment_Runner::save_state(OperatingSystem* os, string file_name) {

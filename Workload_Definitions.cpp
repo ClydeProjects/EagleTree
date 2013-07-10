@@ -133,7 +133,6 @@ vector<Thread*> File_System_With_Noise::generate() {
 
 	Simple_Thread* experiment_thread1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 35722);
 	Thread* experiment_thread2 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 4, INFINITE, max_file_size, 713);
-
 	Thread* experiment_thread3 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, INFINITE, max_file_size, 5);
 
 	vector<Thread*> threads;

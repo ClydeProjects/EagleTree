@@ -492,11 +492,9 @@ private:
 	Ssd * ssd;
 	map<int, Thread*> threads;
 	map<long, long> app_id_to_thread_id_mapping;
-
 	set<uint> currently_executing_ios;
 	long NUM_WRITES_TO_STOP_AFTER;
 	long num_writes_completed;
-
 	int counter_for_user;
 	int idle_time;
 	double time;
