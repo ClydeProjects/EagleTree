@@ -337,35 +337,35 @@ void print_config(FILE *stream) {
 	if (stream == NULL)
 		stream = stdout;
 
-	fprintf(stream, "Operation Timings:\n\n");
+	fprintf(stream, "#Operation Timings:\n");
 	fprintf(stream, "\tBUS_CTRL_DELAY:\t%.16lf\n", BUS_CTRL_DELAY);
 	fprintf(stream, "\tBUS_DATA_DELAY:\t%.16lf\n", BUS_DATA_DELAY);
 	fprintf(stream, "\tPAGE_READ_DELAY:\t%.16lf\n", PAGE_READ_DELAY);
 	fprintf(stream, "\tPAGE_WRITE_DELAY:\t%.16lf\n", PAGE_WRITE_DELAY);
-	fprintf(stream, "\tBLOCK_ERASE_DELAY:\t%.16lf\n", BLOCK_ERASE_DELAY);
+	fprintf(stream, "\tBLOCK_ERASE_DELAY:\t%.16lf\n\n", BLOCK_ERASE_DELAY);
 
-	fprintf(stream, "SSD Architecture:\n\n");
+	fprintf(stream, "#SSD Architecture:\n");
 	fprintf(stream, "\tSSD_SIZE:\t%u\n", SSD_SIZE);
 	fprintf(stream, "\tPACKAGE_SIZE:\t%u\n", PACKAGE_SIZE);
 	fprintf(stream, "\tDIE_SIZE:\t%u\n", DIE_SIZE);
 	fprintf(stream, "\tPLANE_SIZE:\t%u\n", PLANE_SIZE);
 	fprintf(stream, "\tBLOCK_SIZE:\t%u\n", BLOCK_SIZE);
-	fprintf(stream, "\tPAGE_SIZE:\t%u\n", PAGE_SIZE);
+	fprintf(stream, "\tPAGE_SIZE:\t%u\n\n", PAGE_SIZE);
 
 	fprintf(stream, "\tMAX_SSD_QUEUE_SIZE:\t%u\n", MAX_SSD_QUEUE_SIZE);
 	fprintf(stream, "\tOVER_PROVISIONING_FACTOR:\t%u\n", OVER_PROVISIONING_FACTOR);
 
-	fprintf(stream, "Controller:\n\n");
+	fprintf(stream, "#Controller:\n");
 	fprintf(stream, "\tBLOCK_MANAGER_ID:\t%u\n", BLOCK_MANAGER_ID);
 	fprintf(stream, "\tGREED_SCALE:\t%u\n", GREED_SCALE);
 	fprintf(stream, "\tMAX_CONCURRENT_GC_OPS:\t%u\n", MAX_CONCURRENT_GC_OPS);
 	fprintf(stream, "\tFTL_IMPLEMENTATION: %i\n", FTL_IMPLEMENTATION);
 	fprintf(stream, "\tMAX_REPEATED_COPY_BACKS_ALLOWED: %i\n", MAX_REPEATED_COPY_BACKS_ALLOWED);
-	fprintf(stream, "\tMAX_ITEMS_IN_COPY_BACK_MAP: %i\n", MAX_ITEMS_IN_COPY_BACK_MAP);
+	fprintf(stream, "\tMAX_ITEMS_IN_COPY_BACK_MAP: %i\n\n", MAX_ITEMS_IN_COPY_BACK_MAP);
 
-	fprintf(stream, "Scheduler:\n\n");
+	fprintf(stream, "#Scheduler:\n");
 	fprintf(stream, "\tALLOW_DEFERRING_TRANSFERS: %i\n", ALLOW_DEFERRING_TRANSFERS);
-	fprintf(stream, "\tSCHEDULING_SCHEME: %i\n", SCHEDULING_SCHEME);
+	fprintf(stream, "\tSCHEDULING_SCHEME: %i\n\n", SCHEDULING_SCHEME);
 }
 
 }

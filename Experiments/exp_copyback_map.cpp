@@ -84,7 +84,7 @@ int main()
 
 	double start_time = Experiment_Runner::wall_clock_time();
 
-	vector<ExperimentResult> exp;
+	vector<Experiment_Result> exp;
 
 	for (int copybacks = 0; copybacks <= max_copybacks; copybacks++) {
 		MAX_REPEATED_COPY_BACKS_ALLOWED = copybacks;

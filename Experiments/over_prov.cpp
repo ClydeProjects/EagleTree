@@ -17,7 +17,7 @@ int main()
 	double op_min = 0.20;
 	double op_max = 0.80;
 	double incr = 0.1;
-	vector<vector<ExperimentResult> > exps;
+	vector<vector<Experiment_Result> > exps;
 	exps.push_back( Experiment_Runner::simple_experiment(workload, init,	exp_folder + "over_prov/", "over prov", IO_limit, OVER_PROVISIONING_FACTOR, op_min, op_max, incr) );
 
 	//SCHEDULING_SCHEME = 4;

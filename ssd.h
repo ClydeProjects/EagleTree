@@ -1057,7 +1057,7 @@ private:
 class VisualTracer
 {
 public:
-	static void init(bool write_to_file);
+	static void init(string folder);
 	static void register_completed_event(Event& event);
 	static void print_horizontally(int last_how_many_characters = UNDEFINED);
 	static void print_horizontally_with_breaks(ulong cursor = 0);
@@ -1124,6 +1124,7 @@ public:
 	void register_executed_gc(Event const& gc, Block const& victim);
 	void register_events_queue_length(uint queue_size, double time);
 	void print();
+	void print_simple(FILE* file = stdout);
 	void print_gc_info();
 	void print_csv();
 	inline double get_wait_time_histogram_bin_size() { return wait_time_histogram_bin_size; }
@@ -1222,7 +1223,8 @@ public:
 	static void init();
 	static void register_event(double prev_time, double duration, Event const& event, address_valid gran);
 	static void print();
-	static double get_avg_utilization();
+	static double get_avg_channel_utilization();
+	static double get_avg_LUN_utilization();
 private:
 	static vector<double> channel_used;
 	static vector<double> LUNs_used;
@@ -1279,10 +1281,10 @@ private:
 	static double last_registry_time;
 };
 
-class ExperimentResult {
+class Experiment_Result {
 public:
-	ExperimentResult(string experiment_name, string data_folder, string sub_folder, string variable_parameter_name);
-	~ExperimentResult();
+	Experiment_Result(string experiment_name, string data_folder, string sub_folder, string variable_parameter_name);
+	~Experiment_Result();
 	void start_experiment();
 	void collect_stats(double variable_parameter_value, double os_runtime);
 	void collect_stats(double variable_parameter_value, double os_runtime, StatisticsGatherer* statistics_gatherer);
@@ -1383,31 +1385,32 @@ public:
 	static string pretty_time(double time);
 	static void draw_graph(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command);
 	static void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command, vector<string> histogram_commands);
-	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments, int y_max = UNDEFINED, string subfolder = "");
-	static void latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, ExperimentResult experiment, int y_max = UNDEFINED);
-	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, ExperimentResult experiment);
-	static void waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points, int black_column, int red_column = -1);
-    static void cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<ExperimentResult> experiments, int point, int black_column, int red_column = -1);
-	static void age_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
-	static void queue_length_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
-	static void throughput_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points);
+	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<Experiment_Result> experiments, int y_max = UNDEFINED, string subfolder = "");
+	static void latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, Experiment_Result experiment, int y_max = UNDEFINED);
+	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Experiment_Result experiment);
+	static void waittime_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points, int black_column, int red_column = -1);
+    static void cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<Experiment_Result> experiments, int point, int black_column, int red_column = -1);
+	static void age_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points);
+	static void queue_length_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points);
+	static void throughput_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points);
 	static string get_working_dir();
 	static void unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer);
 	static void run_single_measurment(Workload_Definition* experiment_workload, int IO_limit, OperatingSystem* os);
-	static vector<ExperimentResult> simple_experiment(Workload_Definition* experiment_workload, string data_folder, string name, long IO_limit, double& variable, double min_val, double max_val, double incr, string calibration_file);
-	static vector<ExperimentResult> simple_experiment(Workload_Definition* experiment_workload, string data_folder, string name, long IO_limit, long& variable, long min_val, long max_val, long incr, string calibration_file);
+	static vector<Experiment_Result> simple_experiment(Workload_Definition* experiment_workload, string data_folder, string name, long IO_limit, double& variable, double min_val, double max_val, double incr, string calibration_file);
+	static vector<Experiment_Result> simple_experiment(Workload_Definition* experiment_workload, string data_folder, string name, long IO_limit, long& variable, long min_val, long max_val, long incr, string calibration_file);
 	static void simple_experiment(Workload_Definition* workload, string name, int IO_limit);
-	static vector<ExperimentResult> random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba);
-	static ExperimentResult copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
-	static ExperimentResult copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);
+	static vector<Experiment_Result> random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba);
+	static Experiment_Result copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
+	static Experiment_Result copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);
 
 	static string graph_filename_prefix;
-	static void draw_graphs(vector<vector<ExperimentResult> > results, string exp_folder);
-	static void draw_experiment_spesific_graphs(vector<vector<ExperimentResult> > results, string exp_folder, vector<int> x_vals);
+	static void draw_graphs(vector<vector<Experiment_Result> > results, string exp_folder);
+	static void draw_experiment_spesific_graphs(vector<vector<Experiment_Result> > results, string exp_folder, vector<int> x_vals);
 	static void save_state(OperatingSystem* os, string file_name);
 	static OperatingSystem* load_state(string file_name);
 	static void calibrate_and_save(string file_name, Workload_Definition*, bool force = false);
-	//static void write_config_file();
+	static void write_config_file(string folder_name);
+	static void write_results_file(string folder_name);
 private:
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
 
@@ -1419,6 +1422,7 @@ private:
 	static const double K; // One thousand
 	static double calibration_precision;      // microseconds
 	static double calibration_starting_point; // microseconds
+	static string base_folder;
 };
 
 };

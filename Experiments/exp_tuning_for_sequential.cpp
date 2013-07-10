@@ -84,7 +84,7 @@ int main()
 
 	PRINT_LEVEL = 0;
 
-	vector<ExperimentResult> exp;
+	vector<Experiment_Result> exp;
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(greedy_eq_prio,	space_min, space_max, space_inc, exp_folder + 		"greedy_eq_prio/", "greedy eq prio", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(greedy_gc_prio,	space_min, space_max, space_inc, exp_folder + 		"greedy_gc_prio/", "greedy gc prio", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(lazy_eq_prio,		space_min, space_max, space_inc, exp_folder + 		"lazy_eq_prio/", "lazy eq prio", IO_limit) );

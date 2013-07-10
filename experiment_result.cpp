@@ -3,20 +3,20 @@
 #include "ssd.h"
 using namespace ssd;
 
-const string ExperimentResult::throughput_column_name		= "Average throughput (IOs/ms)"; // e.g. "Average throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
-const string ExperimentResult::write_throughput_column_name = "Average write throughput (IOs/ms)";
-const string ExperimentResult::read_throughput_column_name  = "Average read throughput (IOs/ms)";
-const string ExperimentResult::datafile_postfix 			= ".csv";
-const string ExperimentResult::stats_filename 				= "stats";
-const string ExperimentResult::waittime_filename_prefix 	= "waittime-";
-const string ExperimentResult::age_filename_prefix 			= "age-";
-const string ExperimentResult::queue_filename_prefix 		= "queue-";
-const string ExperimentResult::throughput_filename_prefix   = "throughput-";
-const string ExperimentResult::latency_filename_prefix      = "latency-";
-const double ExperimentResult::M 							= 1000000.0; // One million
-const double ExperimentResult::K 							= 1000.0;    // One thousand
+const string Experiment_Result::throughput_column_name		= "Average throughput (IOs/ms)"; // e.g. "Average throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
+const string Experiment_Result::write_throughput_column_name = "Average write throughput (IOs/ms)";
+const string Experiment_Result::read_throughput_column_name  = "Average read throughput (IOs/ms)";
+const string Experiment_Result::datafile_postfix 			= ".csv";
+const string Experiment_Result::stats_filename 				= "stats";
+const string Experiment_Result::waittime_filename_prefix 	= "waittime-";
+const string Experiment_Result::age_filename_prefix 			= "age-";
+const string Experiment_Result::queue_filename_prefix 		= "queue-";
+const string Experiment_Result::throughput_filename_prefix   = "throughput-";
+const string Experiment_Result::latency_filename_prefix      = "latency-";
+const double Experiment_Result::M 							= 1000000.0; // One million
+const double Experiment_Result::K 							= 1000.0;    // One thousand
 
-ExperimentResult::ExperimentResult(string experiment_name, string data_folder_, string sub_folder_, string variable_parameter_name)
+Experiment_Result::Experiment_Result(string experiment_name, string data_folder_, string sub_folder_, string variable_parameter_name)
 :	experiment_name(experiment_name),
  	variable_parameter_name(variable_parameter_name),
  	max_age(0),
@@ -36,12 +36,12 @@ ExperimentResult::ExperimentResult(string experiment_name, string data_folder_, 
     //boost::filesystem::current_path(boost::filesystem::path(data_folder));
 }
 
-ExperimentResult::~ExperimentResult() {
+Experiment_Result::~Experiment_Result() {
 	// Don't stop in the middle of an experiment. You finish what you have begun!
 	assert((!experiment_started && !experiment_finished) || (experiment_started && experiment_finished));
 }
 
-void ExperimentResult::start_experiment() {
+void Experiment_Result::start_experiment() {
 	assert(!experiment_started && !experiment_finished);
 	experiment_started = true;
 	start_time = Experiment_Runner::wall_clock_time();
@@ -56,11 +56,11 @@ void ExperimentResult::start_experiment() {
     (*stats_file) << "\"" << variable_parameter_name << "\", " << StatisticsGatherer::get_global_instance()->totals_csv_header() << ", \"" << throughput_column_name << "\", \"" << write_throughput_column_name << "\", \"" << read_throughput_column_name << "\"" << "\n";
 }
 
-void ExperimentResult::collect_stats(double variable_parameter_value, double os_runtime) {
+void Experiment_Result::collect_stats(double variable_parameter_value, double os_runtime) {
 	collect_stats(variable_parameter_value, os_runtime, StatisticsGatherer::get_global_instance());
 }
 
-void ExperimentResult::collect_stats(double variable_parameter_value, double os_runtime, StatisticsGatherer* statistics_gatherer) {
+void Experiment_Result::collect_stats(double variable_parameter_value, double os_runtime, StatisticsGatherer* statistics_gatherer) {
 	assert(experiment_started && !experiment_finished);
 
 	chdir(data_folder.c_str());
@@ -122,7 +122,7 @@ void ExperimentResult::collect_stats(double variable_parameter_value, double os_
 	vp_num_IOs[variable_parameter_value].push_back(total_write_IOs_issued + total_read_IOs_issued);
 }
 
-void ExperimentResult::end_experiment() {
+void Experiment_Result::end_experiment() {
 	assert(experiment_started && !experiment_finished);
 	experiment_finished = true;
 

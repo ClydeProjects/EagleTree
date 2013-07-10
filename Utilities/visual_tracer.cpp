@@ -14,14 +14,14 @@ bool VisualTracer::write_to_file = false;
 long VisualTracer::amount_written_to_file = 0;
 
 
-void VisualTracer::init(bool write)
+void VisualTracer::init(string folder)
 {
 	trace = vector<vector<vector<char> > >(SSD_SIZE, std::vector<std::vector<char> >(PACKAGE_SIZE, std::vector<char>(0) ));
 	write_to_file = write;
 	amount_written_to_file = 0;
 
-	string name = "/trace.txt";
-	file_name = get_current_dir_name() + name;
+	string name = "trace.txt";
+	file_name = folder + name;
 
 	if (write_to_file) {
 		ofstream file(file_name.c_str());

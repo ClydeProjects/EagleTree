@@ -70,7 +70,7 @@ int main()
 	const long noise_space_min = grace_space + logical_space * 0.5;
 	const long noise_space_max = logical_space;
 
-	vector<vector<ExperimentResult> > exps;
+	vector<vector<Experiment_Result> > exps;
 	string exp_folder  = "exp_grace_hash_join/";
  	mkdir(exp_folder.c_str(), 0755);
 

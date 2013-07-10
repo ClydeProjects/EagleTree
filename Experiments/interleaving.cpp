@@ -18,7 +18,7 @@ int main()
 	long op_min = 1000000;
 	long op_max = 1000000;
 	long incr = 1;
-	vector<vector<ExperimentResult> > exps;
+	vector<vector<Experiment_Result> > exps;
 
 	Workload_Definition* init = new Init_Workload();
 	string a = "/" + exp_folder;

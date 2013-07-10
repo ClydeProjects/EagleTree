@@ -13,7 +13,7 @@ int main()
 
  	Workload_Definition* init = new Init_Workload();
 	Workload_Definition* workload = new Asynch_Random_Workload();
-	vector<vector<ExperimentResult> > exps;
+	vector<vector<Experiment_Result> > exps;
 
 	long deadline_min = 0;
 	long deadline_max = 5000;

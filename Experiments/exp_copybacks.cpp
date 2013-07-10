@@ -98,7 +98,7 @@ int main()
 
 	MAX_ITEMS_IN_COPY_BACK_MAP = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
 	double start_time = Experiment_Runner::wall_clock_time();
-	vector<ExperimentResult> exp;
+	vector<Experiment_Result> exp;
 
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(copybacks0, 	space_min, space_max, space_inc, exp_folder + "copybacks0/",	"copybacks allowed 0", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(copybacks1, 	space_min, space_max, space_inc, exp_folder + "copybacks1/",	"copybacks allowed 1", IO_limit) );

@@ -125,7 +125,7 @@ string exp_folder  = "exp_flexible_reads/";
 
 	double start_time = Experiment_Runner::wall_clock_time();
 
-	vector<ExperimentResult> exp;
+	vector<Experiment_Result> exp;
 
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(flexible_reads,			space_min, space_max, space_inc, exp_folder + "flexible_reads/",			"flexible reads", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(synch_sequential_reads,	space_min, space_max, space_inc, exp_folder + "synch_sequential_reads/",	"synch sequential reads", IO_limit) );

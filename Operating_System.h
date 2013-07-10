@@ -23,7 +23,7 @@ public:
 	virtual ~Thread();
 	void init(OperatingSystem* os, double time);
 	void register_event_completion(Event* event);
-	Event* peek();
+	Event* peek() const;
 	Event* pop();
 
 	bool is_finished();

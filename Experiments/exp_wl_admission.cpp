@@ -82,7 +82,7 @@ int main()
 
 	PRINT_LEVEL = 0;
 
-	vector<ExperimentResult> exp;
+	vector<Experiment_Result> exp;
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_lazy,						space_min, space_max, space_inc, exp_folder + 		"naive_lazy/", "naive lazy", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(naive_greedy,						space_min, space_max, space_inc, exp_folder + 		"naive_greedy/", "naive greedy", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(smart_lazy,		space_min, space_max, space_inc, exp_folder + 		"smart_lazy/", "smart lazy", IO_limit) );

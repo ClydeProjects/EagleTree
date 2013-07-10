@@ -23,7 +23,7 @@ int main()
 	//Workload_Definition* workload = new Random_Workload(0, logical_space, 1);
 	Workload_Definition* workload = new Asynch_Random_Workload(0, logical_space);
 	//(Workload_Definition* workload, string data_folder, string name, int IO_limit, int& variable, int min_val, int max_val, int incr) {
-	vector<vector<ExperimentResult> > exps;
+	vector<vector<Experiment_Result> > exps;
 
 	int concurrent_gc_min = 8;
 	int concurrent_gc_max = 8;

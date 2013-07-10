@@ -134,7 +134,7 @@ int main()
 	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 15;
 
-	vector<ExperimentResult> exp;
+	vector<Experiment_Result> exp;
 
 	PRIORITISE_GC = false;
 	USE_ERASE_QUEUE = true;

@@ -52,14 +52,14 @@ int main()
 
 	string a = "/" + exp_folder;
 	string calibration_file = get_current_dir_name() + a + "calibrated_state.txt";
-	VisualTracer::init("");
+	//VisualTracer::init("");
 	Experiment_Runner::calibrate_and_save(calibration_file, init_workload, false);
 
 	Workload_Definition* experiment = new File_System_With_Noise();
 
-	vector<vector<ExperimentResult> > exps;
+	vector<vector<Experiment_Result> > exps;
 	BLOCK_MANAGER_ID = 0;
-	vector<ExperimentResult> res1 = Experiment_Runner::simple_experiment(experiment, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc, calibration_file);
+	vector<Experiment_Result> res1 = Experiment_Runner::simple_experiment(experiment, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc, calibration_file);
 	exps.push_back(res1);
 
 	BLOCK_MANAGER_ID = 3;

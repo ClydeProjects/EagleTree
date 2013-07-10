@@ -44,10 +44,18 @@ void Utilization_Meter::print() {
 	}*/
 }
 
-double Utilization_Meter::get_avg_utilization() {
+double Utilization_Meter::get_avg_channel_utilization() {
 	double avg = 0;
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		avg += channel_used[i] / (channel_used[i] + channel_unused[i]);
 	}
 	return avg / SSD_SIZE;
+}
+
+double Utilization_Meter::get_avg_LUN_utilization() {
+	double avg = 0;
+	for (uint i = 0; i < SSD_SIZE * PACKAGE_SIZE; i++) {
+		avg += LUNs_used[i] / (LUNs_used[i] + LUNs_unused[i]);
+	}
+	return avg / (SSD_SIZE * PACKAGE_SIZE);
 }

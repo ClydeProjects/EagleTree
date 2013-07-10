@@ -42,13 +42,13 @@ void OperatingSystem::set_threads(vector<Thread*> new_threads) {
 
 OperatingSystem::~OperatingSystem() {
 	delete ssd;
-	for (uint i = 0; i < threads.size(); i++) {
-		Thread* t = threads[i];
-		if (t != NULL) {
-			delete t;
-		}
+	map<int, Thread*>::iterator i = threads.begin();
+	for (; i != threads.end(); i++) {
+		Thread* t = (*i).second;
+		delete t;
 	}
 	threads.clear();
+	delete scheduler;
 }
 
 void OperatingSystem::run() {
@@ -147,12 +147,9 @@ void OperatingSystem::register_event_completion(Event* event) {
 	if (thread->is_finished()) {
 		setup_follow_up_threads(thread_id, event->get_current_time());
 		threads.erase(thread_id);
-		delete threads[thread_id];
+		//delete threads[thread_id];
 	}
 
-	// we update the current time of all threads
-	//time = max(time, event->get_current_time());
-	//event->print();
 	assert(time <= event->get_current_time() + 1);
 	time = max(time, event->get_current_time());
 

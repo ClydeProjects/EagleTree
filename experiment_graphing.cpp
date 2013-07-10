@@ -69,7 +69,7 @@ string Experiment_Runner::pretty_time(double time) {
 }
 
 // Plotting x number of experiments into one graph
-void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filename, int column, vector<ExperimentResult> experiments, int y_max, string subfolder) {
+void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filename, int column, vector<Experiment_Result> experiments, int y_max, string subfolder) {
 	// Write temporary file containing GLE script
     string scriptFilename = Experiment_Runner::graph_filename_prefix + filename + ".gle"; // Name of temporary script file
     ofstream gleScript;
@@ -92,9 +92,9 @@ void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filenam
     "   yaxis min 0" << y_max_str << endl;
 
     for (uint i = 0; i < experiments.size(); i++) {
-    	ExperimentResult e = experiments[i];
+    	Experiment_Result e = experiments[i];
         gleScript <<
-        "   data   \"" << e.data_folder << subfolder << (subfolder != "" ? "/" : "") << ExperimentResult::stats_filename << ExperimentResult::datafile_postfix << "\"" << " d"<<i+1<<"=c1,c" << column+1 << endl <<
+        "   data   \"" << e.data_folder << subfolder << (subfolder != "" ? "/" : "") << Experiment_Result::stats_filename << Experiment_Result::datafile_postfix << "\"" << " d"<<i+1<<"=c1,c" << column+1 << endl <<
         "   d"<<i+1<<" line marker " << markers[i] << " key " << "\"" << e.experiment_name << "\"" << endl;
     }
 
@@ -110,7 +110,7 @@ void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filenam
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete temporary script file again
 }
 
-void Experiment_Runner::latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, ExperimentResult experiment, int y_max) {
+void Experiment_Runner::latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, Experiment_Result experiment, int y_max) {
 	chdir(experiment.data_folder.c_str());
 
 	// Write temporary file containing GLE script
@@ -133,7 +133,7 @@ void Experiment_Runner::latency_plot(int sizeX, int sizeY, string title, string 
     (GRAPH_TITLES ? "" : "!") << "   title  \"" << title << "\"" << endl <<
     "   xtitle \"" << "IO #" << "\"" << endl <<
     "   ytitle \"IO Latency (µs)\"" << endl <<
-	"   data \"" << experiment.data_folder << ExperimentResult::latency_filename_prefix << variable_parameter_value << ExperimentResult::datafile_postfix << "\"" << endl <<
+	"   data \"" << experiment.data_folder << Experiment_Result::latency_filename_prefix << variable_parameter_value << Experiment_Result::datafile_postfix << "\"" << endl <<
     "   xaxis min 0 max " << experiment.vp_num_IOs[variable_parameter_value][column-1] << endl << // nolast nofirst
     "   yaxis min 0" << y_max_str << endl <<
 //    "   dticks off" << endl <<
@@ -151,7 +151,7 @@ void Experiment_Runner::latency_plot(int sizeX, int sizeY, string title, string 
 }
 
 
-void Experiment_Runner::waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, ExperimentResult experiment) {
+void Experiment_Runner::waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Experiment_Result experiment) {
 	chdir(experiment.data_folder.c_str());
 
 	// Write temporary file containing GLE script
@@ -169,7 +169,7 @@ void Experiment_Runner::waittime_boxplot(int sizeX, int sizeY, string title, str
     (GRAPH_TITLES ? "" : "!") << "   title  \"" << title << "\"" << endl <<
     "   xtitle \"" << experiment.variable_parameter_name << "\"" << endl <<
     "   ytitle \"Wait time (µs)\"" << endl <<
-	"   data \"" << experiment.data_folder << ExperimentResult::stats_filename << ExperimentResult::datafile_postfix << "\"" << endl <<
+	"   data \"" << experiment.data_folder << Experiment_Result::stats_filename << Experiment_Result::datafile_postfix << "\"" << endl <<
     "   xaxis min dminx(d1)-2.5 max dmaxx(d1)+2.5 dticks 5" << endl << // nolast nofirst
     "   dticks off" << endl <<
     "   yaxis min 0 max dmaxy(d" << mean_column+5 << ")*1.05" << endl << // mean_column+5 = max column
@@ -218,18 +218,18 @@ void Experiment_Runner::draw_graph(int sizeX, int sizeY, string outputFile, stri
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete temporary script file again
 }
 
-void Experiment_Runner::waittime_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points, int black_column, int red_column) {
+void Experiment_Runner::waittime_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points, int black_column, int red_column) {
 	vector<string> commands;
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "hist 0 " << i << " \"" << ExperimentResult::waittime_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Wait time histogram (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"log min 1\" \"Event wait time (µs)\" " << max(experiment.max_waittimes[black_column], (red_column == -1 ? 0 : experiment.max_waittimes[red_column])) << " " << StatisticsGatherer::get_global_instance()->get_wait_time_histogram_bin_size() << " " << black_column << " " << red_column;
+		command << "hist 0 " << i << " \"" << Experiment_Result::waittime_filename_prefix << points[i] << Experiment_Result::datafile_postfix << "\" \"Wait time histogram (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"log min 1\" \"Event wait time (µs)\" " << max(experiment.max_waittimes[black_column], (red_column == -1 ? 0 : experiment.max_waittimes[red_column])) << " " << StatisticsGatherer::get_global_instance()->get_wait_time_histogram_bin_size() << " " << black_column << " " << red_column;
 		commands.push_back(command.str());
 	}
 
 	multigraph(sizeX, sizeY, outputFile, commands);
 }
 
-void Experiment_Runner::cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<ExperimentResult> experiments, int point, int black_column, int red_column) {
+void Experiment_Runner::cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<Experiment_Result> experiments, int point, int black_column, int red_column) {
 	vector<string> commands;
 	double cross_experiment_max_waittime = 0;
 	for (uint i = 0; i < experiments.size(); i++) {
@@ -241,9 +241,9 @@ void Experiment_Runner::cross_experiment_waittime_histogram(int sizeX, int sizeY
 		if (red_column != -1) cross_experiment_max_waittime = max(cross_experiment_max_waittime, experiments[i].vp_max_waittimes[point][red_column]);
 	}
 	for (uint i = 0; i < experiments.size(); i++) {
-		ExperimentResult& e = experiments[i];
+		Experiment_Result& e = experiments[i];
 		stringstream command;
-		command << "hist 0 " << i << " \"" << e.data_folder << ExperimentResult::waittime_filename_prefix << point << ExperimentResult::datafile_postfix << "\" \"Wait time histogram (" << e.experiment_name << ", " << e.variable_parameter_name << " = " << point << ")\" \"log min 1\" \"Event wait time (µs)\" " << cross_experiment_max_waittime << " " << StatisticsGatherer::get_global_instance()->get_wait_time_histogram_bin_size() << " " << black_column << " " << red_column;
+		command << "hist 0 " << i << " \"" << e.data_folder << Experiment_Result::waittime_filename_prefix << point << Experiment_Result::datafile_postfix << "\" \"Wait time histogram (" << e.experiment_name << ", " << e.variable_parameter_name << " = " << point << ")\" \"log min 1\" \"Event wait time (µs)\" " << cross_experiment_max_waittime << " " << StatisticsGatherer::get_global_instance()->get_wait_time_histogram_bin_size() << " " << black_column << " " << red_column;
 		commands.push_back(command.str());
 	}
 
@@ -251,7 +251,7 @@ void Experiment_Runner::cross_experiment_waittime_histogram(int sizeX, int sizeY
 }
 
 
-void Experiment_Runner::age_histogram(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points) {
+void Experiment_Runner::age_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points) {
 	vector<string> settings;
 	stringstream age_max;
 	age_max << "age_max = " << experiment.max_age;
@@ -260,29 +260,29 @@ void Experiment_Runner::age_histogram(int sizeX, int sizeY, string outputFile, E
 	vector<string> commands;
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "hist 0 " << i << " \"" << ExperimentResult::age_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Block age histogram (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"on min 0 max " << experiment.max_age_freq << "\" \"Block age\" age_max " << SsdStatisticsExtractor::get_age_histogram_bin_size();
+		command << "hist 0 " << i << " \"" << Experiment_Result::age_filename_prefix << points[i] << Experiment_Result::datafile_postfix << "\" \"Block age histogram (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"on min 0 max " << experiment.max_age_freq << "\" \"Block age\" age_max " << SsdStatisticsExtractor::get_age_histogram_bin_size();
 		commands.push_back(command.str());
 	}
 
 	multigraph(sizeX, sizeY, experiment.graph_filename_prefix + outputFile, commands, settings);
 }
 
-void Experiment_Runner::queue_length_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points) {
+void Experiment_Runner::queue_length_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points) {
 	vector<string> commands;
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "plot 0 " << i << " \"" << ExperimentResult::queue_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Queue length history (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"on\" \"Timeline (µs progressed)\" \"Items in event queue\"";
+		command << "plot 0 " << i << " \"" << Experiment_Result::queue_filename_prefix << points[i] << Experiment_Result::datafile_postfix << "\" \"Queue length history (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"on\" \"Timeline (µs progressed)\" \"Items in event queue\"";
 		commands.push_back(command.str());
 	}
 
 	multigraph(sizeX, sizeY, experiment.graph_filename_prefix + outputFile, commands);
 }
 
-void Experiment_Runner::throughput_history(int sizeX, int sizeY, string outputFile, ExperimentResult experiment, vector<int> points) {
+void Experiment_Runner::throughput_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points) {
 	vector<string> commands;
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
-		command << "plot 0 " << i << " \"" << ExperimentResult::throughput_filename_prefix << points[i] << ExperimentResult::datafile_postfix << "\" \"Throughput history (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"on\" \"Timeline (µs progressed)\" \"Throughput (IOs/s)\" " << 2;
+		command << "plot 0 " << i << " \"" << Experiment_Result::throughput_filename_prefix << points[i] << Experiment_Result::datafile_postfix << "\" \"Throughput history (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"on\" \"Timeline (µs progressed)\" \"Throughput (IOs/s)\" " << 2;
 		commands.push_back(command.str());
 	}
 
@@ -382,7 +382,7 @@ string Experiment_Runner::get_working_dir() {
 	return currentPath;
 }
 
-void Experiment_Runner::draw_graphs(vector<vector<ExperimentResult> > exps, string exp_folder) {
+void Experiment_Runner::draw_graphs(vector<vector<Experiment_Result> > exps, string exp_folder) {
 	int sx = 16;
 	int sy = 8;
 	//for (int i = 0; i < exps[0][0].column_names.size(); i++) {
@@ -391,7 +391,7 @@ void Experiment_Runner::draw_graphs(vector<vector<ExperimentResult> > exps, stri
 	printf("chdir %s\n", exp_folder.c_str());
 	chdir(exp_folder.c_str());
 	for (int i = 0; i < exps[0].size(); ++i) { // i = 0: GLOBAL, i = 1: EXPERIMENT, i = 2: WRITE_THREADS
-		vector<ExperimentResult> exp;
+		vector<Experiment_Result> exp;
 		for (int j = 0; j < exps.size(); ++j) {
 			exp.push_back(exps[j][i]);
 		}
@@ -426,7 +426,7 @@ void Experiment_Runner::draw_graphs(vector<vector<ExperimentResult> > exps, stri
 	}
 }
 
-void Experiment_Runner::draw_experiment_spesific_graphs(vector<vector<ExperimentResult> > exps, string exp_folder, vector<int> x_vals) {
+void Experiment_Runner::draw_experiment_spesific_graphs(vector<vector<Experiment_Result> > exps, string exp_folder, vector<int> x_vals) {
 		int sx = 16;
 		int sy = 8;
 
@@ -434,7 +434,7 @@ void Experiment_Runner::draw_experiment_spesific_graphs(vector<vector<Experiment
 		assert(mean_pos_in_datafile != exps[0][0].column_names.size());
 
 		for (uint j = 0; j < exps.size(); j++) {
-			vector<ExperimentResult>& exp = exps[j];
+			vector<Experiment_Result>& exp = exps[j];
 			for (uint i = 0; i < exp.size(); i++) {
 				printf("%s\n", exp[i].data_folder.c_str());
 				if (chdir(exp[i].data_folder.c_str()) != 0) printf("Error changing dir to %s\n", exp[i].data_folder.c_str());

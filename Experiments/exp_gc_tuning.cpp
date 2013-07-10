@@ -92,7 +92,7 @@ int main()
 
 	double start_time = Experiment_Runner::wall_clock_time();
 
-	vector<ExperimentResult> exp;
+	vector<Experiment_Result> exp;
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(greedy_gc_priority,		space_min, space_max, space_inc, exp_folder + "greedy_gc_priority/", "greedy, gc prio", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(greedy_equal_priority,	space_min, space_max, space_inc, exp_folder + "greedy_equal_priority/", "greedy, equal prio", IO_limit) );
 	exp.push_back( Experiment_Runner::overprovisioning_experiment(lazy_gc_priority,			space_min, space_max, space_inc, exp_folder + "lazy_gc_priority/", "lazy, gc prio", IO_limit) );

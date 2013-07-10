@@ -42,7 +42,7 @@ int main()
 	const long noise_space_min = 0;
 	const long noise_space_max = logical_space;
 
-	vector<vector<ExperimentResult> > exps;
+	vector<vector<Experiment_Result> > exps;
 	string exp_folder  = "exp_balanced_scheduling/";
  	mkdir(exp_folder.c_str(), 0755);
 

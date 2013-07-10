@@ -116,7 +116,7 @@ int main()
 
 		double start_time = Experiment_Runner::wall_clock_time();
 
-		vector<vector<ExperimentResult> > exps;
+		vector<vector<Experiment_Result> > exps;
 
 		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(flexible_reads_exp,		write_threads_min, write_threads_max, 1, exp_folder + "None/", "None",                  			IO_limit, used_space, avail_pages*ns+1, avail_pages) );
 		exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(normal_exp,	  			write_threads_min, write_threads_max, 1, exp_folder + "Flexible_reads/", "Flexible reads",        IO_limit, used_space, avail_pages*ns+1, avail_pages) );
@@ -136,7 +136,7 @@ int main()
 
 		chdir(exp_folder.c_str());
 		for (int i = 0; i < exps[0].size(); ++i) { // i = 0: GLOBAL, i = 1: EXPERIMENT, i = 2: WRITE_THREADS
-			vector<ExperimentResult> exp;
+			vector<Experiment_Result> exp;
 			for (int j = 0; j < exps.size(); ++j) exp.push_back(exps[j][i]);
 			if      (i == 1) { mkdir("Experiment_Threads",    0755); chdir("Experiment_Threads"); }
 			else if (i == 2) { mkdir("Noise_Threads", 0755); chdir("Noise_Threads"); }
@@ -160,7 +160,7 @@ int main()
 			Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 60, 1, 4);
 			if (i > 0) { chdir(".."); }
 		}
-		vector<ExperimentResult>& exp = exps[0]; // Global one
+		vector<Experiment_Result>& exp = exps[0]; // Global one
 		for (uint i = 0; i < exp.size(); i++) {
 			printf("%s\n", exp[i].data_folder.c_str());
 			chdir(exp[i].data_folder.c_str());

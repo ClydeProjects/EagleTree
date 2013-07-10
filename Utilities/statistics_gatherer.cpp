@@ -222,6 +222,7 @@ template <class T>
 double get_average(vector<T> const& vector)
 {
 	double sum = get_sum(vector);
+	if (sum == 0) return 0;
     double avg = sum / vector.size();
     return avg;
 }
@@ -229,6 +230,7 @@ double get_average(vector<T> const& vector)
 template <class T>
 double get_std(vector<T> const& vector)
 {
+	if (vector.size() == 0) return 0;
 	double avg = get_average(vector);
 	double std = 0;
 	for (uint i = 0; i < vector.size(); i++) {
@@ -255,6 +257,7 @@ template <class T>
 double get_average(vector<vector<T> > const& vector)
 {
 	double sum = get_sum(vector);
+	if (sum == 0) return 0;
     double avg = sum / (vector.size() * vector[0].size());
     return avg;
 }
@@ -263,6 +266,7 @@ template <class T>
 double get_std(vector<vector<T> > const& vector)
 {
 	double avg = get_average(vector);
+	if (avg == 0) return 0;
 	double std = 0;
 	for (uint i = 0; i < vector.size(); i++) {
 		for (uint j = 0; j < vector[i].size(); j++) {
@@ -379,6 +383,33 @@ void StatisticsGatherer::print() {
 	double queue_length = get_average(queue_length_tracker);
 	printf("avg queue length: %d\n", queue_length);
 	printf("\n\n");
+}
+
+void StatisticsGatherer::print_simple(FILE* stream) {
+
+	vector<double> all_write_latency;
+	flatten(bus_wait_time_for_writes_per_LUN, all_write_latency);
+	double write_avg = get_average(all_write_latency);
+	double write_std = get_std(all_write_latency);
+	double write_max = get_max(all_write_latency);
+
+	fprintf(stream, "num writes:\t%d\n", total_writes());
+	fprintf(stream, "avg writes latency:\t%f\n", write_avg);
+	fprintf(stream, "std writes latency:\t%f\n", write_std);
+	fprintf(stream, "max writes latency:\t%f\n\n", write_max);
+
+	vector<double> all_reads_latency;
+	flatten(bus_wait_time_for_reads_per_LUN, all_reads_latency);
+	double reads_avg = get_average(all_reads_latency);
+	double reads_std = get_std(all_reads_latency);
+	double reads_max = get_max(all_reads_latency);
+
+	fprintf(stream, "num reads:\t%d\n", total_reads());
+	fprintf(stream, "avg reads latency:\t%f\n", reads_avg);
+	fprintf(stream, "std reads latency:\t%f\n", reads_std);
+	fprintf(stream, "max reads latency:\t%f\n", reads_max);
+
+	fprintf(stream, "num gc writes:\t%d\n", total_reads());
 }
 
 void StatisticsGatherer::print_gc_info() {
@@ -588,7 +619,7 @@ string StatisticsGatherer::totals_csv_line() {
 
 	ss << stddev_overall_gc_wait_time << ", ";
 
-	ss << Utilization_Meter::get_avg_utilization() << ", ";
+	ss << Utilization_Meter::get_avg_channel_utilization() << ", ";
 
 	ss << (double)num_migrations / num_gc_executed;
 

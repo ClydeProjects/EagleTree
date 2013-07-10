@@ -25,6 +25,7 @@ const double Experiment_Runner::K = 1000.0;    // One thousand
 
 double Experiment_Runner::calibration_precision      = 1.0; // microseconds
 double Experiment_Runner::calibration_starting_point = 15.00; // microseconds
+string Experiment_Runner::base_folder = get_current_dir_name();
 
 string Experiment_Runner::graph_filename_prefix      = "";
 
@@ -52,55 +53,59 @@ void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_wo
 	//Free_Space_Per_LUN_Meter::print();
 }
 
-vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, string data_folder, string name, long IO_limit, double& variable, double min_val, double max_val, double incr, string calibration_file) {
+vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, string data_folder, string name, long IO_limit, double& variable, double min_val, double max_val, double incr, string calibration_file) {
 	assert(experiment_workload != NULL);
 	mkdir(data_folder.c_str(), 0755);
-	ExperimentResult global_result(name, data_folder, "Global/", "Changing a Var");
+	Experiment_Result global_result(name, data_folder, "Global/", "Changing a Var");
 	global_result.start_experiment();
 
 	for (variable = min_val; variable <= max_val; variable += incr) {
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		printf("%s :  %f \n", name.c_str(), variable);
 		printf("----------------------------------------------------------------------------------------------------------\n");
-		VisualTracer::init(true);
+		string point_folder_name = base_folder + "/" + data_folder + to_string(variable) + "/";
+		mkdir(point_folder_name.c_str(), 0755);
+		VisualTracer::init(point_folder_name);
+		write_config_file(point_folder_name);
 		OperatingSystem* os = load_state(calibration_file);
 		run_single_measurment(experiment_workload, IO_limit, os);
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
+		write_results_file(point_folder_name);
 		delete os;
 	}
 	global_result.end_experiment();
-	vector<ExperimentResult> results;
+	vector<Experiment_Result> results;
 	results.push_back(global_result);
 	return results;
 }
 
-vector<ExperimentResult> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, string data_folder, string name, long IO_limit, long& variable, long min_val, long max_val, long incr, string calibration_file) {
+vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, string data_folder, string name, long IO_limit, long& variable, long min_val, long max_val, long incr, string calibration_file) {
 	assert(experiment_workload != NULL);
 	mkdir(data_folder.c_str(), 0755);
-	ExperimentResult global_result(name, data_folder, "Global/", "Changing a Var");
+	Experiment_Result global_result(name, data_folder, "Global/", "Changing a Var");
 	global_result.start_experiment();
 	assert(incr > 0);
 	for (variable = min_val; variable <= max_val; variable += incr) {
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		printf("%s :  %d \n", name.c_str(), variable);
 		printf("----------------------------------------------------------------------------------------------------------\n");
-		VisualTracer::init(true);
+
 		OperatingSystem* os = load_state(calibration_file);
 		run_single_measurment(experiment_workload, IO_limit, os);
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 		delete os;
 	}
 	global_result.end_experiment();
-	vector<ExperimentResult> results;
+	vector<Experiment_Result> results;
 	results.push_back(global_result);
 	return results;
 }
 
-vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
+vector<Experiment_Result> Experiment_Runner::random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
 	mkdir(data_folder.c_str(), 0755);
-	ExperimentResult global_result       (name, data_folder, "Global/",             "Number of concurrent random write threads");
-    ExperimentResult experiment_result   (name, data_folder, "Experiment_Threads/", "Number of concurrent random write threads");
-    ExperimentResult write_threads_result(name, data_folder, "Noise_Threads/",      "Number of concurrent random write threads");
+	Experiment_Result global_result       (name, data_folder, "Global/",             "Number of concurrent random write threads");
+    Experiment_Result experiment_result   (name, data_folder, "Experiment_Threads/", "Number of concurrent random write threads");
+    Experiment_Result write_threads_result(name, data_folder, "Noise_Threads/",      "Number of concurrent random write threads");
 
     global_result.start_experiment();
     experiment_result.start_experiment();
@@ -167,7 +172,7 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
     experiment_result.end_experiment();
     write_threads_result.end_experiment();
 
-    vector<ExperimentResult> results;
+    vector<Experiment_Result> results;
     results.push_back(global_result);
     results.push_back(experiment_result);
     results.push_back(write_threads_result);
@@ -176,8 +181,8 @@ vector<ExperimentResult> Experiment_Runner::random_writes_on_the_side_experiment
     return results;
 }
 
-ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit) {
-    ExperimentResult experiment_result(name, data_folder, "", "CopyBacks allowed before ECC check");
+Experiment_Result Experiment_Runner::copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit) {
+    Experiment_Result experiment_result(name, data_folder, "", "CopyBacks allowed before ECC check");
     experiment_result.start_experiment();
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
@@ -212,8 +217,8 @@ ExperimentResult Experiment_Runner::copyback_experiment(vector<Thread*> (*experi
 	return experiment_result;
 }
 
-ExperimentResult Experiment_Runner::copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit) {
-    ExperimentResult experiment_result(name, data_folder, "", "Max copyback map size");
+Experiment_Result Experiment_Runner::copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit) {
+    Experiment_Result experiment_result(name, data_folder, "", "Max copyback map size");
     experiment_result.start_experiment();
 
     const int num_pages = NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
@@ -267,10 +272,22 @@ void Experiment_Runner::calibrate_and_save(string file_name, Workload_Definition
 	delete os;
 }
 
-/*void Experiment_Runner::write_config_file(string file_name) {
-	File* file = fopen(file_name , "w");
+void Experiment_Runner::write_config_file(string folder_name) {
+	string file_name = folder_name + "configuration.txt";
+	FILE* file = fopen(file_name.c_str() , "w");
 	print_config(file);
-}*/
+	fclose(file);
+}
+
+void Experiment_Runner::write_results_file(string folder_name) {
+	string file_name = folder_name + "results.txt";
+	FILE* file = fopen(file_name.c_str() , "w");
+	StatisticsGatherer::get_global_instance()->print_simple(file);
+	double channel_util = Utilization_Meter::get_avg_channel_utilization();
+	fprintf(file, "channel util:\t%d\n", channel_util);
+	double LUN_util = Utilization_Meter::get_avg_LUN_utilization();
+	fprintf(file, "LUN util:\t%d\n", LUN_util);
+}
 
 void Experiment_Runner::save_state(OperatingSystem* os, string file_name) {
 	std::ofstream file(file_name.c_str());
