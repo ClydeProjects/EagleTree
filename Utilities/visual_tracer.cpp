@@ -13,9 +13,7 @@ string VisualTracer::file_name = "";
 bool VisualTracer::write_to_file = false;
 long VisualTracer::amount_written_to_file = 0;
 
-
-void VisualTracer::init(string folder)
-{
+void VisualTracer::init(string folder){
 	trace = vector<vector<vector<char> > >(SSD_SIZE, std::vector<std::vector<char> >(PACKAGE_SIZE, std::vector<char>(0) ));
 	write_to_file = write;
 	amount_written_to_file = 0;

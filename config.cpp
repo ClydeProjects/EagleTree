@@ -353,7 +353,7 @@ void print_config(FILE *stream) {
 	fprintf(stream, "\tPAGE_SIZE:\t%u\n\n", PAGE_SIZE);
 
 	fprintf(stream, "\tMAX_SSD_QUEUE_SIZE:\t%u\n", MAX_SSD_QUEUE_SIZE);
-	fprintf(stream, "\tOVER_PROVISIONING_FACTOR:\t%u\n", OVER_PROVISIONING_FACTOR);
+	fprintf(stream, "\tOVER_PROVISIONING_FACTOR:\t%f\n", OVER_PROVISIONING_FACTOR);
 
 	fprintf(stream, "#Controller:\n");
 	fprintf(stream, "\tBLOCK_MANAGER_ID:\t%u\n", BLOCK_MANAGER_ID);
@@ -366,6 +366,7 @@ void print_config(FILE *stream) {
 	fprintf(stream, "#Scheduler:\n");
 	fprintf(stream, "\tALLOW_DEFERRING_TRANSFERS: %i\n", ALLOW_DEFERRING_TRANSFERS);
 	fprintf(stream, "\tSCHEDULING_SCHEME: %i\n\n", SCHEDULING_SCHEME);
+
 }
 
 }
