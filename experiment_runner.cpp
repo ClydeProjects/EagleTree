@@ -27,8 +27,6 @@ double Experiment_Runner::calibration_precision      = 1.0; // microseconds
 double Experiment_Runner::calibration_starting_point = 15.00; // microseconds
 string Experiment_Runner::base_folder = get_current_dir_name();
 
-string Experiment_Runner::graph_filename_prefix      = "";
-
 void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer) {
 	for (uint i = 0; i < threads.size(); ++i) {
 		threads[i]->set_statistics_gatherer(statistics_gatherer);
@@ -53,8 +51,9 @@ void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_wo
 	//Free_Space_Per_LUN_Meter::print();
 }
 
-vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, string data_folder, string name, long IO_limit, double& variable, double min_val, double max_val, double incr, string calibration_file) {
+vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, double& variable, double min_val, double max_val, double incr) {
 	assert(experiment_workload != NULL);
+	string data_folder = base_folder + name + "/";
 	mkdir(data_folder.c_str(), 0755);
 	Experiment_Result global_result(name, data_folder, "Global/", "Changing a Var");
 	global_result.start_experiment();
@@ -63,11 +62,12 @@ vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definiti
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		printf("%s :  %f \n", name.c_str(), variable);
 		printf("----------------------------------------------------------------------------------------------------------\n");
-		string point_folder_name = base_folder + "/" + data_folder + to_string(variable) + "/";
+
+		string point_folder_name = data_folder + to_string(variable) + "/";
 		mkdir(point_folder_name.c_str(), 0755);
 		VisualTracer::init(point_folder_name);
 		write_config_file(point_folder_name);
-		OperatingSystem* os = load_state(calibration_file);
+		OperatingSystem* os = load_state();
 		run_single_measurment(experiment_workload, IO_limit, os);
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 		write_results_file(point_folder_name);
@@ -79,8 +79,9 @@ vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definiti
 	return results;
 }
 
-vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, string data_folder, string name, long IO_limit, long& variable, long min_val, long max_val, long incr, string calibration_file) {
+vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, long& variable, long min_val, long max_val, long incr) {
 	assert(experiment_workload != NULL);
+	string data_folder = base_folder + name;
 	mkdir(data_folder.c_str(), 0755);
 	Experiment_Result global_result(name, data_folder, "Global/", "Changing a Var");
 	global_result.start_experiment();
@@ -90,7 +91,7 @@ vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definiti
 		printf("%s :  %d \n", name.c_str(), variable);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
-		OperatingSystem* os = load_state(calibration_file);
+		OperatingSystem* os = load_state();
 		run_single_measurment(experiment_workload, IO_limit, os);
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 		delete os;
@@ -101,7 +102,8 @@ vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definiti
 	return results;
 }
 
-vector<Experiment_Result> Experiment_Runner::random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
+vector<Experiment_Result> Experiment_Runner::random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
+	string data_folder = base_folder + name;
 	mkdir(data_folder.c_str(), 0755);
 	Experiment_Result global_result       (name, data_folder, "Global/",             "Number of concurrent random write threads");
     Experiment_Result experiment_result   (name, data_folder, "Experiment_Threads/", "Number of concurrent random write threads");
@@ -255,7 +257,8 @@ Experiment_Result Experiment_Runner::copyback_map_experiment(vector<Thread*> (*e
 
 // currently, this method checks if there if a file already exists, and if so, assumes it is valid.
 // ideally, a check should be made to ensure the saved SSD state matches with the state of the current global parameters
-void Experiment_Runner::calibrate_and_save(string file_name, Workload_Definition* workload, bool force) {
+void Experiment_Runner::calibrate_and_save(Workload_Definition* workload, bool force) {
+	string file_name = base_folder + "calibrated_state.txt";
 	std::ifstream ifile(file_name.c_str());
 	if (ifile && !force) {
 		return; // file exists
@@ -298,7 +301,8 @@ void Experiment_Runner::save_state(OperatingSystem* os, string file_name) {
 	oa << os;
 }
 
-OperatingSystem* Experiment_Runner::load_state(string file_name) {
+OperatingSystem* Experiment_Runner::load_state() {
+	string file_name = base_folder + "calibrated_state.txt";
 	std::ifstream file(file_name.c_str());
 	boost::archive::text_iarchive ia(file);
 	ia.register_type<FtlImpl_Page>( );
@@ -319,4 +323,10 @@ OperatingSystem* Experiment_Runner::load_state(string file_name) {
 	gc->set_block_manager(bm);
 
 	return os;
+}
+
+void Experiment_Runner::create_base_folder(string name) {
+	base_folder = name;
+	printf("%s\n", base_folder.c_str());
+	mkdir(base_folder.c_str(), 0755);
 }

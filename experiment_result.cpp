@@ -16,7 +16,7 @@ const string Experiment_Result::latency_filename_prefix      = "latency-";
 const double Experiment_Result::M 							= 1000000.0; // One million
 const double Experiment_Result::K 							= 1000.0;    // One thousand
 
-Experiment_Result::Experiment_Result(string experiment_name, string data_folder_, string sub_folder_, string variable_parameter_name)
+Experiment_Result::Experiment_Result(string experiment_name, string data_folder, string sub_folder_, string variable_parameter_name)
 :	experiment_name(experiment_name),
  	variable_parameter_name(variable_parameter_name),
  	max_age(0),
@@ -25,12 +25,10 @@ Experiment_Result::Experiment_Result(string experiment_name, string data_folder_
  	experiment_finished(false),
 	sub_folder(sub_folder_)
 {
-	working_dir = Experiment_Runner::get_working_dir();
-	data_folder = working_dir + "/" + data_folder_ + sub_folder;
-	replace(data_folder_.begin(), data_folder_.end(), '/', '-');
-	graph_filename_prefix = data_folder_;
+	this->data_folder = data_folder + sub_folder;
 	stats_file = NULL;
  	max_waittimes = vector<double>(6,0);
+ 	graph_filename_prefix = "";
 	//boost::filesystem::path working_dir = boost::filesystem::current_path();
     //boost::filesystem::create_directories(boost::filesystem::path(data_folder));
     //boost::filesystem::current_path(boost::filesystem::path(data_folder));
@@ -46,7 +44,7 @@ void Experiment_Result::start_experiment() {
 	experiment_started = true;
 	start_time = Experiment_Runner::wall_clock_time();
     printf("=== Starting experiment '%s' ===\n", experiment_name.c_str());
-
+    printf("%s\n", data_folder.c_str());
 	mkdir(data_folder.c_str(), 0755);
     chdir(data_folder.c_str());
 
@@ -141,8 +139,6 @@ void Experiment_Result::end_experiment() {
 	column_names.push_back(read_throughput_column_name);
 
     //boost::filesystem::current_path(boost::filesystem::path(working_dir));
-
-	chdir(working_dir.c_str());
 
 	delete stats_file;
 }

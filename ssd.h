@@ -1301,17 +1301,16 @@ public:
 	vector<string> column_names;
 	uint max_age;
 	uint max_age_freq;
+	string graph_filename_prefix;
 	vector<double> max_waittimes;
-	map<uint, vector<double> > vp_max_waittimes; // Varable parameter --> max waittimes for each waittime measurement type
-	map<uint, vector<uint> > vp_num_IOs; // Varable parameter --> num_ios[write, read, write+read]
+	map<double, vector<double> > vp_max_waittimes; // Varable parameter --> max waittimes for each waittime measurement type
+	map<double, vector<uint> > vp_num_IOs; // Varable parameter --> num_ios[write, read, write+read]
     static const string throughput_column_name; // e.g. "Average throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
     static const string write_throughput_column_name;
     static const string read_throughput_column_name;
     std::ofstream* stats_file;
-    string working_dir;
     double start_time;
     double end_time;
-    string graph_filename_prefix;
 
 	static const string datafile_postfix;
 	static const string stats_filename;
@@ -1390,28 +1389,29 @@ public:
 	static void latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, Experiment_Result experiment, int y_max = UNDEFINED);
 	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Experiment_Result experiment);
 	static void waittime_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points, int black_column, int red_column = -1);
-    static void cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<Experiment_Result> experiments, int point, int black_column, int red_column = -1);
+    static void cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<Experiment_Result> experiments, double point, int black_column, int red_column = -1);
 	static void age_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points);
 	static void queue_length_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points);
 	static void throughput_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points);
 	static string get_working_dir();
 	static void unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer);
 	static void run_single_measurment(Workload_Definition* experiment_workload, int IO_limit, OperatingSystem* os);
-	static vector<Experiment_Result> simple_experiment(Workload_Definition* experiment_workload, string data_folder, string name, long IO_limit, double& variable, double min_val, double max_val, double incr, string calibration_file);
-	static vector<Experiment_Result> simple_experiment(Workload_Definition* experiment_workload, string data_folder, string name, long IO_limit, long& variable, long min_val, long max_val, long incr, string calibration_file);
+	static vector<Experiment_Result> simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, double& variable, double min_val, double max_val, double incr);
+	static vector<Experiment_Result> simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, long& variable, long min_val, long max_val, long incr);
 	static void simple_experiment(Workload_Definition* workload, string name, int IO_limit);
-	static vector<Experiment_Result> random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string data_folder, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba);
+	static vector<Experiment_Result> random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba);
 	static Experiment_Result copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
 	static Experiment_Result copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);
 
-	static string graph_filename_prefix;
 	static void draw_graphs(vector<vector<Experiment_Result> > results, string exp_folder);
 	static void draw_experiment_spesific_graphs(vector<vector<Experiment_Result> > results, string exp_folder, vector<int> x_vals);
 	static void save_state(OperatingSystem* os, string file_name);
-	static OperatingSystem* load_state(string file_name);
-	static void calibrate_and_save(string file_name, Workload_Definition*, bool force = false);
+	static OperatingSystem* load_state();
+	static void calibrate_and_save(Workload_Definition*, bool force = false);
 	static void write_config_file(string folder_name);
 	static void write_results_file(string folder_name);
+	static void create_base_folder(string folder_name);
+	static string get_base_directory() { return base_folder; }
 private:
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
 

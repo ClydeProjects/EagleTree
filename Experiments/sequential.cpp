@@ -38,28 +38,26 @@ vector<Thread*> detection_BLOCK(int highest_lba) {
 
 int main()
 {
-	string exp_folder  = "exp_sequential/";
-	mkdir(exp_folder.c_str(), 0755);
+	string name = "/exp_sequential/";
+	string exp_folder = get_current_dir_name() + name;
+	Experiment_Runner::create_base_folder(exp_folder.c_str());
 
 	set_normal_config();
 
-	int IO_limit = 100000;
+	int IO_limit = 10000;
 	double space_min = OVER_PROVISIONING_FACTOR;
 	double space_max = OVER_PROVISIONING_FACTOR;
 	double space_inc = 0.05;
 
 	Workload_Definition* init_workload = new File_System_With_Noise();
 
-	string a = "/" + exp_folder;
-	string calibration_file = get_current_dir_name() + a + "calibrated_state.txt";
-
-	Experiment_Runner::calibrate_and_save(calibration_file, init_workload, false);
+	Experiment_Runner::calibrate_and_save(init_workload, false);
 
 	Workload_Definition* experiment = new File_System_With_Noise();
 
 	vector<vector<Experiment_Result> > exps;
 	BLOCK_MANAGER_ID = 0;
-	vector<Experiment_Result> res1 = Experiment_Runner::simple_experiment(experiment, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc, calibration_file);
+	vector<Experiment_Result> res1 = Experiment_Runner::simple_experiment(experiment, "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc);
 	exps.push_back(res1);
 
 	BLOCK_MANAGER_ID = 3;
@@ -76,6 +74,7 @@ int main()
 	vector<int> num_write_thread_values_to_show;
 	for (double i = space_min; i <= space_max; i += space_inc)
 		num_write_thread_values_to_show.push_back(i); // Show all used spaces values in multi-graphs
+
 	Experiment_Runner::draw_experiment_spesific_graphs(exps, exp_folder, num_write_thread_values_to_show);
 	chdir(".."); // Leaving
 	return 0;

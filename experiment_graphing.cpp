@@ -71,8 +71,9 @@ string Experiment_Runner::pretty_time(double time) {
 // Plotting x number of experiments into one graph
 void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filename, int column, vector<Experiment_Result> experiments, int y_max, string subfolder) {
 	// Write temporary file containing GLE script
-    string scriptFilename = Experiment_Runner::graph_filename_prefix + filename + ".gle"; // Name of temporary script file
+    string scriptFilename =  filename + ".gle"; // Name of temporary script file
     ofstream gleScript;
+    printf("%s\n", scriptFilename.c_str());
     gleScript.open(scriptFilename.c_str());
 
     string y_max_str;
@@ -98,8 +99,7 @@ void Experiment_Runner::graph(int sizeX, int sizeY, string title, string filenam
         "   d"<<i+1<<" line marker " << markers[i] << " key " << "\"" << e.experiment_name << "\"" << endl;
     }
 
-    gleScript <<
-    "end graph" << endl;
+    gleScript << "end graph" << endl;
     gleScript.close();
 
     // Run gle to draw graph
@@ -152,11 +152,13 @@ void Experiment_Runner::latency_plot(int sizeX, int sizeY, string title, string 
 
 
 void Experiment_Runner::waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Experiment_Result experiment) {
+
 	chdir(experiment.data_folder.c_str());
 
 	// Write temporary file containing GLE script
-    string scriptFilename = experiment.graph_filename_prefix + filename + ".gle"; // Name of temporary script file
+    string scriptFilename = experiment.data_folder.c_str() + filename + ".gle"; // Name of temporary script file
     std::ofstream gleScript;
+    printf("%s\n", scriptFilename.c_str());
     gleScript.open(scriptFilename.c_str());
 
     gleScript <<
@@ -229,7 +231,7 @@ void Experiment_Runner::waittime_histogram(int sizeX, int sizeY, string outputFi
 	multigraph(sizeX, sizeY, outputFile, commands);
 }
 
-void Experiment_Runner::cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<Experiment_Result> experiments, int point, int black_column, int red_column) {
+void Experiment_Runner::cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<Experiment_Result> experiments, double point, int black_column, int red_column) {
 	vector<string> commands;
 	double cross_experiment_max_waittime = 0;
 	for (uint i = 0; i < experiments.size(); i++) {
@@ -244,10 +246,11 @@ void Experiment_Runner::cross_experiment_waittime_histogram(int sizeX, int sizeY
 		Experiment_Result& e = experiments[i];
 		stringstream command;
 		command << "hist 0 " << i << " \"" << e.data_folder << Experiment_Result::waittime_filename_prefix << point << Experiment_Result::datafile_postfix << "\" \"Wait time histogram (" << e.experiment_name << ", " << e.variable_parameter_name << " = " << point << ")\" \"log min 1\" \"Event wait time (µs)\" " << cross_experiment_max_waittime << " " << StatisticsGatherer::get_global_instance()->get_wait_time_histogram_bin_size() << " " << black_column << " " << red_column;
+		printf("%s\n", command.str().c_str());
 		commands.push_back(command.str());
 	}
 
-	multigraph(sizeX, sizeY, Experiment_Runner::graph_filename_prefix + outputFile, commands);
+	multigraph(sizeX, sizeY, outputFile, commands);
 }
 
 
@@ -401,11 +404,11 @@ void Experiment_Runner::draw_graphs(vector<vector<Experiment_Result> > exps, str
 		error = (exps[0][i].sub_folder != "") ? chdir(exps[0][i].sub_folder.c_str()) : 0;
 		if (error != 0) printf("Error %d changing to folder %s\n", error, exps[0][i].sub_folder.c_str());
 
-		Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			26, exp/*, 30*/, UNDEFINED);
-		Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	27, exp/*, 30*/);
-		Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 		28, exp/*, 30*/);
-		Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp/*, 16000*/);
-		Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp/*, 500000*/);
+		Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 			26, exp, UNDEFINED);
+		Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	27, exp);
+		Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 		28, exp);
+		Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp);
+		Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp);
 
 		Experiment_Runner::graph(sx, sy,   "Write latency, mean", 		"Write latency, mean", 		9, 	exp);
 		Experiment_Runner::graph(sx, sy,   "Write latency, max", 		"Write latency, max", 		14, exp);
@@ -418,10 +421,18 @@ void Experiment_Runner::draw_graphs(vector<vector<Experiment_Result> > exps, str
 		Experiment_Runner::graph(sx, sy,   "Channel Utilization (%)", 	"Channel utilization", 		24, exp);
 		Experiment_Runner::graph(sx, sy,   "GC Efficiency", 			"GC Efficiency", 			25, exp);
 
-		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
+		Experiment_Result& e = exp[0];
+		int num = e.vp_max_waittimes.size();
+
+		for (auto& kv : e.vp_max_waittimes) {
+		    string name = "waittime_histogram " + to_string(kv.first);
+		    Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, name, exp, kv.first, 1, 4);
+		}
+
+		/*Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
 		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, 1, 4);
 		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 70, 1, 4);
-		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 60, 1, 4);
+		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 60", exp, 60, 1, 4);*/
 		/*if (i > 0)*/ { chdir(".."); }
 	}
 }
