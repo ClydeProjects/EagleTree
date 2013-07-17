@@ -11,10 +11,9 @@ using namespace ssd;
 int FIFO_OS_Scheduler::pick(map<int, Thread*> const& threads) {
 	double soonest_event_time = INFINITE;
 	int thread_id_with_soonest_event = UNDEFINED;
-	map<int, Thread*>::const_iterator i = threads.begin();
-	for (; i != threads.end(); i++) {
-		int id = (*i).first;
-		Thread* t = (*i).second;
+	for (auto i : threads) {
+		int id = i.first;
+		Thread* t = i.second;
 		Event* e = t->peek();
 		if (e != NULL && e->get_current_time() < soonest_event_time) {
 			soonest_event_time = e->get_current_time();
@@ -25,6 +24,16 @@ int FIFO_OS_Scheduler::pick(map<int, Thread*> const& threads) {
 }
 
 int FAIR_OS_Scheduler::pick(map<int, Thread*> const& threads) {
+
+	for (auto entry : threads)
+	{
+		Thread* t = entry.second;
+		Event* next = t->peek();
+		if (next != NULL && next->get_event_type() == TRIM ) {
+			return entry.first;
+		}
+	}
+
 	map<int, Thread*>::const_iterator i = threads.find(last_id);
 	bool found = false;
 	uint num_tried = 0;
@@ -34,11 +43,13 @@ int FAIR_OS_Scheduler::pick(map<int, Thread*> const& threads) {
 		if (i == threads.end()) {
 			i = threads.begin();
 		}
-		last_id = (*i).first;
+		int new_id = (*i).first;
 		Thread* t = (*i).second;
 		if (t->peek() != NULL) {
 			found = true;
 		}
+		last_id = (*i).first;
 	}
+	//printf("%d\n", last_id);
 	return !found ? UNDEFINED : last_id;
 }

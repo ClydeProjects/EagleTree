@@ -44,39 +44,38 @@ int main()
 
 	set_normal_config();
 
-	int IO_limit = 10000;
+	int IO_limit = NUMBER_OF_ADDRESSABLE_PAGES() * 2;
+	OVER_PROVISIONING_FACTOR = 0.9;
 	double space_min = OVER_PROVISIONING_FACTOR;
 	double space_max = OVER_PROVISIONING_FACTOR;
 	double space_inc = 0.05;
 
-	Workload_Definition* init_workload = new File_System_With_Noise();
-
-	Experiment_Runner::calibrate_and_save(init_workload, false);
-
-	Workload_Definition* experiment = new File_System_With_Noise();
-
+	Workload_Definition* workload = new File_System_With_Noise();
+	//Experiment_Runner::calibrate_and_save(workload, true);
+	OS_SCHEDULER = 1;
 	vector<vector<Experiment_Result> > exps;
+
 	BLOCK_MANAGER_ID = 0;
-	vector<Experiment_Result> res1 = Experiment_Runner::simple_experiment(experiment, "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc);
-	exps.push_back(res1);
+	vector<Experiment_Result> res2 = Experiment_Runner::simple_experiment(workload, "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc);
+	exps.push_back(res2);
 
 	BLOCK_MANAGER_ID = 3;
 	ENABLE_TAGGING = true;
-	//Experiment_Runner::calibrate_and_save(calibration_file, init_workload, true);
-	// vector<ExperimentResult> er = Experiment_Runner::simple_experiment(experiment, exp_folder + "sequential/", "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc, calibration_file);
-	//exps.push_back(er);
+	//Experiment_Runner::calibrate_and_save(workload, true);
+	vector<Experiment_Result> er = Experiment_Runner::simple_experiment(workload, "sequential", IO_limit, OVER_PROVISIONING_FACTOR, space_min, space_max, space_inc);
+	exps.push_back(er);
 
 	//exp.push_back( Experiment_Runner::overprovisioning_experiment(detection_LUN, 	space_min, space_max, space_inc, exp_folder + "seq_detect_lun/",	"Seq Detect: LUN", IO_limit) );
 	//exp.push_back( Experiment_Runner::simple_experiment(experiment, Init_Workload, space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );
 	//exp.push_back( Experiment_Runner::overprovisioning_experiment(shortest_queues,	space_min, space_max, space_inc, exp_folder + "shortest_queues/",	"Shortest Queues", IO_limit) );
 
-	Experiment_Runner::draw_graphs(exps, exp_folder);
+	/*Experiment_Runner::draw_graphs(exps, exp_folder);
 	vector<int> num_write_thread_values_to_show;
 	for (double i = space_min; i <= space_max; i += space_inc)
 		num_write_thread_values_to_show.push_back(i); // Show all used spaces values in multi-graphs
 
 	Experiment_Runner::draw_experiment_spesific_graphs(exps, exp_folder, num_write_thread_values_to_show);
-	chdir(".."); // Leaving
+	chdir(".."); // Leaving*/
 	return 0;
 }
 

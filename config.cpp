@@ -86,6 +86,8 @@ double PAGE_WRITE_DELAY = 0.00001;
 uint PAGE_SIZE = 4096;
 bool PAGE_ENABLE_DATA = false;
 
+int OS_SCHEDULER = 0;
+
 /*
  * Memory area to support pages with data.
  */
@@ -268,8 +270,8 @@ void set_normal_config() {
 	SSD_SIZE = 2;				// 8
 	PACKAGE_SIZE = 2;			// 8
 	DIE_SIZE = 1;
-	PLANE_SIZE = 128;			// 1024
-	BLOCK_SIZE = 64;			// 128
+	PLANE_SIZE = 512;			// 1024
+	BLOCK_SIZE = 128;			// 128
 
 	PAGE_READ_DELAY = 115 ;
 	PAGE_WRITE_DELAY = 1600 ;
@@ -294,6 +296,8 @@ void set_normal_config() {
 	GREED_SCALE = 2;
 	ALLOW_DEFERRING_TRANSFERS = true;
 	OVER_PROVISIONING_FACTOR = 0.6;
+
+	OS_SCHEDULER = 0;
 
 	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY + 1;// PAGE_READ_DELAY + 1;
 }

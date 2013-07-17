@@ -74,6 +74,8 @@ void print_config(FILE *stream);
 extern const double RAM_READ_DELAY;
 extern const double RAM_WRITE_DELAY;
 
+extern int OS_SCHEDULER;
+
 /* Bus class:
  * 	delay to communicate over bus
  * 	max number of connected devices allowed

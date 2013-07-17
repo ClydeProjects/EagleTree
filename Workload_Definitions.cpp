@@ -131,19 +131,22 @@ vector<Thread*> File_System_With_Noise::generate() {
 	long log_space_per_thread = max_lba / 4;
 	long max_file_size = log_space_per_thread / 4;
 
-	Simple_Thread* experiment_thread1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 35722);
-	Thread* experiment_thread2 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 4, INFINITE, max_file_size, 713);
-	Thread* experiment_thread3 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, INFINITE, max_file_size, 5);
+	Simple_Thread* t1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 35722);
+	Simple_Thread* t2 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 35722);
+	Thread* t3 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, INFINITE, max_file_size, 713);
+	Thread* t4 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, INFINITE, max_file_size, 5);
 
 	vector<Thread*> threads;
-	threads.push_back(experiment_thread1);
-	threads.push_back(experiment_thread2);
-	//threads.push_back(experiment_thread3);
+	threads.push_back(t1);
+	//threads.push_back(t2);
+	threads.push_back(t3);
+	//threads.push_back(t4);
 
 	Individual_Threads_Statistics::init();
-	Individual_Threads_Statistics::register_thread(experiment_thread1, "Asynchronous Random Thread Reader Writer");
-	Individual_Threads_Statistics::register_thread(experiment_thread2, "File Manager 1");
-	Individual_Threads_Statistics::register_thread(experiment_thread3, "File Manager 2");
+	Individual_Threads_Statistics::register_thread(t1, "Asynchronous Random Thread Reader Writer 1");
+	//Individual_Threads_Statistics::register_thread(t2, "Asynchronous Random Thread Reader Writer 2");
+	Individual_Threads_Statistics::register_thread(t3, "File Manager 1");
+	//Individual_Threads_Statistics::register_thread(t4, "File Manager 2");
 
 	return threads;
 }

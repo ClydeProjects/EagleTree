@@ -44,7 +44,7 @@ void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_wo
 	StatisticsGatherer::get_global_instance()->print();
 	//StatisticsGatherer::get_global_instance()->print_gc_info();
 	Utilization_Meter::print();
-	Individual_Threads_Statistics::print();
+	//Individual_Threads_Statistics::print();
 	//Queue_Length_Statistics::print_distribution();
 	Queue_Length_Statistics::print_avg();
 	//Free_Space_Meter::print();
@@ -67,7 +67,8 @@ vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definiti
 		mkdir(point_folder_name.c_str(), 0755);
 		VisualTracer::init(point_folder_name);
 		write_config_file(point_folder_name);
-		OperatingSystem* os = load_state();
+		//OperatingSystem* os = load_state();
+		OperatingSystem* os = new OperatingSystem();
 		run_single_measurment(experiment_workload, IO_limit, os);
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 		write_results_file(point_folder_name);

@@ -18,10 +18,15 @@ OperatingSystem::OperatingSystem()
 	  counter_for_user(1),
 	  idle_time(0),
 	  time(0),
-	  scheduler(new FAIR_OS_Scheduler())
+	  scheduler(NULL)
 {
 	ssd->set_operating_system(this);
 	thread_id_generator = 0;
+	if (OS_SCHEDULER == 0) {
+		scheduler = new FIFO_OS_Scheduler();
+	} else {
+		scheduler = new FAIR_OS_Scheduler();
+	}
 	//assert(MAX_SSD_QUEUE_SIZE >= SSD_SIZE * PACKAGE_SIZE);
 }
 
@@ -32,8 +37,7 @@ void OperatingSystem::set_threads(vector<Thread*> new_threads) {
 	num_writes_completed = 0;
 	threads.clear();
 	assert(new_threads.size() > 0);
-	for (uint i = 0; i < new_threads.size(); i++) {
-		Thread* t = new_threads[i];
+	for (auto t : new_threads) {
 		t->init(this, time);
 		int new_id = ++thread_id_generator;
 		threads[new_id] = t;
@@ -42,10 +46,8 @@ void OperatingSystem::set_threads(vector<Thread*> new_threads) {
 
 OperatingSystem::~OperatingSystem() {
 	delete ssd;
-	map<int, Thread*>::iterator i = threads.begin();
-	for (; i != threads.end(); i++) {
-		Thread* t = (*i).second;
-		delete t;
+	for (auto t : threads) {
+		delete t.second;
 	}
 	threads.clear();
 	delete scheduler;
@@ -92,9 +94,8 @@ void OperatingSystem::run() {
 		//printf("num_writes   %d\n", num_writes_completed);
 	} while (!finished_experiment && still_more_work);
 
-	map<int, Thread*>::iterator i = threads.begin();
-	for (; i != threads.end(); i++) {
-		Thread* t = (*i).second;
+	for (auto entry : threads) {
+		Thread* t = entry.second;
 		t->set_finished();
 	}
 }
@@ -118,8 +119,7 @@ void OperatingSystem::dispatch_event(int thread_id) {
 void OperatingSystem::setup_follow_up_threads(int thread_id, double current_time) {
 	vector<Thread*>& follow_up_threads = threads[thread_id]->get_follow_up_threads();
 	if (PRINT_LEVEL >= 1) printf("Switching to new follow up thread\n");
-	for (uint i = 0; i < follow_up_threads.size(); i++) {
-		Thread* t = follow_up_threads[i];
+	for (auto t : follow_up_threads) {
 		t->init(this, current_time);
 		int new_id = thread_id_generator++;
 		threads[new_id] = t;

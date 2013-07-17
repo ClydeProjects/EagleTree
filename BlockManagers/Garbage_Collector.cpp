@@ -42,9 +42,8 @@ vector<long> Garbage_Collector::get_relevant_gc_candidates(int package_id, int d
 			int age_class = klass == -1 ? 0 : klass;
 			int num_classes = klass == -1 ? num_age_classes : klass + 1;
 			for (; age_class < num_classes; age_class++) {
-				set<long>::iterator iter = gc_candidates[package][die][age_class].begin();
-				for (; iter != gc_candidates[package][die][age_class].end(); ++iter) {
-					candidates.push_back(*iter);
+				for (auto i :  gc_candidates[package][die][age_class]) {
+					candidates.push_back(i);
 				}
 			}
 		}
@@ -59,8 +58,7 @@ Block* Garbage_Collector::choose_gc_victim(int package_id, int die_id, int klass
 	vector<long> candidates = get_relevant_gc_candidates(package_id, die_id, klass);
 	uint min_valid_pages = BLOCK_SIZE;
 	Block* best_block = NULL;
-	for (uint i = 0; i < candidates.size(); i++) {
-		long physical_address = candidates[i];
+	for (auto physical_address : candidates) {
 		Address a = Address(physical_address, BLOCK);
 		Block* block = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
 		if (block->get_pages_valid() < min_valid_pages && block->get_state() == ACTIVE) {
