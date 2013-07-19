@@ -42,7 +42,7 @@ Experiment_Result::~Experiment_Result() {
 void Experiment_Result::start_experiment() {
 	assert(!experiment_started && !experiment_finished);
 	experiment_started = true;
-	start_time = Experiment_Runner::wall_clock_time();
+	start_time = Experiment::wall_clock_time();
     printf("=== Starting experiment '%s' ===\n", experiment_name.c_str());
     printf("%s\n", data_folder.c_str());
 	mkdir(data_folder.c_str(), 0755);
@@ -126,9 +126,9 @@ void Experiment_Result::end_experiment() {
 
 	stats_file->close();
 
-	end_time = Experiment_Runner::wall_clock_time();
+	end_time = Experiment::wall_clock_time();
 
-	printf("=== Experiment '%s' completed in %s. ===\n", experiment_name.c_str(), Experiment_Runner::pretty_time(time_elapsed()).c_str());
+	printf("=== Experiment '%s' completed in %s. ===\n", experiment_name.c_str(), Experiment::pretty_time(time_elapsed()).c_str());
 	printf("\n");
 
 	vector<string> original_column_names = StatisticsGatherer::get_global_instance()->totals_vector_header();

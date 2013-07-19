@@ -65,9 +65,7 @@ void Thread::register_event_completion(Event* event) {
 		external_statistics_gatherer->register_completed_event(*event);
 	}
 	time = event->get_current_time();
-	if (finished) {
-		return;
-	}
+
 	handle_event_completion(event);
 	if (num_IOs_executing == 0) {
 		handle_no_IOs_left();
@@ -86,6 +84,10 @@ bool Thread::can_submit_more() {
 }
 
 void Thread::submit(Event* event) {
+	if (finished) {
+		delete event;
+		return;
+	}
 	event->set_start_time(event->get_current_time());
 	io_queue.push(event);
 	num_IOs_executing++;
@@ -127,7 +129,7 @@ Simple_Thread::~Simple_Thread() {
 }
 
 void Simple_Thread::generate_io() {
-	while (get_num_ongoing_IOs() < MAX_IOS && number_of_times_to_repeat > 0) {
+	while (get_num_ongoing_IOs() < MAX_IOS && number_of_times_to_repeat > 0 && !get_finished()) {
 		number_of_times_to_repeat--;
 		Event* e = new Event(io_type_gen->next(), io_gen->next(), 1, get_current_time());
 		submit(e);

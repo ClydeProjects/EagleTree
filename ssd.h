@@ -20,6 +20,7 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/map.hpp>
+#include <boost/serialization/deque.hpp>
 #include <boost/serialization/utility.hpp>
 #include <boost/serialization/base_object.hpp>
 #include <sstream>
@@ -556,11 +557,11 @@ public:
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
     {
-    	ar & BOOST_SERIALIZATION_NVP(pages_invalid);
-    	ar & BOOST_SERIALIZATION_NVP(physical_address);
-    	ar & BOOST_SERIALIZATION_NVP(data);
-    	ar & BOOST_SERIALIZATION_NVP(pages_valid);
-    	ar & BOOST_SERIALIZATION_NVP(erases_remaining);
+    	ar & pages_invalid;
+    	ar & physical_address;
+    	ar & data;
+    	ar & pages_valid;
+    	ar & erases_remaining;
     }
 private:
 	uint pages_invalid;
@@ -585,7 +586,7 @@ public:
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
     {
-        ar & BOOST_SERIALIZATION_NVP(data);
+        ar & data;
     }
 private:
 	vector<Block> data;
@@ -611,7 +612,7 @@ public:
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
     {
-    	ar & BOOST_SERIALIZATION_NVP(data);
+    	ar & data;
     }
 private:
 	vector<Plane> data;
@@ -639,7 +640,7 @@ public:
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
     {
-    	ar & BOOST_SERIALIZATION_NVP(data);
+    	ar & data;
     }
 private:
 	vector<Die> data;
@@ -1370,7 +1371,6 @@ public:
 
 class Init_Workload : public Workload_Definition {
 public:
-	Init_Workload();
 	vector<Thread*> generate();
 };
 
@@ -1379,8 +1379,9 @@ public:
 	vector<Thread*> generate();
 };
 
-class Experiment_Runner {
+class Experiment {
 public:
+	Experiment();
 	static double CPU_time_user();
 	static double CPU_time_system();
 	static double wall_clock_time();
@@ -1398,9 +1399,11 @@ public:
 	static string get_working_dir();
 	static void unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer);
 	static void run_single_measurment(Workload_Definition* experiment_workload, int IO_limit, OperatingSystem* os);
-	static vector<Experiment_Result> simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, double& variable, double min_val, double max_val, double incr);
+	vector<Experiment_Result> simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, double& variable, double min_val, double max_val, double incr);
 	static vector<Experiment_Result> simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, long& variable, long min_val, long max_val, long incr);
 	static void simple_experiment(Workload_Definition* workload, string name, int IO_limit);
+	void run(string experiment_name);
+	void run_single_point(string name);
 	static vector<Experiment_Result> random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba);
 	static Experiment_Result copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
 	static Experiment_Result copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);
@@ -1408,13 +1411,29 @@ public:
 	static void draw_graphs(vector<vector<Experiment_Result> > results, string exp_folder);
 	static void draw_experiment_spesific_graphs(vector<vector<Experiment_Result> > results, string exp_folder, vector<int> x_vals);
 	static void save_state(OperatingSystem* os, string file_name);
-	static OperatingSystem* load_state();
-	static void calibrate_and_save(Workload_Definition*, bool force = false);
+	static OperatingSystem* load_state(string file_name);
+	static void calibrate_and_save(Workload_Definition*, string name, bool force = false);
 	static void write_config_file(string folder_name);
 	static void write_results_file(string folder_name);
 	static void create_base_folder(string folder_name);
 	static string get_base_directory() { return base_folder; }
+	void set_variable(double* variable, double low, double high, double incr);
+	void set_variable(int* variable, int low, int high, int incr);
+	void set_workload(Workload_Definition* w) { workload = w; }
+	void set_io_limit(int limit) { io_limit = limit; };
+	void set_calibration_file(string file) { calibration_file = file; }
 private:
+	double* d_variable;
+	double d_min, d_max, d_incr;
+
+	int* i_variable;
+	int i_min, i_max, i_incr;
+
+	int io_limit;
+	Workload_Definition* workload;
+	vector<vector<Experiment_Result> > results;
+	string calibration_file;
+
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
 
 	static uint max_age;

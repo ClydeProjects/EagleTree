@@ -82,7 +82,7 @@ int main()
 	stringstream space_usage_string;
 	space_usage_string << used_space << "% used space";
 
-	double start_time = Experiment_Runner::wall_clock_time();
+	double start_time = Experiment::wall_clock_time();
 
 	vector<Experiment_Result> exp;
 
@@ -94,7 +94,7 @@ int main()
 		if      (copybacks == 0) expname << "Copybacks disabled";
 		else if (copybacks == 1) expname << copybacks << " copyback allowed";
 		else                     expname << copybacks << " copybacks allowed";
-		exp.push_back( Experiment_Runner::copyback_map_experiment(random_writes_reads_experiment, cb_map_min, cb_map_max, cb_map_inc, used_space, folder.str(), expname.str(), IO_limit) );
+		exp.push_back( Experiment::copyback_map_experiment(random_writes_reads_experiment, cb_map_min, cb_map_max, cb_map_inc, used_space, folder.str(), expname.str(), IO_limit) );
 	}
 	uint mean_pos_in_datafile = std::find(exp[0].column_names.begin(), exp[0].column_names.end(), "Write wait, mean (µs)") - exp[0].column_names.begin();
 	assert(mean_pos_in_datafile != exp[0].column_names.size());
@@ -110,22 +110,22 @@ int main()
 	int sy = 8;
 
 	chdir(exp_folder.c_str());
-	Experiment_Runner::graph(sx, sy,   "Average throughput for random writes with different copyback parameters (" + space_usage_string.str() + ")", "throughput", 24, exp);
-	Experiment_Runner::graph(sx, sy,   "Copybacks operations performed (" + space_usage_string.str() + ")", "copybacks", gc_pos_in_datafile, exp);
-    Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram_allIOs", exp, 16000, true);
-    Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram", exp, 16000, false);
+	Experiment::graph(sx, sy,   "Average throughput for random writes with different copyback parameters (" + space_usage_string.str() + ")", "throughput", 24, exp);
+	Experiment::graph(sx, sy,   "Copybacks operations performed (" + space_usage_string.str() + ")", "copybacks", gc_pos_in_datafile, exp);
+    Experiment::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram_allIOs", exp, 16000, true);
+    Experiment::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram", exp, 16000, false);
 
 	for (uint i = 0; i < exp.size(); i++) {
 		chdir(exp[i].data_folder.c_str());
-		Experiment_Runner::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
+		Experiment::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
 		//Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms", exp[i], used_space_values_to_show);
-		Experiment_Runner::age_histogram			(sx, sy/2, "age-histograms", exp[i], used_space_values_to_show);
-		Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);
-		Experiment_Runner::throughput_history		(sx, sy/2, "throughput_history", exp[i], used_space_values_to_show);
+		Experiment::age_histogram			(sx, sy/2, "age-histograms", exp[i], used_space_values_to_show);
+		Experiment::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);
+		Experiment::throughput_history		(sx, sy/2, "throughput_history", exp[i], used_space_values_to_show);
 	}
 
-	double end_time = Experiment_Runner::wall_clock_time();
-	printf("=== Entire experiment finished in %s ===\n", Experiment_Runner::pretty_time(end_time - start_time).c_str());
+	double end_time = Experiment::wall_clock_time();
+	printf("=== Entire experiment finished in %s ===\n", Experiment::pretty_time(end_time - start_time).c_str());
 
 	return 0;
 }

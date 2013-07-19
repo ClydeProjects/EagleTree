@@ -121,7 +121,7 @@ void OperatingSystem::setup_follow_up_threads(int thread_id, double current_time
 	if (PRINT_LEVEL >= 1) printf("Switching to new follow up thread\n");
 	for (auto t : follow_up_threads) {
 		t->init(this, current_time);
-		int new_id = thread_id_generator++;
+		int new_id = ++thread_id_generator;
 		threads[new_id] = t;
 	}
 	follow_up_threads.clear();
@@ -172,5 +172,12 @@ Flexible_Reader* OperatingSystem::create_flexible_reader(vector<Address_Range> r
 	FtlParent* ftl = ssd->get_ftl();
 	Flexible_Reader* reader = new Flexible_Reader(*ftl, ranges);
 	return reader;
+}
+
+void OperatingSystem::init_threads() {
+	for (auto t : threads) {
+		Thread* thread = t.second;
+		thread->init(this, 0);
+	}
 }
 

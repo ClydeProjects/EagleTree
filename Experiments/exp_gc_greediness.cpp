@@ -31,19 +31,19 @@ int main()
 	/*GREED_SCALE = 0;
 	exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "Greed0/", "Greed0, Max GC 0 - 6", IO_limit, MAX_CONCURRENT_GC_OPS, 1, 6, 1) );
 	*/GREED_SCALE = 2;
-	exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "Greed1/", "Greed1, Max GC 0 - 6", IO_limit, MAX_CONCURRENT_GC_OPS, concurrent_gc_min, concurrent_gc_max, 4) );
+	exps.push_back( Experiment::simple_experiment(workload,	exp_folder + "Greed1/", "Greed1, Max GC 0 - 6", IO_limit, MAX_CONCURRENT_GC_OPS, concurrent_gc_min, concurrent_gc_max, 4) );
 	//GREED_SCALE = 2;
 	//exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "Greed2/", "Greed2, Max GC 0 - 6", IO_limit, MAX_CONCURRENT_GC_OPS, 3, 6, 1) );
 	delete workload;
-	Experiment_Runner::draw_graphs(exps, exp_folder);
+	Experiment::draw_graphs(exps, exp_folder);
 	vector<int> num_write_thread_values_to_show;
 	for (int i = concurrent_gc_min; i <= concurrent_gc_max; i += 1)
 		num_write_thread_values_to_show.push_back(i); // Show all used spaces values in multi-graphs
-	Experiment_Runner::draw_experiment_spesific_graphs(exps, exp_folder, num_write_thread_values_to_show);
+	Experiment::draw_experiment_spesific_graphs(exps, exp_folder, num_write_thread_values_to_show);
 
-	double start_time = Experiment_Runner::wall_clock_time();
-	double end_time = Experiment_Runner::wall_clock_time();
-	printf("=== Entire experiment finished in %s ===\n", Experiment_Runner::pretty_time(end_time - start_time).c_str());
+	double start_time = Experiment::wall_clock_time();
+	double end_time = Experiment::wall_clock_time();
+	printf("=== Entire experiment finished in %s ===\n", Experiment::pretty_time(end_time - start_time).c_str());
 
 	chdir(".."); // Leaving
 	return 0;

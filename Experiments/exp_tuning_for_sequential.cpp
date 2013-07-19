@@ -80,15 +80,15 @@ int main()
 	int space_max = 98;
 	int space_inc = 1;
 
-	double start_time = Experiment_Runner::wall_clock_time();
+	double start_time = Experiment::wall_clock_time();
 
 	PRINT_LEVEL = 0;
 
 	vector<Experiment_Result> exp;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(greedy_eq_prio,	space_min, space_max, space_inc, exp_folder + 		"greedy_eq_prio/", "greedy eq prio", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(greedy_gc_prio,	space_min, space_max, space_inc, exp_folder + 		"greedy_gc_prio/", "greedy gc prio", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(lazy_eq_prio,		space_min, space_max, space_inc, exp_folder + 		"lazy_eq_prio/", "lazy eq prio", IO_limit) );
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(lazy_gc_priorty,	space_min, space_max, space_inc, exp_folder + 		"lazy_gc_priorty/", "lazy gc priorty", IO_limit) );
+	exp.push_back( Experiment::overprovisioning_experiment(greedy_eq_prio,	space_min, space_max, space_inc, exp_folder + 		"greedy_eq_prio/", "greedy eq prio", IO_limit) );
+	exp.push_back( Experiment::overprovisioning_experiment(greedy_gc_prio,	space_min, space_max, space_inc, exp_folder + 		"greedy_gc_prio/", "greedy gc prio", IO_limit) );
+	exp.push_back( Experiment::overprovisioning_experiment(lazy_eq_prio,		space_min, space_max, space_inc, exp_folder + 		"lazy_eq_prio/", "lazy eq prio", IO_limit) );
+	exp.push_back( Experiment::overprovisioning_experiment(lazy_gc_priorty,	space_min, space_max, space_inc, exp_folder + 		"lazy_gc_priorty/", "lazy gc priorty", IO_limit) );
 
 	// Print column names for info
 	for (uint i = 0; i < exp[0].column_names.size(); i++)
@@ -106,15 +106,15 @@ int main()
 
 	chdir(exp_folder.c_str());
 
-	Experiment_Runner::graph(sx, sy,   "Throughput", 				"throughput", 				24, exp);
-	Experiment_Runner::graph(sx, sy,   "Write Throughput", 			"throughput_write", 		25, exp);
-	Experiment_Runner::graph(sx, sy,   "Read Throughput", 			"throughput_read", 			26, exp);
-	Experiment_Runner::graph(sx, sy,   "Num Erases", 				"num_erases", 				8, 	exp);
-	Experiment_Runner::graph(sx, sy,   "Num Migrations", 			"num_migrations", 			3, 	exp);
+	Experiment::graph(sx, sy,   "Throughput", 				"throughput", 				24, exp);
+	Experiment::graph(sx, sy,   "Write Throughput", 			"throughput_write", 		25, exp);
+	Experiment::graph(sx, sy,   "Read Throughput", 			"throughput_read", 			26, exp);
+	Experiment::graph(sx, sy,   "Num Erases", 				"num_erases", 				8, 	exp);
+	Experiment::graph(sx, sy,   "Num Migrations", 			"num_migrations", 			3, 	exp);
 
-	Experiment_Runner::graph(sx, sy,   "Write wait, mean", 			"Write wait, mean", 		9, 	exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, max", 			"Write wait, max", 			14, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, std", 			"Write wait, std", 			15, exp);
+	Experiment::graph(sx, sy,   "Write wait, mean", 			"Write wait, mean", 		9, 	exp);
+	Experiment::graph(sx, sy,   "Write wait, max", 			"Write wait, max", 			14, exp);
+	Experiment::graph(sx, sy,   "Write wait, std", 			"Write wait, std", 			15, exp);
 
 	// VALUES FOR THE TWO LAST PARAMETERS IN cross_experiment_waittime_histogram() and waittime_histogram():
 	// 1. Application IOs, Reads+writes
@@ -124,22 +124,22 @@ int main()
 	// 5. Internal operations, Writes
 	// 6. Internal operations, Reads
 
-	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 88", exp, 80, 1, 4);
-	Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 95", exp, 70, 1, 4);
+	Experiment::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 88", exp, 80, 1, 4);
+	Experiment::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 95", exp, 70, 1, 4);
 
 	for (uint i = 0; i < exp.size(); i++) {
 		chdir(exp[i].data_folder.c_str());
-		Experiment_Runner::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
-		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], used_space_values_to_show, 1, 4);
-		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms-appIOs", exp[i], used_space_values_to_show, 1);
-		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms-rw-appIOs", exp[i], used_space_values_to_show, 2, 3);
-		Experiment_Runner::age_histogram			(sx, sy/2, "age_histograms", exp[i], used_space_values_to_show);
-		Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);
-		Experiment_Runner::throughput_history		(sx, sy/2, "throughput_history", exp[i], used_space_values_to_show);
+		Experiment::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
+		Experiment::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], used_space_values_to_show, 1, 4);
+		Experiment::waittime_histogram		(sx, sy/2, "waittime-histograms-appIOs", exp[i], used_space_values_to_show, 1);
+		Experiment::waittime_histogram		(sx, sy/2, "waittime-histograms-rw-appIOs", exp[i], used_space_values_to_show, 2, 3);
+		Experiment::age_histogram			(sx, sy/2, "age_histograms", exp[i], used_space_values_to_show);
+		Experiment::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);
+		Experiment::throughput_history		(sx, sy/2, "throughput_history", exp[i], used_space_values_to_show);
 	}
 
-	double end_time = Experiment_Runner::wall_clock_time();
-	printf("=== Entire experiment finished in %s ===\n", Experiment_Runner::pretty_time(end_time - start_time).c_str());
+	double end_time = Experiment::wall_clock_time();
+	printf("=== Entire experiment finished in %s ===\n", Experiment::pretty_time(end_time - start_time).c_str());
 
 	return 0;
 }

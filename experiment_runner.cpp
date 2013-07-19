@@ -16,25 +16,32 @@
 
 using namespace ssd;
 
-const string Experiment_Runner::markers[] = {"circle", "square", "triangle", "diamond", "cross", "plus", "star", "star2", "star3", "star4", "flower"};
+const string Experiment::markers[] = {"circle", "square", "triangle", "diamond", "cross", "plus", "star", "star2", "star3", "star4", "flower"};
 
-const bool Experiment_Runner::REMOVE_GLE_SCRIPTS_AGAIN = false;
+const bool Experiment::REMOVE_GLE_SCRIPTS_AGAIN = false;
 
-const double Experiment_Runner::M = 1000000.0; // One million
-const double Experiment_Runner::K = 1000.0;    // One thousand
+const double Experiment::M = 1000000.0; // One million
+const double Experiment::K = 1000.0;    // One thousand
 
-double Experiment_Runner::calibration_precision      = 1.0; // microseconds
-double Experiment_Runner::calibration_starting_point = 15.00; // microseconds
-string Experiment_Runner::base_folder = get_current_dir_name();
+double Experiment::calibration_precision      = 1.0; // microseconds
+double Experiment::calibration_starting_point = 15.00; // microseconds
+string Experiment::base_folder = get_current_dir_name();
 
-void Experiment_Runner::unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer) {
+Experiment::Experiment()
+	: d_variable(NULL), d_min(0), d_max(0), d_incr(0),
+	  i_variable(NULL), i_min(0), i_max(0), i_incr(0),
+	  io_limit(NUMBER_OF_ADDRESSABLE_PAGES()),
+	  workload(NULL)
+{}
+
+void Experiment::unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer) {
 	for (uint i = 0; i < threads.size(); ++i) {
 		threads[i]->set_statistics_gatherer(statistics_gatherer);
 		unify_under_one_statistics_gatherer(threads[i]->get_follow_up_threads(), statistics_gatherer); // Recurse
 	}
 }
 
-void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_workload, int IO_limit, OperatingSystem* os) {
+void Experiment::run_single_measurment(Workload_Definition* experiment_workload, int IO_limit, OperatingSystem* os) {
 	Queue_Length_Statistics::init();
 	vector<Thread*> experiment_threads = experiment_workload->generate_instance();
 	os->set_threads(experiment_threads);
@@ -51,7 +58,7 @@ void Experiment_Runner::run_single_measurment(Workload_Definition* experiment_wo
 	//Free_Space_Per_LUN_Meter::print();
 }
 
-vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, double& variable, double min_val, double max_val, double incr) {
+vector<Experiment_Result> Experiment::simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, double& variable, double min_val, double max_val, double incr) {
 	assert(experiment_workload != NULL);
 	string data_folder = base_folder + name + "/";
 	mkdir(data_folder.c_str(), 0755);
@@ -80,7 +87,70 @@ vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definiti
 	return results;
 }
 
-vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, long& variable, long min_val, long max_val, long incr) {
+void Experiment::set_variable(double* variable, double low, double high, double incr) {
+	d_variable = variable;
+	d_min = low;
+	d_max = high;
+	d_incr = incr;
+}
+
+void Experiment::set_variable(int* variable, int low, int high, int incr) {
+	i_variable = variable;
+	i_min = low;
+	i_max = high;
+	i_incr = incr;
+}
+
+void Experiment::run(string name) {
+	if (i_variable == NULL && d_variable == NULL) {
+		run_single_point(name);
+	}
+}
+
+void Experiment::run_single_point(string name) {
+	string data_folder = base_folder + name + "/";
+	mkdir(data_folder.c_str(), 0755);
+	Experiment_Result global_result(name, data_folder, "Global/", "Changing a Var");
+	global_result.start_experiment();
+
+	VisualTracer::init(data_folder);
+	write_config_file(data_folder);
+
+	OperatingSystem* os;
+	if (calibration_file.empty()) {
+		os = new OperatingSystem();
+	}
+	else {
+		os = load_state(calibration_file);
+	}
+
+	Queue_Length_Statistics::init();
+	if (workload != NULL) {
+		vector<Thread*> experiment_threads = workload->generate_instance();
+		os->set_threads(experiment_threads);
+	}
+	os->set_num_writes_to_stop_after(io_limit);
+	os->run();
+
+	StatisticsGatherer::get_global_instance()->print();
+	//StatisticsGatherer::get_global_instance()->print_gc_info();
+	Utilization_Meter::print();
+	//Individual_Threads_Statistics::print();
+	//Queue_Length_Statistics::print_distribution();
+	//Queue_Length_Statistics::print_avg();
+	//Free_Space_Meter::print();
+	//Free_Space_Per_LUN_Meter::print();
+
+	global_result.collect_stats(0, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
+	write_results_file(data_folder);
+
+	global_result.end_experiment();
+	vector<Experiment_Result> result;
+	result.push_back(global_result);
+	results.push_back(result);
+}
+
+vector<Experiment_Result> Experiment::simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, long& variable, long min_val, long max_val, long incr) {
 	assert(experiment_workload != NULL);
 	string data_folder = base_folder + name;
 	mkdir(data_folder.c_str(), 0755);
@@ -92,7 +162,7 @@ vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definiti
 		printf("%s :  %d \n", name.c_str(), variable);
 		printf("----------------------------------------------------------------------------------------------------------\n");
 
-		OperatingSystem* os = load_state();
+		OperatingSystem* os = new OperatingSystem();// load_state();
 		run_single_measurment(experiment_workload, IO_limit, os);
 		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 		delete os;
@@ -103,7 +173,7 @@ vector<Experiment_Result> Experiment_Runner::simple_experiment(Workload_Definiti
 	return results;
 }
 
-vector<Experiment_Result> Experiment_Runner::random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
+vector<Experiment_Result> Experiment::random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
 	string data_folder = base_folder + name;
 	mkdir(data_folder.c_str(), 0755);
 	Experiment_Result global_result       (name, data_folder, "Global/",             "Number of concurrent random write threads");
@@ -184,7 +254,7 @@ vector<Experiment_Result> Experiment_Runner::random_writes_on_the_side_experimen
     return results;
 }
 
-Experiment_Result Experiment_Runner::copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit) {
+Experiment_Result Experiment::copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit) {
     Experiment_Result experiment_result(name, data_folder, "", "CopyBacks allowed before ECC check");
     experiment_result.start_experiment();
 
@@ -220,7 +290,7 @@ Experiment_Result Experiment_Runner::copyback_experiment(vector<Thread*> (*exper
 	return experiment_result;
 }
 
-Experiment_Result Experiment_Runner::copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit) {
+Experiment_Result Experiment::copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit) {
     Experiment_Result experiment_result(name, data_folder, "", "Max copyback map size");
     experiment_result.start_experiment();
 
@@ -258,8 +328,9 @@ Experiment_Result Experiment_Runner::copyback_map_experiment(vector<Thread*> (*e
 
 // currently, this method checks if there if a file already exists, and if so, assumes it is valid.
 // ideally, a check should be made to ensure the saved SSD state matches with the state of the current global parameters
-void Experiment_Runner::calibrate_and_save(Workload_Definition* workload, bool force) {
-	string file_name = base_folder + "calibrated_state.txt";
+void Experiment::calibrate_and_save(Workload_Definition* workload, string name, bool force) {
+	//string file_name = base_folder + "calibrated_state.txt";
+	string file_name = base_folder + name;
 	std::ifstream ifile(file_name.c_str());
 	if (ifile && !force) {
 		return; // file exists
@@ -276,14 +347,14 @@ void Experiment_Runner::calibrate_and_save(Workload_Definition* workload, bool f
 	delete os;
 }
 
-void Experiment_Runner::write_config_file(string folder_name) {
+void Experiment::write_config_file(string folder_name) {
 	string file_name = folder_name + "configuration.txt";
 	FILE* file = fopen(file_name.c_str() , "w");
 	print_config(file);
 	fclose(file);
 }
 
-void Experiment_Runner::write_results_file(string folder_name) {
+void Experiment::write_results_file(string folder_name) {
 	string file_name = folder_name + "results.txt";
 	FILE* file = fopen(file_name.c_str() , "w");
 	StatisticsGatherer::get_global_instance()->print_simple(file);
@@ -293,25 +364,46 @@ void Experiment_Runner::write_results_file(string folder_name) {
 	fprintf(file, "LUN util:\t%f\n", LUN_util);
 }
 
-void Experiment_Runner::save_state(OperatingSystem* os, string file_name) {
+void Experiment::save_state(OperatingSystem* os, string file_name) {
 	std::ofstream file(file_name.c_str());
 	boost::archive::text_oarchive oa(file);
 	oa.register_type<FtlImpl_Page>( );
 	oa.register_type<Block_manager_parallel>( );
 	oa.register_type<Sequential_Locality_BM>( );
+	oa.register_type<File_Manager>( );
+	oa.register_type<Simple_Thread>( );
+	oa.register_type<Random_IO_Pattern>( );
+	oa.register_type<Sequential_IO_Pattern>( );
+	oa.register_type<WRITES>( );
+	oa.register_type<TRIMS>( );
+	oa.register_type<READS>( );
+	oa.register_type<READS_OR_WRITES>();
+	oa.register_type<Asynchronous_Random_Writer>();
+
+	//Simple_Thread* t1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 35722);
+	//oa << t1;
 	oa << os;
 }
 
-OperatingSystem* Experiment_Runner::load_state() {
-	string file_name = base_folder + "calibrated_state.txt";
+OperatingSystem* Experiment::load_state(string name) {
+	string file_name = base_folder + name;
 	std::ifstream file(file_name.c_str());
 	boost::archive::text_iarchive ia(file);
 	ia.register_type<FtlImpl_Page>( );
 	ia.register_type<Block_manager_parallel>();
 	ia.register_type<Sequential_Locality_BM>( );
+	ia.register_type<File_Manager>( );
+	ia.register_type<Simple_Thread>( );
+	ia.register_type<Random_IO_Pattern>( );
+	ia.register_type<Sequential_IO_Pattern>( );
+	ia.register_type<WRITES>( );
+	ia.register_type<TRIMS>( );
+	ia.register_type<READS>( );
+	ia.register_type<READS_OR_WRITES>();
+	ia.register_type<Asynchronous_Random_Writer>();
 	OperatingSystem* os;
 	ia >> os;
-
+	os->init_threads();
 	IOScheduler* scheduler = os->get_ssd()->get_scheduler();
 	scheduler->init();
 	Block_manager_parent* bm = Block_manager_parent::get_new_instance();
@@ -326,7 +418,7 @@ OperatingSystem* Experiment_Runner::load_state() {
 	return os;
 }
 
-void Experiment_Runner::create_base_folder(string name) {
+void Experiment::create_base_folder(string name) {
 	base_folder = name;
 	printf("%s\n", base_folder.c_str());
 	mkdir(base_folder.c_str(), 0755);

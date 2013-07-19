@@ -13,7 +13,7 @@
 # classes.  It is suggested to test with the "test" make target first.
 
 CC = /usr/bin/gcc
-CFLAGS = -Wall -Wextra -g -std=c++0x -O2
+CFLAGS = -std=c++0x -g #-Wextra -Wall
 CXX = /usr/bin/g++
 CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
@@ -36,7 +36,7 @@ ssd: $(HDR) $(SRC)
 
 # All Target
 
-all: sequential  #scheduling sequential_tuning sequential greediness copybacks
+all: interleaving  #scheduling sequential_tuning sequential greediness copybacks
 
 interleaving: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o Experiments/interleaving Experiments/interleaving.cpp $(OBJ) -lboost_serialization

@@ -15,8 +15,7 @@ void event_queue::push(Event* event) {
 	//printf("num_events:  %d\n", num_events);
 	long current_time = floor(event->get_current_time());
 	if (events.count(current_time) == 0) {
-		vector<Event*> new_events;
-		new_events.push_back(event);
+		vector<Event*> new_events(1, event);
 		events[current_time] = new_events;
 	} else {
 		vector<Event*>& events_with_this_time = events[current_time];

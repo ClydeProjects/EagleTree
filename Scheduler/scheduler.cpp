@@ -105,6 +105,12 @@ void IOScheduler::execute_soonest_events() {
 	double current_time = get_current_time();
 	double next_events_time = current_time + 1;
 	update_current_events(current_time);
+	if (current_events->empty() && overdue_events->empty() && !completed_events->empty()) {
+		for (auto event : completed_events->get_soonest_events()) {
+			ssd->register_event_completion(event);
+		}
+	}
+
 	while (current_time < next_events_time && (!current_events->empty() || !overdue_events->empty())) {
 		if (!overdue_events->empty() && overdue_events->get_earliest_time() < next_events_time) {
 			overdue_events->schedule();
@@ -378,13 +384,18 @@ void IOScheduler::remove_current_operation(Event* event) {
 void IOScheduler::handle_noop_events(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
+		if (event->get_application_io_id() == 10111) {
+			event->print();
+		}
 		events.pop_back();
 
 		uint dependency_code = event->get_application_io_id();
 		deque<Event*>& dependents = dependencies[dependency_code];
 		while (dependents.size() > 0) {
 			Event *e = dependents.front();
-			e->incr_bus_wait_time(event->get_bus_wait_time());
+			double diff = event->get_current_time() - e->get_current_time();
+			e->incr_accumulated_wait_time(diff);
+			e->incr_pure_ssd_wait_time(event->get_bus_wait_time() + event->get_execution_time());
 			dependents.pop_front();
 			e->set_noop(true);
 			if (event->is_original_application_io()) {
@@ -429,6 +440,7 @@ void IOScheduler::setup_dependent_event(Event* event, Event* dependent) {
 	//dependent->incr_os_wait_time(event->get_os_wait_time());
 	dependent->incr_accumulated_wait_time(diff);
 	dependent->incr_pure_ssd_wait_time(event->get_bus_wait_time() + event->get_execution_time());
+	assert(dependent->get_current_time() == event->get_current_time());
 	dependent->set_noop(event->get_noop());
 
 	// The dependent event might have a different LBA and type - record this in bookkeeping maps
@@ -447,6 +459,11 @@ enum status IOScheduler::execute_next(Event* event) {
 		if (event->is_flexible_read()) {
 			//printf("FLEX\n");
 		}
+	}
+
+	if (event->get_id() == 653) {
+		int i = 0;
+		i++;
 	}
 
 	handle_finished_event(event);
@@ -494,10 +511,8 @@ enum status IOScheduler::execute_next(Event* event) {
 			ssd->register_event_completion(event);
 		}
 		if (completed_events->size() >= MAX_SSD_QUEUE_SIZE) {
-			vector<Event*> events_that_finished_soonest = completed_events->get_soonest_events();
-			for (uint i = 0; i < events_that_finished_soonest.size(); i++) {
-				Event* e = events_that_finished_soonest[i];
-				ssd->register_event_completion(e);
+			for (auto event : completed_events->get_soonest_events()) {
+				ssd->register_event_completion(event);
 			}
 		}
 	}
@@ -513,6 +528,11 @@ void IOScheduler::manage_operation_completion(Event* event) {
 		uint dependent_code = op_code_to_dependent_op_codes[dependency_code].front();
 		op_code_to_dependent_op_codes[dependency_code].pop();
 		Event* dependant_event = dependencies[dependent_code].front();
+
+		if (dependant_event->get_application_io_id() == 10111) {
+			dependant_event->print();
+		}
+
 		double diff = event->get_current_time() - dependant_event->get_current_time();
 		if (diff > 0) {
 			dependant_event->incr_bus_wait_time(diff);
@@ -669,6 +689,9 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		remove_event_from_current_events(existing_event); // Remove old event from current_events; it's added again when independent event (the copy back) finishes
 	}
 	else */
+	if (new_event->get_application_io_id() == 10111) {
+		new_event->print();
+	}
 
 	if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
 		promote_to_gc(existing_event);

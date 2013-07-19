@@ -129,7 +129,7 @@ int main()
 	int space_max = 90;
 	int space_inc = 2;
 
-	double start_time = Experiment_Runner::wall_clock_time();
+	double start_time = Experiment::wall_clock_time();
 
 	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 15;
@@ -138,10 +138,10 @@ int main()
 
 	PRIORITISE_GC = false;
 	USE_ERASE_QUEUE = true;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(tagging, 			space_min, space_max, space_inc, exp_folder + "oracle_erase/",			"Oracle Erase Queue", IO_limit) );
+	exp.push_back( Experiment::overprovisioning_experiment(tagging, 			space_min, space_max, space_inc, exp_folder + "oracle_erase/",			"Oracle Erase Queue", IO_limit) );
 
 	USE_ERASE_QUEUE = false;
-	exp.push_back( Experiment_Runner::overprovisioning_experiment(tagging, 			space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );
+	exp.push_back( Experiment::overprovisioning_experiment(tagging, 			space_min, space_max, space_inc, exp_folder + "oracle/",			"Oracle", IO_limit) );
 
 
 
@@ -165,29 +165,29 @@ int main()
 	//for (int i = 0; i < exp[0].column_names.size(); i++) printf("%d: %s\n", i, exp[0].column_names[i].c_str());
 
 	chdir(exp_folder.c_str());
-	Experiment_Runner::graph(sx, sy,   "Block Manager Effect on Average Throughput, for mixed SW and RW", "throughput", 24, exp);
+	Experiment::graph(sx, sy,   "Block Manager Effect on Average Throughput, for mixed SW and RW", "throughput", 24, exp);
 
-	Experiment_Runner::graph(sx, sy,   "Total number of erases", "num_erases", 8, exp);
+	Experiment::graph(sx, sy,   "Total number of erases", "num_erases", 8, exp);
 
-	Experiment_Runner::graph(sx, sy,   "Latency standard dev", "latency", 15, exp);
+	Experiment::graph(sx, sy,   "Latency standard dev", "latency", 15, exp);
 
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q25", "Write wait, Q25 (µs)", 11, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q50", "Write wait, Q50 (µs)", 12, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, Q75", "Write wait, Q75 (µs)", 13, exp);
-	Experiment_Runner::graph(sx, sy,   "Write wait, max", "Write wait, max (µs)", 14, exp);
+	Experiment::graph(sx, sy,   "Write wait, Q25", "Write wait, Q25 (µs)", 11, exp);
+	Experiment::graph(sx, sy,   "Write wait, Q50", "Write wait, Q50 (µs)", 12, exp);
+	Experiment::graph(sx, sy,   "Write wait, Q75", "Write wait, Q75 (µs)", 13, exp);
+	Experiment::graph(sx, sy,   "Write wait, max", "Write wait, max (µs)", 14, exp);
 
 	for (uint i = 0; i < exp.size(); i++) {
 		printf("%s\n", exp[i].data_folder.c_str());
 		chdir(exp[i].data_folder.c_str());
-		Experiment_Runner::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
-		Experiment_Runner::waittime_histogram		(sx, sy/2, "waittime-histograms", exp[i], used_space_values_to_show);
-		Experiment_Runner::age_histogram			(sx, sy/2, "age-histograms", exp[i], used_space_values_to_show);
-		Experiment_Runner::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);
-		Experiment_Runner::throughput_history		(sx, sy/2, "throughput_history", exp[i], used_space_values_to_show);
+		Experiment::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
+		Experiment::waittime_histogram		(sx, sy/2, "waittime-histograms", exp[i], used_space_values_to_show);
+		Experiment::age_histogram			(sx, sy/2, "age-histograms", exp[i], used_space_values_to_show);
+		Experiment::queue_length_history		(sx, sy/2, "queue_length", exp[i], used_space_values_to_show);
+		Experiment::throughput_history		(sx, sy/2, "throughput_history", exp[i], used_space_values_to_show);
 	}
 
-	double end_time = Experiment_Runner::wall_clock_time();
-	printf("=== Entire experiment finished in %s ===\n", Experiment_Runner::pretty_time(end_time - start_time).c_str());
+	double end_time = Experiment::wall_clock_time();
+	printf("=== Entire experiment finished in %s ===\n", Experiment::pretty_time(end_time - start_time).c_str());
 
 	return 0;
 }

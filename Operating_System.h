@@ -36,6 +36,9 @@ public:
 	StatisticsGatherer* get_external_statistics_gatherer() { return internal_statistics_gatherer; }
 	void set_statistics_gatherer(StatisticsGatherer* new_statistics_gatherer);
 	void set_finished() { finished = true; }
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version) {}
 protected:
 	virtual void issue_first_IOs() = 0;
 	virtual void handle_event_completion(Event* event) = 0;
@@ -46,6 +49,7 @@ protected:
 	void submit(Event* event);
 	bool can_submit_more();
 	int get_num_ongoing_IOs() { return num_IOs_executing; }
+	bool get_finished() { return finished; }
 private:
 	double time;
 	StatisticsGatherer* internal_statistics_gatherer;
@@ -62,32 +66,52 @@ class IO_Mode_Generator {
 public:
 	virtual ~IO_Mode_Generator() {};
 	virtual event_type next() = 0;
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {}
 };
 
 class WRITES : public IO_Mode_Generator {
 public:
 	~WRITES() {};
 	event_type next() { return WRITE; };
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<IO_Mode_Generator>(*this);
+    }
 };
 
 class TRIMS : public IO_Mode_Generator {
 public:
 	~TRIMS() {};
 	event_type next() { return TRIM; };
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<IO_Mode_Generator>(*this);
+    }
 };
 
 class READS : public IO_Mode_Generator {
 public:
 	~READS() {};
 	event_type next() { return READ; };
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<IO_Mode_Generator>(*this);
+    }
 };
 
 class READS_OR_WRITES : public IO_Mode_Generator {
 public:
+	READS_OR_WRITES() : random_number_generator(4624626), write_probability(0.5) {}
 	READS_OR_WRITES(ulong seed, double write_probability) :
 		random_number_generator(seed), write_probability(write_probability) {}
 	~READS_OR_WRITES() {};
 	event_type next() { return random_number_generator() <= write_probability ? WRITE : READ; };
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<IO_Mode_Generator>(*this);
+    	ar & write_probability;
+    }
 private:
 	MTRand_open random_number_generator;
 	double write_probability;
@@ -99,18 +123,31 @@ private:
 class IO_Pattern
 {
 public:
+	IO_Pattern() : min_LBA(0), max_LBA(0) {}
 	IO_Pattern(long min_LBA, long max_LBA) : min_LBA(min_LBA), max_LBA(max_LBA) {};
 	virtual ~IO_Pattern() {};
 	virtual int next() = 0;
-	const long min_LBA, max_LBA;
+	long min_LBA, max_LBA;
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version) {
+    	ar & min_LBA;
+    	ar & max_LBA;
+    }
 };
 
 class Random_IO_Pattern : public IO_Pattern
 {
 public:
+	Random_IO_Pattern() : IO_Pattern(), random_number_generator(23623620) {}
 	Random_IO_Pattern(long min_LBA, long max_LBA, ulong seed) : IO_Pattern(min_LBA, max_LBA), random_number_generator(seed) {};
 	~Random_IO_Pattern() {};
 	int next() { return min_LBA + random_number_generator() % (max_LBA - min_LBA + 1); };
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<IO_Pattern>(*this);
+    }
 private:
 	MTRand_int32 random_number_generator;
 };
@@ -118,9 +155,16 @@ private:
 class Sequential_IO_Pattern : public IO_Pattern
 {
 public:
+	Sequential_IO_Pattern() : IO_Pattern(), counter(0) {}
 	Sequential_IO_Pattern(long min_LBA, long max_LBA) : IO_Pattern(min_LBA, max_LBA), counter(min_LBA - 1) {};
 	~Sequential_IO_Pattern() {};
 	int next() { return counter == max_LBA ? counter = min_LBA : ++counter; };
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<IO_Pattern>(*this);
+    	ar & counter;
+    }
 private:
 	long counter;
 };
@@ -131,6 +175,7 @@ private:
 class Simple_Thread : public Thread
 {
 public:
+	Simple_Thread() : io_gen(NULL), io_type_gen(NULL), number_of_times_to_repeat(0), MAX_IOS(0) {}
 	Simple_Thread(IO_Pattern* generator, int MAX_IOS, IO_Mode_Generator* type);
 	Simple_Thread(IO_Pattern* generator, IO_Mode_Generator* type, int MAX_IOS, long num_IOs);
 	virtual ~Simple_Thread();
@@ -138,9 +183,18 @@ public:
 	void issue_first_IOs();
 	void handle_event_completion(Event* event);
 	inline void set_num_ios(ulong num_ios) { number_of_times_to_repeat = num_ios; }
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<Thread>(*this);
+    	ar & number_of_times_to_repeat;
+    	ar & MAX_IOS;
+    	ar & io_gen;
+    	ar & io_type_gen;
+    }
 private:
 	long number_of_times_to_repeat;
-	const int MAX_IOS;
+	int MAX_IOS;
 	IO_Pattern* io_gen;
 	IO_Mode_Generator* io_type_gen;
 };
@@ -162,8 +216,13 @@ public:
 class Asynchronous_Random_Writer : public Simple_Thread
 {
 public:
+	Asynchronous_Random_Writer() : Simple_Thread() {}
 	Asynchronous_Random_Writer(long min_LBA, long max_LBA, ulong randseed)
 		: Simple_Thread(new Random_IO_Pattern(min_LBA, max_LBA, randseed), new WRITES(), MAX_SSD_QUEUE_SIZE * 2, INFINITE) {}
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<Simple_Thread>(*this);
+    }
 };
 
 class Synchronous_Sequential_Writer : public Simple_Thread
@@ -299,6 +358,7 @@ private:
 };
 
 struct Address_Range {
+	Address_Range() : min(0), max(0) {}
 	long min;
 	long max;
 	Address_Range(long min, long max);
@@ -311,6 +371,12 @@ struct Address_Range {
 	bool is_contiguously_followed_by(Address_Range other) const;
 	bool is_followed_by(Address_Range other) const;
 	void merge(Address_Range other);
+    friend class boost::serialization::access;
+    template<class Archive> void
+    serialize(Archive & ar, const unsigned int version) {
+    	ar & min;
+    	ar & max;
+    }
 };
 
 // This is a file manager that writes one file at a time sequentially
@@ -320,28 +386,50 @@ struct Address_Range {
 class File_Manager : public Thread
 {
 public:
+	File_Manager();
 	File_Manager(long min_LBA, long max_LBA, uint num_files_to_write, long max_file_size, ulong randseed = 0);
 	~File_Manager();
 	void issue_first_IOs();
 	void handle_event_completion(Event* event);
 	void handle_no_IOs_left();
 	//virtual void print_thread_stats();
-	static void reset_id_generator();
+    friend class boost::serialization::access;
+    template<class Archive> void
+    serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<Thread>(*this);
+    	ar & num_free_pages;
+    	ar & free_ranges;
+    	ar & live_files;
+    	ar & min_LBA;
+    	ar & max_LBA;
+    	ar & num_files_to_write;
+    	ar & max_file_size;
+    }
 private:
 	struct File {
-		const double death_probability;
+		File() : death_probability(0.5), time_created(0), time_finished_writing(UNDEFINED), time_deleted(UNDEFINED),
+				size(0), id(UNDEFINED), num_pages_written(0), ranges_comprising_file() {}
+		double death_probability;
 		double time_created, time_finished_writing, time_deleted;
-		static int file_id_generator;
-		const uint size;
+		uint size;
 		int id;
 		uint num_pages_written;
 		deque<Address_Range > ranges_comprising_file;
 
-		File(uint size, double death_probability, double time_created);
+		File(uint size, double death_probability, double time_created, int id);
 
 		bool is_finished() const;
 		void register_write_completion();
 		void finish(double time_finished);
+	    friend class boost::serialization::access;
+	    template<class Archive> void
+	    serialize(Archive & ar, const unsigned int version) {
+	    	ar & death_probability;
+	    	ar & size;
+	    	ar & id;
+	    	ar & num_pages_written;
+	    	ar & ranges_comprising_file;
+	    }
 	};
 
 	void schedule_to_trim_file(File* file);
@@ -364,13 +452,14 @@ private:
 	File* current_file;
 	long min_LBA, max_LBA;
 	int num_files_to_write;
+	int file_id_generator;
 
 	//Reliable_Random_Int_Generator random_number_generator;
 	//Reliable_Random_Double_Generator double_generator;
 
 	MTRand_int32 random_number_generator;
 	MTRand_open double_generator;
-	const long max_file_size;
+	long max_file_size;
 	int num_pending_trims;
 	phase phase;
 	//Throughput_Moderator throughout_moderator;
@@ -460,7 +549,7 @@ public:
 
 class FAIR_OS_Scheduler : public OS_Scheduler {
 public:
-	FAIR_OS_Scheduler() : last_id(UNDEFINED) {}
+	FAIR_OS_Scheduler() : last_id(0) {}
 	int pick(map<int, Thread*> const& threads);
 private:
 	int last_id;
@@ -471,6 +560,7 @@ class OperatingSystem
 public:
 	OperatingSystem();
 	void set_threads(vector<Thread*> threads);
+	void init_threads();
 	~OperatingSystem();
 	void run();
 	void register_event_completion(Event* event);
@@ -484,6 +574,7 @@ public:
     void serialize(Archive & ar, const unsigned int version)
     {
     	ar & ssd;
+    	ar & threads;
     }
 private:
 	void dispatch_event(int thread_id);

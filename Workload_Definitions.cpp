@@ -16,7 +16,7 @@ Workload_Definition::Workload_Definition() :
 
 void Workload_Definition::recalculate_lba_range() {
 	min_lba = 0;
-	max_lba = OVER_PROVISIONING_FACTOR * NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE;
+	max_lba = OVER_PROVISIONING_FACTOR * NUMBER_OF_ADDRESSABLE_PAGES();
 }
 
 vector<Thread*> Workload_Definition::generate_instance() {
@@ -93,7 +93,6 @@ vector<Thread*> Asynch_Random_Workload::generate() {
 //*****************************************************************************************
 //				Classical INIT workload
 //*****************************************************************************************
-Init_Workload::Init_Workload() {}
 
 vector<Thread*> Init_Workload::generate() {
 	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
@@ -129,11 +128,11 @@ File_System_With_Noise::File_System_With_Noise() {
 vector<Thread*> File_System_With_Noise::generate() {
 
 	long log_space_per_thread = max_lba / 4;
-	long max_file_size = log_space_per_thread / 4;
+	long max_file_size = BLOCK_SIZE * 20;
 
 	Simple_Thread* t1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 35722);
 	Simple_Thread* t2 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 35722);
-	Thread* t3 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, INFINITE, max_file_size, 713);
+	Thread* t3 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 4, INFINITE, max_file_size, 713);
 	Thread* t4 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, INFINITE, max_file_size, 5);
 
 	vector<Thread*> threads;

@@ -48,21 +48,21 @@ int main()
 
 	BALANCEING_SCHEME = false;
 	MAX_CONCURRENT_GC_OPS = 6;
-	exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(NULL,	write_threads_min, write_threads_max, 1, exp_folder + "Normal_Sched/", "Normal sched",       IO_limit, logical_space, noise_space_min, noise_space_max) );
+	exps.push_back( Experiment::random_writes_on_the_side_experiment(NULL,	write_threads_min, write_threads_max, 1, exp_folder + "Normal_Sched/", "Normal sched",       IO_limit, logical_space, noise_space_min, noise_space_max) );
 
 	BALANCEING_SCHEME = true;
 	MAX_CONCURRENT_GC_OPS = 1;
-	exps.push_back( Experiment_Runner::random_writes_on_the_side_experiment(NULL,	write_threads_min, write_threads_max, 1, exp_folder + "Balanced_Sched/", "Balanced sched",   IO_limit, logical_space, noise_space_min, noise_space_max) );
+	exps.push_back( Experiment::random_writes_on_the_side_experiment(NULL,	write_threads_min, write_threads_max, 1, exp_folder + "Balanced_Sched/", "Balanced sched",   IO_limit, logical_space, noise_space_min, noise_space_max) );
 
-	Experiment_Runner::draw_graphs(exps, exp_folder);
+	Experiment::draw_graphs(exps, exp_folder);
 	vector<int> num_write_thread_values_to_show;
 	for (int i = write_threads_min; i <= write_threads_max; i += 1)
 		num_write_thread_values_to_show.push_back(i); // Show all used spaces values in multi-graphs
-	Experiment_Runner::draw_experiment_spesific_graphs(exps, exp_folder, num_write_thread_values_to_show);
+	Experiment::draw_experiment_spesific_graphs(exps, exp_folder, num_write_thread_values_to_show);
 
-	double start_time = Experiment_Runner::wall_clock_time();
-	double end_time = Experiment_Runner::wall_clock_time();
-	printf("=== Entire experiment finished in %s ===\n", Experiment_Runner::pretty_time(end_time - start_time).c_str());
+	double start_time = Experiment::wall_clock_time();
+	double end_time = Experiment::wall_clock_time();
+	printf("=== Entire experiment finished in %s ===\n", Experiment::pretty_time(end_time - start_time).c_str());
 
 	chdir(".."); // Leaving
 	return 0;

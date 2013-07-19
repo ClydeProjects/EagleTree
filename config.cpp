@@ -270,8 +270,8 @@ void set_normal_config() {
 	SSD_SIZE = 2;				// 8
 	PACKAGE_SIZE = 2;			// 8
 	DIE_SIZE = 1;
-	PLANE_SIZE = 512;			// 1024
-	BLOCK_SIZE = 128;			// 128
+	PLANE_SIZE = 128;			// 1024
+	BLOCK_SIZE = 64;			// 128
 
 	PAGE_READ_DELAY = 115 ;
 	PAGE_WRITE_DELAY = 1600 ;

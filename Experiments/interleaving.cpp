@@ -9,11 +9,12 @@ using namespace ssd;
 
 int main()
 {
-	set_normal_config();
-	string exp_folder  = "interleaving_exp/";
- 	mkdir(exp_folder.c_str(), 0755);
+	string name  = "/exp_interleaving/";
+	string exp_folder = get_current_dir_name() + name;
+	Experiment::create_base_folder(exp_folder.c_str());
 
-	Workload_Definition* workload = new Asynch_Random_Workload();
+	set_normal_config();
+
 	int IO_limit = 200000;
 	long op_min = 1000000;
 	long op_max = 1000000;
@@ -22,19 +23,29 @@ int main()
 
 	Workload_Definition* init = new Init_Workload();
 	string a = "/" + exp_folder;
-	string calibrated_file = get_current_dir_name() + a + "interleaving_calibrated_state.txt";
-	Experiment_Runner::calibrate_and_save(calibrated_file, init);
 
-	SCHEDULING_SCHEME = 0;
+	string calibration_file = "calib.txt";
+	Experiment::calibrate_and_save(init, calibration_file);
+
+	Workload_Definition* workload = new Asynch_Random_Workload();
+	Experiment* e = new Experiment();
+	e->set_calibration_file(calibration_file);
+	e->set_workload(workload);
+	e->set_io_limit(50000);
+
+	BLOCK_MANAGER_ID = 0;
 	ALLOW_DEFERRING_TRANSFERS = false;
-	exps.push_back( Experiment_Runner::simple_experiment(workload, exp_folder + "no_split/", "no split", IO_limit, WRITE_DEADLINE, op_min, op_max, incr, calibrated_file) );
-
 	SCHEDULING_SCHEME = 0;
-	ALLOW_DEFERRING_TRANSFERS = true;
-	exps.push_back( Experiment_Runner::simple_experiment(workload, exp_folder + "split/", "split", IO_limit, WRITE_DEADLINE, op_min, op_max, incr, calibrated_file) );
+	e->run("no_split");
 
-	SCHEDULING_SCHEME = 1;
 	ALLOW_DEFERRING_TRANSFERS = true;
+	e->run("split");
+
+	delete workload;
+	delete init;
+
+	//SCHEDULING_SCHEME = 1;
+	//ALLOW_DEFERRING_TRANSFERS = true;
 	//exps.push_back( Experiment_Runner::simple_experiment(workload, init,	exp_folder + "smart/", "smart", IO_limit, WRITE_DEADLINE, op_min, op_max, incr) );
 
 	//SCHEDULING_SCHEME = 4;
@@ -43,13 +54,13 @@ int main()
 	//exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "all_equal/", "all_equal", IO_limit, WRITE_DEADLINE, deadline_min, deadline_max, incr) );
 
 	//exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "deadlines3333/", "deadlines3333/", IO_limit, WRITE_DEADLINE, deadline_min, deadline_max, incr) );
-	delete init;
+	/*delete init;
 	delete workload;
-	Experiment_Runner::draw_graphs(exps, exp_folder);
+	Experiment::draw_graphs(exps, exp_folder);
 	vector<int> num_write_thread_values_to_show(0);
 	for (double i = op_min; i <= op_max; i += incr)
 		num_write_thread_values_to_show.push_back(i); // Show all used spaces values in multi-graphs
-	Experiment_Runner::draw_experiment_spesific_graphs(exps, exp_folder, num_write_thread_values_to_show);
-	chdir(".."); // Leaving
+	Experiment::draw_experiment_spesific_graphs(exps, exp_folder, num_write_thread_values_to_show);
+	chdir(".."); // Leaving */
 	return 0;
 }
