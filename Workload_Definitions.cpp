@@ -121,10 +121,6 @@ vector<Thread*> Synch_Write::generate() {
 //				File System With Noise
 //*****************************************************************************************
 
-File_System_With_Noise::File_System_With_Noise() {
-
-}
-
 vector<Thread*> File_System_With_Noise::generate() {
 
 	long log_space_per_thread = max_lba / 4;

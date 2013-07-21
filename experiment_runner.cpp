@@ -31,7 +31,9 @@ Experiment::Experiment()
 	: d_variable(NULL), d_min(0), d_max(0), d_incr(0),
 	  i_variable(NULL), i_min(0), i_max(0), i_incr(0),
 	  io_limit(NUMBER_OF_ADDRESSABLE_PAGES()),
-	  workload(NULL)
+	  workload(NULL), calibration_workload(NULL),
+	  calibrate_for_each_point(false),
+	  results()
 {}
 
 void Experiment::unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer) {
@@ -58,34 +60,7 @@ void Experiment::run_single_measurment(Workload_Definition* experiment_workload,
 	//Free_Space_Per_LUN_Meter::print();
 }
 
-vector<Experiment_Result> Experiment::simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, double& variable, double min_val, double max_val, double incr) {
-	assert(experiment_workload != NULL);
-	string data_folder = base_folder + name + "/";
-	mkdir(data_folder.c_str(), 0755);
-	Experiment_Result global_result(name, data_folder, "Global/", "Changing a Var");
-	global_result.start_experiment();
 
-	for (variable = min_val; variable <= max_val; variable += incr) {
-		printf("----------------------------------------------------------------------------------------------------------\n");
-		printf("%s :  %f \n", name.c_str(), variable);
-		printf("----------------------------------------------------------------------------------------------------------\n");
-
-		string point_folder_name = data_folder + to_string(variable) + "/";
-		mkdir(point_folder_name.c_str(), 0755);
-		VisualTracer::init(point_folder_name);
-		write_config_file(point_folder_name);
-		//OperatingSystem* os = load_state();
-		OperatingSystem* os = new OperatingSystem();
-		run_single_measurment(experiment_workload, IO_limit, os);
-		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
-		write_results_file(point_folder_name);
-		delete os;
-	}
-	global_result.end_experiment();
-	vector<Experiment_Result> results;
-	results.push_back(global_result);
-	return results;
-}
 
 void Experiment::set_variable(double* variable, double low, double high, double incr) {
 	d_variable = variable;
@@ -105,6 +80,12 @@ void Experiment::run(string name) {
 	if (i_variable == NULL && d_variable == NULL) {
 		run_single_point(name);
 	}
+	else if (d_variable != NULL) {
+		simple_experiment_double(name, d_variable, d_min, d_max, d_incr);
+	}
+	else if (i_variable != NULL) {
+		simple_experiment_double(name, i_variable, i_min, i_max, i_incr);
+	}
 }
 
 void Experiment::run_single_point(string name) {
@@ -115,16 +96,10 @@ void Experiment::run_single_point(string name) {
 
 	VisualTracer::init(data_folder);
 	write_config_file(data_folder);
-
-	OperatingSystem* os;
-	if (calibration_file.empty()) {
-		os = new OperatingSystem();
-	}
-	else {
-		os = load_state(calibration_file);
-	}
-
 	Queue_Length_Statistics::init();
+
+	OperatingSystem* os = calibration_file.empty() ? new OperatingSystem() : load_state(calibration_file);
+
 	if (workload != NULL) {
 		vector<Thread*> experiment_threads = workload->generate_instance();
 		os->set_threads(experiment_threads);
@@ -144,6 +119,59 @@ void Experiment::run_single_point(string name) {
 	global_result.collect_stats(0, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
 	write_results_file(data_folder);
 
+	global_result.end_experiment();
+	vector<Experiment_Result> result;
+	result.push_back(global_result);
+	results.push_back(result);
+}
+
+template <class T>
+void Experiment::simple_experiment_double(string name, T* var, T min, T max, T inc) {
+	string data_folder = base_folder + name + "/";
+	mkdir(data_folder.c_str(), 0755);
+	Experiment_Result global_result(name, data_folder, "Global/", "Changing a Var");
+	global_result.start_experiment();
+	T& variable = *var;
+	for (variable = min; variable <= max; variable += inc) {
+		printf("----------------------------------------------------------------------------------------------------------\n");
+		printf("%s :  %s \n", name.c_str(), to_string(variable).c_str());
+		printf("----------------------------------------------------------------------------------------------------------\n");
+		printf("%d\n", WRITE_DEADLINE);
+
+		string point_folder_name = data_folder + to_string(variable) + "/";
+		mkdir(point_folder_name.c_str(), 0755);
+		VisualTracer::init(point_folder_name);
+		Free_Space_Meter::init();
+		write_config_file(point_folder_name);
+		Queue_Length_Statistics::init();
+		Free_Space_Per_LUN_Meter::init();
+
+		OperatingSystem* os;
+		if (calibrate_for_each_point && calibration_workload != NULL) {
+			string calib_file_name = "calib-" + to_string(variable) + ".txt";
+			Experiment::calibrate_and_save(calibration_workload, calib_file_name);
+			os = load_state(calib_file_name);
+		} else if (!calibration_file.empty()) {
+			os = load_state(calibration_file);
+		} else {
+			os = new OperatingSystem();
+		}
+
+		if (workload != NULL) {
+			vector<Thread*> experiment_threads = workload->generate_instance();
+			os->set_threads(experiment_threads);
+		}
+		os->set_num_writes_to_stop_after(io_limit);
+		os->run();
+		StatisticsGatherer::get_global_instance()->print();
+		Utilization_Meter::print();
+		Queue_Length_Statistics::print_avg();
+		Free_Space_Meter::print();
+		Free_Space_Per_LUN_Meter::print();
+		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
+		write_results_file(point_folder_name);
+		delete os;
+	}
 	global_result.end_experiment();
 	vector<Experiment_Result> result;
 	result.push_back(global_result);

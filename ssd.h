@@ -180,7 +180,7 @@ extern int BLOCK_MANAGER_ID;
 extern int GREED_SCALE;
 extern int WEARWOLF_LOCALITY_THRESHOLD;
 extern bool ENABLE_TAGGING;
-extern long WRITE_DEADLINE;
+extern int WRITE_DEADLINE;
 extern int READ_DEADLINE;
 extern int READ_TRANSFER_DEADLINE;
 
@@ -1216,7 +1216,6 @@ private:
 	vector<vector<uint> > num_wl_writes_per_LUN_origin;
 	vector<vector<uint> > num_wl_writes_per_LUN_destination;
 
-	bool expleriment_started;
 	double start_time;
 	double end_time;
 };
@@ -1352,7 +1351,6 @@ private:
 
 class File_System_With_Noise : public Workload_Definition {
 public:
-	File_System_With_Noise();
 	vector<Thread*> generate();
 };
 
@@ -1399,17 +1397,18 @@ public:
 	static string get_working_dir();
 	static void unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer);
 	static void run_single_measurment(Workload_Definition* experiment_workload, int IO_limit, OperatingSystem* os);
-	vector<Experiment_Result> simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, double& variable, double min_val, double max_val, double incr);
+	template <class T> void simple_experiment_double(string name, T* variable, T min, T max, T inc);
 	static vector<Experiment_Result> simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, long& variable, long min_val, long max_val, long incr);
 	static void simple_experiment(Workload_Definition* workload, string name, int IO_limit);
+	void setup(string name);
 	void run(string experiment_name);
 	void run_single_point(string name);
 	static vector<Experiment_Result> random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba);
 	static Experiment_Result copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
 	static Experiment_Result copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);
 
-	static void draw_graphs(vector<vector<Experiment_Result> > results, string exp_folder);
-	static void draw_experiment_spesific_graphs(vector<vector<Experiment_Result> > results, string exp_folder, vector<int> x_vals);
+	void draw_graphs();
+	void draw_experiment_spesific_graphs();
 	static void save_state(OperatingSystem* os, string file_name);
 	static OperatingSystem* load_state(string file_name);
 	static void calibrate_and_save(Workload_Definition*, string name, bool force = false);
@@ -1420,6 +1419,7 @@ public:
 	void set_variable(double* variable, double low, double high, double incr);
 	void set_variable(int* variable, int low, int high, int incr);
 	void set_workload(Workload_Definition* w) { workload = w; }
+	void set_calibration_workload(Workload_Definition* w) { calibrate_for_each_point = true; calibration_workload = w; }
 	void set_io_limit(int limit) { io_limit = limit; };
 	void set_calibration_file(string file) { calibration_file = file; }
 private:
@@ -1431,8 +1431,10 @@ private:
 
 	int io_limit;
 	Workload_Definition* workload;
+	Workload_Definition* calibration_workload;
 	vector<vector<Experiment_Result> > results;
 	string calibration_file;
+	bool calibrate_for_each_point;
 
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
 

@@ -107,7 +107,8 @@ void Event::print(FILE *stream) const
 		//merge_address.print(stream);
 	//if(type == WRITE || type == TRIM || type == COPY_BACK)
 		//replace_address.print(stream);
-	fprintf(stream, " Time[%d, %d, %d, %d, %d, %d]", (int)start_time, (int)os_wait_time, (int)accumulated_wait_time, (int)bus_wait_time, (int)execution_time, (int)get_current_time());
+	//fprintf(stream, " Time[%f, %f, %f, %f, %f, %f]", start_time, os_wait_time, accumulated_wait_time, bus_wait_time, execution_time, get_current_time());
+	fprintf(stream, " Time[%d, %d, %d, %d]", (int)start_time, (int)os_wait_time, (int)bus_wait_time, (int)execution_time);
 	//fprintf(stream, " Time[%d, %d, %d]", (int)start_time, (int)bus_wait_time, (int)get_current_time());
 	//fprintf(stream, "\tTime[%d, %d, %d, %d]", (int)start_time, (int) (start_time + os_wait_time),(int) bus_wait_time + (int)os_wait_time, (int) get_current_time());
 	fprintf(stream, " ID: %d ", id);

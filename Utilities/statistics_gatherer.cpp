@@ -20,7 +20,6 @@ StatisticsGatherer::StatisticsGatherer()
 	: num_gc_cancelled_no_candidate(0),
 	  num_gc_cancelled_not_enough_free_space(0),
 	  num_gc_cancelled_gc_already_happening(0),
-//	  ssd(ssd),
 	  bus_wait_time_for_reads_per_LUN(SSD_SIZE, vector<vector<double> >(PACKAGE_SIZE, vector<double>())),
 	  num_reads_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  bus_wait_time_for_writes_per_LUN(SSD_SIZE, vector<vector<double> >(PACKAGE_SIZE, vector<double>())),
@@ -47,7 +46,6 @@ StatisticsGatherer::StatisticsGatherer()
 	  num_gc_targeting_anything(0),
 	  num_wl_writes_per_LUN_origin(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_wl_writes_per_LUN_destination(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
-	  expleriment_started(false),
 	  start_time(UNDEFINED),
 	  end_time(UNDEFINED)
 {}
@@ -69,13 +67,6 @@ StatisticsGatherer *StatisticsGatherer::get_global_instance()
 }
 
 void StatisticsGatherer::register_completed_event(Event const& event) {
-	//if (inst != this) inst->register_completed_event(event); // Do the same for global instance
-
-	//if (inst == this && /*!expleriment_started &&*/ !event.is_experiment_io()) { // Only register experiment IOs in global instance?!?
-	//	return;
-	//}
-
-	expleriment_started = true;
 	if (start_time == UNDEFINED) {
 		start_time = event.get_start_time();
 	}

@@ -194,9 +194,9 @@ uint MAX_ITEMS_IN_COPY_BACK_MAP = 1024;
 /* Defines the maximal length of the SSD queue  */
 int MAX_SSD_QUEUE_SIZE = 15;
 
-long WRITE_DEADLINE = 1000000;
-int READ_DEADLINE =  1000000;
-int READ_TRANSFER_DEADLINE = 1000000;
+int WRITE_DEADLINE = 10000000;
+int READ_DEADLINE =  10000000;
+int READ_TRANSFER_DEADLINE = 10000000;
 
 /* Defines the maximal number of locks that can be held by the OS  */
 uint MAX_OS_NUM_LOCKS = 1000;
@@ -267,23 +267,23 @@ void load_entry(char *name, double value, uint line_number) {
 	return;
 }
 void set_normal_config() {
-	SSD_SIZE = 2;				// 8
-	PACKAGE_SIZE = 2;			// 8
+	SSD_SIZE = 4;				// 8
+	PACKAGE_SIZE = 8;			// 8
 	DIE_SIZE = 1;
-	PLANE_SIZE = 128;			// 1024
+	PLANE_SIZE = 256;			// 1024
 	BLOCK_SIZE = 64;			// 128
 
-	PAGE_READ_DELAY = 115 ;
+	/*PAGE_READ_DELAY = 115 ;
 	PAGE_WRITE_DELAY = 1600 ;
 	BUS_CTRL_DELAY = 5 ;
 	BUS_DATA_DELAY = 350 ;
-	BLOCK_ERASE_DELAY = 3000 ;
+	BLOCK_ERASE_DELAY = 3000 ;*/
 
-	/*PAGE_READ_DELAY = 115 / 5;
+	PAGE_READ_DELAY = 115 / 5;
 	PAGE_WRITE_DELAY = 1600 / 5;
 	BUS_CTRL_DELAY = 5 / 5;
 	BUS_DATA_DELAY = 350 / 5;
-	BLOCK_ERASE_DELAY = 3000 / 5;*/
+	BLOCK_ERASE_DELAY = 3000 / 5;
 
 	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;

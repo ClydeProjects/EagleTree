@@ -60,7 +60,6 @@ void mark_as_gc_or_app(bool gc, bool app, vector<vector<char> >& symbols) {
 }
 
 void VisualTracer::register_completed_event(Event& event) {
-	write_to_file = false;
 	if (event.get_event_type() == TRIM || !write_to_file) {
 		return;
 	}
@@ -174,6 +173,8 @@ void VisualTracer::write_with_id(int package, int die, char symbol, int length, 
 void VisualTracer::print_horizontally(int last_how_many_characters) {
 	int starting_point;
 	if (last_how_many_characters == UNDEFINED) {
+		starting_point = 0;
+	} else if (trace[0][0].size() < last_how_many_characters) {
 		starting_point = 0;
 	} else {
 		starting_point = trace[0][0].size() - last_how_many_characters;

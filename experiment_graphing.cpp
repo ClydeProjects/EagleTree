@@ -385,24 +385,24 @@ string Experiment::get_working_dir() {
 	return currentPath;
 }
 
-void Experiment::draw_graphs(vector<vector<Experiment_Result> > exps, string exp_folder) {
+void Experiment::draw_graphs() {
 	int sx = 16;
 	int sy = 8;
 	//for (int i = 0; i < exps[0][0].column_names.size(); i++) {
 		//printf("%d: %s\n", i, exps[0][0].column_names[i].c_str());
 	//}
-	printf("chdir %s\n", exp_folder.c_str());
-	chdir(exp_folder.c_str());
-	for (int i = 0; i < exps[0].size(); ++i) { // i = 0: GLOBAL, i = 1: EXPERIMENT, i = 2: WRITE_THREADS
+	printf("chdir %s\n", base_folder.c_str());
+	chdir(base_folder.c_str());
+	for (int i = 0; i < results[0].size(); ++i) { // i = 0: GLOBAL, i = 1: EXPERIMENT, i = 2: WRITE_THREADS
 		vector<Experiment_Result> exp;
-		for (int j = 0; j < exps.size(); ++j) {
-			exp.push_back(exps[j][i]);
+		for (int j = 0; j < results.size(); ++j) {
+			exp.push_back(results[j][i]);
 		}
-		cout << "chdir "<<exps[0][i].sub_folder.c_str() << "\n";
-		int error = (exps[0][i].sub_folder != "") ? mkdir(exps[0][i].sub_folder.c_str(), 0755) : 0;
+		cout << "chdir "<< results[0][i].sub_folder.c_str() << "\n";
+		int error = (results[0][i].sub_folder != "") ? mkdir(results[0][i].sub_folder.c_str(), 0755) : 0;
 		//if (error != 0 && error != 17 /*EEXIST*/) printf("Error %d creating to folder %s\n", error, exps[0][i].data_folder.c_str());
-		error = (exps[0][i].sub_folder != "") ? chdir(exps[0][i].sub_folder.c_str()) : 0;
-		if (error != 0) printf("Error %d changing to folder %s\n", error, exps[0][i].sub_folder.c_str());
+		error = (results[0][i].sub_folder != "") ? chdir(results[0][i].sub_folder.c_str()) : 0;
+		if (error != 0) printf("Error %d changing to folder %s\n", error, results[0][i].sub_folder.c_str());
 
 		Experiment::graph(sx, sy,   "Throughput", 				"throughput", 			26, exp, UNDEFINED);
 		Experiment::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	27, exp);
@@ -434,18 +434,28 @@ void Experiment::draw_graphs(vector<vector<Experiment_Result> > exps, string exp
 		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 70, 1, 4);
 		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 60", exp, 60, 1, 4);*/
 		/*if (i > 0)*/ { chdir(".."); }
+		draw_experiment_spesific_graphs();
 	}
+
 }
 
-void Experiment::draw_experiment_spesific_graphs(vector<vector<Experiment_Result> > exps, string exp_folder, vector<int> x_vals) {
+void Experiment::draw_experiment_spesific_graphs() {
 		int sx = 16;
 		int sy = 8;
 
-		uint mean_pos_in_datafile = std::find(exps[0][0].column_names.begin(), exps[0][0].column_names.end(), "Write latency, mean (µs)") - exps[0][0].column_names.begin();
-		assert(mean_pos_in_datafile != exps[0][0].column_names.size());
+		vector<int> x_vals;
+		for (double i = d_min; i < d_max && d_variable != NULL; i += d_incr) {
+			x_vals.push_back(i * 100);
+		}
+		for (int i = i_min; i < i_max && i_variable != NULL; i += i_incr) {
+			x_vals.push_back(i);
+		}
 
-		for (uint j = 0; j < exps.size(); j++) {
-			vector<Experiment_Result>& exp = exps[j];
+		uint mean_pos_in_datafile = std::find(results[0][0].column_names.begin(), results[0][0].column_names.end(), "Write latency, mean (µs)") - results[0][0].column_names.begin();
+		assert(mean_pos_in_datafile != results[0][0].column_names.size());
+
+		for (uint j = 0; j < results.size(); j++) {
+			vector<Experiment_Result>& exp = results[j];
 			for (uint i = 0; i < exp.size(); i++) {
 				printf("%s\n", exp[i].data_folder.c_str());
 				if (chdir(exp[i].data_folder.c_str()) != 0) printf("Error changing dir to %s\n", exp[i].data_folder.c_str());
@@ -453,7 +463,7 @@ void Experiment::draw_experiment_spesific_graphs(vector<vector<Experiment_Result
 				Experiment::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], x_vals, 1, 4);
 				Experiment::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], x_vals, true);
 				Experiment::age_histogram			(sx, sy/2, "age-histograms", exp[i], x_vals);
-				Experiment::queue_length_history		(sx, sy/2, "queue_length", exp[i], x_vals);
+				Experiment::queue_length_history	(sx, sy/2, "queue_length", exp[i], x_vals);
 				Experiment::throughput_history		(sx, sy/2, "throughput_history", exp[i], x_vals);
 			}
 		}

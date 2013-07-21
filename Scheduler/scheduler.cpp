@@ -214,7 +214,7 @@ void IOScheduler::handle(vector<Event*>& events) {
 
 // executes read_commands, read_transfers and erases
 void IOScheduler::handle_event(Event* event) {
-	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
+	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time(), event->get_event_type());
 	bool can_schedule = bm->can_schedule_on_die(event->get_address(), event->get_event_type(), event->get_application_io_id());
 	if (!can_schedule) {
 		event->incr_bus_wait_time(BUS_DATA_DELAY + BUS_CTRL_DELAY + time);
@@ -230,8 +230,16 @@ void IOScheduler::handle_event(Event* event) {
 }
 
 void IOScheduler::handle_read(Event* event) {
-	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
+	/*if (event->get_application_io_id() == 178) {
+		event->print();
+		int i = 0;
+		i++;
+		VisualTracer::print_horizontally(2000);
+	}*/
+
+	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time(), event->get_event_type());
 	bool can_schedule = bm->can_schedule_on_die(event->get_address(), event->get_event_type(), event->get_application_io_id());
+
 	if (!can_schedule) {
 		event->incr_bus_wait_time(BUS_DATA_DELAY + BUS_CTRL_DELAY + time);
 		push(event);
@@ -303,7 +311,7 @@ void IOScheduler::handle_flexible_read(Event* event) {
 			return;
 		}
 	}
-	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, fr->get_current_time());
+	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, fr->get_current_time(), fr->get_event_type());
 	if ( wait_time == 0 && !bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id())) {
 		wait_time = WAIT_TIME;
 	}
@@ -327,7 +335,7 @@ void IOScheduler::handle_flexible_read(Event* event) {
 void IOScheduler::handle_write(Event* event) {
 	Address addr = bm->choose_write_address(*event);
 	try_to_put_in_safe_cache(event);
-	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time());
+	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time(), event->get_event_type());
 
 	if (addr.valid == NONE && event->get_event_type() == COPY_BACK) {
 		transform_copyback(event);
@@ -440,6 +448,12 @@ void IOScheduler::setup_dependent_event(Event* event, Event* dependent) {
 	//dependent->incr_os_wait_time(event->get_os_wait_time());
 	dependent->incr_accumulated_wait_time(diff);
 	dependent->incr_pure_ssd_wait_time(event->get_bus_wait_time() + event->get_execution_time());
+	if (dependent->get_current_time() != event->get_current_time()) {
+		printf("%f\n", dependent->get_current_time());
+		printf("%f\n", event->get_current_time());
+		dependent->print();
+		event->print();
+	}
 	assert(dependent->get_current_time() == event->get_current_time());
 	dependent->set_noop(event->get_noop());
 

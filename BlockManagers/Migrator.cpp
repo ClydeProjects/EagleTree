@@ -284,11 +284,11 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 				register_copy_back_operation_on(logical_address);
 				//printf("COPY_BACK MAP (Size: %d):\n", page_copy_back_count.size()); for (map<long, uint>::iterator it = page_copy_back_count.begin(); it != page_copy_back_count.end(); it++) printf(" lba %d\t: %d\n", it->first, it->second);
 			} else {
-				Event* read = new Event(READ, logical_address, 1, gc_event->get_start_time());
+				Event* read = new Event(READ, logical_address, 1, gc_event->get_current_time());
 				read->set_address(addr);
 				read->set_garbage_collection_op(true);
 
-				Event* write = new Event(WRITE, logical_address, 1, gc_event->get_start_time());
+				Event* write = new Event(WRITE, logical_address, 1, gc_event->get_current_time());
 				write->set_garbage_collection_op(true);
 				write->set_replace_address(addr);
 

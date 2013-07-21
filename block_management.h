@@ -70,7 +70,7 @@ public:
 	Address choose_flexible_read_address(Flexible_Read_Event* fr);
 	virtual void register_write_arrival(Event const& write);
 	virtual void trim(Event const& write);
-	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double current_time) const;
+	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double current_time, event_type type) const;
 	vector<deque<Event*> > migrate(Event * gc_event);
 	bool Copy_backs_in_progress(Address const& address);
 	bool can_schedule_on_die(Address const& address, event_type type, uint app_io_id) const;

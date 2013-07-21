@@ -22,8 +22,6 @@ int main()
 	vector<vector<Experiment_Result> > exps;
 
 	Workload_Definition* init = new Init_Workload();
-	string a = "/" + exp_folder;
-
 	string calibration_file = "calib.txt";
 	Experiment::calibrate_and_save(init, calibration_file);
 
