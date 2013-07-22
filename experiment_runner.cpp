@@ -366,7 +366,7 @@ void Experiment::calibrate_and_save(Workload_Definition* workload, string name, 
 	VisualTracer::init();
 	printf("Creating calibrated SSD state.\n");
 	OperatingSystem* os = new OperatingSystem();
-	os->set_num_writes_to_stop_after(NUMBER_OF_ADDRESSABLE_PAGES() * 2);
+	os->set_num_writes_to_stop_after(NUMBER_OF_ADDRESSABLE_PAGES() * 3);
 	vector<Thread*> init_threads = workload->generate_instance();
 	os->set_threads(init_threads);
 	os->run();
