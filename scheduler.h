@@ -123,6 +123,8 @@ private:
 	void push(Event* event);
 	void manage_operation_completion(Event* event);
 	double get_soonest_event_time(vector<Event*> const& events) const;
+	void send_earliest_completed_events_back();
+	void complete(Event* event);
 
 	event_queue* future_events;
 	Scheduling_Strategy* overdue_events;

@@ -101,17 +101,34 @@ void IOScheduler::schedule_event(Event* event) {
 	schedule_events_queue(eventVec);
 }
 
+void IOScheduler::send_earliest_completed_events_back() {
+	for (auto event : completed_events->get_soonest_events()) {
+		ssd->register_event_completion(event);
+	}
+}
+
+void IOScheduler::complete(Event* event) {
+	if (event->is_original_application_io()) {
+		completed_events->push(event);
+	} else {
+		ssd->register_event_completion(event);
+	}
+}
+
 void IOScheduler::execute_soonest_events() {
+	if (current_events->empty() && overdue_events->empty() && !completed_events->empty()) {
+		send_earliest_completed_events_back();
+	}
 	double current_time = get_current_time();
 	double next_events_time = current_time + 1;
 	update_current_events(current_time);
-	if (current_events->empty() && overdue_events->empty() && !completed_events->empty()) {
-		for (auto event : completed_events->get_soonest_events()) {
-			ssd->register_event_completion(event);
-		}
-	}
-
 	while (current_time < next_events_time && (!current_events->empty() || !overdue_events->empty())) {
+		if (!completed_events->empty() && current_time >= completed_events->get_earliest_time()) {
+			send_earliest_completed_events_back();
+			update_current_events(current_time);
+			current_time = get_current_time();
+			continue;
+		}
 		if (!overdue_events->empty() && overdue_events->get_earliest_time() < next_events_time) {
 			overdue_events->schedule();
 		}
@@ -214,7 +231,7 @@ void IOScheduler::handle(vector<Event*>& events) {
 
 // executes read_commands, read_transfers and erases
 void IOScheduler::handle_event(Event* event) {
-	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time(), event->get_event_type());
+	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
 	bool can_schedule = bm->can_schedule_on_die(event->get_address(), event->get_event_type(), event->get_application_io_id());
 	if (!can_schedule) {
 		event->incr_bus_wait_time(BUS_DATA_DELAY + BUS_CTRL_DELAY + time);
@@ -230,14 +247,7 @@ void IOScheduler::handle_event(Event* event) {
 }
 
 void IOScheduler::handle_read(Event* event) {
-	/*if (event->get_application_io_id() == 178) {
-		event->print();
-		int i = 0;
-		i++;
-		VisualTracer::print_horizontally(2000);
-	}*/
-
-	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time(), event->get_event_type());
+	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
 	bool can_schedule = bm->can_schedule_on_die(event->get_address(), event->get_event_type(), event->get_application_io_id());
 
 	if (!can_schedule) {
@@ -311,7 +321,7 @@ void IOScheduler::handle_flexible_read(Event* event) {
 			return;
 		}
 	}
-	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, fr->get_current_time(), fr->get_event_type());
+	double wait_time = bm->in_how_long_can_this_write_be_scheduled(fr->get_current_time());
 	if ( wait_time == 0 && !bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id())) {
 		wait_time = WAIT_TIME;
 	}
@@ -335,7 +345,11 @@ void IOScheduler::handle_flexible_read(Event* event) {
 void IOScheduler::handle_write(Event* event) {
 	Address addr = bm->choose_write_address(*event);
 	try_to_put_in_safe_cache(event);
-	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time(), event->get_event_type());
+	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time());
+	if (wait_time > 0) {
+		wait_time = max(1.0, bm->in_how_long_can_this_write_be_scheduled( event->get_current_time() ));
+	}
+	//assert(wait_time1 == wait_time);
 
 	if (addr.valid == NONE && event->get_event_type() == COPY_BACK) {
 		transform_copyback(event);
@@ -406,22 +420,14 @@ void IOScheduler::handle_noop_events(vector<Event*>& events) {
 			e->incr_pure_ssd_wait_time(event->get_bus_wait_time() + event->get_execution_time());
 			dependents.pop_front();
 			e->set_noop(true);
-			if (event->is_original_application_io()) {
-				completed_events->push(e);
-			} else {
-				ssd->register_event_completion(e);
-			}
+			complete(e);
 		}
 		dependencies.erase(dependency_code);
 		dependency_code_to_LBA.erase(dependency_code);
 		dependency_code_to_type.erase(dependency_code);
 		manage_operation_completion(event);
 		//ssd->register_event_completion(event);
-		if (event->is_original_application_io()) {
-			completed_events->push(event);
-		} else {
-			ssd->register_event_completion(event);
-		}
+		complete(event);
 	}
 }
 
@@ -475,11 +481,6 @@ enum status IOScheduler::execute_next(Event* event) {
 		}
 	}
 
-	if (event->get_id() == 653) {
-		int i = 0;
-		i++;
-	}
-
 	handle_finished_event(event);
 
 	int dependency_code = event->get_application_io_id();
@@ -504,30 +505,15 @@ enum status IOScheduler::execute_next(Event* event) {
 		manage_operation_completion(event);
 	}
 
-	if (event->get_application_io_id() == 98976) {
-			int i = 1;
-			i++;
-		}
-
-	if (event->get_application_io_id() == 105531) {
-			int i = 1;
-			i++;
-		}
-
 	if (safe_cache.exists(event->get_logical_address())) {
 		safe_cache.remove(event->get_logical_address());
 		//printf("removing from cache:  %d\n", event->get_logical_address());
 		delete event;
 	} else {
-		if (event->is_original_application_io()) {
-			completed_events->push(event);
-		} else {
-			ssd->register_event_completion(event);
-		}
+		complete(event);
 		if (completed_events->size() >= MAX_SSD_QUEUE_SIZE) {
-			for (auto event : completed_events->get_soonest_events()) {
-				ssd->register_event_completion(event);
-			}
+			send_earliest_completed_events_back();
+			printf("here, events back to ssd\n");
 		}
 	}
 	return result;
@@ -543,13 +529,14 @@ void IOScheduler::manage_operation_completion(Event* event) {
 		op_code_to_dependent_op_codes[dependency_code].pop();
 		Event* dependant_event = dependencies[dependent_code].front();
 
-		if (dependant_event->get_application_io_id() == 10111) {
+		if (dependant_event->get_application_io_id() == 245479) {
 			dependant_event->print();
 		}
 
 		double diff = event->get_current_time() - dependant_event->get_current_time();
 		if (diff > 0) {
-			dependant_event->incr_bus_wait_time(diff);
+			dependant_event->incr_accumulated_wait_time(diff);
+			dependant_event->incr_pure_ssd_wait_time(event->get_bus_wait_time() + event->get_execution_time());
 		}
 		dependencies[dependent_code].pop_front();
 		init_event(dependant_event);

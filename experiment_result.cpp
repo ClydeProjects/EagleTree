@@ -54,11 +54,11 @@ void Experiment_Result::start_experiment() {
     (*stats_file) << "\"" << variable_parameter_name << "\", " << StatisticsGatherer::get_global_instance()->totals_csv_header() << ", \"" << throughput_column_name << "\", \"" << write_throughput_column_name << "\", \"" << read_throughput_column_name << "\"" << "\n";
 }
 
-void Experiment_Result::collect_stats(double variable_parameter_value, double os_runtime) {
-	collect_stats(variable_parameter_value, os_runtime, StatisticsGatherer::get_global_instance());
+void Experiment_Result::collect_stats(double variable_parameter_value) {
+	collect_stats(variable_parameter_value, StatisticsGatherer::get_global_instance());
 }
 
-void Experiment_Result::collect_stats(double variable_parameter_value, double os_runtime, StatisticsGatherer* statistics_gatherer) {
+void Experiment_Result::collect_stats(double variable_parameter_value, StatisticsGatherer* statistics_gatherer) {
 	assert(experiment_started && !experiment_finished);
 
 	chdir(data_folder.c_str());
@@ -66,8 +66,8 @@ void Experiment_Result::collect_stats(double variable_parameter_value, double os
 	// Compute throughput
 	int total_read_IOs_issued  = statistics_gatherer->total_reads();
 	int total_write_IOs_issued = statistics_gatherer->total_writes();
-	long double read_throughput = (long double) (total_read_IOs_issued / os_runtime) * 1000; // IOs/sec
-	long double write_throughput = (long double) (total_write_IOs_issued / os_runtime) * 1000; // IOs/sec
+	long double read_throughput = (long double) (statistics_gatherer->get_reads_throughput() / 1000.0) ; // IOs/sec
+	long double write_throughput = (long double) (statistics_gatherer->get_writes_throughput() / 1000.0); // IOs/sec
 	long double total_throughput = write_throughput + read_throughput;
 
 	(*stats_file) << variable_parameter_value << ", " << statistics_gatherer->totals_csv_line() << ", " << total_throughput << ", " << write_throughput << ", " << read_throughput << "\n";

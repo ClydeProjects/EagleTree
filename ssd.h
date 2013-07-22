@@ -1147,6 +1147,9 @@ public:
 	vector<double> max_waittimes();
 	uint total_reads();
 	uint total_writes();
+	double get_reads_throughput();
+	double get_writes_throughput();
+	double get_total_throughput();
 
 	long num_gc_cancelled_no_candidate;
 	long num_gc_cancelled_not_enough_free_space;
@@ -1216,7 +1219,6 @@ private:
 	vector<vector<uint> > num_wl_writes_per_LUN_origin;
 	vector<vector<uint> > num_wl_writes_per_LUN_destination;
 
-	double start_time;
 	double end_time;
 };
 
@@ -1289,8 +1291,8 @@ public:
 	Experiment_Result(string experiment_name, string data_folder, string sub_folder, string variable_parameter_name);
 	~Experiment_Result();
 	void start_experiment();
-	void collect_stats(double variable_parameter_value, double os_runtime);
-	void collect_stats(double variable_parameter_value, double os_runtime, StatisticsGatherer* statistics_gatherer);
+	void collect_stats(double variable_parameter_value);
+	void collect_stats(double variable_parameter_value, StatisticsGatherer* statistics_gatherer);
 	void end_experiment();
 	double time_elapsed() { return end_time - start_time; }
 

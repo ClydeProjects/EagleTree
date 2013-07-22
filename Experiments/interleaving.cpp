@@ -14,12 +14,13 @@ int main()
 	Experiment::create_base_folder(exp_folder.c_str());
 
 	set_normal_config();
+	SSD_SIZE = 8;
+	PACKAGE_SIZE = 8;
+	PLANE_SIZE = 2048;
+	BLOCK_SIZE = 256;
+	MAX_SSD_QUEUE_SIZE = 64;
+	OVER_PROVISIONING_FACTOR = 0.7;
 
-	int IO_limit = 200000;
-	long op_min = 1000000;
-	long op_max = 1000000;
-	long incr = 1;
-	vector<vector<Experiment_Result> > exps;
 
 	Workload_Definition* init = new Init_Workload();
 	string calibration_file = "calib.txt";
