@@ -98,10 +98,17 @@ vector<Thread*> Init_Workload::generate() {
 	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
 	Simple_Thread* thread = new Asynchronous_Random_Writer(min_lba, max_lba, 23623);
 	init_write->add_follow_up_thread(thread);
-	//init_write->set_statistics_gatherer(stats);
-	//init_write->set_experiment_thread(true);
 	vector<Thread*> threads(1, init_write);
 	return threads;
+}
+
+//*****************************************************************************************
+//				Sequentail write to calibrate the SSD
+//*****************************************************************************************
+
+vector<Thread*> Init_Write::generate() {
+	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
+	return vector<Thread*>(1, init_write);
 }
 
 //*****************************************************************************************

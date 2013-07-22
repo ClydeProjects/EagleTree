@@ -46,8 +46,7 @@ StatisticsGatherer::StatisticsGatherer()
 	  num_gc_targeting_anything(0),
 	  num_wl_writes_per_LUN_origin(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_wl_writes_per_LUN_destination(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
-	  start_time(UNDEFINED),
-	  end_time(UNDEFINED)
+	  end_time(0)
 {}
 
 vector<vector<double> > num_valid_pages_per_gc_op;
@@ -67,10 +66,7 @@ StatisticsGatherer *StatisticsGatherer::get_global_instance()
 }
 
 void StatisticsGatherer::register_completed_event(Event const& event) {
-	if (start_time == UNDEFINED) {
-		start_time = event.get_start_time();
-	}
-	end_time = event.get_current_time();
+	end_time = max(end_time, event.get_current_time());
 
 	uint current_window = floor(event.get_current_time() / io_counter_window_size);
 	while (application_io_history.size() < current_window + 1) application_io_history.push_back(0);
@@ -369,7 +365,7 @@ void StatisticsGatherer::print() {
 	printf("\n");
 	//printf("Erase avg:\t%f \n", get_average(num_erases_per_LUN));
 	//printf("Erase std:\t%f \n", get_std(num_erases_per_LUN));
-	double milliseconds = (end_time - start_time) / 1000;
+	double milliseconds = end_time / 1000;
 	printf("Time taken (ms):\t%d\n", (int)milliseconds);
 	double queue_length = get_average(queue_length_tracker);
 	printf("avg queue length: %d\n", queue_length);
@@ -400,7 +396,15 @@ void StatisticsGatherer::print_simple(FILE* stream) {
 	fprintf(stream, "std reads latency:\t%f\n", reads_std);
 	fprintf(stream, "max reads latency:\t%f\n", reads_max);
 
-	fprintf(stream, "num gc writes:\t%d\n", total_reads());
+	fprintf(stream, "num gc writes:\t%d\n", get_sum(num_gc_writes_per_LUN_destination));
+
+	int read_throughput = (int) (get_reads_throughput() * 1000 * 1000);
+	int writes_throughput = (int) (get_reads_throughput() * 1000 * 1000);
+
+	fprintf(stream, "Thoughput (IO/sec)\n");
+	fprintf(stream, "read throughput:\t%d\n", read_throughput);
+	fprintf(stream, "writes throughput:\t%d\n", writes_throughput);
+	fprintf(stream, "total throughput:\t%d\n", read_throughput + writes_throughput);
 }
 
 void StatisticsGatherer::print_gc_info() {
@@ -528,6 +532,18 @@ uint StatisticsGatherer::total_reads() {
 
 uint StatisticsGatherer::total_writes() {
 	return get_sum(num_writes_per_LUN);
+}
+
+double StatisticsGatherer::get_reads_throughput() {
+	return total_reads() / end_time;
+}
+
+double StatisticsGatherer::get_writes_throughput() {
+	return total_writes() / end_time;
+}
+
+double StatisticsGatherer::get_total_throughput() {
+	return get_reads_throughput() + get_writes_throughput();
 }
 
 string StatisticsGatherer::totals_csv_line() {

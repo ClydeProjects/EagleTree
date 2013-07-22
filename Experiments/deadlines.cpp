@@ -21,8 +21,8 @@ int main()
 	e->set_calibration_file(calib_name);
 	e->set_io_limit(20000);
 	int deadline_min = 0;
-	int deadline_max = 1400;
-	int incr = 200;
+	int deadline_max = 2000;
+	int incr = 500;
 	e->set_variable(&WRITE_DEADLINE, deadline_min, deadline_max, incr);
 	Workload_Definition* workload = new Asynch_Random_Workload();
 	e->set_workload(workload);

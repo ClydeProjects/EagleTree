@@ -565,7 +565,6 @@ public:
 	void run();
 	void register_event_completion(Event* event);
 	void set_num_writes_to_stop_after(long num_writes);
-	double get_experiment_runtime() const;
 	Flexible_Reader* create_flexible_reader(vector<Address_Range>);
 	void submit(Event* event);
 	Ssd* get_ssd() { return ssd; }

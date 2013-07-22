@@ -13,13 +13,7 @@ int main()
 	string exp_folder = get_current_dir_name() + name;
 	Experiment::create_base_folder(exp_folder.c_str());
 
-	set_normal_config();
-
-	int IO_limit = 200000;
-	long op_min = 1000000;
-	long op_max = 1000000;
-	long incr = 1;
-	vector<vector<Experiment_Result> > exps;
+	set_big_SSD();
 
 	Workload_Definition* init = new Init_Workload();
 	string calibration_file = "calib.txt";
@@ -29,7 +23,7 @@ int main()
 	Experiment* e = new Experiment();
 	e->set_calibration_file(calibration_file);
 	e->set_workload(workload);
-	e->set_io_limit(50000);
+	e->set_io_limit(100000);
 
 	BLOCK_MANAGER_ID = 0;
 	ALLOW_DEFERRING_TRANSFERS = false;
@@ -40,25 +34,6 @@ int main()
 	e->run("split");
 
 	delete workload;
-	delete init;
-
-	//SCHEDULING_SCHEME = 1;
-	//ALLOW_DEFERRING_TRANSFERS = true;
-	//exps.push_back( Experiment_Runner::simple_experiment(workload, init,	exp_folder + "smart/", "smart", IO_limit, WRITE_DEADLINE, op_min, op_max, incr) );
-
-	//SCHEDULING_SCHEME = 4;
-	//exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "fifo/", "fifo", IO_limit, WRITE_DEADLINE, deadline_min, deadline_max, incr) );
-	//SCHEDULING_SCHEME = 0;
-	//exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "all_equal/", "all_equal", IO_limit, WRITE_DEADLINE, deadline_min, deadline_max, incr) );
-
-	//exps.push_back( Experiment_Runner::simple_experiment(workload,	exp_folder + "deadlines3333/", "deadlines3333/", IO_limit, WRITE_DEADLINE, deadline_min, deadline_max, incr) );
-	/*delete init;
-	delete workload;
-	Experiment::draw_graphs(exps, exp_folder);
-	vector<int> num_write_thread_values_to_show(0);
-	for (double i = op_min; i <= op_max; i += incr)
-		num_write_thread_values_to_show.push_back(i); // Show all used spaces values in multi-graphs
-	Experiment::draw_experiment_spesific_graphs(exps, exp_folder, num_write_thread_values_to_show);
-	chdir(".."); // Leaving */
+	//delete init;
 	return 0;
 }

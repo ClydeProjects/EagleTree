@@ -129,7 +129,7 @@ void OperatingSystem::setup_follow_up_threads(int thread_id, double current_time
 
 void OperatingSystem::register_event_completion(Event* event) {
 
-	bool queue_was_full = currently_executing_ios.size() == MAX_SSD_QUEUE_SIZE;
+	//bool queue_was_full = currently_executing_ios.size() == MAX_SSD_QUEUE_SIZE;
 	currently_executing_ios.erase(event->get_application_io_id());
 
 	//printf("finished:\t"); event->print();
@@ -147,8 +147,9 @@ void OperatingSystem::register_event_completion(Event* event) {
 		setup_follow_up_threads(thread_id, event->get_current_time());
 		threads.erase(thread_id);
 	}
-
-	assert(time <= event->get_current_time() + 1);
+	if (!event->get_noop()) {
+		assert(time <= event->get_current_time() + 1);
+	}
 	time = max(time, event->get_current_time());
 
 	int thread_with_soonest_event = scheduler->pick(threads);
@@ -162,10 +163,6 @@ void OperatingSystem::register_event_completion(Event* event) {
 
 void OperatingSystem::set_num_writes_to_stop_after(long num_writes) {
 	NUM_WRITES_TO_STOP_AFTER = num_writes;
-}
-
-double OperatingSystem::get_experiment_runtime() const {
-	return time;
 }
 
 Flexible_Reader* OperatingSystem::create_flexible_reader(vector<Address_Range> ranges) {

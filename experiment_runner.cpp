@@ -116,7 +116,7 @@ void Experiment::run_single_point(string name) {
 	//Free_Space_Meter::print();
 	//Free_Space_Per_LUN_Meter::print();
 
-	global_result.collect_stats(0, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
+	global_result.collect_stats(0, StatisticsGatherer::get_global_instance());
 	write_results_file(data_folder);
 
 	global_result.end_experiment();
@@ -168,7 +168,7 @@ void Experiment::simple_experiment_double(string name, T* var, T min, T max, T i
 		Queue_Length_Statistics::print_avg();
 		Free_Space_Meter::print();
 		Free_Space_Per_LUN_Meter::print();
-		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
+		global_result.collect_stats(variable, StatisticsGatherer::get_global_instance());
 		write_results_file(point_folder_name);
 		delete os;
 	}
@@ -192,7 +192,7 @@ vector<Experiment_Result> Experiment::simple_experiment(Workload_Definition* exp
 
 		OperatingSystem* os = new OperatingSystem();// load_state();
 		run_single_measurment(experiment_workload, IO_limit, os);
-		global_result.collect_stats(variable, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
+		global_result.collect_stats(variable, StatisticsGatherer::get_global_instance());
 		delete os;
 	}
 	global_result.end_experiment();
@@ -249,9 +249,9 @@ vector<Experiment_Result> Experiment::random_writes_on_the_side_experiment(Workl
 		os->run();
 
 			// Collect statistics from this experiment iteration (save in csv files)
-		global_result.collect_stats       (random_write_threads, os->get_experiment_runtime(), StatisticsGatherer::get_global_instance());
-		experiment_result.collect_stats   (random_write_threads, os->get_experiment_runtime(), experiment_statistics_gatherer);
-		write_threads_result.collect_stats(random_write_threads, os->get_experiment_runtime(), random_writes_statics_gatherer);
+		global_result.collect_stats       (random_write_threads, StatisticsGatherer::get_global_instance());
+		experiment_result.collect_stats   (random_write_threads, experiment_statistics_gatherer);
+		write_threads_result.collect_stats(random_write_threads, random_writes_statics_gatherer);
 
 		if (workload == NULL) {
 			StatisticsGatherer::get_global_instance()->print();
@@ -303,7 +303,7 @@ Experiment_Result Experiment::copyback_experiment(vector<Thread*> (*experiment)(
 		os->run();
 
 		// Collect statistics from this experiment iteration (save in csv files)
-		experiment_result.collect_stats(copybacks_allowed, os->get_experiment_runtime());
+		experiment_result.collect_stats(copybacks_allowed);
 
 		StatisticsGatherer::get_global_instance()->print();
 		if (PRINT_LEVEL >= 1) {
@@ -339,7 +339,7 @@ Experiment_Result Experiment::copyback_map_experiment(vector<Thread*> (*experime
 		os->run();
 
 		// Collect statistics from this experiment iteration (save in csv files)
-		experiment_result.collect_stats(copyback_map_size, os->get_experiment_runtime());
+		experiment_result.collect_stats(copyback_map_size);
 
 		StatisticsGatherer::get_global_instance()->print();
 		if (PRINT_LEVEL >= 1) {
@@ -390,6 +390,7 @@ void Experiment::write_results_file(string folder_name) {
 	fprintf(file, "channel util:\t%f\n", channel_util);
 	double LUN_util = Utilization_Meter::get_avg_LUN_utilization();
 	fprintf(file, "LUN util:\t%f\n", LUN_util);
+	fclose(file);
 }
 
 void Experiment::save_state(OperatingSystem* os, string file_name) {

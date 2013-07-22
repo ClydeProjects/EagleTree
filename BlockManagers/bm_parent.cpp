@@ -344,9 +344,8 @@ Hey Niv, Thanks that sounds fairy easy! A& block = ssd.get_package()[addr.packag
 }
 
 // gives time until both the channel and die are clear
-double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& address, double event_time, event_type type) const {
+double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& address, double event_time) const {
 	if (address.valid == NONE) {
-		//printf("warning, heren\n");
 		return BUS_DATA_DELAY + BUS_CTRL_DELAY;
 	}
 
@@ -355,13 +354,22 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 	double channel_finish_time = ssd->get_currently_executing_operation_finish_time(package_id);
 	double die_finish_time = ssd->get_package(package_id)->get_die(die_id)->get_currently_executing_io_finish_time();
 	double max_time = max(channel_finish_time, die_finish_time);
+	return max(0.0, max_time - event_time);
+}
 
-	double time = max_time - event_time;
-	time = max(0.0, time);
-	if (type == WRITE) {
-		time = min(time, BUS_DATA_DELAY + BUS_CTRL_DELAY);
+double Block_manager_parent::in_how_long_can_this_write_be_scheduled(double current_time) const {
+	double min_execution_time = INFINITE;
+	for (int i = 0; i < SSD_SIZE; i++) {
+		double channel_finish_time = ssd->get_currently_executing_operation_finish_time(i);
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			bool busy = ssd->get_package(i)->get_die(j)->register_is_busy();
+			double die_finish_time = ssd->get_package(i)->get_die(j)->get_currently_executing_io_finish_time();
+			die_finish_time += busy ? BUS_DATA_DELAY + BUS_CTRL_DELAY : 0;
+			double max_time = max(channel_finish_time, die_finish_time);
+			min_execution_time = min(min_execution_time, max_time);
+		}
 	}
-	return time;
+	return max(min_execution_time - current_time, 0.0);
 }
 
 bool Block_manager_parent::can_schedule_on_die(Address const& address, event_type type, uint app_io_id) const {
@@ -385,7 +393,7 @@ bool Block_manager_parent::can_schedule_write_immediately(Address const& prospec
 	bool free_pages = has_free_pages(prospective_dest);
 	bool die_not_busy =		!is_die_register_busy(prospective_dest);
 	bool no_copy_back =		!Copy_backs_in_progress(prospective_dest);
-	bool can_be_scheduled_now =	in_how_long_can_this_event_be_scheduled(prospective_dest, current_time, WRITE) == 0;
+	bool can_be_scheduled_now =	in_how_long_can_this_write_be_scheduled(current_time) == 0;
 	return free_pages && die_not_busy && no_copy_back && can_be_scheduled_now;
 }
 

@@ -266,12 +266,13 @@ void load_entry(char *name, double value, uint line_number) {
 		fprintf(stderr, "Config file parsing error on line %u\n", line_number);
 	return;
 }
+
 void set_normal_config() {
-	SSD_SIZE = 4;				// 8
-	PACKAGE_SIZE = 8;			// 8
+	SSD_SIZE = 8;
+	PACKAGE_SIZE = 8;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 256;			// 1024
-	BLOCK_SIZE = 64;			// 128
+	PLANE_SIZE = 64;
+	BLOCK_SIZE = 32;
 
 	/*PAGE_READ_DELAY = 115 ;
 	PAGE_WRITE_DELAY = 1600 ;
@@ -285,7 +286,37 @@ void set_normal_config() {
 	BUS_DATA_DELAY = 350 / 5;
 	BLOCK_ERASE_DELAY = 3000 / 5;
 
-	MAX_SSD_QUEUE_SIZE = 32;
+	MAX_SSD_QUEUE_SIZE = 64;
+	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
+	SCHEDULING_SCHEME = 0;  // FIFO
+
+	USE_ERASE_QUEUE = false;
+	ENABLE_WEAR_LEVELING = false;
+	BLOCK_MANAGER_ID = 0;
+	MAX_CONCURRENT_GC_OPS = PACKAGE_SIZE * SSD_SIZE;
+	GREED_SCALE = 2;
+	ALLOW_DEFERRING_TRANSFERS = true;
+	OVER_PROVISIONING_FACTOR = 0.6;
+
+	OS_SCHEDULER = 0;
+
+	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY + 1;// PAGE_READ_DELAY + 1;
+}
+
+void set_big_SSD() {
+	SSD_SIZE = 8;
+	PACKAGE_SIZE = 8;
+	DIE_SIZE = 1;
+	PLANE_SIZE = 1024;
+	BLOCK_SIZE = 256;
+
+	PAGE_READ_DELAY = 115 ;
+	PAGE_WRITE_DELAY = 1600 ;
+	BUS_CTRL_DELAY = 5 ;
+	BUS_DATA_DELAY = 350 ;
+	BLOCK_ERASE_DELAY = 3000 ;
+
+	MAX_SSD_QUEUE_SIZE = 64;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 	SCHEDULING_SCHEME = 0;  // FIFO
 
@@ -366,6 +397,9 @@ void print_config(FILE *stream) {
 	fprintf(stream, "\tFTL_IMPLEMENTATION: %i\n", FTL_IMPLEMENTATION);
 	fprintf(stream, "\tMAX_REPEATED_COPY_BACKS_ALLOWED: %i\n", MAX_REPEATED_COPY_BACKS_ALLOWED);
 	fprintf(stream, "\tMAX_ITEMS_IN_COPY_BACK_MAP: %i\n\n", MAX_ITEMS_IN_COPY_BACK_MAP);
+
+	fprintf(stream, "#Operating System:\n");
+	fprintf(stream, "\tOS_SCHEDULER: %i\n\n", OS_SCHEDULER);
 
 	fprintf(stream, "#Scheduler:\n");
 	fprintf(stream, "\tALLOW_DEFERRING_TRANSFERS: %i\n", ALLOW_DEFERRING_TRANSFERS);
