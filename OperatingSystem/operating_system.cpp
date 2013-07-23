@@ -136,6 +136,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	//printf("queue size:\t%d\n", currently_executing_ios_counter);
 
 	long thread_id = app_id_to_thread_id_mapping[event->get_application_io_id()];
+	app_id_to_thread_id_mapping.erase(event->get_application_io_id());
 	Thread* thread = threads[thread_id];
 	thread->register_event_completion(event);
 

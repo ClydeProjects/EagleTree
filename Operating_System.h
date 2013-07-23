@@ -39,6 +39,7 @@ public:
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version) {}
+    static void set_record_internal_statistics(bool val) { record_internal_statistics = val; }
 protected:
 	virtual void issue_first_IOs() = 0;
 	virtual void handle_event_completion(Event* event) = 0;
@@ -57,6 +58,7 @@ private:
 	int num_IOs_executing;
 	queue<Event*> io_queue;
 	bool finished;
+	static bool record_internal_statistics;
 };
 
 /*

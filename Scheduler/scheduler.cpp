@@ -55,13 +55,11 @@ IOScheduler::~IOScheduler(){
 	delete future_events;
 	delete current_events;
 	delete overdue_events;
-	map<uint, deque<Event*> >::iterator i = dependencies.begin();
-	for (; i != dependencies.end(); i++) {
-		deque<Event*>& d = (*i).second;
-		for (uint j = 0; j < d.size(); j++) {
-			delete d[j];
+	for (auto entry : dependencies) {
+		for (auto event : entry.second) {
+			delete event;
 		}
-		d.clear();
+		entry.second.clear();
 	}
 	dependencies.clear();
 	delete bm;
@@ -70,6 +68,7 @@ IOScheduler::~IOScheduler(){
 
 // assumption is that all events within an operation have the same LBA
 void IOScheduler::schedule_events_queue(deque<Event*> events) {
+	assert(events.size() > 0);
 	long logical_address = events.back()->get_logical_address();
 	event_type type = events.back()->get_event_type();
 	uint operation_code = events.back()->get_application_io_id();
@@ -79,6 +78,8 @@ void IOScheduler::schedule_events_queue(deque<Event*> events) {
 	dependency_code_to_type[operation_code] = type;
 	assert(dependencies.count(operation_code) == 0);
 	dependencies[operation_code] = events;
+
+	//printf("dependency_code_to_type size: %d\n", dependency_code_to_type.size());
 
 	Event* first = dependencies[operation_code].front();
 	dependencies[operation_code].pop_front();
@@ -471,6 +472,7 @@ void IOScheduler::setup_dependent_event(Event* event, Event* dependent) {
 }
 
 enum status IOScheduler::execute_next(Event* event) {
+
 	enum status result = ssd->issue(event);
 	assert(result == SUCCESS);
 
@@ -623,6 +625,8 @@ void IOScheduler::init_event(Event* event) {
 			dependency_code_to_type[first->get_application_io_id()] = second->get_event_type(); // = WRITE for normal GC, COPY_BACK for copy backs
 			init_event(first);
 		}
+		dependencies.erase(event->get_application_io_id());
+		dependency_code_to_type.erase(event->get_application_io_id());
 		delete event;
 	}
 	else if (type == ERASE) {

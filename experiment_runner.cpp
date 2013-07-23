@@ -77,6 +77,8 @@ void Experiment::set_variable(int* variable, int low, int high, int incr) {
 }
 
 void Experiment::run(string name) {
+	Thread::set_record_internal_statistics(true);
+	StatisticsGatherer::set_record_statistics(true);
 	if (i_variable == NULL && d_variable == NULL) {
 		run_single_point(name);
 	}
@@ -363,6 +365,8 @@ void Experiment::calibrate_and_save(Workload_Definition* workload, string name, 
 	if (ifile && !force) {
 		return; // file exists
 	}
+	StatisticsGatherer::set_record_statistics(false);
+	Thread::set_record_internal_statistics(false);
 	VisualTracer::init();
 	printf("Creating calibrated SSD state.\n");
 	OperatingSystem* os = new OperatingSystem();

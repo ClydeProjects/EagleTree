@@ -15,6 +15,7 @@ StatisticsGatherer *StatisticsGatherer::inst = NULL;
 
 const double StatisticsGatherer::wait_time_histogram_bin_size = 1000;
 const double StatisticsGatherer::io_counter_window_size = 1000000; // second
+bool StatisticsGatherer::record_statistics = true;
 
 StatisticsGatherer::StatisticsGatherer()
 	: num_gc_cancelled_no_candidate(0),
@@ -66,6 +67,9 @@ StatisticsGatherer *StatisticsGatherer::get_global_instance()
 }
 
 void StatisticsGatherer::register_completed_event(Event const& event) {
+	if (!record_statistics) {
+		return;
+	}
 	end_time = max(end_time, event.get_current_time());
 
 	uint current_window = floor(event.get_current_time() / io_counter_window_size);
@@ -125,6 +129,9 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 
 
 void StatisticsGatherer::register_scheduled_gc(Event const& gc) {
+	if (!record_statistics) {
+		return;
+	}
 	if (inst != this) inst->register_scheduled_gc(gc); // Do the same for global instance
 	num_gc_scheduled++;
 
@@ -154,6 +161,9 @@ void StatisticsGatherer::register_scheduled_gc(Event const& gc) {
 }
 
 void StatisticsGatherer::register_executed_gc(Event const& gc, Block const& victim) {
+	if (!record_statistics) {
+		return;
+	}
 	if (inst != this) inst->register_executed_gc(gc, victim); // Do the same for global instance
 	num_gc_executed++;
 	num_migrations += victim.get_pages_valid();
@@ -164,7 +174,9 @@ void StatisticsGatherer::register_executed_gc(Event const& gc, Block const& vict
 }
 
 void StatisticsGatherer::register_events_queue_length(uint queue_size, double time) {
-
+	if (!record_statistics) {
+		return;
+	}
 	if (inst != this) inst->register_events_queue_length(queue_size, time); // Do the same for global instance
 	if (time == 0) return;
 	uint current_window = floor(time / queue_length_tracker_resolution);

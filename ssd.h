@@ -1157,6 +1157,7 @@ public:
 	long num_gc_cancelled_gc_already_happening;
 
 	long get_num_erases_executed() { return num_erases; }
+	static void set_record_statistics(bool val) { record_statistics = val; }
 private:
 	static StatisticsGatherer *inst;
 //	Ssd & ssd;
@@ -1221,6 +1222,7 @@ private:
 	vector<vector<uint> > num_wl_writes_per_LUN_destination;
 
 	double end_time;
+	static bool record_statistics;
 };
 
 // Keeps track of the fraction of the time in which channels and LUNs are busy

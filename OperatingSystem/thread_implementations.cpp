@@ -12,6 +12,8 @@ using namespace ssd;
 
 // =================  Thread =============================
 
+bool Thread::record_internal_statistics = false;
+
 Thread::Thread() :
 		finished(false), time(1), threads_to_start_when_this_thread_finishes(),
 		os(NULL), internal_statistics_gatherer(new StatisticsGatherer()),
@@ -60,7 +62,9 @@ void Thread::register_event_completion(Event* event) {
 	//deque<Event*> empty;
 	//swap(empty, submitted_events);
 	num_IOs_executing--;
-	internal_statistics_gatherer->register_completed_event(*event);
+	if (record_internal_statistics) {
+		internal_statistics_gatherer->register_completed_event(*event);
+	}
 	if (external_statistics_gatherer != NULL) {
 		external_statistics_gatherer->register_completed_event(*event);
 	}
