@@ -236,7 +236,7 @@ void Experiment::cross_experiment_waittime_histogram(int sizeX, int sizeY, strin
 	double cross_experiment_max_waittime = 0;
 	for (uint i = 0; i < experiments.size(); i++) {
 		if (experiments[i].vp_max_waittimes.find(point) == experiments[i].vp_max_waittimes.end()) {
-			printf("cross_experiment_waittime_histogram: experiment with variable parameter value %d not found. Skipping graph drawing.\n", point);
+			printf("cross_experiment_waittime_histogram: experiment with variable parameter value %f not found. Skipping graph drawing.\n", point);
 			return;
 		}
 		cross_experiment_max_waittime = max(cross_experiment_max_waittime, experiments[i].vp_max_waittimes[point][black_column]);

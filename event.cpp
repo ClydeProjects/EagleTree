@@ -31,13 +31,15 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	thread_id(UNDEFINED),
 	pure_ssd_wait_time(0),
 	copyback(false),
-	cached_write(false)
+	cached_write(false),
+	num_iterations_in_scheduler(0)
 {
 	assert(start_time >= 0.0);
 	if (logical_address > NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE) {
 		printf("invalid logical address, too big  %d   %d\n", logical_address, NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE);
 		assert(false);
 	}
+
 }
 
 Event::Event(Event& event) :
@@ -63,7 +65,8 @@ Event::Event(Event& event) :
 	thread_id(event.thread_id),
 	pure_ssd_wait_time(event.pure_ssd_wait_time),
 	copyback(event.copyback),
-	cached_write(event.cached_write)
+	cached_write(event.cached_write),
+	num_iterations_in_scheduler(0)
 {}
 
 bool Event::is_flexible_read() {

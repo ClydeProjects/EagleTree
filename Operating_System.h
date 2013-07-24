@@ -567,6 +567,7 @@ public:
 	void run();
 	void register_event_completion(Event* event);
 	void set_num_writes_to_stop_after(long num_writes);
+	void set_progress_meter_granularity(int num) { progress_meter_granularity = num; }
 	Flexible_Reader* create_flexible_reader(vector<Address_Range>);
 	void submit(Event* event);
 	Ssd* get_ssd() { return ssd; }
@@ -592,6 +593,7 @@ private:
 	double time;
 	static int thread_id_generator;
 	OS_Scheduler* scheduler;
+	int progress_meter_granularity;
 };
 
 }

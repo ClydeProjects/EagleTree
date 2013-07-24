@@ -125,6 +125,7 @@ void Experiment::run_single_point(string name) {
 	vector<Experiment_Result> result;
 	result.push_back(global_result);
 	results.push_back(result);
+	delete os;
 }
 
 template <class T>
@@ -143,9 +144,9 @@ void Experiment::simple_experiment_double(string name, T* var, T min, T max, T i
 		string point_folder_name = data_folder + to_string(variable) + "/";
 		mkdir(point_folder_name.c_str(), 0755);
 		VisualTracer::init(point_folder_name);
-		Free_Space_Meter::init();
 		write_config_file(point_folder_name);
 		Queue_Length_Statistics::init();
+		Free_Space_Meter::init();
 		Free_Space_Per_LUN_Meter::init();
 
 		OperatingSystem* os;
@@ -180,7 +181,7 @@ void Experiment::simple_experiment_double(string name, T* var, T min, T max, T i
 	results.push_back(result);
 }
 
-vector<Experiment_Result> Experiment::simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, long& variable, long min_val, long max_val, long incr) {
+/*vector<Experiment_Result> Experiment::simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, long& variable, long min_val, long max_val, long incr) {
 	assert(experiment_workload != NULL);
 	string data_folder = base_folder + name;
 	mkdir(data_folder.c_str(), 0755);
@@ -201,7 +202,7 @@ vector<Experiment_Result> Experiment::simple_experiment(Workload_Definition* exp
 	vector<Experiment_Result> results;
 	results.push_back(global_result);
 	return results;
-}
+}*/
 
 vector<Experiment_Result> Experiment::random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
 	string data_folder = base_folder + name;
@@ -366,16 +367,22 @@ void Experiment::calibrate_and_save(Workload_Definition* workload, string name, 
 		return; // file exists
 	}
 	StatisticsGatherer::set_record_statistics(false);
+	//StatisticsGatherer::get_global_instance()->init();
 	Thread::set_record_internal_statistics(false);
 	VisualTracer::init();
+	//Free_Space_Meter::init();
+	//Free_Space_Per_LUN_Meter::init();
 	printf("Creating calibrated SSD state.\n");
 	OperatingSystem* os = new OperatingSystem();
 	os->set_num_writes_to_stop_after(NUMBER_OF_ADDRESSABLE_PAGES() * 3);
 	vector<Thread*> init_threads = workload->generate_instance();
 	os->set_threads(init_threads);
+	os->set_progress_meter_granularity(1000);
 	os->run();
 	os->get_ssd()->execute_all_remaining_events();
 	save_state(os, file_name);
+	Free_Space_Meter::print();
+	Free_Space_Per_LUN_Meter::print();
 	delete os;
 }
 

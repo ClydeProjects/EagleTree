@@ -472,6 +472,8 @@ public:
 	void print(FILE *stream = stdout) const;
 	static void reset_id_generators();
 	bool is_flexible_read();
+	inline void increment_iteration_count() { num_iterations_in_scheduler++; }
+	inline int get_iteration_count() { return num_iterations_in_scheduler; }
 protected:
 	double start_time;
 	double execution_time;
@@ -507,6 +509,7 @@ protected:
 
 	int thread_id;
 	double pure_ssd_wait_time;
+	int num_iterations_in_scheduler;
 };
 
 /* The page is the lowest level data storage unit that is the size unit of
@@ -1408,7 +1411,7 @@ public:
 	static void unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer);
 	static void run_single_measurment(Workload_Definition* experiment_workload, int IO_limit, OperatingSystem* os);
 	template <class T> void simple_experiment_double(string name, T* variable, T min, T max, T inc);
-	static vector<Experiment_Result> simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, long& variable, long min_val, long max_val, long incr);
+	//static vector<Experiment_Result> simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, long& variable, long min_val, long max_val, long incr);
 	static void simple_experiment(Workload_Definition* workload, string name, int IO_limit);
 	void setup(string name);
 	void run(string experiment_name);

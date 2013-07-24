@@ -18,7 +18,8 @@ OperatingSystem::OperatingSystem()
 	  counter_for_user(1),
 	  idle_time(0),
 	  time(0),
-	  scheduler(NULL)
+	  scheduler(NULL),
+	  progress_meter_granularity(10)
 {
 	ssd->set_operating_system(this);
 	thread_id_generator = 0;
@@ -79,8 +80,8 @@ void OperatingSystem::run() {
 			dispatch_event(thread_id);
 		}
 
-		if ((double)num_writes_completed / NUM_WRITES_TO_STOP_AFTER > (double)counter_for_user / 10.0) {
-			printf("finished %d%%.\t\tNum writes completed:  %d \n", counter_for_user * 10, num_writes_completed);
+		if ((double)num_writes_completed / NUM_WRITES_TO_STOP_AFTER > (double)counter_for_user / progress_meter_granularity) {
+			printf("finished %f%%.\t\tNum writes completed:  %d \n", counter_for_user * 100 / (double)progress_meter_granularity , num_writes_completed);
 			if (counter_for_user == 9) {
 				//PRINT_LEVEL = 1;
 				//VisualTracer::get_instance()->print_horizontally(10000);
@@ -149,7 +150,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 		threads.erase(thread_id);
 	}
 	if (!event->get_noop()) {
-		assert(time <= event->get_current_time() + 1);
+		//assert(time <= event->get_current_time() + 1);
 	}
 	time = max(time, event->get_current_time());
 

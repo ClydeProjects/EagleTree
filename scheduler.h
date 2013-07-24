@@ -153,6 +153,28 @@ private:
 		inline bool exists(long logical_address) { return logical_addresses.count(logical_address) == 1; }
 	};
 
+	struct stats {
+	public:
+		stats();
+		void register_IO_completion(Event* e);
+		void print();
+		struct IO_type_recorder {
+			IO_type_recorder();
+			void register_io(Event*);
+			double get_iterations_per_io();
+		private:
+			int total_iterations;
+			int total_IOs;
+		};
+	private:
+		IO_type_recorder write_recorder;
+		IO_type_recorder gc_write_recorder;
+		IO_type_recorder read_commands_recorder;
+		IO_type_recorder read_transfers_recorder;
+		IO_type_recorder erase_recorder;
+	};
+	stats stats;
+
 	Safe_Cache safe_cache;
 
 	void update_current_events(double current_time);

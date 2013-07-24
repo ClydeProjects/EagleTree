@@ -268,8 +268,8 @@ void load_entry(char *name, double value, uint line_number) {
 }
 
 void set_normal_config() {
-	SSD_SIZE = 8;
-	PACKAGE_SIZE = 8;
+	SSD_SIZE = 4;
+	PACKAGE_SIZE = 4;
 	DIE_SIZE = 1;
 	PLANE_SIZE = 64;
 	BLOCK_SIZE = 32;
@@ -286,7 +286,7 @@ void set_normal_config() {
 	BUS_DATA_DELAY = 350 / 5;
 	BLOCK_ERASE_DELAY = 3000 / 5;
 
-	MAX_SSD_QUEUE_SIZE = 64;
+	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 	SCHEDULING_SCHEME = 0;  // FIFO
 
@@ -307,7 +307,7 @@ void set_big_SSD() {
 	SSD_SIZE = 8;
 	PACKAGE_SIZE = 8;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 1024;
+	PLANE_SIZE = 1028;
 	BLOCK_SIZE = 256;
 
 	PAGE_READ_DELAY = 115 ;
@@ -324,7 +324,7 @@ void set_big_SSD() {
 	ENABLE_WEAR_LEVELING = false;
 	BLOCK_MANAGER_ID = 0;
 	MAX_CONCURRENT_GC_OPS = PACKAGE_SIZE * SSD_SIZE;
-	GREED_SCALE = 3;
+	GREED_SCALE = 2;
 	ALLOW_DEFERRING_TRANSFERS = true;
 	OVER_PROVISIONING_FACTOR = 0.6;
 

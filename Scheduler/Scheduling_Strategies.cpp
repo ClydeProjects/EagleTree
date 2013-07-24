@@ -106,6 +106,7 @@ void Scheduling_Strategy::schedule() {
 	uint num_reads = read_commands.size();
 	printf("%d\t%d\n", num_writes, num_reads);*/
 
+	//printf("size: %d\n", writes.size());
 	scheduler->handle(trims);
 	priorty_scheme->schedule(reads, copybacks, writes, erases);
 	scheduler->handle(read_transfers);

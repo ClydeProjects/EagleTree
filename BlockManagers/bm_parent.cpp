@@ -344,7 +344,7 @@ Hey Niv, Thanks that sounds fairy easy! A& block = ssd.get_package()[addr.packag
 }
 
 // gives time until both the channel and die are clear
-double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& address, double event_time) const {
+double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address const& address, double event_time, event_type type) const {
 	if (address.valid == NONE) {
 		return BUS_DATA_DELAY + BUS_CTRL_DELAY;
 	}
@@ -354,7 +354,11 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 	double channel_finish_time = ssd->get_currently_executing_operation_finish_time(package_id);
 	double die_finish_time = ssd->get_package(package_id)->get_die(die_id)->get_currently_executing_io_finish_time();
 	double max_time = max(channel_finish_time, die_finish_time);
-	return max(0.0, max_time - event_time);
+	double time = max(0.0, max_time - event_time);
+	if (type == WRITE) {
+		time = min(time, BUS_DATA_DELAY + BUS_CTRL_DELAY);
+	}
+	return time;
 }
 
 double Block_manager_parent::in_how_long_can_this_write_be_scheduled(double current_time) const {

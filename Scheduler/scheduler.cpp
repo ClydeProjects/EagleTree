@@ -25,7 +25,8 @@ IOScheduler::IOScheduler() :
 	migrator(NULL),
 	dependency_code_to_LBA(),
 	dependency_code_to_type(),
-	safe_cache(0)
+	safe_cache(0),
+	stats()
 {
 }
 
@@ -51,6 +52,7 @@ void IOScheduler::init() {
 }
 
 IOScheduler::~IOScheduler(){
+	stats.print();
 	//VisualTracer::print_horizontally(100000);
 	delete future_events;
 	delete current_events;
@@ -210,6 +212,7 @@ void IOScheduler::update_current_events(double current_time) {
 void IOScheduler::handle(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
+		event->increment_iteration_count();
 		events.pop_back();
 		event_type type = event->get_event_type();
 		if (type == WRITE || type == COPY_BACK) {
@@ -345,11 +348,19 @@ void IOScheduler::handle_flexible_read(Event* event) {
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_write(Event* event) {
 	Address addr = bm->choose_write_address(*event);
-	try_to_put_in_safe_cache(event);
-	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time());
-	if (wait_time > 0) {
-		wait_time = max(1.0, bm->in_how_long_can_this_write_be_scheduled( event->get_current_time() ));
+
+	if (event->get_application_io_id() == 41495) {
+		int i = 0;
+		i++;
+		//VisualTracer::print_horizontally(1000);
 	}
+
+	try_to_put_in_safe_cache(event);
+	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time(), WRITE);
+	/*if (wait_time > 0) {
+		wait_time = max(1.0, bm->in_how_long_can_this_write_be_scheduled( event->get_current_time() ));
+	}*/
+
 	//assert(wait_time1 == wait_time);
 
 	if (addr.valid == NONE && event->get_event_type() == COPY_BACK) {
@@ -515,7 +526,7 @@ enum status IOScheduler::execute_next(Event* event) {
 		complete(event);
 		if (completed_events->size() >= MAX_SSD_QUEUE_SIZE) {
 			send_earliest_completed_events_back();
-			printf("here, events back to ssd\n");
+			//printf("here, events back to ssd\n");
 		}
 	}
 	return result;
@@ -547,6 +558,7 @@ void IOScheduler::manage_operation_completion(Event* event) {
 }
 
 void IOScheduler::handle_finished_event(Event *event) {
+	stats.register_IO_completion(event);
 	VisualTracer::register_completed_event(*event);
 	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
 	migrator->register_event_completion(event);
@@ -786,4 +798,48 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	} else {
 		assert(false);
 	}
+}
+
+IOScheduler::stats::stats() :
+		write_recorder(), read_commands_recorder(), read_transfers_recorder(), erase_recorder()
+{}
+
+void IOScheduler::stats::register_IO_completion(Event* e) {
+	if (e->get_event_type() == WRITE && e->is_original_application_io()) {
+		//printf("write:  %d    ", e->get_iteration_count());
+		//e->print();
+		write_recorder.register_io(e);
+	}
+	else if (e->get_event_type() == WRITE) {
+		gc_write_recorder.register_io(e);
+	}
+	else if (e->get_event_type() == READ_COMMAND) {
+		read_commands_recorder.register_io(e);
+	}
+	else if (e->get_event_type() == READ_TRANSFER) {
+		read_transfers_recorder.register_io(e);
+	}
+	else if (e->get_event_type() == ERASE) {
+		erase_recorder.register_io(e);
+	}
+}
+
+void IOScheduler::stats::print() {
+	printf("iterations per write:  %f\n", write_recorder.get_iterations_per_io());
+	printf("iterations per write:  %f\n", gc_write_recorder.get_iterations_per_io());
+	printf("iterations per read commands:  %f\n", read_commands_recorder.get_iterations_per_io());
+	printf("iterations per read transfers:  %f\n", read_transfers_recorder.get_iterations_per_io());
+	printf("iterations per erases:  %f\n", erase_recorder.get_iterations_per_io());
+}
+
+IOScheduler::stats::IO_type_recorder::IO_type_recorder() :
+		total_iterations(0), total_IOs(0) {}
+
+void IOScheduler::stats::IO_type_recorder::register_io(Event* e) {
+	total_iterations += e->get_iteration_count();
+	total_IOs++;
+}
+
+double IOScheduler::stats::IO_type_recorder::get_iterations_per_io() {
+	return total_iterations / (double)total_IOs;
 }

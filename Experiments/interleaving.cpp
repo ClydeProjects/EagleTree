@@ -34,6 +34,6 @@ int main()
 	e->run("split");
 
 	delete workload;
-	//delete init;
+	delete init;
 	return 0;
 }
