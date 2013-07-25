@@ -58,8 +58,8 @@ void Smart_App_Priorty_Scheme::schedule(vector<Event*>& reads, vector<Event*>& c
 	vector<Event*> external_writes;
 	seperate_internal_external(writes, internal_writes, external_writes);
 
-	scheduler->handle(internal_reads);
 	scheduler->handle(external_reads);
+	scheduler->handle(internal_reads);
 	scheduler->handle(copybacks);
 	scheduler->handle(erases);
 	scheduler->handle(external_writes);

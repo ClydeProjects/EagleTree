@@ -813,8 +813,11 @@ void IOScheduler::stats::register_IO_completion(Event* e) {
 	else if (e->get_event_type() == WRITE) {
 		gc_write_recorder.register_io(e);
 	}
-	else if (e->get_event_type() == READ_COMMAND) {
+	else if (e->get_event_type() == READ_COMMAND && e->is_original_application_io()) {
 		read_commands_recorder.register_io(e);
+	}
+	else if (e->get_event_type() == READ_COMMAND) {
+		gc_read_commands_recorder.register_io(e);
 	}
 	else if (e->get_event_type() == READ_TRANSFER) {
 		read_transfers_recorder.register_io(e);
@@ -826,8 +829,9 @@ void IOScheduler::stats::register_IO_completion(Event* e) {
 
 void IOScheduler::stats::print() {
 	printf("iterations per write:  %f\n", write_recorder.get_iterations_per_io());
-	printf("iterations per write:  %f\n", gc_write_recorder.get_iterations_per_io());
+	printf("iterations per gc write:  %f\n", gc_write_recorder.get_iterations_per_io());
 	printf("iterations per read commands:  %f\n", read_commands_recorder.get_iterations_per_io());
+	printf("iterations per gc read commands:  %f\n", gc_read_commands_recorder.get_iterations_per_io());
 	printf("iterations per read transfers:  %f\n", read_transfers_recorder.get_iterations_per_io());
 	printf("iterations per erases:  %f\n", erase_recorder.get_iterations_per_io());
 }

@@ -139,7 +139,6 @@ void Experiment::simple_experiment_double(string name, T* var, T min, T max, T i
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		printf("%s :  %s \n", name.c_str(), to_string(variable).c_str());
 		printf("----------------------------------------------------------------------------------------------------------\n");
-		printf("%d\n", WRITE_DEADLINE);
 
 		string point_folder_name = data_folder + to_string(variable) + "/";
 		mkdir(point_folder_name.c_str(), 0755);

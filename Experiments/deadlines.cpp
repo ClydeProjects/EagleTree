@@ -10,18 +10,27 @@ int main()
 	string exp_folder = get_current_dir_name() + name;
 	Experiment::create_base_folder(exp_folder.c_str());
 
-	set_normal_config();
-	OVER_PROVISIONING_FACTOR = 0.6;
+	set_big_SSD();
+	//OVER_PROVISIONING_FACTOR = 0.6;
 
 	Workload_Definition* init = new Init_Workload();
 	string calib_name = "calib.txt";
 	Experiment::calibrate_and_save(init, calib_name);
 
+	Experiment* fifo = new Experiment();
+	fifo->set_calibration_file(calib_name);
+	fifo->set_io_limit(200000);
+	SCHEDULING_SCHEME = 0;
+	Workload_Definition* workload = new Asynch_Random_Workload();
+	fifo->set_workload(workload);
+	fifo->run("fifo");
+	delete fifo;
+
 	Experiment* e = new Experiment();
 	e->set_calibration_file(calib_name);
-	e->set_io_limit(20000);
+	e->set_io_limit(200000);
 	int deadline_min = 0;
-	int deadline_max = 2000;
+	int deadline_max = 5000;
 	int incr = 500;
 	e->set_variable(&WRITE_DEADLINE, deadline_min, deadline_max, incr);
 	Workload_Definition* workload = new Asynch_Random_Workload();
@@ -29,7 +38,7 @@ int main()
 	SCHEDULING_SCHEME = 1;
 	e->run("deadlines");
 	e->draw_graphs();
-
+	delete e;
 
 	//exps.push_back( Experiment_Runner::simple_experiment(workload, init, exp_folder + "no_split/", "no split", IO_limit, OVER_PROVISIONING_FACTOR, op_min, op_max, incr) );
 

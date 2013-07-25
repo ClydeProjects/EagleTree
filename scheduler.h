@@ -169,6 +169,7 @@ private:
 	private:
 		IO_type_recorder write_recorder;
 		IO_type_recorder gc_write_recorder;
+		IO_type_recorder gc_read_commands_recorder;
 		IO_type_recorder read_commands_recorder;
 		IO_type_recorder read_transfers_recorder;
 		IO_type_recorder erase_recorder;

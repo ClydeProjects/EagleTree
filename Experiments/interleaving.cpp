@@ -4,9 +4,6 @@
 
 using namespace ssd;
 
-//BOOST_CLASS_EXPORT_GUID(FtlParent, "FtlParent")
-//BOOST_CLASS_EXPORT_GUID(FtlImpl_Page, "FtlImpl_Page")
-
 int main()
 {
 	string name  = "/exp_interleaving/";
