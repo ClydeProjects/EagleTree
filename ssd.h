@@ -1372,7 +1372,10 @@ private:
 
 class Asynch_Random_Workload : public Workload_Definition {
 public:
+	Asynch_Random_Workload(double writes_probability = 0.5);
 	vector<Thread*> generate();
+private:
+	double writes_probability;
 };
 
 class Init_Workload : public Workload_Definition {
@@ -1435,6 +1438,7 @@ public:
 	void set_calibration_workload(Workload_Definition* w) { calibrate_for_each_point = true; calibration_workload = w; }
 	void set_io_limit(int limit) { io_limit = limit; };
 	void set_calibration_file(string file) { calibration_file = file; }
+	void set_generate_trace_file(bool val) {generate_trace_file = val;}
 private:
 	double* d_variable;
 	double d_min, d_max, d_incr;
@@ -1448,6 +1452,7 @@ private:
 	vector<vector<Experiment_Result> > results;
 	string calibration_file;
 	bool calibrate_for_each_point;
+	bool generate_trace_file;
 
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
 

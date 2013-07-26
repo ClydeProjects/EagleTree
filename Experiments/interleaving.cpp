@@ -16,11 +16,13 @@ int main()
 	string calibration_file = "calib.txt";
 	Experiment::calibrate_and_save(init, calibration_file);
 
-	Workload_Definition* workload = new Asynch_Random_Workload();
+	double writes_probability = 0;
+	Workload_Definition* workload = new Asynch_Random_Workload(writes_probability);
 	Experiment* e = new Experiment();
 	e->set_calibration_file(calibration_file);
 	e->set_workload(workload);
 	e->set_io_limit(100000);
+	e->set_generate_trace_file(true);
 
 	BLOCK_MANAGER_ID = 0;
 	ALLOW_DEFERRING_TRANSFERS = false;

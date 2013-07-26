@@ -80,9 +80,12 @@ vector<Thread*> Random_Workload::generate() {
 //				Asynch RANDOM WORKLOAD
 //*****************************************************************************************
 
+Asynch_Random_Workload::Asynch_Random_Workload(double writes_probability)
+	: writes_probability(writes_probability) {}
+
 vector<Thread*> Asynch_Random_Workload::generate() {
 	//Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
-	Simple_Thread* thread = new Asynchronous_Random_Reader_Writer(min_lba, max_lba, 2521);
+	Simple_Thread* thread = new Asynchronous_Random_Reader_Writer(min_lba, max_lba, 2521, writes_probability);
 	//init_write->add_follow_up_thread(thread);
 	//init_write->set_statistics_gatherer(stats);
 	//init_write->set_experiment_thread(true);

@@ -408,7 +408,7 @@ void StatisticsGatherer::print_simple(FILE* stream) {
 	fprintf(stream, "std reads latency:\t%f\n", reads_std);
 	fprintf(stream, "max reads latency:\t%f\n", reads_max);
 
-	fprintf(stream, "num gc writes:\t%d\n", get_sum(num_gc_writes_per_LUN_destination));
+	fprintf(stream, "num gc writes:\t%f\n", get_sum(num_gc_writes_per_LUN_destination));
 
 	int read_throughput = (int) (get_reads_throughput() * 1000 * 1000);
 	int writes_throughput = (int) (get_reads_throughput() * 1000 * 1000);

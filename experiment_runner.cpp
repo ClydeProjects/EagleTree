@@ -33,7 +33,8 @@ Experiment::Experiment()
 	  io_limit(NUMBER_OF_ADDRESSABLE_PAGES()),
 	  workload(NULL), calibration_workload(NULL),
 	  calibrate_for_each_point(false),
-	  results()
+	  results(),
+	  generate_trace_file(false)
 {}
 
 void Experiment::unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer) {
@@ -96,7 +97,12 @@ void Experiment::run_single_point(string name) {
 	Experiment_Result global_result(name, data_folder, "Global/", "Changing a Var");
 	global_result.start_experiment();
 
-	VisualTracer::init(data_folder);
+	if (generate_trace_file) {
+		VisualTracer::init(data_folder);
+	} else {
+		VisualTracer::init();
+	}
+
 	write_config_file(data_folder);
 	Queue_Length_Statistics::init();
 
@@ -142,7 +148,11 @@ void Experiment::simple_experiment_double(string name, T* var, T min, T max, T i
 
 		string point_folder_name = data_folder + to_string(variable) + "/";
 		mkdir(point_folder_name.c_str(), 0755);
-		VisualTracer::init(point_folder_name);
+		if (generate_trace_file) {
+			VisualTracer::init(data_folder);
+		} else {
+			VisualTracer::init();
+		}
 		write_config_file(point_folder_name);
 		Queue_Length_Statistics::init();
 		Free_Space_Meter::init();

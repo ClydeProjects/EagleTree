@@ -19,11 +19,14 @@ void Utilization_Meter::register_event(double prev_time, double duration, Event 
 		int id = event.get_address().package;
 		channel_used[id] += duration;
 		double unused_time = event.get_current_time() - prev_time;
-		if (unused_time > 0) {
-			//VisualTracer::print_horizontally(1000);
-			//event.print();
-		}
+		//VisualTracer::print_horizontally(1000);
+		/*if (unused_time > 23  || event.get_application_io_id() == 313 ) {
+			VisualTracer::print_horizontally(1000);
+			event.print();
+		}*/
 		channel_unused[id] += unused_time;
+		//double util = channel_used[id] / (channel_used[id] + channel_unused[id]);
+		//printf("C%d\t%f\n", id, util);
 	} else if (gran == DIE) {
 		int id = event.get_address().package * PACKAGE_SIZE + event.get_address().die;
 		LUNs_used[id] += duration;
