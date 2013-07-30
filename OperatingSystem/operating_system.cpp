@@ -45,6 +45,14 @@ void OperatingSystem::set_threads(vector<Thread*> new_threads) {
 	}
 }
 
+vector<Thread*> OperatingSystem::get_threads() {
+	vector<Thread*> vec;
+	for (auto t : threads) {
+		vec.push_back(t.second);
+	}
+	return vec;
+}
+
 OperatingSystem::~OperatingSystem() {
 	delete ssd;
 	for (auto t : threads) {

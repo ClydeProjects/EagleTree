@@ -387,8 +387,9 @@ void Experiment::calibrate_and_save(Workload_Definition* workload, string name, 
 	vector<Thread*> init_threads = workload->generate_instance();
 	os->set_threads(init_threads);
 	os->set_progress_meter_granularity(1000);
+
 	os->run();
-	os->get_ssd()->execute_all_remaining_events();
+
 	save_state(os, file_name);
 	Free_Space_Meter::print();
 	Free_Space_Per_LUN_Meter::print();
@@ -414,6 +415,8 @@ void Experiment::write_results_file(string folder_name) {
 }
 
 void Experiment::save_state(OperatingSystem* os, string file_name) {
+	vector<Thread*> threads = os->get_threads();
+	os->get_ssd()->execute_all_remaining_events();
 	std::ofstream file(file_name.c_str());
 	boost::archive::text_oarchive oa(file);
 	oa.register_type<FtlImpl_Page>( );
@@ -429,9 +432,19 @@ void Experiment::save_state(OperatingSystem* os, string file_name) {
 	oa.register_type<READS_OR_WRITES>();
 	oa.register_type<Asynchronous_Random_Writer>();
 
+	oa.register_type<MTRand>();
+	oa.register_type<MTRand_closed>();
+	oa.register_type<MTRand_open>();
+	oa.register_type<MTRand53>();
+
+
+
+
 	//Simple_Thread* t1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 35722);
 	//oa << t1;
 	oa << os;
+	oa << threads;
+	file.close();
 }
 
 OperatingSystem* Experiment::load_state(string name) {
@@ -450,9 +463,18 @@ OperatingSystem* Experiment::load_state(string name) {
 	ia.register_type<READS>( );
 	ia.register_type<READS_OR_WRITES>();
 	ia.register_type<Asynchronous_Random_Writer>();
+
+	ia.register_type<MTRand>();
+	ia.register_type<MTRand_closed>();
+	ia.register_type<MTRand_open>();
+	ia.register_type<MTRand53>();
+
 	OperatingSystem* os;
 	ia >> os;
-	os->init_threads();
+	vector<Thread*> threads;
+	ia >> threads;
+	os->set_threads(threads);
+	//os->init_threads();
 	IOScheduler* scheduler = os->get_ssd()->get_scheduler();
 	scheduler->init();
 	Block_manager_parent* bm = Block_manager_parent::get_new_instance();

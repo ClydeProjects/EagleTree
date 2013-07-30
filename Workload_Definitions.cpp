@@ -137,8 +137,8 @@ vector<Thread*> File_System_With_Noise::generate() {
 	long max_file_size = BLOCK_SIZE * 20;
 
 	Simple_Thread* t1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 35722);
-	Simple_Thread* t2 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 35722);
-	Thread* t3 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 4, INFINITE, max_file_size, 713);
+	Simple_Thread* t2 = new Asynchronous_Random_Reader(0, log_space_per_thread * 2, 35722);
+	Thread* t3 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, INFINITE, max_file_size, 713);
 	Thread* t4 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, INFINITE, max_file_size, 5);
 
 	vector<Thread*> threads;

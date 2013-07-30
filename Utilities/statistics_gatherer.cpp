@@ -379,8 +379,14 @@ void StatisticsGatherer::print() {
 	//printf("Erase std:\t%f \n", get_std(num_erases_per_LUN));
 	double milliseconds = end_time / 1000;
 	printf("Time taken (ms):\t%d\n", (int)milliseconds);
+
+	printf("Thoughput (IO/sec)\n");
+	printf("read throughput:\t%d\n", (int)get_reads_throughput());
+	printf("writes throughput:\t%d\n", (int)get_writes_throughput());
+	printf("total throughput:\t%d\n", (int)get_reads_throughput() + (int)get_writes_throughput());
+
 	double queue_length = get_average(queue_length_tracker);
-	printf("avg queue length: %d\n", queue_length);
+	printf("avg queue length: %f\n", queue_length);
 	printf("\n\n");
 }
 
@@ -410,8 +416,8 @@ void StatisticsGatherer::print_simple(FILE* stream) {
 
 	fprintf(stream, "num gc writes:\t%f\n", get_sum(num_gc_writes_per_LUN_destination));
 
-	int read_throughput = (int) (get_reads_throughput() * 1000 * 1000);
-	int writes_throughput = (int) (get_reads_throughput() * 1000 * 1000);
+	int read_throughput = (int) get_reads_throughput();
+	int writes_throughput = (int) get_writes_throughput();
 
 	fprintf(stream, "Thoughput (IO/sec)\n");
 	fprintf(stream, "read throughput:\t%d\n", read_throughput);
@@ -547,11 +553,11 @@ uint StatisticsGatherer::total_writes() {
 }
 
 double StatisticsGatherer::get_reads_throughput() {
-	return total_reads() / end_time;
+	return (total_reads() / end_time) * 1000 * 1000;
 }
 
 double StatisticsGatherer::get_writes_throughput() {
-	return total_writes() / end_time;
+	return (total_writes() / end_time) * 1000 * 1000;
 }
 
 double StatisticsGatherer::get_total_throughput() {

@@ -44,7 +44,7 @@ int main()
 
 	set_normal_config();
 
-	OVER_PROVISIONING_FACTOR = 0.9;
+	OVER_PROVISIONING_FACTOR = 0.90;
 
 	Workload_Definition* workload = new File_System_With_Noise();
 
@@ -52,7 +52,7 @@ int main()
 	vector<vector<Experiment_Result> > exps;
 
 	Experiment* e = new Experiment();
-	e->set_io_limit(50000);
+	e->set_io_limit(200000);
 
 	BLOCK_MANAGER_ID = 0;
 	string no_locality_calibration_file = "no_locality_calibration_file.txt";
