@@ -42,7 +42,7 @@
 #include <boost/multi_index/random_access<_index.hpp>*/
 #include "bloom_filter.hpp"
 #include <sys/types.h>
-#include "MTRand/mtrand.h" // Marsenne Twister random number generator
+//#include "mtrand.h" // Marsenne Twister random number generator
 #include <fstream>
 #include "block_management.h"
 #include "scheduler.h"
@@ -337,6 +337,7 @@ class Synchronous_Writer;
 struct Address_Range;
 class Flexible_Reader;
 
+class MTRand_int32;
 
 /* Class to manage physical addresses for the SSD.  It was designed to have
  * public members like a struct for quick access but also have checking,
@@ -1372,7 +1373,10 @@ private:
 
 class Asynch_Random_Workload : public Workload_Definition {
 public:
+	Asynch_Random_Workload(double writes_probability = 0.5);
 	vector<Thread*> generate();
+private:
+	double writes_probability;
 };
 
 class Init_Workload : public Workload_Definition {
@@ -1435,6 +1439,7 @@ public:
 	void set_calibration_workload(Workload_Definition* w) { calibrate_for_each_point = true; calibration_workload = w; }
 	void set_io_limit(int limit) { io_limit = limit; };
 	void set_calibration_file(string file) { calibration_file = file; }
+	void set_generate_trace_file(bool val) {generate_trace_file = val;}
 private:
 	double* d_variable;
 	double d_min, d_max, d_incr;
@@ -1448,6 +1453,7 @@ private:
 	vector<vector<Experiment_Result> > results;
 	string calibration_file;
 	bool calibrate_for_each_point;
+	bool generate_trace_file;
 
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
 
@@ -1460,6 +1466,149 @@ private:
 	static double calibration_precision;      // microseconds
 	static double calibration_starting_point; // microseconds
 	static string base_folder;
+};
+
+class MTRand_int32 { // Mersenne Twister random number generator
+public:
+// default constructor: uses default seed only if this is the first instance
+/* MKS: Uncommented empty constructor since seeding is required for each object instantiation as a result of the removal of static fields */
+  MTRand_int32() : n(624), m(397), state(n) { std::cout << "You should always provide a seed to the constructor, since the static fields have been made dynamic.\n"; throw; if (!init) seed(5489UL); init = true; }
+// constructor with 32 bit int as seed
+  MTRand_int32(unsigned long s) : n(624), m(397), state(n) { seed(s); init = true; }
+// constructor with array of size 32 bit ints as seed
+  MTRand_int32(const unsigned long* array, int size) : n(624), m(397), state(n) { seed(array, size); init = true; }
+// the two seed functions
+  void seed(unsigned long); // seed with 32 bit integer
+  void seed(const unsigned long*, int size); // seed with array
+// overload operator() to make this a generator (functor)
+  unsigned long operator()() { return rand_int32(); }
+// 2007-02-11: made the destructor virtual; thanks "double more" for pointing this out
+  virtual ~MTRand_int32() {} // destructor
+
+  friend class boost::serialization::access;
+  template<class Archive>
+  void serialize(Archive & ar, const unsigned int version) {
+  	ar & state;
+  	ar & p;
+  	ar & init;
+  }
+
+protected: // used by derived classes, otherwise not accessible; use the ()-operator
+  unsigned long rand_int32(); // generate 32 bit random integer
+private:
+  int n, m; // compile time constants
+// the variables below are static (no duplicates can exist)
+  // MKS: Following three lines uncommented because the static fields are made dynamic
+  /*static*/ vector<uint> state; // state vector array
+  /*static*/ int p; // position in state array
+  /*static*/ bool init; // true if init function is called
+// private functions used to generate the pseudo random numbers
+  unsigned long twiddle(unsigned long, unsigned long); // used by gen_state()
+  void gen_state(); // generate new state
+// make copy constructor and assignment operator unavailable, they don't make sense
+  //MTRand_int32(const MTRand_int32&); // copy constructor not defined
+  void operator=(const MTRand_int32&); // assignment operator not defined
+
+};
+
+// inline for speed, must therefore reside in header file
+inline unsigned long MTRand_int32::twiddle(unsigned long u, unsigned long v) {
+  return (((u & 0x80000000UL) | (v & 0x7FFFFFFFUL)) >> 1)
+    ^ ((v & 1UL) ? 0x9908B0DFUL : 0x0UL);
+}
+
+inline unsigned long MTRand_int32::rand_int32() { // generate 32 bit random int
+  /*DEBUG LINE INSERTED BY MK*/assert(init == true);
+  if (p == n) gen_state(); // new state vector needed
+// gen_state() is split off to be non-inline, because it is only called once
+// in every 624 calls and otherwise irand() would become too big to get inlined
+  unsigned long x = state[p++];
+  x ^= (x >> 11);
+  x ^= (x << 7) & 0x9D2C5680UL;
+  x ^= (x << 15) & 0xEFC60000UL;
+  return x ^ (x >> 18);
+}
+
+// generates double floating point numbers in the half-open interval [0, 1)
+class MTRand : public MTRand_int32 {
+public:
+  MTRand() : MTRand_int32() {}
+  MTRand(unsigned long seed) : MTRand_int32(seed) {}
+  MTRand(const unsigned long* seed, int size) : MTRand_int32(seed, size) {}
+  ~MTRand() {}
+  double operator()() {
+    return static_cast<double>(rand_int32()) * (1. / 4294967296.); } // divided by 2^32
+
+  /*friend class boost::serialization::access;
+  template<class Archive>
+  void serialize(Archive & ar, const unsigned int version) {
+	  ar & boost::serialization::base_object<MTRand_int32>(*this);
+  }*/
+
+private:
+  MTRand(const MTRand&); // copy constructor not defined
+  void operator=(const MTRand&); // assignment operator not defined
+};
+
+// generates double floating point numbers in the closed interval [0, 1]
+class MTRand_closed : public MTRand_int32 {
+public:
+  MTRand_closed() : MTRand_int32() {}
+  MTRand_closed(unsigned long seed) : MTRand_int32(seed) {}
+  MTRand_closed(const unsigned long* seed, int size) : MTRand_int32(seed, size) {}
+  ~MTRand_closed() {}
+  double operator()() {
+    return static_cast<double>(rand_int32()) * (1. / 4294967295.); } // divided by 2^32 - 1
+private:
+  MTRand_closed(const MTRand_closed&); // copy constructor not defined
+  void operator=(const MTRand_closed&); // assignment operator not defined
+
+  /*friend class boost::serialization::access;
+  template<class Archive>
+  void serialize(Archive & ar, const unsigned int version) {
+	  ar & boost::serialization::base_object<MTRand_int32>(*this);
+  }*/
+};
+
+// generates double floating point numbers in the open interval (0, 1)
+class MTRand_open : public MTRand_int32 {
+public:
+  MTRand_open() : MTRand_int32() {}
+  MTRand_open(unsigned long seed) : MTRand_int32(seed) {}
+  MTRand_open(const unsigned long* seed, int size) : MTRand_int32(seed, size) {}
+  ~MTRand_open() {}
+  double operator()() {
+    return (static_cast<double>(rand_int32()) + .5) * (1. / 4294967296.); } // divided by 2^32
+private:
+  MTRand_open(const MTRand_open&); // copy constructor not defined
+  void operator=(const MTRand_open&); // assignment operator not defined
+
+  /*friend class boost::serialization::access;
+  template<class Archive>
+  void serialize(Archive & ar, const unsigned int version) {
+	  ar & boost::serialization::base_object<MTRand_int32>(*this);
+  }*/
+};
+
+// generates 53 bit resolution doubles in the half-open interval [0, 1)
+class MTRand53 : public MTRand_int32 {
+public:
+  MTRand53() : MTRand_int32() {}
+  MTRand53(unsigned long seed) : MTRand_int32(seed) {}
+  MTRand53(const unsigned long* seed, int size) : MTRand_int32(seed, size) {}
+  ~MTRand53() {}
+  double operator()() {
+    return (static_cast<double>(rand_int32() >> 5) * 67108864. +
+      static_cast<double>(rand_int32() >> 6)) * (1. / 9007199254740992.); }
+private:
+  MTRand53(const MTRand53&); // copy constructor not defined
+  void operator=(const MTRand53&); // assignment operator not defined
+
+  /*friend class boost::serialization::access;
+  template<class Archive>
+  void serialize(Archive & ar, const unsigned int version) {
+	  ar & boost::serialization::base_object<MTRand_int32>(*this);
+  }*/
 };
 
 };

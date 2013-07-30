@@ -6,7 +6,7 @@
  */
 
 #include "../ssd.h"
-#include "../MTRand/mtrand.h"
+//#include "../MTRand/mtrand.h"
 
 using namespace ssd;
 

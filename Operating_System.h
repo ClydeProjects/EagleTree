@@ -68,6 +68,7 @@ class IO_Mode_Generator {
 public:
 	virtual ~IO_Mode_Generator() {};
 	virtual event_type next() = 0;
+	virtual void init() {}
     friend class boost::serialization::access;
     template<class Archive> void serialize(Archive & ar, const unsigned int version) {}
 };
@@ -108,15 +109,17 @@ public:
 	READS_OR_WRITES(ulong seed, double write_probability) :
 		random_number_generator(seed), write_probability(write_probability) {}
 	~READS_OR_WRITES() {};
+	virtual void init() {  }
 	event_type next() { return random_number_generator() <= write_probability ? WRITE : READ; };
     friend class boost::serialization::access;
     template<class Archive> void serialize(Archive & ar, const unsigned int version) {
     	ar & boost::serialization::base_object<IO_Mode_Generator>(*this);
     	ar & write_probability;
+    	ar & random_number_generator;
     }
 private:
+    double write_probability;
 	MTRand_open random_number_generator;
-	double write_probability;
 };
 
 /*
@@ -149,6 +152,7 @@ public:
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version) {
     	ar & boost::serialization::base_object<IO_Pattern>(*this);
+    	ar & random_number_generator;
     }
 private:
 	MTRand_int32 random_number_generator;
@@ -269,6 +273,10 @@ class Asynchronous_Random_Reader_Writer : public Simple_Thread
 public:
 	Asynchronous_Random_Reader_Writer(long min_LBA, long max_LBA, ulong seed, double writes_probability = 0.5 )
 		: Simple_Thread(new Random_IO_Pattern(min_LBA, max_LBA, seed), new READS_OR_WRITES(seed, writes_probability), MAX_SSD_QUEUE_SIZE * 2, INFINITE) {}
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<Simple_Thread>(*this);
+    }
 };
 
 /*class Collision_Free_Asynchronous_Random_Thread : public Thread
@@ -406,6 +414,8 @@ public:
     	ar & max_LBA;
     	ar & num_files_to_write;
     	ar & max_file_size;
+    	ar & random_number_generator;
+    	ar & double_generator;
     }
 private:
 	struct File {
@@ -562,6 +572,7 @@ class OperatingSystem
 public:
 	OperatingSystem();
 	void set_threads(vector<Thread*> threads);
+	vector<Thread*> get_threads();
 	void init_threads();
 	~OperatingSystem();
 	void run();
@@ -576,7 +587,6 @@ public:
     void serialize(Archive & ar, const unsigned int version)
     {
     	ar & ssd;
-    	ar & threads;
     }
 private:
 	void dispatch_event(int thread_id);
