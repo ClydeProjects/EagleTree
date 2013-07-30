@@ -68,6 +68,7 @@ int main()
 	e->run("locality");
 
 	delete workload;
+	delete e;
 	//BLOCK_MANAGER_ID = 3;
 	//ENABLE_TAGGING = true;
 	//Experiment_Runner::calibrate_and_save(workload, true);
