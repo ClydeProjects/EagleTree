@@ -40,6 +40,7 @@ File_Manager::File_Manager()
 {}
 
 File_Manager::~File_Manager() {
+	//print_thread_stats();
 	for (auto f : files_history) {
 		if (f != NULL) {
 			delete f;
@@ -48,6 +49,7 @@ File_Manager::~File_Manager() {
 }
 
 void File_Manager::issue_first_IOs() {
+	//print_thread_stats();
 	write_next_file();
 }
 
@@ -138,7 +140,11 @@ void File_Manager::randomly_delete_files() {
 	for (uint i = 0; i < live_files.size(); ) {
 		File* file = live_files[i];
 		double random_num = double_generator();
-		if (file->death_probability > random_num && file != live_files.back()) {
+
+		// only start deleting files once less than 10% of the address space is occupied
+		bool delete_files = num_free_pages / (double)(max_LBA - min_LBA) < 0.1;
+
+		if (delete_files && file->death_probability > random_num && file != live_files.back()) {
 			delete_file(file);
 			live_files.erase(live_files.begin() + i);
 			phase = TRIM_PHASE;
@@ -241,10 +247,17 @@ void File_Manager::reclaim_file_space(File* file) {
 
 }
 
-/*void File_Manager::print_thread_stats() {
+void File_Manager::print_thread_stats() {
+	printf("free pages:\t%d\n", num_free_pages);
+	double percentage_written = 1 - num_free_pages / (double)(max_LBA - min_LBA);
+	printf("occupied percentage of pages:\t%f\n", percentage_written);
+	printf("max_file_size:\t%d\n", max_file_size);
+	printf("free ranges:\n");
+	for (auto r : free_ranges) {
+		printf("%d  %d\n", r.min, r.max);
+	}
 	int total_pages_written = 0;
-	for (uint i = 0; i < files_history.size(); i++) {
-		File* f = files_history[i];
+	for (auto f : live_files) {
 		printf("file %d: ", f->id);
 		printf("\t%d ", f->size);
 		printf("\t%f ", f->death_probability);
@@ -256,7 +269,7 @@ void File_Manager::reclaim_file_space(File* file) {
 	}
 	printf("total pages written: %d \n", total_pages_written);
 	printf("\n");
-}*/
+}
 
 // ----------------- Address_Range ---------------------------
 

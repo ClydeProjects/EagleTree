@@ -543,10 +543,11 @@ void Block_manager_parent::copy_state(Block_manager_parent* bm) {
 Block_manager_parent* Block_manager_parent::get_new_instance() {
 	Block_manager_parent* bm;
 	switch ( BLOCK_MANAGER_ID ) {
+		case 0: bm = new Block_manager_parallel(); break;
 		case 1: bm = new Shortest_Queue_Hot_Cold_BM(); break;
-		case 2: bm = new Wearwolf(); break;
-		case 3: bm = new Sequential_Locality_BM(); break;
-		case 4: bm = new Block_manager_roundrobin(); break;
+		case 2: bm = new Sequential_Locality_BM(); break;
+		case 3: bm = new Block_manager_roundrobin(); break;
+		case 4: bm = new Wearwolf(); break;
 		default: bm = new Block_manager_parallel(); break;
 	}
 	return bm;

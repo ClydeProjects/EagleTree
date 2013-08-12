@@ -32,31 +32,33 @@ OperatingSystem::OperatingSystem()
 }
 
 void OperatingSystem::set_threads(vector<Thread*> new_threads) {
-	for (uint i = 0; i < threads.size(); i++) {
-		delete threads[i];
+	for (auto t : historical_threads) {
+		delete t;
 	}
+	historical_threads.clear();
 	num_writes_completed = 0;
 	threads.clear();
-	assert(new_threads.size() > 0);
 	for (auto t : new_threads) {
 		t->init(this, time);
 		int new_id = ++thread_id_generator;
 		threads[new_id] = t;
+		historical_threads.push_back(t);
 	}
 }
 
-vector<Thread*> OperatingSystem::get_threads() {
+vector<Thread*> OperatingSystem::get_non_finished_threads() {
 	vector<Thread*> vec;
-	for (auto t : threads) {
-		vec.push_back(t.second);
+	for (auto t : historical_threads) {
+		if (t->is_stopped() && !t->is_finished())
+		vec.push_back(t);
 	}
 	return vec;
 }
 
 OperatingSystem::~OperatingSystem() {
 	delete ssd;
-	for (auto t : threads) {
-		delete t.second;
+	for (auto t : historical_threads) {
+		delete t;
 	}
 	threads.clear();
 	delete scheduler;
@@ -103,9 +105,11 @@ void OperatingSystem::run() {
 		//printf("num_writes   %d\n", num_writes_completed);
 	} while (!finished_experiment && still_more_work);
 
+	VisualTracer::print_horizontally_with_breaks();
+
 	for (auto entry : threads) {
 		Thread* t = entry.second;
-		t->set_finished();
+		t->stop();
 	}
 }
 
@@ -132,6 +136,7 @@ void OperatingSystem::setup_follow_up_threads(int thread_id, double current_time
 		t->init(this, current_time);
 		int new_id = ++thread_id_generator;
 		threads[new_id] = t;
+		historical_threads.push_back(t);
 	}
 	follow_up_threads.clear();
 }
@@ -153,7 +158,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 		num_writes_completed++;
 	}
 
-	if (thread->is_finished()) {
+	if (thread->is_finished() && thread->get_num_ongoing_IOs() == 0) {
 		setup_follow_up_threads(thread_id, event->get_current_time());
 		threads.erase(thread_id);
 	}

@@ -66,7 +66,7 @@ namespace ssd {
 
 /* Configuration file parsing for extern config variables defined below */
 void load_entry(char *name, double value, uint line_number);
-void load_config();
+void load_config(const char * const file_name);
 void set_big_SSD();
 void set_normal_config();
 void print_config(FILE *stream);
@@ -204,9 +204,6 @@ extern uint MAX_ITEMS_IN_COPY_BACK_MAP;
 
 /* Defines the maximal length of the SSD queue  */
 extern int MAX_SSD_QUEUE_SIZE;
-
-/* Defines the maximal number of locks that can be held by the OS  */
-extern uint MAX_OS_NUM_LOCKS;
 
 /* Defines how the sequential writes detection algorithm spreads a sequential write  */
 extern uint LOCALITY_PARALLEL_DEGREE;
@@ -1237,6 +1234,8 @@ public:
 	static void print();
 	static double get_avg_channel_utilization();
 	static double get_avg_LUN_utilization();
+	static double get_channel_utilization(int package_id);
+	static double get_LUN_utilization(int lun_id);
 private:
 	static vector<double> channel_used;
 	static vector<double> LUNs_used;
@@ -1277,6 +1276,8 @@ public:
 	static void init();
 	static void print();
 	static void register_thread(Thread*, string name);
+	static StatisticsGatherer* get_stats_for_thread(int index);
+	static int size();
 private:
 	static vector<Thread*> threads;
 	static vector<string> thread_names;
@@ -1428,7 +1429,7 @@ public:
 	void draw_experiment_spesific_graphs();
 	static void save_state(OperatingSystem* os, string file_name);
 	static OperatingSystem* load_state(string file_name);
-	static void calibrate_and_save(Workload_Definition*, string name, bool force = false);
+	static void calibrate_and_save(Workload_Definition*, string name, int num_times_to_repeat = NUMBER_OF_ADDRESSABLE_PAGES() * 3, bool force = false);
 	static void write_config_file(string folder_name);
 	static void write_results_file(string folder_name);
 	static void create_base_folder(string folder_name);
@@ -1440,6 +1441,7 @@ public:
 	void set_io_limit(int limit) { io_limit = limit; };
 	void set_calibration_file(string file) { calibration_file = file; }
 	void set_generate_trace_file(bool val) {generate_trace_file = val;}
+	void set_alternate_location_for_results_file(string val) { alternate_location_for_results_file = val; }
 private:
 	double* d_variable;
 	double d_min, d_max, d_incr;
@@ -1454,6 +1456,8 @@ private:
 	string calibration_file;
 	bool calibrate_for_each_point;
 	bool generate_trace_file;
+
+	string alternate_location_for_results_file;
 
 	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
 
@@ -1472,7 +1476,7 @@ class MTRand_int32 { // Mersenne Twister random number generator
 public:
 // default constructor: uses default seed only if this is the first instance
 /* MKS: Uncommented empty constructor since seeding is required for each object instantiation as a result of the removal of static fields */
-  MTRand_int32() : n(624), m(397), state(n) { std::cout << "You should always provide a seed to the constructor, since the static fields have been made dynamic.\n"; throw; if (!init) seed(5489UL); init = true; }
+  MTRand_int32() : n(624), m(397), state(n) { if (!init) seed(5489UL); init = true; }
 // constructor with 32 bit int as seed
   MTRand_int32(unsigned long s) : n(624), m(397), state(n) { seed(s); init = true; }
 // constructor with array of size 32 bit ints as seed

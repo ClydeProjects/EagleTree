@@ -50,6 +50,7 @@ Ssd::Ssd():
 	}*/
 
 	ftl = new FtlImpl_Page(this);
+
 	scheduler = new IOScheduler();
 	Block_manager_parent* bm = Block_manager_parent::get_new_instance();
 

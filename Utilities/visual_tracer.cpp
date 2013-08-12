@@ -213,7 +213,7 @@ void VisualTracer::print_horizontally_with_breaks(ulong cursor) {
 }
 
 void VisualTracer::write_file() {
-	int chars_per_line = 300;
+	int chars_per_line = 1000;
 	// figure out how much to write
 	int min_size = INFINITE;
 	for (uint i = 0; i < SSD_SIZE; i++) {
@@ -245,6 +245,7 @@ void VisualTracer::trim_from_start(int num_characters_from_start) {
 			vec.erase(vec.begin(), vec.begin() + to_remove);
 		}
 	}
+	amount_written_to_file += num_characters_from_start;
 }
 
 string VisualTracer::get_as_string(ulong cursor, ulong max, int chars_per_line) {

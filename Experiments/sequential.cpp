@@ -36,36 +36,68 @@ vector<Thread*> detection_BLOCK(int highest_lba) {
 	return sequential_experiment(highest_lba);
 }*/
 
-int main()
+int main(int argc, char* argv[])
 {
+	printf("Running sequential!!\n");
+	char* results_file = "";
+	if (argc == 1) {
+		printf("Setting big SSD config\n");
+		set_big_SSD();
+	}
+	else if (argc == 3) {
+		char* config_file_name = argv[1];
+		printf("Setting config from file:  %s\n", config_file_name);
+		results_file = argv[2];
+		printf("results_file:  %s\n", results_file);
+		load_config(config_file_name);
+	}
+
 	string name = "/exp_sequential/";
 	string exp_folder = get_current_dir_name() + name;
 	Experiment::create_base_folder(exp_folder.c_str());
 
-	set_normal_config();
-
-	OVER_PROVISIONING_FACTOR = 0.90;
+	//set_big_SSD();
+	//OVER_PROVISIONING_FACTOR = 0.70;
 
 	Workload_Definition* workload = new File_System_With_Noise();
 
 	OS_SCHEDULER = 1;
 	vector<vector<Experiment_Result> > exps;
 
+
 	Experiment* e = new Experiment();
 	e->set_io_limit(200000);
+	//e->set_generate_trace_file(true);
+	if (argc == 1) {
+		BLOCK_MANAGER_ID = 0;
+		string no_locality_calibration_file = "no_locality_calibration_file.txt";
+		Experiment::calibrate_and_save(workload, no_locality_calibration_file, 4 * NUMBER_OF_ADDRESSABLE_PAGES());
+		e->set_calibration_file(no_locality_calibration_file);
+		e->run("no_locality");
 
-	BLOCK_MANAGER_ID = 0;
-	string no_locality_calibration_file = "no_locality_calibration_file.txt";
-	Experiment::calibrate_and_save(workload, no_locality_calibration_file);
-	e->set_calibration_file(no_locality_calibration_file);
-	e->run("no_locality");
+		BLOCK_MANAGER_ID = 2;
+		ENABLE_TAGGING = true;
+		string locality_calibration_file = "locality_calibration_file.txt";
+		Experiment::calibrate_and_save(workload, locality_calibration_file);
+		e->set_calibration_file(locality_calibration_file);
+		e->run("locality");
+	}
+	else if (argc == 3 && BLOCK_MANAGER_ID == 0) {
+		printf("running no locality\n");
+		string no_locality_calibration_file = "no_locality_calibration_file.txt";
+		e->set_calibration_file(no_locality_calibration_file);
+		e->set_alternate_location_for_results_file(results_file);
+		e->run("no_locality");
+	}
+	else if (argc == 3 && BLOCK_MANAGER_ID == 2) {
+		printf("running locality\n");
+		string locality_calibration_file = "locality_calibration_file.txt";
+		e->set_calibration_file(locality_calibration_file);
+		e->set_alternate_location_for_results_file(results_file);
+		e->run("locality");
+	}
+	e->draw_graphs();
 
-	BLOCK_MANAGER_ID = 3;
-	ENABLE_TAGGING = true;
-	string locality_calibration_file = "locality_calibration_file.txt";
-	Experiment::calibrate_and_save(workload, locality_calibration_file);
-	e->set_calibration_file(locality_calibration_file);
-	e->run("locality");
 
 	delete workload;
 	delete e;

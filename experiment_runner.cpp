@@ -34,7 +34,8 @@ Experiment::Experiment()
 	  workload(NULL), calibration_workload(NULL),
 	  calibrate_for_each_point(false),
 	  results(),
-	  generate_trace_file(false)
+	  generate_trace_file(false),
+	  alternate_location_for_results_file("")
 {}
 
 void Experiment::unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer) {
@@ -94,7 +95,10 @@ void Experiment::run(string name) {
 void Experiment::run_single_point(string name) {
 	string data_folder = base_folder + name + "/";
 	mkdir(data_folder.c_str(), 0755);
+	StatisticsGatherer::set_record_statistics(true);
+	Thread::set_record_internal_statistics(true);
 	Experiment_Result global_result(name, data_folder, "Global/", "Changing a Var");
+	Individual_Threads_Statistics::init();
 	global_result.start_experiment();
 
 	if (generate_trace_file) {
@@ -126,6 +130,10 @@ void Experiment::run_single_point(string name) {
 
 	global_result.collect_stats(0, StatisticsGatherer::get_global_instance());
 	write_results_file(data_folder);
+	if (!alternate_location_for_results_file.compare("") == 0) {
+		printf("writing results in %s\n", alternate_location_for_results_file.c_str());
+		write_results_file(alternate_location_for_results_file);
+	}
 
 	global_result.end_experiment();
 	vector<Experiment_Result> result;
@@ -368,7 +376,7 @@ Experiment_Result Experiment::copyback_map_experiment(vector<Thread*> (*experime
 
 // currently, this method checks if there if a file already exists, and if so, assumes it is valid.
 // ideally, a check should be made to ensure the saved SSD state matches with the state of the current global parameters
-void Experiment::calibrate_and_save(Workload_Definition* workload, string name, bool force) {
+void Experiment::calibrate_and_save(Workload_Definition* workload, string name, int num_IOs, bool force) {
 	//string file_name = base_folder + "calibrated_state.txt";
 	string file_name = base_folder + name;
 	std::ifstream ifile(file_name.c_str());
@@ -383,16 +391,17 @@ void Experiment::calibrate_and_save(Workload_Definition* workload, string name, 
 	//Free_Space_Per_LUN_Meter::init();
 	printf("Creating calibrated SSD state.\n");
 	OperatingSystem* os = new OperatingSystem();
-	os->set_num_writes_to_stop_after(NUMBER_OF_ADDRESSABLE_PAGES() * 3);
+	os->set_num_writes_to_stop_after(num_IOs);
 	vector<Thread*> init_threads = workload->generate_instance();
 	os->set_threads(init_threads);
 	os->set_progress_meter_granularity(1000);
 
 	os->run();
-
+	os->get_ssd()->execute_all_remaining_events();
 	save_state(os, file_name);
-	Free_Space_Meter::print();
-	Free_Space_Per_LUN_Meter::print();
+	//StatisticsGatherer::get_global_instance()->print();
+	//Free_Space_Meter::print();
+	//Free_Space_Per_LUN_Meter::print();
 	delete os;
 }
 
@@ -405,18 +414,40 @@ void Experiment::write_config_file(string folder_name) {
 
 void Experiment::write_results_file(string folder_name) {
 	string file_name = folder_name + "results.txt";
+	printf("Writing results file in:   %s\n", file_name.c_str());
 	FILE* file = fopen(file_name.c_str() , "w");
 	StatisticsGatherer::get_global_instance()->print_simple(file);
 	double channel_util = Utilization_Meter::get_avg_channel_utilization();
 	fprintf(file, "channel util:\t%f\n", channel_util);
 	double LUN_util = Utilization_Meter::get_avg_LUN_utilization();
-	fprintf(file, "LUN util:\t%f\n", LUN_util);
+	fprintf(file, "LUN util:\t%f\n\n", LUN_util);
+
+	for (int i = 0; i < SSD_SIZE; i++) {
+		fprintf(file, "Channel util for package %d:\t%f\n", i, Utilization_Meter::get_channel_utilization(i) );
+	}
+	fprintf(file, "\n");
+	for (int i = 0; i < SSD_SIZE * PACKAGE_SIZE; i++) {
+		fprintf(file, "LUN util for LUN %d:\t%f\n", i, Utilization_Meter::get_LUN_utilization(i) );
+	}
+	fprintf(file, "\n");
+
+	//Individual_Threads_Statistics::print();
+	for (int i = 0; i < Individual_Threads_Statistics::size(); i++) {
+		StatisticsGatherer* sg = Individual_Threads_Statistics::get_stats_for_thread(i);
+		if (sg != NULL) {
+			int num_reads = sg->total_reads();
+			int num_writes = sg->total_writes();
+			fprintf(file, "Thread reads %d: %d\n", i, num_reads);
+			fprintf(file, "Thread writes %d: %d\n", i, num_writes);
+		}
+	}
+
 	fclose(file);
 }
 
 void Experiment::save_state(OperatingSystem* os, string file_name) {
-	vector<Thread*> threads = os->get_threads();
-	os->get_ssd()->execute_all_remaining_events();
+	vector<Thread*> threads = os->get_non_finished_threads();
+
 	std::ofstream file(file_name.c_str());
 	boost::archive::text_oarchive oa(file);
 	oa.register_type<FtlImpl_Page>( );
@@ -431,6 +462,7 @@ void Experiment::save_state(OperatingSystem* os, string file_name) {
 	oa.register_type<READS>( );
 	oa.register_type<READS_OR_WRITES>();
 	oa.register_type<Asynchronous_Random_Writer>();
+	oa.register_type<Asynchronous_Random_Reader>();
 
 	oa.register_type<MTRand>();
 	oa.register_type<MTRand_closed>();
@@ -449,6 +481,7 @@ void Experiment::save_state(OperatingSystem* os, string file_name) {
 
 OperatingSystem* Experiment::load_state(string name) {
 	string file_name = base_folder + name;
+	printf("loading calibration file:  %s\n", file_name.c_str());
 	std::ifstream file(file_name.c_str());
 	boost::archive::text_iarchive ia(file);
 	ia.register_type<FtlImpl_Page>( );
@@ -463,6 +496,7 @@ OperatingSystem* Experiment::load_state(string name) {
 	ia.register_type<READS>( );
 	ia.register_type<READS_OR_WRITES>();
 	ia.register_type<Asynchronous_Random_Writer>();
+	ia.register_type<Asynchronous_Random_Reader>();
 
 	ia.register_type<MTRand>();
 	ia.register_type<MTRand_closed>();
@@ -473,6 +507,10 @@ OperatingSystem* Experiment::load_state(string name) {
 	ia >> os;
 	vector<Thread*> threads;
 	ia >> threads;
+	Individual_Threads_Statistics::init();
+	for (auto t : threads) {
+		Individual_Threads_Statistics::register_thread(t, "");
+	}
 	os->set_threads(threads);
 	//os->init_threads();
 	IOScheduler* scheduler = os->get_ssd()->get_scheduler();

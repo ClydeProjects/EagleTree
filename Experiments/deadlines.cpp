@@ -11,7 +11,6 @@ int main()
 	Experiment::create_base_folder(exp_folder.c_str());
 
 	set_big_SSD();
-	//OVER_PROVISIONING_FACTOR = 0.6;
 
 	Workload_Definition* init = new Init_Workload();
 	string calib_name = "calib.txt";
@@ -23,7 +22,7 @@ int main()
 	SCHEDULING_SCHEME = 0;
 	Workload_Definition* workload = new Asynch_Random_Workload();
 	fifo->set_workload(workload);
-	fifo->run("fifo");
+	//fifo->run("fifo");
 	delete fifo;
 
 	Experiment* e = new Experiment();

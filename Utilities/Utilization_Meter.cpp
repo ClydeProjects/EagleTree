@@ -20,10 +20,10 @@ void Utilization_Meter::register_event(double prev_time, double duration, Event 
 		channel_used[id] += duration;
 		double unused_time = event.get_current_time() - prev_time;
 		//VisualTracer::print_horizontally(1000);
-		/*if (unused_time > 23  || event.get_application_io_id() == 313 ) {
-			VisualTracer::print_horizontally(1000);
-			event.print();
-		}*/
+		if (unused_time > 0) {
+			//VisualTracer::print_horizontally(1000);
+			//event.print();
+		}
 		channel_unused[id] += unused_time;
 		//double util = channel_used[id] / (channel_used[id] + channel_unused[id]);
 		//printf("C%d\t%f\n", id, util);
@@ -53,6 +53,14 @@ double Utilization_Meter::get_avg_channel_utilization() {
 		avg += channel_used[i] / (channel_used[i] + channel_unused[i]);
 	}
 	return avg / SSD_SIZE;
+}
+
+double Utilization_Meter::get_channel_utilization(int package_id) {
+	return channel_used[package_id] / (channel_used[package_id] + channel_unused[package_id]);
+}
+
+double Utilization_Meter::get_LUN_utilization(int lun_id) {
+	return LUNs_used[lun_id] / (LUNs_used[lun_id] + LUNs_unused[lun_id]);
 }
 
 double Utilization_Meter::get_avg_LUN_utilization() {

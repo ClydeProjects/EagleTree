@@ -86,6 +86,8 @@ Asynch_Random_Workload::Asynch_Random_Workload(double writes_probability)
 vector<Thread*> Asynch_Random_Workload::generate() {
 	//Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
 	Simple_Thread* thread = new Asynchronous_Random_Reader_Writer(min_lba, max_lba, 2521, writes_probability);
+	Individual_Threads_Statistics::init();
+	Individual_Threads_Statistics::register_thread(thread, "");
 	//init_write->add_follow_up_thread(thread);
 	//init_write->set_statistics_gatherer(stats);
 	//init_write->set_experiment_thread(true);
@@ -134,22 +136,27 @@ vector<Thread*> Synch_Write::generate() {
 vector<Thread*> File_System_With_Noise::generate() {
 
 	long log_space_per_thread = max_lba / 4;
-	long max_file_size = BLOCK_SIZE * 20;
+	long max_file_size = log_space_per_thread / 8;
+
+	Simple_Thread* seq = new Asynchronous_Sequential_Writer(0, log_space_per_thread * 2);
 
 	Simple_Thread* t1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 35722);
-	Simple_Thread* t2 = new Asynchronous_Random_Reader(0, log_space_per_thread * 2, 35722);
-	Thread* t3 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 3, INFINITE, max_file_size, 713);
-	Thread* t4 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, INFINITE, max_file_size, 5);
+	Simple_Thread* t2 = new Asynchronous_Random_Reader(0, log_space_per_thread * 2, 3456);
+	Thread* t3 = new File_Manager(log_space_per_thread * 2 + 1, log_space_per_thread * 4, INFINITE, max_file_size, 713);
+	//Thread* t4 = new File_Manager(log_space_per_thread * 3 + 1, log_space_per_thread * 4, INFINITE, max_file_size, 5);
+
+	seq->add_follow_up_thread(t1);
+	//seq->add_follow_up_thread(t2);
+	seq->add_follow_up_thread(t3);
 
 	vector<Thread*> threads;
-	threads.push_back(t1);
-	//threads.push_back(t2);
-	threads.push_back(t3);
+	threads.push_back(seq);
 	//threads.push_back(t4);
 
 	Individual_Threads_Statistics::init();
-	Individual_Threads_Statistics::register_thread(t1, "Asynchronous Random Thread Reader Writer 1");
-	//Individual_Threads_Statistics::register_thread(t2, "Asynchronous Random Thread Reader Writer 2");
+	Individual_Threads_Statistics::register_thread(seq, "Asynchronous Sequential Writer Thread");
+	Individual_Threads_Statistics::register_thread(t1, "Asynchronous Random Thread Reader");
+	Individual_Threads_Statistics::register_thread(t2, "Asynchronous Random Thread Writer");
 	Individual_Threads_Statistics::register_thread(t3, "File Manager 1");
 	//Individual_Threads_Statistics::register_thread(t4, "File Manager 2");
 

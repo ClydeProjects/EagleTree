@@ -23,7 +23,16 @@ void Individual_Threads_Statistics::print() {
 	}
 }
 
-void Individual_Threads_Statistics::register_thread(Thread* t, string name) {
+void Individual_Threads_Statistics::register_thread(Thread* t, string name = "") {
 	threads.push_back(t);
 	thread_names.push_back(name);
+}
+
+StatisticsGatherer* Individual_Threads_Statistics::get_stats_for_thread(int index) {
+	Thread* t = threads[index];
+	return t->get_internal_statistics_gatherer();
+}
+
+int Individual_Threads_Statistics::size() {
+	return threads.size();
 }

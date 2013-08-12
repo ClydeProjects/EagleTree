@@ -36,7 +36,7 @@ ssd: $(HDR) $(SRC)
 
 # All Target
 
-all: sequential  #scheduling sequential_tuning sequential greediness copybacks
+all: sequential interleaving  #scheduling sequential_tuning sequential greediness copybacks
 
 interleaving: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o Experiments/interleaving Experiments/interleaving.cpp $(OBJ) -lboost_serialization
@@ -51,7 +51,12 @@ overprov: $(HDR) $(OBJ)
 sequential: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o Experiments/sequential Experiments/sequential.cpp $(OBJ) -lboost_serialization
 	-chmod $(PERMS) $(OBJ)
-	-chmod $(EPERMS) sequential
+	-chmod $(EPERMS) Experiments/sequential
+	
+config_loader: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o Experiments/config_loader Experiments/config_loader.cpp $(OBJ) -lboost_serialization
+	-chmod $(PERMS) $(OBJ)
+	-chmod $(EPERMS) Experiments/config_loader
 
 deadlines: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o Experiments/deadlines Experiments/deadlines.cpp $(OBJ) -lboost_serialization

@@ -84,6 +84,7 @@ void Experiment::graph(int sizeX, int sizeY, string title, string filename, int 
     gleScript <<
     "size " << sizeX << " " << sizeY << endl << // 12 8
     "set font texcmr" << endl <<
+    "set hei 0.75" << endl <<
     "begin graph" << endl <<
     "   key pos tl offset -0.0 0 compact" << endl <<
     "   scale auto" << endl <<
@@ -127,6 +128,7 @@ void Experiment::latency_plot(int sizeX, int sizeY, string title, string filenam
     "size " << sizeX << " " << sizeY << endl << // 12 8
     "include \"graphutil.gle\"" << endl <<
     "set font texcmr" << endl <<
+    "set hei 0.75" << endl <<
     "begin graph" << endl <<
     "   key pos tr offset -0.0 0 compact" << endl <<
     "   scale auto" << endl <<
@@ -165,6 +167,7 @@ void Experiment::waittime_boxplot(int sizeX, int sizeY, string title, string fil
     "size " << sizeX << " " << sizeY << endl << // 12 8
     "include \"graphutil.gle\"" << endl <<
     "set font texcmr" << endl <<
+    "set hei 0.75" << endl <<
     "begin graph" << endl <<
     "   key pos tl offset -0.0 0 compact" << endl <<
     "   scale auto" << endl <<
@@ -197,6 +200,7 @@ void Experiment::draw_graph(int sizeX, int sizeY, string outputFile, string data
     gleScript <<
     "size " << sizeX << " " << sizeY << endl << // 12 8
     "set font texcmr" << endl <<
+    "set hei 0.75" << endl <<
     "begin graph" << endl <<
     "   " << "key pos tl offset -0.0 0 compact" << endl <<
     "   scale auto" << endl <<
@@ -286,6 +290,8 @@ void Experiment::throughput_history(int sizeX, int sizeY, string outputFile, Exp
 	for (uint i = 0; i < points.size(); i++) {
 		stringstream command;
 		command << "plot 0 " << i << " \"" << Experiment_Result::throughput_filename_prefix << points[i] << Experiment_Result::datafile_postfix << "\" \"Throughput history (" << experiment.variable_parameter_name << " = " << points[i] << ")\" \"on\" \"Timeline (µs progressed)\" \"Throughput (IOs/s)\" " << 2;
+
+		//printf("%s\n", command.str().c_str());
 		commands.push_back(command.str());
 	}
 
@@ -309,6 +315,7 @@ void Experiment::multigraph(int sizeX, int sizeY, string outputFile, vector<stri
 	endl <<
 	"size std_sx+pad std_sy*hist_graphs+pad" << endl <<
 	"set font texcmr" << endl <<
+	"set hei 0.75" << endl <<
 	endl <<
 	"sub hist xp yp data$ title$ yaxis$ xaxistitle$ xmax binsize black_column red_column" << endl <<
 	"   default black_column 1" << endl <<
@@ -370,7 +377,7 @@ void Experiment::multigraph(int sizeX, int sizeY, string outputFile, vector<stri
 	}
 
 	// Run gle to draw graph
-	string gleCommand = "gle \"" + scriptFilename + "\" \"" + outputFile + "\"";
+	string gleCommand = "gle -d png \"" + scriptFilename + "\" \"" + outputFile + "\"";
 	cout << gleCommand << "\n";
 	system(gleCommand.c_str());
 
@@ -386,8 +393,8 @@ string Experiment::get_working_dir() {
 }
 
 void Experiment::draw_graphs() {
-	int sx = 16;
-	int sy = 8;
+	int sx = 32;
+	int sy = 16;
 	//for (int i = 0; i < exps[0][0].column_names.size(); i++) {
 		//printf("%d: %s\n", i, exps[0][0].column_names[i].c_str());
 	//}
@@ -428,11 +435,6 @@ void Experiment::draw_graphs() {
 		    string name = "waittime_histogram " + to_string(kv.first);
 		    Experiment::cross_experiment_waittime_histogram(sx, sy/2, name, exp, kv.first, 1, 4);
 		}
-
-		/*Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 90", exp, 90, 1, 4);
-		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 80", exp, 80, 1, 4);
-		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 70", exp, 70, 1, 4);
-		Experiment_Runner::cross_experiment_waittime_histogram(sx, sy/2, "waittime_histogram 60", exp, 60, 1, 4);*/
 		/*if (i > 0)*/ { chdir(".."); }
 		draw_experiment_spesific_graphs();
 	}
@@ -440,8 +442,8 @@ void Experiment::draw_graphs() {
 }
 
 void Experiment::draw_experiment_spesific_graphs() {
-		int sx = 16;
-		int sy = 8;
+		int sx = 32;
+		int sy = 16;
 
 		vector<int> x_vals;
 		for (double i = d_min; i < d_max && d_variable != NULL; i += d_incr) {
@@ -449,6 +451,9 @@ void Experiment::draw_experiment_spesific_graphs() {
 		}
 		for (int i = i_min; i < i_max && i_variable != NULL; i += i_incr) {
 			x_vals.push_back(i);
+		}
+		if (x_vals.size() == 0) {
+			x_vals.push_back(0);
 		}
 
 		uint mean_pos_in_datafile = std::find(results[0][0].column_names.begin(), results[0][0].column_names.end(), "Write latency, mean (µs)") - results[0][0].column_names.begin();
@@ -461,7 +466,7 @@ void Experiment::draw_experiment_spesific_graphs() {
 				if (chdir(exp[i].data_folder.c_str()) != 0) printf("Error changing dir to %s\n", exp[i].data_folder.c_str());
 				Experiment::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
 				Experiment::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], x_vals, 1, 4);
-				Experiment::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], x_vals, true);
+				//Experiment::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], x_vals, true);
 				Experiment::age_histogram			(sx, sy/2, "age-histograms", exp[i], x_vals);
 				Experiment::queue_length_history	(sx, sy/2, "queue_length", exp[i], x_vals);
 				Experiment::throughput_history		(sx, sy/2, "throughput_history", exp[i], x_vals);

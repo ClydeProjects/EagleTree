@@ -26,19 +26,25 @@ public:
 	Event* peek() const;
 	Event* pop();
 
-	bool is_finished();
+	bool is_finished() const;
+	int get_num_ongoing_IOs() { return num_IOs_executing; }
+	void stop();
+	bool is_stopped();
+
 	inline void set_time(double current_time) { time = current_time; }
 	inline double get_time() { return time; }
 	inline void add_follow_up_thread(Thread* thread) { threads_to_start_when_this_thread_finishes.push_back(thread); }
 	inline void add_follow_up_threads(vector<Thread*> threads) { threads_to_start_when_this_thread_finishes.insert(threads_to_start_when_this_thread_finishes.end(), threads.begin(), threads.end()); }
 	inline vector<Thread*>& get_follow_up_threads() { return threads_to_start_when_this_thread_finishes; }
 	StatisticsGatherer* get_internal_statistics_gatherer() { return internal_statistics_gatherer; }
-	StatisticsGatherer* get_external_statistics_gatherer() { return internal_statistics_gatherer; }
+	StatisticsGatherer* get_external_statistics_gatherer() { return external_statistics_gatherer; }
 	void set_statistics_gatherer(StatisticsGatherer* new_statistics_gatherer);
 	void set_finished() { finished = true; }
     friend class boost::serialization::access;
     template<class Archive>
-    void serialize(Archive & ar, const unsigned int version) {}
+    void serialize(Archive & ar, const unsigned int version) {
+    	ar & threads_to_start_when_this_thread_finishes;
+    }
     static void set_record_internal_statistics(bool val) { record_internal_statistics = val; }
 protected:
 	virtual void issue_first_IOs() = 0;
@@ -48,9 +54,8 @@ protected:
 	vector<Thread*> threads_to_start_when_this_thread_finishes;
 	OperatingSystem* os;
 	void submit(Event* event);
-	bool can_submit_more();
-	int get_num_ongoing_IOs() { return num_IOs_executing; }
-	bool get_finished() { return finished; }
+	bool can_submit_more() const;
+
 private:
 	double time;
 	StatisticsGatherer* internal_statistics_gatherer;
@@ -58,6 +63,7 @@ private:
 	int num_IOs_executing;
 	queue<Event*> io_queue;
 	bool finished;
+	bool stopped;
 	static bool record_internal_statistics;
 };
 
@@ -231,6 +237,18 @@ public:
     }
 };
 
+class Asynchronous_Random_Reader : public Simple_Thread
+{
+public:
+	Asynchronous_Random_Reader() : Simple_Thread() {}
+	Asynchronous_Random_Reader(long min_LBA, long max_LBA, ulong randseed)
+		: Simple_Thread(new Random_IO_Pattern(min_LBA, max_LBA, randseed), new READS(), MAX_SSD_QUEUE_SIZE * 2, INFINITE) {}
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<Simple_Thread>(*this);
+    }
+};
+
 class Synchronous_Sequential_Writer : public Simple_Thread
 {
 public:
@@ -244,6 +262,10 @@ public:
 	Asynchronous_Sequential_Writer(long min_LBA, long max_LBA)
 		: Simple_Thread(new Sequential_IO_Pattern(min_LBA, max_LBA), MAX_SSD_QUEUE_SIZE * 2, new WRITES()) {
 	}
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<Simple_Thread>(*this);
+    }
 };
 
 class Asynchronous_Sequential_Trimmer : public Simple_Thread
@@ -402,7 +424,7 @@ public:
 	void issue_first_IOs();
 	void handle_event_completion(Event* event);
 	void handle_no_IOs_left();
-	//virtual void print_thread_stats();
+	virtual void print_thread_stats();
     friend class boost::serialization::access;
     template<class Archive> void
     serialize(Archive & ar, const unsigned int version) {
@@ -572,7 +594,7 @@ class OperatingSystem
 public:
 	OperatingSystem();
 	void set_threads(vector<Thread*> threads);
-	vector<Thread*> get_threads();
+	vector<Thread*> get_non_finished_threads();
 	void init_threads();
 	~OperatingSystem();
 	void run();
@@ -594,6 +616,7 @@ private:
 	void setup_follow_up_threads(int thread_id, double time);
 	Ssd * ssd;
 	map<int, Thread*> threads;
+	vector<Thread*> historical_threads;
 	map<long, long> app_id_to_thread_id_mapping;
 	set<uint> currently_executing_ios;
 	long NUM_WRITES_TO_STOP_AFTER;

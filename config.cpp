@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+using namespace std;
 /* using namespace ssd; */
 namespace ssd {
 
@@ -192,14 +192,11 @@ uint MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 uint MAX_ITEMS_IN_COPY_BACK_MAP = 1024;
 
 /* Defines the maximal length of the SSD queue  */
-int MAX_SSD_QUEUE_SIZE = 15;
+int MAX_SSD_QUEUE_SIZE = 32;
 
 int WRITE_DEADLINE = 10000000;
 int READ_DEADLINE =  10000000;
 int READ_TRANSFER_DEADLINE = 10000000;
-
-/* Defines the maximal number of locks that can be held by the OS  */
-uint MAX_OS_NUM_LOCKS = 1000;
 
 /* Defines how the sequential writes detection algorithm spreads a sequential write  */
 uint LOCALITY_PARALLEL_DEGREE = 0;
@@ -208,11 +205,7 @@ int PAGE_HOTNESS_MEASURER = 0;
 
 void load_entry(char *name, double value, uint line_number) {
 	/* cheap implementation - go through all possibilities and match entry */
-	if (!strcmp(name, "RAM_READ_DELAY"))
-		RAM_READ_DELAY = value;
-	else if (!strcmp(name, "RAM_WRITE_DELAY"))
-		RAM_WRITE_DELAY = value;
-	else if (!strcmp(name, "BUS_CTRL_DELAY"))
+	if (!strcmp(name, "BUS_CTRL_DELAY"))
 		BUS_CTRL_DELAY = value;
 	else if (!strcmp(name, "BUS_DATA_DELAY"))
 		BUS_DATA_DELAY = value;
@@ -224,10 +217,6 @@ void load_entry(char *name, double value, uint line_number) {
 		DIE_SIZE = (uint) value;
 	else if (!strcmp(name, "PLANE_SIZE"))
 		PLANE_SIZE = (uint) value;
-	else if (!strcmp(name, "PLANE_REG_READ_DELAY"))
-		PLANE_REG_READ_DELAY = value;
-	else if (!strcmp(name, "PLANE_REG_WRITE_DELAY"))
-		PLANE_REG_WRITE_DELAY = value;
 	else if (!strcmp(name, "BLOCK_SIZE"))
 		BLOCK_SIZE = (uint) value;
 	else if (!strcmp(name, "BLOCK_ERASES"))
@@ -242,33 +231,45 @@ void load_entry(char *name, double value, uint line_number) {
 		PAGE_SIZE = value;
 	else if (!strcmp(name, "FTL_IMPLEMENTATION"))
 		FTL_IMPLEMENTATION = value;
-	else if (!strcmp(name, "PAGE_ENABLE_DATA"))
-		PAGE_ENABLE_DATA = (value == 1);
-	else if (!strcmp(name, "MAP_DIRECTORY_SIZE"))
-		MAP_DIRECTORY_SIZE = value;
-	else if (!strcmp(name, "FTL_IMPLEMENTATION"))
-		FTL_IMPLEMENTATION = value;
-	else if (!strcmp(name, "BAST_LOG_PAGE_LIMIT"))
-		BAST_LOG_PAGE_LIMIT = value;
-	else if (!strcmp(name, "FAST_LOG_PAGE_LIMIT"))
-		FAST_LOG_PAGE_LIMIT = value;
-	else if (!strcmp(name, "CACHE_DFTL_LIMIT"))
-		CACHE_DFTL_LIMIT = value;
-	else if (!strcmp(name, "PARALLELISM_MODE"))
-		PARALLELISM_MODE = value;
-	else if (!strcmp(name, "RAID_NUMBER_OF_PHYSICAL_SSDS"))
-		RAID_NUMBER_OF_PHYSICAL_SSDS = value;
 	else if (!strcmp(name, "MAX_REPEATED_COPY_BACKS_ALLOWED"))
 		MAX_REPEATED_COPY_BACKS_ALLOWED = value;
 	else if (!strcmp(name, "MAX_ITEMS_IN_COPY_BACK_MAP"))
 		MAX_ITEMS_IN_COPY_BACK_MAP = value;
+	else if (!strcmp(name, "MAX_SSD_QUEUE_SIZE"))
+		MAX_SSD_QUEUE_SIZE = value;
+	else if (!strcmp(name, "OVER_PROVISIONING_FACTOR"))
+		OVER_PROVISIONING_FACTOR = value;
+	else if (!strcmp(name, "BLOCK_MANAGER_ID"))
+		BLOCK_MANAGER_ID = value;
+	else if (!strcmp(name, "GREED_SCALE"))
+		GREED_SCALE = value;
+	else if (!strcmp(name, "MAX_CONCURRENT_GC_OPS"))
+		MAX_CONCURRENT_GC_OPS = value;
+	else if (!strcmp(name, "FTL_IMPLEMENTATION"))
+		FTL_IMPLEMENTATION = value;
+	else if (!strcmp(name, "OS_SCHEDULER"))
+		OS_SCHEDULER = value;
+	else if (!strcmp(name, "GREED_SCALE"))
+		GREED_SCALE = value;
+	else if (!strcmp(name, "ALLOW_DEFERRING_TRANSFERS"))
+		ALLOW_DEFERRING_TRANSFERS = value;
+	else if (!strcmp(name, "SCHEDULING_SCHEME"))
+		SCHEDULING_SCHEME = value;
+	else if (!strcmp(name, "WRITE_DEADLINE"))
+		WRITE_DEADLINE = value;
+	else if (!strcmp(name, "READ_DEADLINE"))
+		READ_DEADLINE = value;
+	else if (!strcmp(name, "ENABLE_WEAR_LEVELING"))
+		ENABLE_WEAR_LEVELING = value;
+	else if (!strcmp(name, "ENABLE_TAGGING"))
+		ENABLE_TAGGING = value;
 	else
-		fprintf(stderr, "Config file parsing error on line %u\n", line_number);
+		fprintf(stderr, "Config file parsing error on line %u:  %s   %f\n", line_number, name, value);
 	return;
 }
 
 void set_normal_config() {
-	SSD_SIZE = 8;
+	SSD_SIZE = 4;
 	PACKAGE_SIZE = 8;
 	DIE_SIZE = 1;
 	PLANE_SIZE = 128;
@@ -286,7 +287,7 @@ void set_normal_config() {
 	BUS_DATA_DELAY = 350 / 5;
 	BLOCK_ERASE_DELAY = 3000 / 5;
 
-	MAX_SSD_QUEUE_SIZE = 200;
+	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 	SCHEDULING_SCHEME = 0;  // FIFO
 
@@ -326,15 +327,14 @@ void set_big_SSD() {
 	MAX_CONCURRENT_GC_OPS = PACKAGE_SIZE * SSD_SIZE;
 	GREED_SCALE = 2;
 	ALLOW_DEFERRING_TRANSFERS = true;
-	OVER_PROVISIONING_FACTOR = 0.6;
+	OVER_PROVISIONING_FACTOR = 0.7;
 
 	OS_SCHEDULER = 0;
 
-	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY + 1;// PAGE_READ_DELAY + 1;
+	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY;// PAGE_READ_DELAY + 1;
 }
 
-void load_config() {
-	const char * const config_name = "ssd.conf";
+void load_config(const char * const config_name) {
 	FILE *config_file = NULL;
 
 	/* update sscanf line below with max name length (%s) if changing sizes */
@@ -358,12 +358,13 @@ void load_config() {
 			continue;
 
 		/* read lines with entries (name value) */
-		if (sscanf(line, "%127s %lf", name, &value) == 2) {
+		//printf("%s\n", line);
+		if (sscanf(line, "\t%127s %lf", name, &value) == 2) {
 			name[line_size - 1] = '\0';
+			printf("%s    %f    %d\n", name, value, line_number);
 			load_entry(name, value, line_number);
 		} else
-			fprintf(stderr, "Config file parsing error on line %u\n",
-					line_number);
+			fprintf(stderr, "Config file parsing error on line %u:  %s\n", line_number, line);
 	}
 	fclose(config_file);
 }
@@ -397,6 +398,12 @@ void print_config(FILE *stream) {
 	fprintf(stream, "\tFTL_IMPLEMENTATION: %i\n", FTL_IMPLEMENTATION);
 	fprintf(stream, "\tMAX_REPEATED_COPY_BACKS_ALLOWED: %i\n", MAX_REPEATED_COPY_BACKS_ALLOWED);
 	fprintf(stream, "\tMAX_ITEMS_IN_COPY_BACK_MAP: %i\n\n", MAX_ITEMS_IN_COPY_BACK_MAP);
+	fprintf(stream, "\tWRITE_DEADLINE: %i\n\n", WRITE_DEADLINE);
+	fprintf(stream, "\tREAD_DEADLINE: %i\n\n", READ_DEADLINE);
+	fprintf(stream, "\tENABLE_WEAR_LEVELING: %i\n\n", ENABLE_WEAR_LEVELING);
+
+	fprintf(stream, "#Open Interface:\n");
+	fprintf(stream, "\tENABLE_TAGGING: %i\n\n", ENABLE_TAGGING);
 
 	fprintf(stream, "#Operating System:\n");
 	fprintf(stream, "\tOS_SCHEDULER: %i\n\n", OS_SCHEDULER);

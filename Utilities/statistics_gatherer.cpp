@@ -13,8 +13,8 @@ using namespace ssd;
 
 StatisticsGatherer *StatisticsGatherer::inst = NULL;
 
-const double StatisticsGatherer::wait_time_histogram_bin_size = 1000;
-const double StatisticsGatherer::io_counter_window_size = 1000000; // second
+const double StatisticsGatherer::wait_time_histogram_bin_size = 500;
+const double StatisticsGatherer::io_counter_window_size = 200000; // second
 bool StatisticsGatherer::record_statistics = true;
 
 StatisticsGatherer::StatisticsGatherer()
@@ -412,17 +412,20 @@ void StatisticsGatherer::print_simple(FILE* stream) {
 	fprintf(stream, "num reads:\t%d\n", total_reads());
 	fprintf(stream, "avg reads latency:\t%f\n", reads_avg);
 	fprintf(stream, "std reads latency:\t%f\n", reads_std);
-	fprintf(stream, "max reads latency:\t%f\n", reads_max);
+	fprintf(stream, "max reads latency:\t%f\n\n", reads_max);
 
-	fprintf(stream, "num gc writes:\t%f\n", get_sum(num_gc_writes_per_LUN_destination));
+	fprintf(stream, "num gc reads:\t%d\n", (int)get_sum(num_gc_reads_per_LUN));
+	fprintf(stream, "num gc writes:\t%d\n", (int)get_sum(num_gc_writes_per_LUN_destination));
+	fprintf(stream, "num erases:\t%d\n\n", (int)get_sum(num_erases_per_LUN));
 
 	int read_throughput = (int) get_reads_throughput();
 	int writes_throughput = (int) get_writes_throughput();
 
 	fprintf(stream, "Thoughput (IO/sec)\n");
+	fprintf(stream, "total throughput:\t%d\n", read_throughput + writes_throughput);
 	fprintf(stream, "read throughput:\t%d\n", read_throughput);
 	fprintf(stream, "writes throughput:\t%d\n", writes_throughput);
-	fprintf(stream, "total throughput:\t%d\n", read_throughput + writes_throughput);
+
 }
 
 void StatisticsGatherer::print_gc_info() {
@@ -784,7 +787,13 @@ string StatisticsGatherer::app_and_gc_throughput_csv() {
 	stringstream ss;
 	ss << "\"Time (µs)\", \"Application IOs/s\", \"Internal operations/s\"" << "\n";
 	for (uint i = 0; i < application_io_history.size(); i++) {
-		ss << io_counter_window_size * i << ", " << (double) application_io_history[i]/io_counter_window_size*1000 << ", " << (double) non_application_io_history[i]/io_counter_window_size*1000 << "\n";
+		double second = 1000000;
+		double app_throughput = second / io_counter_window_size * application_io_history[i];
+		double non_app_throughput = second / io_counter_window_size * non_application_io_history[i];
+
+		//double app_throughput = (double) application_io_history[i]/io_counter_window_size * 1000;
+		//double non_app_throughput = (double) non_application_io_history[i]/io_counter_window_size*1000;
+		ss << io_counter_window_size * i << ", " << app_throughput << ", " << non_app_throughput << "\n";
 	}
 	return ss.str();
 }

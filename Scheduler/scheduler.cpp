@@ -28,6 +28,7 @@ IOScheduler::IOScheduler() :
 	safe_cache(0),
 	stats()
 {
+	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY;
 }
 
 void IOScheduler::init(Ssd* new_ssd, FtlParent* new_ftl, Block_manager_parent* new_bm, Migrator* new_migrator) {
@@ -42,10 +43,10 @@ void IOScheduler::init() {
 	future_events = new event_queue();
 	completed_events = new event_queue();
 	Priorty_Scheme* ps;
-	if (SCHEDULING_SCHEME == 0) {
-		ps = new Fifo_Priorty_Scheme(this);
-	} else {
-		ps = new Smart_App_Priorty_Scheme(this);
+	switch (SCHEDULING_SCHEME) {
+		case 0: ps = new Fifo_Priorty_Scheme(this); break;
+		case 1: ps = new Smart_App_Priorty_Scheme(this); break;
+		default: ps = new Fifo_Priorty_Scheme(this); break;
 	}
 	current_events = new Scheduling_Strategy(this, ssd, ps);
 	overdue_events = new Scheduling_Strategy(this, ssd, new Fifo_Priorty_Scheme(this));

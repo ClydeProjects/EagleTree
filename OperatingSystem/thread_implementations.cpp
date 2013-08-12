@@ -17,14 +17,11 @@ bool Thread::record_internal_statistics = false;
 Thread::Thread() :
 		finished(false), time(1), threads_to_start_when_this_thread_finishes(),
 		os(NULL), internal_statistics_gatherer(new StatisticsGatherer()),
-		external_statistics_gatherer(NULL), num_IOs_executing(0), io_queue() {}
+		external_statistics_gatherer(NULL), num_IOs_executing(0), io_queue(), stopped(false) {}
 
 Thread::~Thread() {
-	for (uint i = 0; i < threads_to_start_when_this_thread_finishes.size(); i++) {
-		Thread* t = threads_to_start_when_this_thread_finishes[i];
-		if (t != NULL) {
-			delete t;
-		}
+	for (auto t : threads_to_start_when_this_thread_finishes) {
+		delete t;
 	}
 	delete internal_statistics_gatherer;
 }
@@ -73,22 +70,30 @@ void Thread::register_event_completion(Event* event) {
 	handle_event_completion(event);
 	if (num_IOs_executing == 0) {
 		handle_no_IOs_left();
-		if (num_IOs_executing == 0) {
+		if (num_IOs_executing == 0 && !stopped) {
 			finished = true;
 		}
 	}
 }
 
-bool Thread::is_finished() {
-	return finished && num_IOs_executing == 0;
+bool Thread::is_finished() const {
+	return finished;
 }
 
-bool Thread::can_submit_more() {
+bool Thread::can_submit_more() const {
 	return io_queue.size() < NUMBER_OF_ADDRESSABLE_PAGES();
 }
 
+void Thread::stop() {
+	stopped = true;
+}
+
+bool Thread::is_stopped() {
+	return stopped;
+}
+
 void Thread::submit(Event* event) {
-	if (finished) {
+	if (finished || stopped) {
 		delete event;
 		return;
 	}
@@ -133,9 +138,11 @@ Simple_Thread::~Simple_Thread() {
 }
 
 void Simple_Thread::generate_io() {
-	while (get_num_ongoing_IOs() < MAX_IOS && number_of_times_to_repeat > 0 && !get_finished()) {
+	while (get_num_ongoing_IOs() < MAX_IOS && number_of_times_to_repeat > 0 && !is_finished() && !is_stopped()) {
 		number_of_times_to_repeat--;
-		Event* e = new Event(io_type_gen->next(), io_gen->next(), 1, get_current_time());
+		event_type type = io_type_gen->next();
+		long logical_addr = io_gen->next();
+		Event* e = new Event(type, logical_addr, 1, get_current_time());
 		submit(e);
 	}
 
