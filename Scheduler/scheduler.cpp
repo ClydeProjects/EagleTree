@@ -46,6 +46,9 @@ void IOScheduler::init() {
 	switch (SCHEDULING_SCHEME) {
 		case 0: ps = new Fifo_Priorty_Scheme(this); break;
 		case 1: ps = new Smart_App_Priorty_Scheme(this); break;
+		case 2: ps = new gcRe_gcWr_Er_Re_Wr_Priorty_Scheme(this); break;
+		case 3: ps = new Er_Wr_Re_gcRe_gcWr_Priorty_Scheme(this); break;
+		case 4: ps = new We_Re_gcWr_E_gcR_Priorty_Scheme(this); break;
 		default: ps = new Fifo_Priorty_Scheme(this); break;
 	}
 	current_events = new Scheduling_Strategy(this, ssd, ps);

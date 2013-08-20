@@ -23,31 +23,12 @@ void Fifo_Priorty_Scheme::schedule(vector<Event*>& reads, vector<Event*>& copyba
 	scheduler->handle(all_ios);
 }
 
-void Re_Er_Wr_Priorty_Scheme::schedule(vector<Event*>& reads, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases) {
+/*void Re_Er_Wr_Priorty_Scheme::schedule(vector<Event*>& reads, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases) {
 	scheduler->handle(reads);
 	scheduler->handle(copyback_commands);
 	scheduler->handle(erases);
 	scheduler->handle(writes);
-}
-
-void Er_gcRe_gcWr_Re_Wr_Priorty_Scheme::schedule(vector<Event*>& reads, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases) {
-	vector<Event*> internal_reads;
-	vector<Event*> external_reads;
-	seperate_internal_external(reads, internal_reads, external_reads);
-
-	vector<Event*> internal_writes;
-	vector<Event*> external_writes;
-	seperate_internal_external(writes, internal_writes, external_writes);
-
-	scheduler->handle(erases);
-	scheduler->handle(internal_reads);
-	scheduler->handle(internal_writes);
-
-	scheduler->handle(external_reads);
-	scheduler->handle(copyback_commands);
-	scheduler->handle(external_writes);
-}
-
+}*/
 
 void Smart_App_Priorty_Scheme::schedule(vector<Event*>& reads, vector<Event*>& copybacks, vector<Event*>& writes, vector<Event*>& erases) {
 	vector<Event*> internal_reads;
@@ -64,6 +45,61 @@ void Smart_App_Priorty_Scheme::schedule(vector<Event*>& reads, vector<Event*>& c
 	scheduler->handle(erases);
 	scheduler->handle(external_writes);
 	scheduler->handle(internal_writes);
+}
+
+
+void Er_Wr_Re_gcRe_gcWr_Priorty_Scheme::schedule(vector<Event*>& reads, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases) {
+	vector<Event*> internal_reads;
+	vector<Event*> external_reads;
+	seperate_internal_external(reads, internal_reads, external_reads);
+
+	vector<Event*> internal_writes;
+	vector<Event*> external_writes;
+	seperate_internal_external(writes, internal_writes, external_writes);
+
+	scheduler->handle(erases);
+	scheduler->handle(external_writes);
+	scheduler->handle(external_reads);
+	scheduler->handle(internal_reads);
+	scheduler->handle(internal_writes);
+	//scheduler->handle(copyback_commands);
+
+}
+
+void gcRe_gcWr_Er_Re_Wr_Priorty_Scheme::schedule(vector<Event*>& reads, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases) {
+	vector<Event*> internal_reads;
+	vector<Event*> external_reads;
+	seperate_internal_external(reads, internal_reads, external_reads);
+
+	vector<Event*> internal_writes;
+	vector<Event*> external_writes;
+	seperate_internal_external(writes, internal_writes, external_writes);
+
+	scheduler->handle(erases);
+	scheduler->handle(internal_reads);
+	scheduler->handle(internal_writes);
+
+	scheduler->handle(external_reads);
+	scheduler->handle(copyback_commands);
+	scheduler->handle(external_writes);
+}
+
+void We_Re_gcWr_E_gcR_Priorty_Scheme::schedule(vector<Event*>& reads, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases) {
+	vector<Event*> internal_reads;
+	vector<Event*> external_reads;
+	seperate_internal_external(reads, internal_reads, external_reads);
+
+	vector<Event*> internal_writes;
+	vector<Event*> external_writes;
+	seperate_internal_external(writes, internal_writes, external_writes);
+
+	scheduler->handle(external_writes);
+	scheduler->handle(internal_reads);
+	scheduler->handle(internal_writes);
+	scheduler->handle(erases);
+	scheduler->handle(external_reads);
+	scheduler->handle(copyback_commands);
+
 }
 
 void Scheduling_Strategy::schedule() {

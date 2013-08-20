@@ -100,6 +100,8 @@ void Experiment::run_single_point(string name) {
 	Experiment_Result global_result(name, data_folder, "Global/", "Changing a Var");
 	Individual_Threads_Statistics::init();
 	global_result.start_experiment();
+	Free_Space_Meter::init();
+	Free_Space_Per_LUN_Meter::init();
 
 	if (generate_trace_file) {
 		VisualTracer::init(data_folder);
@@ -125,8 +127,8 @@ void Experiment::run_single_point(string name) {
 	//Individual_Threads_Statistics::print();
 	//Queue_Length_Statistics::print_distribution();
 	//Queue_Length_Statistics::print_avg();
-	//Free_Space_Meter::print();
-	//Free_Space_Per_LUN_Meter::print();
+	Free_Space_Meter::print();
+	Free_Space_Per_LUN_Meter::print();
 
 	global_result.collect_stats(0, StatisticsGatherer::get_global_instance());
 	write_results_file(data_folder);

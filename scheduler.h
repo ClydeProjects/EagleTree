@@ -29,15 +29,27 @@ public:
 	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
 };
 
-class Re_Er_Wr_Priorty_Scheme : public Priorty_Scheme {
+/*class Re_Er_Wr_Priorty_Scheme : public Priorty_Scheme {
 public:
 	Re_Er_Wr_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
 	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
+};*/
+
+class Er_Wr_Re_gcRe_gcWr_Priorty_Scheme : public Priorty_Scheme {
+public:
+	Er_Wr_Re_gcRe_gcWr_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
 };
 
-class Er_gcRe_gcWr_Re_Wr_Priorty_Scheme : public Priorty_Scheme {
+class gcRe_gcWr_Er_Re_Wr_Priorty_Scheme : public Priorty_Scheme {
 public:
-	Er_gcRe_gcWr_Re_Wr_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	gcRe_gcWr_Er_Re_Wr_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
+};
+
+class We_Re_gcWr_E_gcR_Priorty_Scheme : public Priorty_Scheme {
+public:
+	We_Re_gcWr_E_gcR_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
 	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
 };
 
