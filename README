@@ -1,1 +1,8 @@
-EagleTree is an open-source SSD simulator from the IT University of Copenhagen. Read more here: http://nivdayan.com/eagletree/. 
+EagleTree is an open-source SSD simulator from the IT University of Copenhagen. 
+
+For an installation guide and tutorials, go to our wiki: https://github.com/ClydeProjects/EagleTree/wiki
+
+For some more context and overview, look in the following places:
+ - http://nivdayandotcom.files.wordpress.com/2013/08/poster_vldb2013_eagletree-pptx-1.pdf
+ - http://nivdayandotcom.files.wordpress.com/2013/06/eagletreedemo_v15.pdf
+ - http://nivdayan.com/eagletree/
