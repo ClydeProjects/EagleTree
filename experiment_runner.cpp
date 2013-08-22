@@ -7,10 +7,7 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <stdio.h>  /* defines FILENAME_MAX */
-#include <unistd.h>   // chdir
-#include <sys/stat.h> // mkdir
 #include <iostream>
-//#include <boost/filesystem.hpp>
 
 #define SIZE 2
 
@@ -44,25 +41,6 @@ void Experiment::unify_under_one_statistics_gatherer(vector<Thread*> threads, St
 		unify_under_one_statistics_gatherer(threads[i]->get_follow_up_threads(), statistics_gatherer); // Recurse
 	}
 }
-
-void Experiment::run_single_measurment(Workload_Definition* experiment_workload, int IO_limit, OperatingSystem* os) {
-	Queue_Length_Statistics::init();
-	vector<Thread*> experiment_threads = experiment_workload->generate_instance();
-	os->set_threads(experiment_threads);
-	os->set_num_writes_to_stop_after(IO_limit);
-	os->run();
-
-	StatisticsGatherer::get_global_instance()->print();
-	//StatisticsGatherer::get_global_instance()->print_gc_info();
-	Utilization_Meter::print();
-	//Individual_Threads_Statistics::print();
-	//Queue_Length_Statistics::print_distribution();
-	Queue_Length_Statistics::print_avg();
-	//Free_Space_Meter::print();
-	//Free_Space_Per_LUN_Meter::print();
-}
-
-
 
 void Experiment::set_variable(double* variable, double low, double high, double incr) {
 	d_variable = variable;
@@ -199,29 +177,6 @@ void Experiment::simple_experiment_double(string name, T* var, T min, T max, T i
 	result.push_back(global_result);
 	results.push_back(result);
 }
-
-/*vector<Experiment_Result> Experiment::simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, long& variable, long min_val, long max_val, long incr) {
-	assert(experiment_workload != NULL);
-	string data_folder = base_folder + name;
-	mkdir(data_folder.c_str(), 0755);
-	Experiment_Result global_result(name, data_folder, "Global/", "Changing a Var");
-	global_result.start_experiment();
-	assert(incr > 0);
-	for (variable = min_val; variable <= max_val; variable += incr) {
-		printf("----------------------------------------------------------------------------------------------------------\n");
-		printf("%s :  %d \n", name.c_str(), variable);
-		printf("----------------------------------------------------------------------------------------------------------\n");
-
-		OperatingSystem* os = new OperatingSystem();// load_state();
-		run_single_measurment(experiment_workload, IO_limit, os);
-		global_result.collect_stats(variable, StatisticsGatherer::get_global_instance());
-		delete os;
-	}
-	global_result.end_experiment();
-	vector<Experiment_Result> results;
-	results.push_back(global_result);
-	return results;
-}*/
 
 vector<Experiment_Result> Experiment::random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba) {
 	string data_folder = base_folder + name;
@@ -449,7 +404,6 @@ void Experiment::write_results_file(string folder_name) {
 
 void Experiment::save_state(OperatingSystem* os, string file_name) {
 	vector<Thread*> threads = os->get_non_finished_threads();
-
 	std::ofstream file(file_name.c_str());
 	boost::archive::text_oarchive oa(file);
 	oa.register_type<FtlImpl_Page>( );
@@ -465,17 +419,11 @@ void Experiment::save_state(OperatingSystem* os, string file_name) {
 	oa.register_type<READS_OR_WRITES>();
 	oa.register_type<Asynchronous_Random_Writer>();
 	oa.register_type<Asynchronous_Random_Reader>();
-
 	oa.register_type<MTRand>();
 	oa.register_type<MTRand_closed>();
 	oa.register_type<MTRand_open>();
 	oa.register_type<MTRand53>();
 
-
-
-
-	//Simple_Thread* t1 = new Asynchronous_Random_Writer(0, log_space_per_thread * 2, 35722);
-	//oa << t1;
 	oa << os;
 	oa << threads;
 	file.close();
@@ -530,6 +478,8 @@ OperatingSystem* Experiment::load_state(string name) {
 }
 
 void Experiment::create_base_folder(string name) {
+	string exp_folder = get_current_dir_name() + name;
+	printf("creating exp folder:  %s\n", get_current_dir_name());
 	base_folder = name;
 	printf("%s\n", base_folder.c_str());
 	mkdir(base_folder.c_str(), 0755);

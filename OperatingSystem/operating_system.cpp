@@ -105,8 +105,6 @@ void OperatingSystem::run() {
 		//printf("num_writes   %d\n", num_writes_completed);
 	} while (!finished_experiment && still_more_work);
 
-	VisualTracer::print_horizontally_with_breaks();
-
 	for (auto entry : threads) {
 		Thread* t = entry.second;
 		t->stop();

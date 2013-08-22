@@ -412,7 +412,7 @@ void Experiment::draw_graphs() {
 		if (error != 0) printf("Error %d changing to folder %s\n", error, results[0][i].sub_folder.c_str());
 
 		Experiment::graph(sx, sy,   "Throughput", 				"throughput", 			26, exp, UNDEFINED);
-		Experiment::graph(sx, sy,   "Write Throughput", 			"throughput_write", 	27, exp);
+		Experiment::graph(sx, sy,   "Write Throughput", 		"throughput_write", 	27, exp);
 		Experiment::graph(sx, sy,   "Read Throughput", 			"throughput_read", 		28, exp);
 		Experiment::graph(sx, sy,   "Num Erases", 				"num_erases", 			8, 	exp);
 		Experiment::graph(sx, sy,   "Num Migrations", 			"num_migrations", 		3, 	exp);

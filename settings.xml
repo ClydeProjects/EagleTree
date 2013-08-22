@@ -14,6 +14,7 @@
 <includepath>/usr/lib/gcc/x86_64-linux-gnu/4.7/include</includepath>
 <includepath>/usr/lib/gcc/x86_64-linux-gnu/4.7/include-fixed</includepath>
 <includepath>/usr/local/include</includepath>
+<includepath>/usr/include/unistd</includepath>
 </language>
 <language name="GNU C++">
 <includepath>/usr/include</includepath>

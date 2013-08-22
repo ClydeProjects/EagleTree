@@ -1414,7 +1414,6 @@ public:
 	static void throughput_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points);
 	static string get_working_dir();
 	static void unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer);
-	static void run_single_measurment(Workload_Definition* experiment_workload, int IO_limit, OperatingSystem* os);
 	template <class T> void simple_experiment_double(string name, T* variable, T min, T max, T inc);
 	//static vector<Experiment_Result> simple_experiment(Workload_Definition* experiment_workload, string name, long IO_limit, long& variable, long min_val, long max_val, long incr);
 	static void simple_experiment(Workload_Definition* workload, string name, int IO_limit);
@@ -1440,7 +1439,7 @@ public:
 	void set_calibration_workload(Workload_Definition* w) { calibrate_for_each_point = true; calibration_workload = w; }
 	void set_io_limit(int limit) { io_limit = limit; };
 	void set_calibration_file(string file) { calibration_file = file; }
-	void set_generate_trace_file(bool val) {generate_trace_file = val;}
+	void set_generate_trace_files(bool val) {generate_trace_file = val;}
 	void set_alternate_location_for_results_file(string val) { alternate_location_for_results_file = val; }
 private:
 	double* d_variable;

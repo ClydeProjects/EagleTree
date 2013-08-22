@@ -1,16 +1,5 @@
 
-# FlashSim makefile
-# 
-# Use the "ssd" (default) make target for separate compilation to include
-# with external programs, such as DiskSim or a custom drivers.
-#
-# Use the "test" make target to run the most basic test of your FTL scheme
-# after adding your content to the FTL, wear-leveler, and garbage-collector
-# classes.
-# 
-# Use the "trace" make target to run a more involved test of your FTL scheme
-# after adding your content to the FTL, wear-leveler, and garbage-collector
-# classes.  It is suggested to test with the "test" make target first.
+# EagleTree makefile
 
 CC = /usr/bin/gcc
 CFLAGS = -std=c++0x -g -w -O2 
