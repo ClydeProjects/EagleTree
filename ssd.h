@@ -649,8 +649,8 @@ private:
 	double currently_executing_operation_finish_time;
 };
 
-const int UNDEFINED = -1;
-const int INFINITE = std::numeric_limits<long>::max();
+extern const int UNDEFINED;
+extern const int INFINITE;
 
 class Page_Hotness_Measurer {
 public:

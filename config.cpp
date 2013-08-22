@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits>
 using namespace std;
 /* using namespace ssd; */
 namespace ssd {
@@ -27,6 +28,9 @@ typedef unsigned long ulong;
  * 	when defined in the config file.
  * We do not want a class here because we want to use the configuration
  * 	variables in the same was as macros. */
+
+int UNDEFINED = -1;
+int INFINITE = std::numeric_limits<int>::max();
 
 /* Ram class:
  * 	delay to read from and write to the RAM for 1 page of data */
