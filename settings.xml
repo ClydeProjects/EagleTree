@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cdtprojectproperties>
+<section name="org.eclipse.cdt.internal.ui.wizards.settingswizards.IncludePaths">
+<language name="holder for library settings">
+
+</language>
+<language name="Assembly">
+<includepath>/usr/include</includepath>
+<includepath>/usr/include/boost/serialization</includepath>
+<includepath>/usr/include/c++/4.7</includepath>
+<includepath>/usr/include/c++/4.7/backward</includepath>
+<includepath>/usr/include/x86_64-linux-gnu</includepath>
+<includepath>/usr/include/x86_64-linux-gnu/c++/4.7</includepath>
+<includepath>/usr/lib/gcc/x86_64-linux-gnu/4.7/include</includepath>
+<includepath>/usr/lib/gcc/x86_64-linux-gnu/4.7/include-fixed</includepath>
+<includepath>/usr/local/include</includepath>
+</language>
+<language name="GNU C++">
+<includepath>/usr/include</includepath>
+<includepath>/usr/include/boost/serialization</includepath>
+<includepath>/usr/include/c++/4.7</includepath>
+<includepath>/usr/include/c++/4.7/backward</includepath>
+<includepath>/usr/include/x86_64-linux-gnu</includepath>
+<includepath>/usr/include/x86_64-linux-gnu/c++/4.7</includepath>
+<includepath>/usr/lib/gcc/x86_64-linux-gnu/4.7/include</includepath>
+<includepath>/usr/lib/gcc/x86_64-linux-gnu/4.7/include-fixed</includepath>
+<includepath>/usr/local/include</includepath>
+
+</language>
+<language name="GNU C">
+<includepath>/usr/include</includepath>
+<includepath>/usr/include/boost/serialization</includepath>
+<includepath>/usr/include/c++/4.7</includepath>
+<includepath>/usr/include/c++/4.7/backward</includepath>
+<includepath>/usr/include/x86_64-linux-gnu</includepath>
+<includepath>/usr/include/x86_64-linux-gnu/c++/4.7</includepath>
+<includepath>/usr/lib/gcc/x86_64-linux-gnu/4.7/include</includepath>
+<includepath>/usr/lib/gcc/x86_64-linux-gnu/4.7/include-fixed</includepath>
+<includepath>/usr/local/include</includepath>
+
+</language>
+</section>
+<section name="org.eclipse.cdt.internal.ui.wizards.settingswizards.Macros">
+<language name="holder for library settings">
+
+</language>
+<language name="Assembly">
+
+</language>
+<language name="GNU C++">
+
+</language>
+<language name="GNU C">
+
+</language>
+</section>
+</cdtprojectproperties>
