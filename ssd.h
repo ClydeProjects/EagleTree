@@ -67,8 +67,8 @@ namespace ssd {
 /* Configuration file parsing for extern config variables defined below */
 void load_entry(char *name, double value, uint line_number);
 void load_config(const char * const file_name);
-void set_big_SSD();
-void set_normal_config();
+void set_big_SSD_config();
+void set_small_SSD_config();
 void print_config(FILE *stream);
 
 /* Ram class:

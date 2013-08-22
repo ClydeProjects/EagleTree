@@ -3,7 +3,7 @@ using namespace ssd;
 
 int main()
 {
-	set_normal_config();
+	set_small_SSD_config();
 	WRITE_DEADLINE = 1000;
 	Workload_Definition* workload = new Asynch_Random_Workload(0, NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE * 0.8);
 	int IO_limit = 100000;

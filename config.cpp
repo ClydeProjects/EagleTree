@@ -272,18 +272,12 @@ void load_entry(char *name, double value, uint line_number) {
 	return;
 }
 
-void set_normal_config() {
+void set_small_SSD_config() {
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 8;
 	DIE_SIZE = 1;
 	PLANE_SIZE = 128;
 	BLOCK_SIZE = 64;
-
-	/*PAGE_READ_DELAY = 115 ;
-	PAGE_WRITE_DELAY = 1600 ;
-	BUS_CTRL_DELAY = 5 ;
-	BUS_DATA_DELAY = 350 ;
-	BLOCK_ERASE_DELAY = 3000 ;*/
 
 	PAGE_READ_DELAY = 115 / 5;
 	PAGE_WRITE_DELAY = 1600 / 5;
@@ -308,7 +302,7 @@ void set_normal_config() {
 	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY + 1;// PAGE_READ_DELAY + 1;
 }
 
-void set_big_SSD() {
+void set_big_SSD_config() {
 	SSD_SIZE = 8;
 	PACKAGE_SIZE = 8;
 	DIE_SIZE = 1;
