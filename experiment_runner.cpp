@@ -482,6 +482,5 @@ void Experiment::create_base_folder(string name) {
 	string exp_folder = get_current_dir_name() + name;
 	printf("creating exp folder:  %s\n", get_current_dir_name());
 	base_folder = exp_folder;
-	printf("%s\n", base_folder.c_str());
 	mkdir(base_folder.c_str(), 0755);
 }
