@@ -405,6 +405,7 @@ void Experiment::write_results_file(string folder_name) {
 void Experiment::save_state(OperatingSystem* os, string file_name) {
 	vector<Thread*> threads = os->get_non_finished_threads();
 	std::ofstream file(file_name.c_str());
+	printf("%s\n", file_name.c_str());
 	boost::archive::text_oarchive oa(file);
 	oa.register_type<FtlImpl_Page>( );
 	oa.register_type<Block_manager_parallel>( );
@@ -480,7 +481,7 @@ OperatingSystem* Experiment::load_state(string name) {
 void Experiment::create_base_folder(string name) {
 	string exp_folder = get_current_dir_name() + name;
 	printf("creating exp folder:  %s\n", get_current_dir_name());
-	base_folder = name;
+	base_folder = exp_folder;
 	printf("%s\n", base_folder.c_str());
 	mkdir(base_folder.c_str(), 0755);
 }

@@ -23,10 +23,10 @@ demo: $(HDR) $(OBJ)
 	-chmod $(EPERMS) Experiments/demo
 	
 clean:
-	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) sequential erase_queues gc_tuning scheduling sequential_tuning greediness copybacks copyback_map flexible_reads
+	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) Experiments/demo
 
 rm_exec:
-	-rm -f sequential erase_queues gc_tuning scheduling sequential_tuning greediness copybacks copyback_map flexible_reads
+	-rm -f Experiments/demo
 
 
 files:
