@@ -311,7 +311,7 @@ void Experiment::multigraph(int sizeX, int sizeY, string outputFile, vector<stri
 	endl <<
 	"hist_graphs = " << commands.size() << endl <<
 	endl <<
-	"pad = " << (commands.size() == 1 ? 2 : 2) << endl <<
+	"pad = 5" << endl <<
 	endl <<
 	"size std_sx+pad std_sy*hist_graphs+pad" << endl <<
 	"set font texcmr" << endl <<
@@ -393,11 +393,15 @@ string Experiment::get_working_dir() {
 }
 
 void Experiment::draw_graphs() {
+	if (results.size() > 1) {
+		draw_aggregate_graphs();
+	}
+	draw_experiment_spesific_graphs();
+}
+
+void Experiment::draw_aggregate_graphs() {
 	int sx = 32;
 	int sy = 16;
-	//for (int i = 0; i < exps[0][0].column_names.size(); i++) {
-		//printf("%d: %s\n", i, exps[0][0].column_names[i].c_str());
-	//}
 	printf("chdir %s\n", base_folder.c_str());
 	chdir(base_folder.c_str());
 	for (int i = 0; i < results[0].size(); ++i) { // i = 0: GLOBAL, i = 1: EXPERIMENT, i = 2: WRITE_THREADS
@@ -436,9 +440,7 @@ void Experiment::draw_graphs() {
 		    Experiment::cross_experiment_waittime_histogram(sx, sy/2, name, exp, kv.first, 1, 4);
 		}
 		/*if (i > 0)*/ { chdir(".."); }
-		draw_experiment_spesific_graphs();
 	}
-
 }
 
 void Experiment::draw_experiment_spesific_graphs() {

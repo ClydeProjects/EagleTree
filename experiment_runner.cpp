@@ -42,18 +42,20 @@ void Experiment::unify_under_one_statistics_gatherer(vector<Thread*> threads, St
 	}
 }
 
-void Experiment::set_variable(double* variable, double low, double high, double incr) {
+void Experiment::set_variable(double* variable, double low, double high, double incr, string name) {
 	d_variable = variable;
 	d_min = low;
 	d_max = high;
 	d_incr = incr;
+	variable_name = name;
 }
 
-void Experiment::set_variable(int* variable, int low, int high, int incr) {
+void Experiment::set_variable(int* variable, int low, int high, int incr, string name) {
 	i_variable = variable;
 	i_min = low;
 	i_max = high;
 	i_incr = incr;
+	variable_name = name;
 }
 
 void Experiment::run(string name) {
@@ -126,7 +128,7 @@ template <class T>
 void Experiment::simple_experiment_double(string name, T* var, T min, T max, T inc) {
 	string data_folder = base_folder + name + "/";
 	mkdir(data_folder.c_str(), 0755);
-	Experiment_Result global_result(name, data_folder, "Global/", "Changing a Var");
+	Experiment_Result global_result(name, data_folder, "Global/", variable_name);
 	global_result.start_experiment();
 	T& variable = *var;
 	for (variable = min; variable <= max; variable += inc) {

@@ -56,7 +56,7 @@ void IOScheduler::init() {
 }
 
 IOScheduler::~IOScheduler(){
-	stats.print();
+	//stats.print();
 	//VisualTracer::print_horizontally(100000);
 	delete future_events;
 	delete current_events;

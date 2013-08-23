@@ -1425,6 +1425,7 @@ public:
 	static Experiment_Result copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);
 
 	void draw_graphs();
+	void draw_aggregate_graphs();
 	void draw_experiment_spesific_graphs();
 	static void save_state(OperatingSystem* os, string file_name);
 	static OperatingSystem* load_state(string file_name);
@@ -1433,8 +1434,8 @@ public:
 	static void write_results_file(string folder_name);
 	static void create_base_folder(string folder_name);
 	static string get_base_directory() { return base_folder; }
-	void set_variable(double* variable, double low, double high, double incr);
-	void set_variable(int* variable, int low, int high, int incr);
+	void set_variable(double* variable, double low, double high, double incr, string variable_name);
+	void set_variable(int* variable, int low, int high, int incr, string variable_name);
 	void set_workload(Workload_Definition* w) { workload = w; }
 	void set_calibration_workload(Workload_Definition* w) { calibrate_for_each_point = true; calibration_workload = w; }
 	void set_io_limit(int limit) { io_limit = limit; };
@@ -1442,6 +1443,7 @@ public:
 	void set_generate_trace_files(bool val) {generate_trace_file = val;}
 	void set_alternate_location_for_results_file(string val) { alternate_location_for_results_file = val; }
 private:
+	string variable_name;
 	double* d_variable;
 	double d_min, d_max, d_incr;
 

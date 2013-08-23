@@ -15,12 +15,17 @@ LOG = log
 PERMS = 660
 EPERMS = 770
 
-all: demo
+all: demo demo2
 
 demo: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o Experiments/demo Experiments/demo.cpp $(OBJ) -lboost_serialization
 	-chmod $(PERMS) $(OBJ) 
 	-chmod $(EPERMS) Experiments/demo
+	
+demo2: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o Experiments/demo2 Experiments/demo2.cpp $(OBJ) -lboost_serialization
+	-chmod $(PERMS) $(OBJ) 
+	-chmod $(EPERMS) Experiments/demo2
 	
 clean:
 	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) Experiments/demo
