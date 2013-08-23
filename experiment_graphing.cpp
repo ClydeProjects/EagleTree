@@ -83,6 +83,7 @@ void Experiment::graph(int sizeX, int sizeY, string title, string filename, int 
 
     gleScript <<
     "size " << sizeX << " " << sizeY << endl << // 12 8
+    "include \"graphutil.gle\"" << endl <<
     "set font texcmr" << endl <<
     "set hei 0.75" << endl <<
     "begin graph" << endl <<
@@ -90,8 +91,7 @@ void Experiment::graph(int sizeX, int sizeY, string title, string filename, int 
     "   scale auto" << endl <<
     (GRAPH_TITLES ? "" : "!") << "   title  \"" << title << "\"" << endl <<
     "   xtitle \"" << experiments[0].variable_parameter_name << "\"" << endl <<
-    "   ytitle \"" << experiments[0].column_names[column] << "\"" << endl <<
-    "   yaxis min 0" << y_max_str << endl;
+    "   ytitle \"" << experiments[0].column_names[column] << "\"" << endl;
 
     for (uint i = 0; i < experiments.size(); i++) {
     	Experiment_Result e = experiments[i];
@@ -99,6 +99,8 @@ void Experiment::graph(int sizeX, int sizeY, string title, string filename, int 
         "   data   \"" << e.data_folder << subfolder << (subfolder != "" ? "/" : "") << Experiment_Result::stats_filename << Experiment_Result::datafile_postfix << "\"" << " d"<<i+1<<"=c1,c" << column+1 << endl <<
         "   d"<<i+1<<" line marker " << markers[i] << " key " << "\"" << e.experiment_name << "\"" << endl;
     }
+
+    gleScript  <<"   yaxis min 0" << y_max_str << " max dmaxy(d1)*1.05 " << endl;
 
     gleScript << "end graph" << endl;
     gleScript.close();
@@ -393,7 +395,7 @@ string Experiment::get_working_dir() {
 }
 
 void Experiment::draw_graphs() {
-	if (results.size() > 1) {
+	if (d_variable != NULL || i_variable != NULL) {
 		draw_aggregate_graphs();
 	}
 	draw_experiment_spesific_graphs();

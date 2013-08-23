@@ -3,9 +3,9 @@
 #include "ssd.h"
 using namespace ssd;
 
-const string Experiment_Result::throughput_column_name		= "Average throughput (IOs/ms)"; // e.g. "Average throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
-const string Experiment_Result::write_throughput_column_name = "Average write throughput (IOs/ms)";
-const string Experiment_Result::read_throughput_column_name  = "Average read throughput (IOs/ms)";
+const string Experiment_Result::throughput_column_name		= "Average throughput (IOs/s)"; // e.g. "Average throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
+const string Experiment_Result::write_throughput_column_name = "Average write throughput (IOs/s)";
+const string Experiment_Result::read_throughput_column_name  = "Average read throughput (IOs/s)";
 const string Experiment_Result::datafile_postfix 			= ".csv";
 const string Experiment_Result::stats_filename 				= "stats";
 const string Experiment_Result::waittime_filename_prefix 	= "waittime-";
@@ -66,8 +66,8 @@ void Experiment_Result::collect_stats(double variable_parameter_value, Statistic
 	// Compute throughput
 	int total_read_IOs_issued  = statistics_gatherer->total_reads();
 	int total_write_IOs_issued = statistics_gatherer->total_writes();
-	long double read_throughput = (long double) (statistics_gatherer->get_reads_throughput() / 1000.0) ; // IOs/sec
-	long double write_throughput = (long double) (statistics_gatherer->get_writes_throughput() / 1000.0); // IOs/sec
+	long double read_throughput = (long double) (statistics_gatherer->get_reads_throughput()) ; // IOs/sec
+	long double write_throughput = (long double) (statistics_gatherer->get_writes_throughput() ); // IOs/sec
 	long double total_throughput = write_throughput + read_throughput;
 
 	(*stats_file) << variable_parameter_value << ", " << statistics_gatherer->totals_csv_line() << ", " << total_throughput << ", " << write_throughput << ", " << read_throughput << "\n";
