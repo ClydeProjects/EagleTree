@@ -19,7 +19,7 @@ int main()
 	int deadline_min = 0;
 	int deadline_max = 1400;
 	int incr = 200;
-	e->set_variable(&WRITE_DEADLINE, deadline_min, deadline_max, incr, "Writes Deadline");
+	e->set_variable(&WRITE_DEADLINE, deadline_min, deadline_max, incr, "Writes Deadline (µs)");
 	Workload_Definition* workload = new Asynch_Random_Workload();
 	e->set_workload(workload);
 	SCHEDULING_SCHEME = 0;
