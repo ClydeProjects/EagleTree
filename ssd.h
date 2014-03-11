@@ -148,11 +148,6 @@ extern const uint FTL_IMPLEMENTATION;
  */
 extern const uint CACHE_DFTL_LIMIT;
 
-/*
- * Parallelism mode
- */
-extern const uint PARALLELISM_MODE;
-
 /* Virtual block size (as a multiple of the physical block size) */
 //extern const uint VIRTUAL_BLOCK_SIZE;
 
@@ -179,7 +174,7 @@ extern void *global_buffer;
  */
 extern int BLOCK_MANAGER_ID;
 extern int GREED_SCALE;
-extern int WEARWOLF_LOCALITY_THRESHOLD;
+extern int SEQUENTIAL_LOCALITY_THRESHOLD;
 extern bool ENABLE_TAGGING;
 extern int WRITE_DEADLINE;
 extern int READ_DEADLINE;
@@ -190,10 +185,6 @@ extern int READ_TRANSFER_DEADLINE;
  */
 extern int PRINT_LEVEL;
 extern bool PRINT_FILE_MANAGER_INFO;
-/*
- * tells the Operating System class to either lock or not lock LBAs after dispatching IOs to them
- */
-extern const bool OS_LOCK;
 
 /* Defines the max number of copy back operations on a page before ECC check is performed.
  * Set to zero to disable copy back GC operations */
@@ -307,7 +298,6 @@ class FtlImpl_Fast;
 //class FtlImpl_Dftl;
 class FtlImpl_BDftl;
 
-class Ram;
 class Ssd;
 
 class event_queue;
@@ -984,18 +974,6 @@ private:
 };
 */
 
-/* This is a basic implementation that only provides delay updates to events
- * based on a delay value multiplied by the size (number of pages) needed to
- * be written. */
-class Ram 
-{
-public:
-	Ram();
-	~Ram();
-	enum status read(Event &event);
-	enum status write(Event &event);
-};
-
 /* The SSD is the single main object that will be created to simulate a real
  * SSD.  Creating a SSD causes all other objects in the SSD to be created.  The
  * event_arrive method is where events will arrive from DiskSim. */
@@ -1031,7 +1009,6 @@ private:
 	enum status write(Event &event);
 	enum status erase(Event &event);
 	Package &get_data();
-	Ram ram;
 	vector<Package> data;
 	double last_io_submission_time;
 	OperatingSystem* os;
@@ -1359,6 +1336,10 @@ private:
 	bool use_flexible_reads;
 };
 
+// This workload consists of 3 threads operating in parallel.
+// The logical address space is divided into two equal halves.
+// On the first half, one thread is doing random reads, and another is doing random writes.
+// On the other half, there is a file system emulating thread that performs large sequential writes.
 class File_System_With_Noise : public Workload_Definition {
 public:
 	vector<Thread*> generate();
@@ -1380,16 +1361,20 @@ private:
 	double writes_probability;
 };
 
+// This workload starts with a large sequential write of the entire logical address space
+// After that an asynchronous thread performs random writes across the logical address space
 class Init_Workload : public Workload_Definition {
 public:
 	vector<Thread*> generate();
 };
 
+// This workload conists of a large sequential write of the entire logical address space
 class Init_Write : public Workload_Definition {
 public:
 	vector<Thread*> generate();
 };
 
+// This workload consists of a file system emulating thread that does many large file writes
 class Synch_Write : public Workload_Definition {
 public:
 	vector<Thread*> generate();

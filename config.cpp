@@ -37,118 +37,61 @@ int INFINITE = std::numeric_limits<int>::max();
 double RAM_READ_DELAY = 0.00000001;
 double RAM_WRITE_DELAY = 0.00000001;
 
-/* Bus class:
- * 	delay to communicate over bus
- * 	max number of connected devices allowed
- * 	number of time entries bus has to keep track of future schedule usage
- * 	value used as a flag to indicate channel is free
- * 		(use a value not used as a delay value - e.g. -1.0)
- * 	number of simultaneous communication channels - defined by SSD_SIZE */
-double BUS_CTRL_DELAY = 0.000000005;
-double BUS_DATA_DELAY = 0.00000001;
-/* uint BUS_CHANNELS = 4; same as # of Packages, defined by SSD_SIZE */
+// The amount of time in microseconds to transmit a command from the SSD controller to a chip
+double BUS_CTRL_DELAY = 5;
 
-/* Ssd class:
- * 	number of Packages per Ssd (size) */
+// The amount of time in microseconds to transmit a page between the SSD controller and a chip
+double BUS_DATA_DELAY = 100;
+
+// Number of packages in the ssd
 uint SSD_SIZE = 4;
 
-/* Package class:
- * 	number of Dies per Package (size) */
+// Number of dies in a package
 uint PACKAGE_SIZE = 8;
 
-/* Die class:
- * 	number of Planes per Die (size) */
-uint DIE_SIZE = 2;
+// Number of planes in a die
+// We currently do not support multiple planes per die
+uint DIE_SIZE = 1;
 
-/* Plane class:
- * 	number of Blocks per Plane (size)
- * 	delay for reading from plane register
- * 	delay for writing to plane register
- * 	delay for merging is based on read, write, reg_read, reg_write 
- * 		and does not need to be explicitly defined */
+// Number of blocks in a plane
 uint PLANE_SIZE = 64;
-double PLANE_REG_READ_DELAY = 0.0000000001;
-double PLANE_REG_WRITE_DELAY = 0.0000000001;
 
-/* Block class:
- * 	number of Pages per Block (size)
- * 	number of erases in lifetime of block
- * 	delay for erasing block */
+// Number of pages in a block
 uint BLOCK_SIZE = 16;
-uint BLOCK_ERASES = 1048675;
-double BLOCK_ERASE_DELAY = 0.001;
 
-/* Page class:
- * 	delay for Page reads
- * 	delay for Page writes */
+// Lifetime if a block in erases
+uint BLOCK_ERASES = 1048675;
+
+// Time for an erase operation
+double BLOCK_ERASE_DELAY = 1000;
+
+// Time for reading a flash page
 double PAGE_READ_DELAY = 0.000001;
+
+// Time for writing a flash page
 double PAGE_WRITE_DELAY = 0.00001;
 
-/* Page data memory allocation
- *
- */
+// The size of a page in kilobytes.
 uint PAGE_SIZE = 4096;
-bool PAGE_ENABLE_DATA = false;
 
+// The IO scheduler used by the Operating System.
+// There are currently two schedulers available
+// 0 corresponds to a FIFO scheduler, which is similar to the noop IO scheduler in Linux
+// 1 corresponds to a fair scheduler that scheduels IOs in a round robin manner from different threads. It is similar to the CFQ Linux scheduler
+// You can create more schedulers by extending the OS_Scheduler class.
 int OS_SCHEDULER = 0;
-
-/*
- * Memory area to support pages with data.
- */
-void *page_data;
-
-/*
- * Number of blocks to reserve for mappings. e.g. map directory in BAST.
- */
-uint MAP_DIRECTORY_SIZE = 0;
-
-/*
- * Implementation to use (0 -> Page, 1 -> BAST, 2 -> FAST, 3 -> DFTL, 4 -> BiModal
- */
-uint FTL_IMPLEMENTATION = 0;
-
-/*
- * Limit of LOG pages (for use in BAST)
- */
-uint BAST_LOG_PAGE_LIMIT = 100;
-
-
-/*
- * Limit of LOG pages (for use in FAST)
- */
-uint FAST_LOG_PAGE_LIMIT = 4;
-
-/*
- * Number of pages allowed to be in DFTL Cached Mapping Table.
- * (Size equals CACHE_BLOCK_LIMIT * block size * page size)
- *
- */
-uint CACHE_DFTL_LIMIT = 8;
-
-/*
- * Parallelism mode.
- * 0 -> Normal
- * 1 -> Striping
- * 2 -> Logical Address Space Parallelism (LASP)
- */
-uint PARALLELISM_MODE = 0;
-
-/* Virtual block size (as a multiple of the physical block size) */
-//uint VIRTUAL_BLOCK_SIZE = 1;
-
-/* Virtual page size (as a multiple of the physical page size) */
-//uint VIRTUAL_PAGE_SIZE = 1;
 
 uint NUMBER_OF_ADDRESSABLE_BLOCKS = 0;
 
-/* RAISSDs: Number of physical SSDs */
-uint RAID_NUMBER_OF_PHYSICAL_SSDS = 0;
-
+// Determines the aggresiveness of how the internal SSD scheduler schedules erases
+// The idea is that erases are long and may delay other operations.
+// Erases also often appear in bulks, for example if we trim a large file
+// If set to true, then we use a queue of erases. If false, we schedule all erases immediately.
 bool USE_ERASE_QUEUE = false;
 
 
 /*
- * Scheduling scheme
+ * This
  * 0 ->  Naive: Read Command, Read Transfer, Write, GC, Erase
  * 1 ->  Experimental
  * 2 ->  Smart
@@ -161,15 +104,29 @@ int MAX_ONGOING_WL_OPS = 1;
 int MAX_CONCURRENT_GC_OPS = 1;
 
 /*
- * Block manager
- * 0 -> Shortest Queues
- * 1 -> Shortest Queues with Hot/Cold data seperation
- * 2 -> Wearwolf
- * 3 -> SQ with Locality
+ * Block manager controls how writes are allocated across the physical architecture of the device
+ * 0 -> Shortest Queues - This is a simple FIFO block scheduler that assigns the next write to whichever package is free
+ * 1 -> Shortest Queues with Hot/Cold data seperation -- This block manager uses two active blocks in each die.
+ * 		One of these blocks is used for storing cold pages, and the other is used for storing hot pages.
+ * 2 -> This block manager is currently broken
+ * 3 -> Sequential Locality Exploiter - This block manager is like 0, but it is able to detect sequential writes
+ * 		across the logical address space. After a certain threshold of such writes, defined by the variable SEQUENTIAL_LOCALITY_THRESHOLD,
+ * 		it clusters pages from the same sequential write in the same flash blocks.
  * 4 -> Round Robin
  */
 int BLOCK_MANAGER_ID = 3;
 
+// This parameter is special for block manager 3. If is the threshold governing when to start dedicating blocks
+// exclusively for a given sequential write
+int SEQUENTIAL_LOCALITY_THRESHOLD = 10;
+
+/* This parameter is special for block manager 3. If defines how aggressively we allocate blocks for sequential write
+ * 0 means just 1 block is used. 1 means 1 block per channel is allocated. 2 means 1 block per die is allocated.  */
+uint LOCALITY_PARALLEL_DEGREE = 0;
+
+// This determines how greedy the garbage-collection is.
+// The number corresponds to the number of live pages per die before garbage-collection kicks in
+// to clear more space in the die
 bool GREED_SCALE = 2;
 
 /* Output level of detail:
@@ -178,14 +135,20 @@ bool GREED_SCALE = 2;
  * 2 -> Detailed
  */
 int PRINT_LEVEL = 0;
+
 int PRINT_FILE_MANAGER_INFO = false;
 
-bool OS_LOCK = false;
-int WEARWOLF_LOCALITY_THRESHOLD = 10;
 bool ENABLE_TAGGING = false;
 
+// This determines how reads are scheduled.
+// Recall that a read consists of two parts.
+// In the first part, a command is sent to the SSD and a read takes place in the chip.
+// In the second part, the page is transmitted from the chip to the controller.
+// If false, this parameter makes the second part happen immediately after the first part
+// If true, it allows deferring the second part. This allow us to use the channel for different things. In the meanwhile, the page is assumed to be stored in the die buffer.
 bool ALLOW_DEFERRING_TRANSFERS = true;
 
+// The fraction of the SSD that is addressable.
 double OVER_PROVISIONING_FACTOR = 0.7;
 
 /* Defines the max number of copy back operations on a page before ECC check is performed.
@@ -195,16 +158,15 @@ uint MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
 /* Defines the max number of page addresses in map keeping track of each pages copy back count */
 uint MAX_ITEMS_IN_COPY_BACK_MAP = 1024;
 
-/* Defines the maximal length of the SSD queue  */
+/* Defines the maximal length of the number of outstanding IOs that the OS can submit to the SSD  */
 int MAX_SSD_QUEUE_SIZE = 32;
 
+// These are internal deadlines for scheduling IOs inside the SSD. They are in microseconds.
 int WRITE_DEADLINE = 10000000;
 int READ_DEADLINE =  10000000;
 int READ_TRANSFER_DEADLINE = 10000000;
 
-/* Defines how the sequential writes detection algorithm spreads a sequential write  */
-uint LOCALITY_PARALLEL_DEGREE = 0;
-
+// This is to be ignored for now
 int PAGE_HOTNESS_MEASURER = 0;
 
 void load_entry(char *name, double value, uint line_number) {
@@ -233,8 +195,6 @@ void load_entry(char *name, double value, uint line_number) {
 		PAGE_WRITE_DELAY = value;
 	else if (!strcmp(name, "PAGE_SIZE"))
 		PAGE_SIZE = value;
-	else if (!strcmp(name, "FTL_IMPLEMENTATION"))
-		FTL_IMPLEMENTATION = value;
 	else if (!strcmp(name, "MAX_REPEATED_COPY_BACKS_ALLOWED"))
 		MAX_REPEATED_COPY_BACKS_ALLOWED = value;
 	else if (!strcmp(name, "MAX_ITEMS_IN_COPY_BACK_MAP"))
@@ -249,8 +209,6 @@ void load_entry(char *name, double value, uint line_number) {
 		GREED_SCALE = value;
 	else if (!strcmp(name, "MAX_CONCURRENT_GC_OPS"))
 		MAX_CONCURRENT_GC_OPS = value;
-	else if (!strcmp(name, "FTL_IMPLEMENTATION"))
-		FTL_IMPLEMENTATION = value;
 	else if (!strcmp(name, "OS_SCHEDULER"))
 		OS_SCHEDULER = value;
 	else if (!strcmp(name, "GREED_SCALE"))
@@ -393,7 +351,6 @@ void print_config(FILE *stream) {
 	fprintf(stream, "\tBLOCK_MANAGER_ID:\t%u\n", BLOCK_MANAGER_ID);
 	fprintf(stream, "\tGREED_SCALE:\t%u\n", GREED_SCALE);
 	fprintf(stream, "\tMAX_CONCURRENT_GC_OPS:\t%u\n", MAX_CONCURRENT_GC_OPS);
-	fprintf(stream, "\tFTL_IMPLEMENTATION: %i\n", FTL_IMPLEMENTATION);
 	fprintf(stream, "\tMAX_REPEATED_COPY_BACKS_ALLOWED: %i\n", MAX_REPEATED_COPY_BACKS_ALLOWED);
 	fprintf(stream, "\tMAX_ITEMS_IN_COPY_BACK_MAP: %i\n\n", MAX_ITEMS_IN_COPY_BACK_MAP);
 	fprintf(stream, "\tWRITE_DEADLINE: %i\n\n", WRITE_DEADLINE);

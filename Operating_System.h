@@ -79,6 +79,7 @@ public:
     template<class Archive> void serialize(Archive & ar, const unsigned int version) {}
 };
 
+// Generates writes
 class WRITES : public IO_Mode_Generator {
 public:
 	~WRITES() {};
@@ -89,6 +90,7 @@ public:
     }
 };
 
+// Generates trims
 class TRIMS : public IO_Mode_Generator {
 public:
 	~TRIMS() {};
@@ -99,6 +101,7 @@ public:
     }
 };
 
+// Generates reads
 class READS : public IO_Mode_Generator {
 public:
 	~READS() {};
@@ -109,6 +112,7 @@ public:
     }
 };
 
+// Generates reads or writes with a certain probability
 class READS_OR_WRITES : public IO_Mode_Generator {
 public:
 	READS_OR_WRITES() : random_number_generator(4624626), write_probability(0.5) {}
@@ -147,6 +151,7 @@ public:
     }
 };
 
+// Creates a uniformly randomly distributed IO pattern acress the target logical address space
 class Random_IO_Pattern : public IO_Pattern
 {
 public:
@@ -164,6 +169,7 @@ private:
 	MTRand_int32 random_number_generator;
 };
 
+// Creates a uniformly randomly distributed IO pattern acress the target logical address space
 class Sequential_IO_Pattern : public IO_Pattern
 {
 public:
@@ -211,6 +217,7 @@ private:
 	IO_Mode_Generator* io_type_gen;
 };
 
+// This thread performs synchronous random writes across the target address space
 class Synchronous_Random_Writer : public Simple_Thread
 {
 public:
@@ -218,6 +225,7 @@ public:
 		: Simple_Thread(new Random_IO_Pattern(min_LBA, max_LBA, randseed), new WRITES(), 1, INFINITE) {}
 };
 
+// This thread performs synchronous random reads across the target address space
 class Synchronous_Random_Reader : public Simple_Thread
 {
 public:
@@ -225,6 +233,7 @@ public:
 		: Simple_Thread(new Random_IO_Pattern(min_LBA, max_LBA, randseed), new READS(), 1, INFINITE) {}
 };
 
+// This thread performs asynchronous random writes across the target address space
 class Asynchronous_Random_Writer : public Simple_Thread
 {
 public:
@@ -237,6 +246,7 @@ public:
     }
 };
 
+// This thread performs asynchronous random reads across the target address space
 class Asynchronous_Random_Reader : public Simple_Thread
 {
 public:
@@ -249,6 +259,7 @@ public:
     }
 };
 
+// This thread performs synchronous sequential writes across the target address space
 class Synchronous_Sequential_Writer : public Simple_Thread
 {
 public:
@@ -256,6 +267,7 @@ public:
 		: Simple_Thread(new Sequential_IO_Pattern(min_LBA, max_LBA), 1, new WRITES()) {}
 };
 
+// This thread performs asynchronous sequential writes across the target address space
 class Asynchronous_Sequential_Writer : public Simple_Thread
 {
 public:
@@ -268,6 +280,7 @@ public:
     }
 };
 
+// This thread trims the target address space
 class Asynchronous_Sequential_Trimmer : public Simple_Thread
 {
 public:
@@ -276,6 +289,7 @@ public:
 	}
 };
 
+// This thread synchronously and sequentially reads the target address space
 class Synchronous_Sequential_Reader : public Simple_Thread
 {
 public:
@@ -283,6 +297,7 @@ public:
 		: Simple_Thread(new Sequential_IO_Pattern(min_LBA, max_LBA), 1, new READS()) {}
 };
 
+// This thread asynchronously and sequentially reads the target address space
 class Asynchronous_Sequential_Reader : public Simple_Thread
 {
 public:
@@ -290,6 +305,7 @@ public:
 		: Simple_Thread(new Sequential_IO_Pattern(min_LBA, max_LBA), MAX_SSD_QUEUE_SIZE * 2, new READS()) {}
 };
 
+// This thread performs random reads and writes
 class Asynchronous_Random_Reader_Writer : public Simple_Thread
 {
 public:
@@ -301,22 +317,7 @@ public:
     }
 };
 
-/*class Collision_Free_Asynchronous_Random_Thread : public Thread
-{
-public:
-	Collision_Free_Asynchronous_Random_Thread(long min_LBA, long max_LAB, int number_of_times_to_repeat, ulong randseed = 0, event_type type = WRITE);
-	void issue_first_IOs();
-	void handle_event_completion(Event* event);
-private:
-	long min_LBA, max_LBA;
-	int number_of_times_to_repeat;
-	MTRand_int32 random_number_generator;
-	event_type type;
-	set<long> logical_addresses_submitted;
-};*/
-
-// assuming the relation is made of contigouse pages
-// RAM_available is the number of pages that fit into RAM
+// This thread simulates the IO pattern of an external sort algorithm
 class External_Sort : public Thread
 {
 public:
@@ -335,7 +336,7 @@ private:
 	bool can_start_next_read;
 };
 
-// Simulates the IO pattern of a grace hash join between two relations
+// A thread that simulates the IO pattern of a grace hash join between two relations
 class Grace_Hash_Join : public Thread
 {
 public:
@@ -488,23 +489,12 @@ private:
 	int num_files_to_write;
 	int file_id_generator;
 
-	//Reliable_Random_Int_Generator random_number_generator;
-	//Reliable_Random_Double_Generator double_generator;
-
 	MTRand_int32 random_number_generator;
 	MTRand_open double_generator;
 	long max_file_size;
 	int num_pending_trims;
 	phase phase;
-	//Throughput_Moderator throughout_moderator;
 };
-
-/*struct os_event {
-	int thread_id;
-	Event* pending_event;
-	os_event(int thread_id, Event* event) : thread_id(thread_id), pending_event(event) {}
-	os_event() : thread_id(UNDEFINED), pending_event(NULL) {}
-};*/
 
 class Flexible_Reader {
 public:
@@ -570,17 +560,20 @@ private:
 	Flexible_Reader* flex_reader;
 };
 
+// This class can be extended to allow customized IO scheduling policies
 class OS_Scheduler {
 public:
 	virtual ~OS_Scheduler() {}
 	virtual int pick(map<int, Thread*> const& threads) = 0;
 };
 
+// This is a FIFO scheduler that implements a simple IO queue.
 class FIFO_OS_Scheduler : public OS_Scheduler {
 public:
 	int pick(map<int, Thread*> const& threads);
 };
 
+// This is a fair IO scheduler that tries to schedule IOs from different threads in round robin
 class FAIR_OS_Scheduler : public OS_Scheduler {
 public:
 	FAIR_OS_Scheduler() : last_id(0) {}

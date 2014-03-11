@@ -13,7 +13,6 @@
 using namespace ssd;
 
 Ssd::Ssd():
-	ram(),
 	data(),
 	last_io_submission_time(0.0),
 	os(NULL)
@@ -25,11 +24,11 @@ Ssd::Ssd():
 	}
 	
 	// Check for 32bit machine. We do not allow page data on 32bit machines.
-	if (PAGE_ENABLE_DATA == 1 && sizeof(void*) == 4)
+	/*if (PAGE_ENABLE_DATA == 1 && sizeof(void*) == 4)
 	{
 		fprintf(stderr, "Ssd error: %s: The simulator requires a 64bit kernel when using data pages. Disabling data pages.\n", __func__);
 		exit(MEM_ERR);
-	}
+	}*/
 
 	/*if (PAGE_ENABLE_DATA)
 	{
@@ -78,10 +77,10 @@ Ssd::~Ssd()
 	execute_all_remaining_events();
 	//VisualTracer::get_instance()->print_horizontally(2000);
 	//if (PRINT_LEVEL >= 1) StatisticsGatherer::get_global_instance()->print()
-	if (PAGE_ENABLE_DATA) {
+	/*if (PAGE_ENABLE_DATA) {
 		ulong pageSize = ((ulong)(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE)) * (ulong)PAGE_SIZE;
 		munmap(page_data, pageSize);
-	}
+	}*/
 	delete ftl;
 	delete scheduler;
 }
@@ -203,12 +202,9 @@ enum status Ssd::issue(Event *event) {
 	}
 	else if(event -> get_event_type() == READ_TRANSFER) {
 		data[package].lock(event->get_current_time(), BUS_CTRL_DELAY + BUS_DATA_DELAY, *event);
-		//ssd.ram.write(*event);2w
 	}
 	else if(event -> get_event_type() == WRITE) {
 		data[package].lock(event->get_current_time(), 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY, *event);
-		//ssd.ram.write(*event);
-		//ssd.ram.read(*event);
 		write(*event);
 		return SUCCESS;
 	}

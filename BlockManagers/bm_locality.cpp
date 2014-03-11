@@ -7,7 +7,7 @@ using namespace std;
 Sequential_Locality_BM::Sequential_Locality_BM()
 	: Block_manager_parallel(),
 	  seq_write_key_to_pointers_mapping(),
-	  detector(new Sequential_Pattern_Detector(WEARWOLF_LOCALITY_THRESHOLD)),
+	  detector(new Sequential_Pattern_Detector(SEQUENTIAL_LOCALITY_THRESHOLD)),
 	  strat(SHOREST_QUEUE),
 	  random_number_generator(1111),
 	  num_hits(0),
@@ -49,13 +49,13 @@ void Sequential_Locality_BM::register_write_arrival(Event const& event) {
 
 	sequential_writes_tracking const& swt = detector->register_event(lb, event.get_current_time());
 	// checks if should allocate pointers for the pattern
-	if (swt.num_times_pattern_has_repeated == 0 && swt.counter == WEARWOLF_LOCALITY_THRESHOLD) {
+	if (swt.num_times_pattern_has_repeated == 0 && swt.counter == SEQUENTIAL_LOCALITY_THRESHOLD) {
 		if (PRINT_LEVEL > 1) {
 			printf("SEQUENTIAL PATTERN IDENTIFIED!  KEY: %d \n", swt.key);
 		}
 		set_pointers_for_sequential_write(swt.key, event.get_current_time());
 	}
-	if (swt.num_times_pattern_has_repeated > 0 || swt.counter >= WEARWOLF_LOCALITY_THRESHOLD) {
+	if (swt.num_times_pattern_has_repeated > 0 || swt.counter >= SEQUENTIAL_LOCALITY_THRESHOLD) {
 		arrived_writes_to_sequential_key_mapping[event.get_id()] = swt.key;
 	}
 }
