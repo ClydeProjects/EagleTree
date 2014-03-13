@@ -77,7 +77,7 @@ void Experiment::run_single_point(string name) {
 	mkdir(data_folder.c_str(), 0755);
 	StatisticsGatherer::set_record_statistics(true);
 	Thread::set_record_internal_statistics(true);
-	Experiment_Result global_result(name, data_folder, "Global/", "Changing a Var");
+	Experiment_Result global_result(name, data_folder, "Global/", "");
 	Individual_Threads_Statistics::init();
 	global_result.start_experiment();
 	Free_Space_Meter::init();
