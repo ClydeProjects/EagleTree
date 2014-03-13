@@ -17,16 +17,17 @@ class Priorty_Scheme {
 public:
 	Priorty_Scheme(IOScheduler* scheduler) : scheduler(scheduler) {}
 	virtual ~Priorty_Scheme() {};
-	virtual void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases) = 0;
-	void seperate_internal_external(vector<Event*> const& events, vector<Event*>& internal, vector<Event*>& external);
+	virtual void schedule(vector<Event*>& events) = 0;
 protected:
+	void seperate_internal_external(vector<Event*> const& events, vector<Event*>& internal, vector<Event*>& external);
+	void seperate_by_type(vector<Event*> const& events, vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
 	IOScheduler* scheduler;
 };
 
 class Fifo_Priorty_Scheme : public Priorty_Scheme {
 public:
 	Fifo_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
-	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
+	void schedule(vector<Event*>& events);
 };
 
 /*class Re_Er_Wr_Priorty_Scheme : public Priorty_Scheme {
@@ -38,25 +39,25 @@ public:
 class Er_Wr_Re_gcRe_gcWr_Priorty_Scheme : public Priorty_Scheme {
 public:
 	Er_Wr_Re_gcRe_gcWr_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
-	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
+	void schedule(vector<Event*>& events);
 };
 
 class gcRe_gcWr_Er_Re_Wr_Priorty_Scheme : public Priorty_Scheme {
 public:
 	gcRe_gcWr_Er_Re_Wr_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
-	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
+	void schedule(vector<Event*>& events);
 };
 
 class We_Re_gcWr_E_gcR_Priorty_Scheme : public Priorty_Scheme {
 public:
 	We_Re_gcWr_E_gcR_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
-	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
+	void schedule(vector<Event*>& events);
 };
 
 class Smart_App_Priorty_Scheme : public Priorty_Scheme {
 public:
 	Smart_App_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
-	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
+	void schedule(vector<Event*>& events);
 };
 
 class event_queue {

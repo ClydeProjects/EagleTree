@@ -65,8 +65,8 @@ vector<Thread*> Random_Workload::generate() {
 	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
 	for (int i = 0; i < num_threads; i++) {
 		int seed = 23621 * i + 62;
-		Simple_Thread* writer = new Synchronous_Random_Writer(min_lba, max_lba / 2, seed);
-		Simple_Thread* reader = new Synchronous_Random_Reader(min_lba, max_lba / 2, seed * 136);
+		Simple_Thread* writer = new Synchronous_Random_Writer(min_lba, max_lba, seed);
+		Simple_Thread* reader = new Synchronous_Random_Reader(min_lba, max_lba, seed * 136);
 		init_write->add_follow_up_thread(reader);
 		init_write->add_follow_up_thread(writer);
 		writer->set_num_ios(INFINITE);
