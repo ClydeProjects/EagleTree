@@ -462,7 +462,7 @@ OperatingSystem* Experiment::load_state(string name) {
 	ia >> threads;
 	Individual_Threads_Statistics::init();
 	for (auto t : threads) {
-		Individual_Threads_Statistics::register_thread(t, "");
+		//Individual_Threads_Statistics::register_thread(t, "");
 	}
 	os->set_threads(threads);
 	//os->init_threads();
