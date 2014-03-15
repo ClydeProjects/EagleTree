@@ -519,31 +519,31 @@ vector<string> StatisticsGatherer::totals_vector_header() {
 	result.push_back("Copybacks");
 	result.push_back("Erases");
 
-	result.push_back("Write latency, mean (µs)"); // 10
-	result.push_back("Write latency, min (µs)");
-	result.push_back("Write latency, Q25 (µs)");
-	result.push_back("Write latency, Q50 (µs)");
-	result.push_back("Write latency, Q75 (µs)");
-	result.push_back("Write latency, max (µs)");
-	result.push_back("Write latency, stdev (µs)");
+	result.push_back("Write latency, mean (us)"); // 10
+	result.push_back("Write latency, min (us)");
+	result.push_back("Write latency, Q25 (us)");
+	result.push_back("Write latency, Q50 (us)");
+	result.push_back("Write latency, Q75 (us)");
+	result.push_back("Write latency, max (us)");
+	result.push_back("Write latency, stdev (us)");
 
-	result.push_back("Read latency, mean (µs)");
-	result.push_back("Read latency, min (µs)");
-	result.push_back("Read latency, Q25 (µs)"); // 20
-	result.push_back("Read latency, Q50 (µs)");
-	result.push_back("Read latency, Q75 (µs)");
-	result.push_back("Read latency, max (µs)");
-	result.push_back("Read latency, stdev (µs)");
+	result.push_back("Read latency, mean (us)");
+	result.push_back("Read latency, min (us)");
+	result.push_back("Read latency, Q25 (us)"); // 20
+	result.push_back("Read latency, Q50 (us)");
+	result.push_back("Read latency, Q75 (us)");
+	result.push_back("Read latency, max (us)");
+	result.push_back("Read latency, stdev (us)");
 
-	result.push_back("GC latency, stdev (µs)"); // 25
+	result.push_back("GC latency, stdev (us)"); // 25
 	result.push_back("Channel Utilization (%)");
 
 	result.push_back("GC Efficiency");
 
-	//result.push_back("max write wait (µs)"); // 15
-	//result.push_back("max read wait (µs)");
-	//result.push_back("max GC wait (µs)");
-	// Sustainable throughput (µs) 18
+	//result.push_back("max write wait (us)"); // 15
+	//result.push_back("max read wait (us)");
+	//result.push_back("max GC wait (us)");
+	// Sustainable throughput (us) 18
 	return result;
 }
 

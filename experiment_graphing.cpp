@@ -476,7 +476,7 @@ void Experiment::draw_experiment_spesific_graphs() {
 			x_vals.push_back(0);
 		}
 
-		uint mean_pos_in_datafile = std::find(results[0][0].column_names.begin(), results[0][0].column_names.end(), "Write latency, mean (µs)") - results[0][0].column_names.begin();
+		uint mean_pos_in_datafile = std::find(results[0][0].column_names.begin(), results[0][0].column_names.end(), "Write latency, mean (us)") - results[0][0].column_names.begin();
 		assert(mean_pos_in_datafile != results[0][0].column_names.size());
 
 		for (uint j = 0; j < results.size(); j++) {
