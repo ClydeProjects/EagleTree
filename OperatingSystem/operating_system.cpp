@@ -64,41 +64,63 @@ OperatingSystem::~OperatingSystem() {
 	delete scheduler;
 }
 
-void OperatingSystem::run() {
+void OperatingSystem::check_if_stuck(bool no_pending_event, bool queue_is_full) {
 	const int idle_limit = 5000000;
-	bool finished_experiment, still_more_work;
+	if (idle_time > 100000 && idle_time % 100000 == 0) {
+		printf("Idle for %f seconds. No_pending_event=%d  Queue_is_full=%d\n", (double) idle_time / 1000000, no_pending_event, queue_is_full);
+	}
+	if (idle_time >= idle_limit) {
+		printf("\n");
+		if (queue_is_full) {
+			fprintf(stderr, "For some reason, application IOs are getting stuck inside the SSD and never making it back to the OS.\n");
+			fprintf(stderr, "Normally the SSD invokes the OS's register_event_completion method whenever an application IO completes.\n");
+			fprintf(stderr, "This isn't happening, though. Since these IOs are still in the IO queue, we are stuck. We cannot submit any more IOs.\n");
+			fprintf(stderr, "The IOs that were submitted but never completed have the following application IDs:\n");
+			for (auto it : currently_executing_ios) {
+				printf("%d ", it);
+			}
+		}
+		else if (no_pending_event) {
+			fprintf(stderr, "For some reason, the application threads are not submitting IOs.\n");
+			fprintf(stderr, "This means we are not making any progress. We are stuck an infinite loop.\n");
+			fprintf(stderr, "Hint: try to debug the OS_Scheduler method \"pick\", and try to see why the threads are not submitting IOs.\n");
+		}
+
+		printf("\n");
+		throw;
+	}
+	idle_time++;
+}
+
+void OperatingSystem::print_progess() {
+	if ((double)num_writes_completed / NUM_WRITES_TO_STOP_AFTER > (double)counter_for_user / progress_meter_granularity) {
+		printf("finished %f%%.\t\tNum writes completed:  %d \n", counter_for_user * 100 / (double)progress_meter_granularity , num_writes_completed);
+		/*if (counter_for_user == 9) {
+			PRINT_LEVEL = 1;
+			VisualTracer::get_instance()->print_horizontally(10000);
+			VisualTracer::get_instance()->print_horizontally_with_breaks_last(10000);
+		}*/
+		counter_for_user++;
+	}
+}
+
+// The operating system loops until one of two conditions holds:
+// 		- no thread
+void OperatingSystem::run() {
+
+	bool finished_experiment = false, still_more_work = true;
 	do {
 		int thread_id = scheduler->pick(threads);
 		bool no_pending_event = thread_id == UNDEFINED;
 		bool queue_is_full = currently_executing_ios.size() >= MAX_SSD_QUEUE_SIZE;
 		if (no_pending_event || queue_is_full) {
-			if (idle_time > 100000 && idle_time % 100000 == 0) {
-				printf("Idle for %f seconds. No_pending_event=%d  Queue_is_full=%d\n", (double) idle_time / 1000000, no_pending_event, queue_is_full);
-			}
-			if (idle_time >= idle_limit) {
-				printf("Idle time limit reached\nRunning IOs:");
-				for (set<uint>::iterator it = currently_executing_ios.begin(); it != currently_executing_ios.end(); it++) {
-					printf("%d ", *it);
-				}
-				printf("\n");
-				throw;
-			}
+			check_if_stuck(no_pending_event, queue_is_full);
 			ssd->progress_since_os_is_waiting();
-			idle_time++;
 		}
 		else {
 			dispatch_event(thread_id);
 		}
-
-		if ((double)num_writes_completed / NUM_WRITES_TO_STOP_AFTER > (double)counter_for_user / progress_meter_granularity) {
-			printf("finished %f%%.\t\tNum writes completed:  %d \n", counter_for_user * 100 / (double)progress_meter_granularity , num_writes_completed);
-			if (counter_for_user == 9) {
-				//PRINT_LEVEL = 1;
-				//VisualTracer::get_instance()->print_horizontally(10000);
-				//VisualTracer::get_instance()->print_horizontally_with_breaks_last(10000);
-			}
-			counter_for_user++;
-		}
+		print_progess();
 
 		finished_experiment = NUM_WRITES_TO_STOP_AFTER != UNDEFINED && NUM_WRITES_TO_STOP_AFTER <= num_writes_completed;
 		still_more_work = currently_executing_ios.size() > 0 || threads.size() > 0;

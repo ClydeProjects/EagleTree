@@ -591,6 +591,8 @@ public:
 	void init_threads();
 	~OperatingSystem();
 	void run();
+	void check_if_stuck(bool no_pending_event, bool queue_is_full);
+	void print_progess();
 	void register_event_completion(Event* event);
 	void set_num_writes_to_stop_after(long num_writes);
 	void set_progress_meter_granularity(int num) { progress_meter_granularity = num; }
