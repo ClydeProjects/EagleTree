@@ -4,7 +4,7 @@ using namespace ssd;
 
 Garbage_Collector::Garbage_Collector()
 	:  gc_candidates(SSD_SIZE, vector<vector<set<long> > >(PACKAGE_SIZE, vector<set<long> >(1, set<long>()))),
-	   blocks_per_lun_with_min_live_pages(SSD_SIZE, vector<pair<Address, int> >(PACKAGE_SIZE)),
+	   //blocks_per_lun_with_min_live_pages(SSD_SIZE, vector<pair<Address, int> >(PACKAGE_SIZE)),
 	   ssd(NULL),
 	   bm(NULL),
 	   num_age_classes(1)
@@ -12,7 +12,7 @@ Garbage_Collector::Garbage_Collector()
 
 Garbage_Collector::Garbage_Collector(Ssd* ssd, Block_manager_parent* bm)
 	:  gc_candidates(SSD_SIZE, vector<vector<set<long> > >(PACKAGE_SIZE, vector<set<long> >(bm->get_num_age_classes(), set<long>()))),
-	   blocks_per_lun_with_min_live_pages(SSD_SIZE, vector<pair<Address, int> >(PACKAGE_SIZE)),
+	   //blocks_per_lun_with_min_live_pages(SSD_SIZE, vector<pair<Address, int> >(PACKAGE_SIZE)),
 	   ssd(ssd),
 	   bm(bm),
 	   num_age_classes(bm->get_num_age_classes())
@@ -23,12 +23,12 @@ void Garbage_Collector::remove_as_gc_candidate(Address const& phys_address) {
 	for (int i = 0; i < num_age_classes; i++) {
 		gc_candidates[phys_address.package][phys_address.die][i].erase(phys_address.get_linear_address());
 	}
-	pair<Address, int>& map = blocks_per_lun_with_min_live_pages[phys_address.package][phys_address.die];
+	/*pair<Address, int>& map = blocks_per_lun_with_min_live_pages[phys_address.package][phys_address.die];
 	if (map.first.valid == BLOCK && map.first.compare(phys_address) == BLOCK) {
 		Block* b = choose_gc_victim(phys_address.package, phys_address.die, -1);
 		map.first = b != NULL ? Address(b->get_physical_address(), BLOCK) : Address();
 		map.second = b != NULL ? b->get_pages_valid() : 0;
-	}
+	}*/
 }
 
 vector<long> Garbage_Collector::get_relevant_gc_candidates(int package_id, int die_id, int klass) const {
@@ -83,14 +83,14 @@ void Garbage_Collector::register_trim(Event const& event, uint age_class, int nu
 	if (gc_candidates[ra.package][ra.die][age_class].size() == 1) {
 		bm->check_if_should_trigger_more_GC(event.get_current_time());
 	}
-	pair<Address, int>& map = blocks_per_lun_with_min_live_pages[ra.package][ra.die];
+	/*pair<Address, int>& map = blocks_per_lun_with_min_live_pages[ra.package][ra.die];
 	if (map.first.valid != BLOCK || map.first.compare(ra) == BLOCK || map.second > num_live_pages) {
 		map.first = ra;
 		map.second = num_live_pages;
-	}
+	}*/
 }
 
-double Garbage_Collector::get_average_live_pages_per_best_candidate() const {
+/*double Garbage_Collector::get_average_live_pages_per_best_candidate() const {
 	int total_live_pages = 0;
 	int num_blocks_considered = 0;
 	for (uint i = 0; i < SSD_SIZE; i++) {
@@ -106,4 +106,4 @@ double Garbage_Collector::get_average_live_pages_per_best_candidate() const {
 		return PAGE_SIZE;
 	double avg = (double)total_live_pages / num_blocks_considered;
 	return avg;
-}
+}*/

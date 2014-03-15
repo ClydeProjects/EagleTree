@@ -145,7 +145,11 @@ private:
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 
+	// The num_age_classes variable controls into how many age classes we divide blocks.
+	// In every LUN, the block manager tries to keep num_age_classes free blocks.
+	// This allows doing efficient dynamic wear-leveling by putting pages of a certain temperature in blocks of a certain age.
 	int num_age_classes;
+
 	uint num_free_pages;
 	uint num_available_pages_for_new_writes;
 
@@ -384,34 +388,43 @@ private:
 	int num_misses;
 };
 
+// The garbage collector organizes blocks in a data structure that is convenient for choosing which block to garbage-collect next
+// This organization happens within the gc_candidates structure.
+// Blocks that are candidates for garbage collection are first organized based on which package and die they belong to.
+// Within the each die, they are further divided how old they are (i.e. how many erases they have experienced).
+// The variable num_age_classes controls how many groups we use for blocks of different ages.
+// Note that the block manager maintains a free block for every age class in every LUN. This allows us to implement efficient
+// dynamic wear-leveling by putting pages of a certain temperature in blocks of a certain age.
 class Garbage_Collector {
 public:
 	Garbage_Collector();
-	//Garbage_Collector(Garbage_Collector&);
 	Garbage_Collector(Ssd* ssd, Block_manager_parent* bm);
-	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
-	void remove_as_gc_candidate(Address const& phys_address);
+	// Called by the block manager after any page in the SSD is invalidated, as a result of a trim or a write.
+	// This is used to keep the gc_candidates structure updated.
 	void register_trim(Event const& event, uint age_class, int num_live_pages);
-	double get_average_live_pages_per_best_candidate() const;
-	void issue_erase(Address ra, double time);
+	// Called by the block manager to ask the garbage-collector for a good block to garbage-collect in a given package, die, and with a certain age.
+	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
+	// Called by the block manager when a GC operation for a certain block has been issued. This block is removed from the gc_candidates structure.
+	void remove_as_gc_candidate(Address const& phys_address);
 	void set_block_manager(Block_manager_parent* b) { bm = b; }
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
     {
     	ar & gc_candidates;
-    	ar & blocks_per_lun_with_min_live_pages;
+    	//ar & blocks_per_lun_with_min_live_pages;
     	ar & ssd;
     	ar & bm;
     	ar & num_age_classes;
     }
+    //double get_average_live_pages_per_best_candidate() const;
 private:
 	vector<long> get_relevant_gc_candidates(int package_id, int die_id, int klass) const;
 	vector<vector<vector<set<long> > > > gc_candidates;  // each age class has a vector of candidates for GC
-	vector<vector<pair<Address, int> > > blocks_per_lun_with_min_live_pages;
 	Ssd* ssd;
 	Block_manager_parent* bm;
 	int num_age_classes;
+	//vector<vector<pair<Address, int> > > blocks_per_lun_with_min_live_pages;
 };
 
 
