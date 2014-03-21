@@ -35,6 +35,10 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	num_iterations_in_scheduler(0)
 {
 	assert(start_time >= 0.0);
+	if (size > 1) {
+		fprintf(stderr, "For now we do not support an IO size of more than 1 flash page.\n");
+		assert(false);
+	}
 	if (logical_address > NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE) {
 		printf("invalid logical address, too big  %d   %d\n", logical_address, NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE);
 		assert(false);
