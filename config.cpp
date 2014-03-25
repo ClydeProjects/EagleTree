@@ -127,7 +127,7 @@ uint LOCALITY_PARALLEL_DEGREE = 0;
 // This determines how greedy the garbage-collection is.
 // The number corresponds to the number of live pages per die before garbage-collection kicks in
 // to clear more space in the die
-bool GREED_SCALE = 2;
+int GREED_SCALE = 2;
 
 /* Output level of detail:
  * 0 -> Nothing
