@@ -35,7 +35,7 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	num_iterations_in_scheduler(0)
 {
 	assert(start_time >= 0.0);
-	if (size > 1) {
+	if (size > 1 && type != GARBAGE_COLLECTION) {
 		fprintf(stderr, "For now we do not support an IO size of more than 1 flash page.\n");
 		assert(false);
 	}
