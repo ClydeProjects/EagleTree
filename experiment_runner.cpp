@@ -61,6 +61,11 @@ void Experiment::set_variable(int* variable, int low, int high, int incr, string
 void Experiment::run(string name) {
 	Thread::set_record_internal_statistics(true);
 	StatisticsGatherer::set_record_statistics(true);
+
+	if (MAX_REPEATED_COPY_BACKS_ALLOWED > 0) {
+		fprintf(stderr, "The simulation parameter MAX_REPEATED_COPY_BACKS_ALLOWED is greater than 0. This is still buggy, and so we fail.\nSet this parameter to 0 to remove this error message.\n");
+	}
+
 	if (i_variable == NULL && d_variable == NULL) {
 		run_single_point(name);
 	}
