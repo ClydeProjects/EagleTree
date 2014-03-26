@@ -7,7 +7,9 @@ using namespace ssd;
 uint Event::id_generator = 0;
 uint Event::application_io_id_generator = 0;
 
-/* see "enum event_type" in ssd.h for details on event types */
+/* see "enum event_type" in ssd.h for details on event types
+ * The logical address and size are both measured in flash pages
+ * */
 Event::Event(enum event_type type, ulong logical_address, uint size, double start_time):
 	start_time(start_time),
 	execution_time(0.0),
