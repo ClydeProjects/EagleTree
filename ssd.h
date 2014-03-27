@@ -403,13 +403,14 @@ class Event
 public:
 	Event(enum event_type type, ulong logical_address, uint size, double start_time);
 	Event();
-	Event(Event& event);
+	Event(Event const& event);
 	inline virtual ~Event() {}
 	inline ulong get_logical_address() const 			{ return logical_address; }
 	inline void set_logical_address(ulong addr) 		{ logical_address = addr; }
 	inline const Address &get_address() const 			{ return address; }
 	inline const Address &get_replace_address() const 	{ return replace_address; }
 	inline uint get_size() const 						{ return size; }
+	inline void set_size(int new_size)  				{ size = new_size; }
 	inline enum event_type get_event_type() const 		{ return type; }
 	inline double get_start_time() const 				{ assert(start_time >= 0.0); return start_time; }
 	inline bool is_original_application_io() const 		{ return original_application_io; }
@@ -462,6 +463,8 @@ public:
 	bool is_flexible_read();
 	inline void increment_iteration_count() { num_iterations_in_scheduler++; }
 	inline int get_iteration_count() { return num_iterations_in_scheduler; }
+	inline int get_ssd_id() { return ssd_id; }
+	inline void set_ssd_id(int new_ssd_id) { ssd_id = new_ssd_id; }
 protected:
 	double start_time;
 	double execution_time;
@@ -491,6 +494,8 @@ protected:
 	// an ID to manage dependencies in the scheduler.
 	uint application_io_id;
 	static uint application_io_id_generator;
+
+	uint ssd_id;
 
 	int age_class;
 	int tag;
@@ -974,6 +979,8 @@ private:
 };
 */
 
+
+
 /* The SSD is the single main object that will be created to simulate a real
  * SSD.  Creating a SSD causes all other objects in the SSD to be created.  The
  * event_arrive method is where events will arrive from DiskSim. */
@@ -1005,6 +1012,7 @@ public:
     IOScheduler* get_scheduler() { return scheduler; }
     void execute_all_remaining_events();
 private:
+    void submit_to_ftl(Event* event);
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status erase(Event &event);
@@ -1014,6 +1022,19 @@ private:
 	OperatingSystem* os;
 	FtlParent *ftl;
 	IOScheduler *scheduler;
+
+	struct io_map {
+		void resiger_large_event(Event* e);
+		void register_completion(Event* e);
+		bool is_part_of_large_event(Event* e);
+		bool is_finished(int id) const;
+		Event* get_original_event(int id);
+	private:
+		map<int, int> io_counter;
+		map<int, Event*> event_map;
+	};
+	io_map large_events_map;
+
 };
 
 class RaidSsd

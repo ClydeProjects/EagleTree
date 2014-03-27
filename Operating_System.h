@@ -193,13 +193,14 @@ private:
 class Simple_Thread : public Thread
 {
 public:
-	Simple_Thread() : io_gen(NULL), io_type_gen(NULL), number_of_times_to_repeat(0), MAX_IOS(0) {}
+	Simple_Thread() : io_gen(NULL), io_type_gen(NULL), number_of_times_to_repeat(0), MAX_IOS(0), io_size(1) {}
 	Simple_Thread(IO_Pattern* generator, int MAX_IOS, IO_Mode_Generator* type);
 	Simple_Thread(IO_Pattern* generator, IO_Mode_Generator* type, int MAX_IOS, long num_IOs);
 	virtual ~Simple_Thread();
 	void generate_io();
 	void issue_first_IOs();
 	void handle_event_completion(Event* event);
+	void set_io_size(int size) { io_size = size; }
 	inline void set_num_ios(ulong num_ios) { number_of_times_to_repeat = num_ios; }
     friend class boost::serialization::access;
     template<class Archive>
@@ -215,6 +216,7 @@ private:
 	int MAX_IOS;
 	IO_Pattern* io_gen;
 	IO_Mode_Generator* io_type_gen;
+	int io_size; // in pages
 };
 
 // This thread performs synchronous random writes across the target address space

@@ -142,7 +142,7 @@ void Simple_Thread::generate_io() {
 		number_of_times_to_repeat--;
 		event_type type = io_type_gen->next();
 		long logical_addr = io_gen->next();
-		Event* e = new Event(type, logical_addr, 1, get_current_time());
+		Event* e = new Event(type, logical_addr, io_size, get_current_time());
 		submit(e);
 	}
 

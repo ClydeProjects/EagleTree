@@ -34,13 +34,10 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	pure_ssd_wait_time(0),
 	copyback(false),
 	cached_write(false),
-	num_iterations_in_scheduler(0)
+	num_iterations_in_scheduler(0),
+	ssd_id(UNDEFINED)
 {
 	assert(start_time >= 0.0);
-	if (size > 1 && type != GARBAGE_COLLECTION) {
-		fprintf(stderr, "For now we do not support an IO size of more than 1 flash page.\n");
-		assert(false);
-	}
 	if (logical_address > NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE) {
 		printf("invalid logical address, too big  %d   %d\n", logical_address, NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE);
 		assert(false);
@@ -48,7 +45,7 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 
 }
 
-Event::Event(Event& event) :
+Event::Event(Event const& event) :
 	start_time(event.start_time),
 	execution_time(event.execution_time),
 	bus_wait_time(event.bus_wait_time),
@@ -72,7 +69,8 @@ Event::Event(Event& event) :
 	pure_ssd_wait_time(event.pure_ssd_wait_time),
 	copyback(event.copyback),
 	cached_write(event.cached_write),
-	num_iterations_in_scheduler(0)
+	num_iterations_in_scheduler(0),
+	ssd_id(event.ssd_id)
 {}
 
 bool Event::is_flexible_read() {
