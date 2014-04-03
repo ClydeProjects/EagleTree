@@ -210,6 +210,7 @@ public:
     	ar & MAX_IOS;
     	ar & io_gen;
     	ar & io_type_gen;
+    	ar & io_size;
     }
 private:
 	long number_of_times_to_repeat;
