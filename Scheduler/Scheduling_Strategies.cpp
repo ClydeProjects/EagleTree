@@ -22,8 +22,44 @@ void Priorty_Scheme::seperate_by_type(vector<Event*> const& events, vector<Event
 	}
 }
 
+int get_num_mimatches(vector<Event*>& events) {
+	int mismatches = 0;
+	set<double> values;
+	if (events.size() == 0) {
+		return 0;
+	}
+	values.insert(events[0]->get_bus_wait_time());
+	for (int i = 1; i < events.size(); i++) {
+		if (events[i-1]->get_bus_wait_time() > events[i]->get_bus_wait_time()) {
+			mismatches++;
+		}
+		values.insert(events[i]->get_bus_wait_time());
+	}
+	printf("size:  %d    values:  %d    mismatches: %d\n", events.size(), values.size(), mismatches);
+	if (mismatches > 10) {
+		for (int i = 0; i < events.size(); i++) {
+			printf("\t%f\t", events[i]->get_bus_wait_time());
+
+			events[i]->print();
+		}
+	}
+
+
+	return mismatches;
+}
+
 void Fifo_Priorty_Scheme::schedule(vector<Event*>& events) {
-	//sort(events.begin(), events.end(), current_wait_time_comparator);
+	event_queue q;
+	for (auto e : events) {
+		q.push(e, e->get_bus_wait_time());
+	}
+	while (q.size() > 0) {
+		vector<Event*> ordered_events = q.get_soonest_events();
+		scheduler->handle(ordered_events);
+	}
+}
+
+void Noop_Priorty_Scheme::schedule(vector<Event*>& events) {
 	scheduler->handle(events);
 }
 

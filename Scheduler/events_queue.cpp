@@ -10,12 +10,26 @@ vector<Event*> event_queue::get_soonest_events() {
 	return soonest_events;
 }
 
+void event_queue::push(Event* event, double value) {
+	num_events++;
+	//printf("num_events:  %d\n", num_events);
+	if (events.count(value) == 0) {
+		vector<Event*> new_events(1, event);
+		new_events.reserve(10);
+		events[value] = new_events;
+	} else {
+		vector<Event*>& events_with_this_time = events[value];
+		events_with_this_time.push_back(event);
+	}
+}
+
 void event_queue::push(Event* event) {
 	num_events++;
 	//printf("num_events:  %d\n", num_events);
 	long current_time = floor(event->get_current_time());
 	if (events.count(current_time) == 0) {
 		vector<Event*> new_events(1, event);
+		new_events.reserve(50);
 		events[current_time] = new_events;
 	} else {
 		vector<Event*>& events_with_this_time = events[current_time];

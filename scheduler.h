@@ -30,6 +30,12 @@ public:
 	void schedule(vector<Event*>& events);
 };
 
+class Noop_Priorty_Scheme : public Priorty_Scheme {
+public:
+	Noop_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	void schedule(vector<Event*>& events);
+};
+
 /*class Re_Er_Wr_Priorty_Scheme : public Priorty_Scheme {
 public:
 	Re_Er_Wr_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
@@ -64,6 +70,7 @@ class event_queue {
 public:
 	event_queue() : events(), num_events(0) {};
 	virtual ~event_queue();
+	virtual void push(Event*, double value);
 	virtual void push(Event*);
 	vector<Event*> get_soonest_events();
 	virtual bool remove(Event*);

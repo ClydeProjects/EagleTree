@@ -2,7 +2,7 @@
 # EagleTree makefile
 
 CC = /usr/bin/gcc
-CFLAGS = -std=c++0x -g -O2 -w 
+CFLAGS = -std=c++0x -O2 -g -w 
 CXX = /usr/bin/g++
 CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
@@ -14,20 +14,25 @@ OBJ = OS_Schedulers.o Queue_Length_Statistics.o experiment_graphing.o experiment
 PERMS = 660
 EPERMS = 770
 
-all: demo demo2
+all: demo demo1 demo2
 
 demo: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o Experiments/demo Experiments/demo.cpp $(OBJ) -lboost_serialization
 	-chmod $(PERMS) $(OBJ) 
 	-chmod $(EPERMS) Experiments/demo
-	
+
+demo1: $(HDR) $(OBJ)
+	$(CXX) $(CXXFLAGS) -o Experiments/demo1 Experiments/demo1.cpp $(OBJ) -lboost_serialization
+	-chmod $(PERMS) $(OBJ) 
+	-chmod $(EPERMS) Experiments/demo1
+
 demo2: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o Experiments/demo2 Experiments/demo2.cpp $(OBJ) -lboost_serialization
 	-chmod $(PERMS) $(OBJ) 
 	-chmod $(EPERMS) Experiments/demo2
 	
 clean:
-	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) Experiments/demo
+	-rm -f $(OBJ) $(LOG) $(ELF0) $(ELF1) $(ELF2) Experiments/demo Experiments/demo2
 
 rm_exec:
 	-rm -f Experiments/demo

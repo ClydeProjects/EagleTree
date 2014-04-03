@@ -12,8 +12,10 @@ vector<Thread*> Example_Workload::generate() {
 
 	// This workload begins with a large sequential write of the entire logical address space.
 	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
+	init_write->set_io_size(1);
 	vector<Thread*> starting_threads;
 	starting_threads.push_back(init_write);
+	//init_write->set_num_ios(10000);
 
 	// Once the sequential write above is finished, two threads start.
 	// One performs random writes across the logical address space. The other performs random reads.
@@ -49,7 +51,6 @@ int main()
 	Workload_Definition* workload = new Example_Workload();
 	e->set_workload(workload);
 	e->set_io_limit(1000000);
-	PRINT_LEVEL = 0;
 	e->run("test");
 	e->draw_graphs();
 	delete workload;

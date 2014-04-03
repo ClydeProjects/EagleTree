@@ -91,10 +91,13 @@ bool USE_ERASE_QUEUE = false;
 
 
 /*
- * This
- * 0 ->  Naive: Read Command, Read Transfer, Write, GC, Erase
- * 1 ->  Experimental
- * 2 ->  Smart
+ * The SSD controller IO scheduler works by finding a LUN on which something can be scheduled soonest,
+ * and then finding an operation that can be scheduled on that LUN according to a priority scheme.
+ * The priority scheme is determined by by the SCHEDULING_SCHEME parameter.
+ * 0 ->  FIFO: disregards event types and schedules everything fifo
+ * 1 ->  Noop: schedules the next event in an arbitrary manner. This is fastest in terms of real execution time of the simulator.
+ * 			   however, latency outliers may occur and be significant. This scheduler is typically used for calibration.
+ * 2 ->  Smart: internal reads, external reads, copybacks, erases, external writes, internal writes
  */
 int SCHEDULING_SCHEME = 2;
 
