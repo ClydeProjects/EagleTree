@@ -9,7 +9,7 @@
 using namespace ssd;
 
 int FIFO_OS_Scheduler::pick(map<int, Thread*> const& threads) {
-	double soonest_event_time = INFINITE;
+	long double soonest_event_time = std::numeric_limits<long double>::max();
 	int thread_id_with_soonest_event = UNDEFINED;
 	for (auto i : threads) {
 		int id = i.first;
