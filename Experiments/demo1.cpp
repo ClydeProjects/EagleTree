@@ -16,7 +16,7 @@ int main()
 	e->set_calibration_file(calibration_file);
 	Workload_Definition* workload = new Asynch_Random_Workload();
 	e->set_workload(workload);
-	e->set_io_limit(100000);
+	e->set_io_limit(1000000);
 	SCHEDULING_SCHEME = 0; // use a fifo IO scheduler during the actual experiment
 	e->run("test");
 	e->draw_graphs();

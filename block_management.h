@@ -21,7 +21,6 @@ public:
 	void init(IOScheduler*, Block_manager_parent*, Garbage_Collector*, Wear_Leveling_Strategy*, FtlParent*, Ssd*);
 	void schedule_gc(double time, int package, int die, int block, int klass);
 	vector<deque<Event*> > migrate(Event * gc_event);
-	vector<deque<Event*> > migrate2(Event * gc_event);
 	void print_pending_migrations();
 	deque<Event*> trigger_next_migration(Event * gc_read);
 	bool more_migrations(Event * gc_read);

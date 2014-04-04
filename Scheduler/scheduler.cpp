@@ -658,7 +658,7 @@ void IOScheduler::init_event(Event* event) {
 		ftl->set_replace_address(*event);
 	}
 	else if (type == GARBAGE_COLLECTION) {
-		vector<deque<Event*> > migrations = migrator->migrate2(event);
+		vector<deque<Event*> > migrations = migrator->migrate(event);
 		while (migrations.size() > 0) {
 			// Pick first migration from deque
 			deque<Event*> migration = migrations.back();

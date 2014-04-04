@@ -2,7 +2,7 @@
 # EagleTree makefile
 
 CC = /usr/bin/gcc
-CFLAGS = -std=c++0x -O2 -g -w 
+CFLAGS = -std=c++0x -g -w -O2
 CXX = /usr/bin/g++
 CXXFLAGS = $(CFLAGS)
 ELF0 = run_test
