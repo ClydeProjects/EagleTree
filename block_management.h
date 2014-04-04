@@ -21,6 +21,10 @@ public:
 	void init(IOScheduler*, Block_manager_parent*, Garbage_Collector*, Wear_Leveling_Strategy*, FtlParent*, Ssd*);
 	void schedule_gc(double time, int package, int die, int block, int klass);
 	vector<deque<Event*> > migrate(Event * gc_event);
+	vector<deque<Event*> > migrate2(Event * gc_event);
+	void print_pending_migrations();
+	deque<Event*> trigger_next_migration(Event * gc_read);
+	bool more_migrations(Event * gc_read);
 	void register_event_completion(Event* event);
 	void register_ECC_check_on(uint logical_address);
 	uint how_many_gc_operations_are_scheduled() const;
@@ -54,6 +58,7 @@ private:
 	map<int, int> blocks_being_garbage_collected;
 	vector<queue<Event*> > erase_queue;
 	vector<int> num_erases_scheduled_per_package;
+	map<long, vector<deque<Event*> > > dependent_gc;
 };
 
 class Block_manager_parent {

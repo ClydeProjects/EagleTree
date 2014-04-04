@@ -157,6 +157,17 @@ void We_Re_gcWr_E_gcR_Priorty_Scheme::schedule(vector<Event*>& events) {
 void Scheduling_Strategy::schedule() {
 
 	vector<Event*> current_events = get_soonest_events();
+
+	/*cout << current_events.size() << endl;
+	float gc = 0;
+	for (auto e : current_events) {
+		if (e->is_garbage_collection_op()) {
+			gc++;
+		}
+	}
+	printf("%d\t%f\t%f", current_events.size(), gc, gc / (float)current_events.size());
+*/
+
 	vector<Event*> read_transfers;
 	vector<Event*> noop_events;
 	vector<Event*> trims;

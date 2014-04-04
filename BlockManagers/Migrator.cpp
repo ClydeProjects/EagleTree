@@ -5,7 +5,8 @@ Migrator::Migrator() :
 		scheduler(NULL), bm(NULL), gc(NULL), wl(NULL), ftl(NULL), ssd(NULL), page_copy_back_count(),
 		num_blocks_being_garbaged_collected_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 		blocks_being_garbage_collected(),
-		num_erases_scheduled_per_package(SSD_SIZE)
+		num_erases_scheduled_per_package(SSD_SIZE),
+		dependent_gc()
 {}
 
 Migrator::~Migrator() {
@@ -330,6 +331,185 @@ void Migrator::register_copy_back_operation_on(uint logical_address) {
 void Migrator::register_ECC_check_on(uint logical_address) {
 	page_copy_back_count.erase(logical_address);
 }
+
+vector<deque<Event*> > Migrator::migrate2(Event* gc_event) {
+	Address a = gc_event->get_address();
+	vector<deque<Event*> > migrations;
+
+	if (how_many_gc_operations_are_scheduled() >= MAX_CONCURRENT_GC_OPS) {
+		return migrations;
+	}
+
+	/*bool scheduled_erase_successfully = schedule_queued_erase(a);
+	if (scheduled_erase_successfully) {
+		return migrations;
+	}*/
+
+	int die_id = a.valid >= DIE ? a.die : UNDEFINED;
+	int package_id = a.valid >= PACKAGE ? a.package : UNDEFINED;
+
+	bool is_wear_leveling_op = gc_event->is_wear_leveling_op();
+
+	Block * victim;
+	if (is_wear_leveling_op) {
+		victim = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
+	}
+	else {
+		victim = gc->choose_gc_victim(package_id, die_id, gc_event->get_age_class());
+	}
+
+	StatisticsGatherer::get_global_instance()->register_scheduled_gc(*gc_event);
+
+	if (victim == NULL) {
+		StatisticsGatherer::get_global_instance()->num_gc_cancelled_no_candidate++;
+		return migrations;
+	}
+
+	if (bm->get_num_pages_available_for_new_writes() < victim->get_pages_valid()) {
+		StatisticsGatherer::get_global_instance()->num_gc_cancelled_not_enough_free_space++;
+		return migrations;
+	}
+
+	Address addr = Address(victim->get_physical_address(), BLOCK);
+
+	if (num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die] >= 1) {
+		StatisticsGatherer::get_global_instance()->num_gc_cancelled_gc_already_happening++;
+		return migrations;
+	}
+
+	/*if (blocks_being_wl.count(victim) == 1) {
+		return migrations;
+	}*/
+
+	if (is_wear_leveling_op && !wl->schedule_wear_leveling_op(victim)) {
+		return migrations;
+	}
+
+	gc->remove_as_gc_candidate(addr);
+
+	blocks_being_garbage_collected[victim->get_physical_address()] = victim->get_pages_valid();
+	num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die]++;
+
+	if (PRINT_LEVEL > 1) {
+		printf("num gc operations in (%d %d) : %d  ", addr.package, addr.die, num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die]);
+		printf("Triggering GC in %ld    time: %f  ", victim->get_physical_address(), gc_event->get_current_time()); addr.print(); printf(". Migrating %d \n", victim->get_pages_valid());
+		printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
+		for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
+			printf("%d  ", (*iter).first);
+		}
+		printf("\n");
+	}
+
+	assert(victim->get_state() != FREE);
+	assert(victim->get_state() != PARTIALLY_FREE);
+
+	bm->subtract_from_available_for_new_writes(victim->get_pages_valid());
+	//printf("num_available_pages_for_new_writes:  %d\n", num_available_pages_for_new_writes);
+
+	//deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
+	StatisticsGatherer::get_global_instance()->register_executed_gc(*gc_event, *victim);
+	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
+	//PRINT_LEVEL = 1;
+	for (uint i = 0; i < BLOCK_SIZE; i++) {
+		if (victim->get_page(i).get_state() == VALID) {
+
+			Address addr = Address(victim->get_physical_address(), PAGE);
+			addr.page = i;
+			long logical_address = ftl->get_logical_address(addr.get_linear_address());
+
+			deque<Event*> migration;
+
+			// If a copy back is allowed, and a target page could be reserved, do it. Otherwise, just do a traditional and more expensive READ - WRITE garbage collection
+			if (copy_back_allowed_on(logical_address)) {
+
+				Event* read_command = new Event(READ_COMMAND, logical_address, 1, gc_event->get_start_time());
+				read_command->set_address(addr);
+				read_command->set_garbage_collection_op(true);
+				read_command->set_copyback(true);
+
+				Event* copy_back = new Event(COPY_BACK, logical_address, 1, gc_event->get_start_time());
+				copy_back->set_replace_address(addr);
+				copy_back->set_garbage_collection_op(true);
+				copy_back->set_copyback(true);
+
+				migration.push_back(read_command);
+				migration.push_back(copy_back);
+				register_copy_back_operation_on(logical_address);
+				//printf("COPY_BACK MAP (Size: %d):\n", page_copy_back_count.size()); for (map<long, uint>::iterator it = page_copy_back_count.begin(); it != page_copy_back_count.end(); it++) printf(" lba %d\t: %d\n", it->first, it->second);
+			} else {
+				Event* read = new Event(READ, logical_address, 1, gc_event->get_current_time());
+				read->set_address(addr);
+				read->set_garbage_collection_op(true);
+
+				Event* write = new Event(WRITE, logical_address, 1, gc_event->get_current_time());
+				write->set_garbage_collection_op(true);
+				write->set_replace_address(addr);
+
+				if (is_wear_leveling_op) {
+					read->set_wear_leveling_op(true);
+					write->set_wear_leveling_op(true);
+				}
+
+				migration.push_back(read);
+				migration.push_back(write);
+
+				//register_ECC_check_on(logical_address); // An ECC check happens in a normal read-write GC operation
+			}
+
+			long block_id = addr.get_block_id();
+			if (dependent_gc.count(block_id) == 0) {
+				migrations.push_back(migration);
+				dependent_gc[block_id] = vector<deque<Event* > >();
+			}
+			else {
+				dependent_gc[block_id].push_back(migration);
+			}
+		}
+	}
+	//if (cb_migrations.size() > 0) migrations.push_back(cb_migrations);
+	//StateVisualiser::pr
+	return migrations;
+}
+
+void Migrator::print_pending_migrations() {
+	for (auto block : dependent_gc) {
+		cout << block.first << endl;
+		for (auto migration : block.second) {
+			migration[0]->get_address().print();
+			cout << endl;
+		}
+	}
+}
+
+bool Migrator::more_migrations(Event * gc_read) {
+	int block_id = gc_read->get_address().get_block_id();
+	return dependent_gc.count(block_id) == 1;
+}
+
+deque<Event*> Migrator::trigger_next_migration(Event * gc_read) {
+	int block_id = gc_read->get_address().get_block_id();
+	/*if (gc_read->get_address().get_block_id() == 31) {
+		cout << dependent_gc[block_id].size() << endl;
+		int i = 0;
+		i++;
+	}*/
+
+
+	assert(dependent_gc.count(block_id) == 1);
+
+	deque<Event*> next_migration = dependent_gc[block_id].back();
+	dependent_gc[block_id].pop_back();
+
+	if (dependent_gc[block_id].size() == 0) {
+		dependent_gc.erase(block_id);
+	}
+
+
+	return next_migration;
+}
+
+
+
 
 /*bool Block_manager_parent::schedule_queued_erase(Address location) {
 	int package = location.package;

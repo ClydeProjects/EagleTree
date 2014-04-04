@@ -129,6 +129,7 @@ public:
 private:
 	void setup_structures(deque<Event*> events);
 	enum status execute_next(Event* event);
+	void trigger_next_migration(Event* event);
 	void execute_current_waiting_ios();
 	void handle_event(Event* event);
 	void handle_write(Event* event);
