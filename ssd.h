@@ -180,6 +180,8 @@ extern int WRITE_DEADLINE;
 extern int READ_DEADLINE;
 extern int READ_TRANSFER_DEADLINE;
 
+extern int FTL_DESIGN;
+
 /*
  * Controls the level of detail of output
  */
@@ -825,7 +827,7 @@ public:
 	virtual long get_logical_address(uint physical_address) const = 0;
 	virtual Address get_physical_address(uint logical_address) const = 0;
 	virtual void set_replace_address(Event& event) const = 0;
-	virtual void set_read_address(Event& event) = 0;
+	virtual void set_read_address(Event& event) const = 0;
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
@@ -853,7 +855,7 @@ public:
 	long get_logical_address(uint physical_address) const;
 	Address get_physical_address(uint logical_address) const;
 	void set_replace_address(Event& event) const;
-	void set_read_address(Event& event);
+	void set_read_address(Event& event) const;
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
@@ -867,6 +869,49 @@ private:
 	Address get_physical_address(Event const& event) const;
 	vector<long> logical_to_physical_map;
 	vector<long> physical_to_logical_map;
+};
+
+
+//
+class DFTL : public FtlParent {
+public:
+	DFTL(Ssd *ssd);
+	DFTL();
+	~DFTL();
+	void read(Event *event);
+	void write(Event *event);
+	void submit_or_translate(Event *event);
+	void trim(Event *event);
+	void register_write_completion(Event const& event, enum status result);
+	void register_read_completion(Event const& event, enum status result);
+	void register_trim_completion(Event & event);
+	long get_logical_address(uint physical_address) const;
+	Address get_physical_address(uint logical_address) const;
+	void set_replace_address(Event& event) const;
+	void set_read_address(Event& event) const;
+	void flush_mapping();
+private:
+
+	struct entry {
+		entry() : phys_addr(Address()), dirty(false), fixed(false), hotness(0) {}
+		Address phys_addr;
+		bool dirty;
+		bool fixed;
+		short hotness;
+	};
+
+	map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
+	vector<Address> global_translation_directory; // tracks where translation pages are
+
+	map<long, long> ongoing_mapping_operations; // maps IO id to the translation page id
+
+	map<long, vector<Event*> > application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
+
+	const int NUM_PAGES_IN_SSD;
+	FtlImpl_Page page_mapping;
+	const int CACHED_ENTRIES_THRESHOLD;
+	int num_dirty_cached_entries;
+	int dial;
 };
 
 /*class FtlImpl_DftlParent : public FtlParent

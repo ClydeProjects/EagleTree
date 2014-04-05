@@ -132,6 +132,12 @@ uint LOCALITY_PARALLEL_DEGREE = 0;
 // to clear more space in the die
 int GREED_SCALE = 2;
 
+/* FTL Design
+ * 0 -> Page FTL
+ * 1 -> DFTL
+ */
+int FTL_DESIGN = 0;
+
 /* Output level of detail:
  * 0 -> Nothing
  * 1 -> Semi-detailed

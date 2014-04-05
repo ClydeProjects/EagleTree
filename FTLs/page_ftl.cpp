@@ -100,7 +100,7 @@ void FtlImpl_Page::set_replace_address(Event& event) const {
 	event.set_replace_address(target);
 }
 
-void FtlImpl_Page::set_read_address(Event& event) {
+void FtlImpl_Page::set_read_address(Event& event) const {
 	Address target = get_physical_address(event);
 	if (target.valid == NONE) {
 		fprintf(stderr, "You are trying to read logical address %d, but this address does not have a corresponding physical page in the mapping table.\n", event.get_logical_address());

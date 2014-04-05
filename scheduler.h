@@ -109,7 +109,7 @@ public:
 	void init(Ssd*, FtlParent*, Block_manager_parent*, Migrator*);
 	void init();
 	void schedule_events_queue(deque<Event*> events);
-	void schedule_event(Event* events);
+	void schedule_event(Event* event);
 	bool is_empty();
 	void execute_soonest_events();
 	void handle(vector<Event*>& events);

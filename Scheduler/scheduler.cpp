@@ -694,6 +694,7 @@ void IOScheduler::trigger_next_migration(Event* event) {
 	dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
 	dependency_code_to_type[first->get_application_io_id()] = second->get_event_type(); // = WRITE for normal GC, COPY_BACK for copy backs
 	init_event(first);
+	first->incr_bus_wait_time(first->get_current_time() - event->get_current_time());
 	if (event->get_address().get_block_id() != first->get_address().get_block_id()) {
 		if (LBA_currently_executing.at(first->get_logical_address()) == first->get_application_io_id()) {
 			LBA_currently_executing.erase(first->get_logical_address());
