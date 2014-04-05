@@ -889,22 +889,25 @@ public:
 	Address get_physical_address(uint logical_address) const;
 	void set_replace_address(Event& event) const;
 	void set_read_address(Event& event) const;
-	void flush_mapping(double time);
-	void create_mapping_read(long translation_page_id, double time, Event* dependant);
+
 private:
 
 	struct entry {
-		entry() : phys_addr(Address()), dirty(false), fixed(false), hotness(0) {}
-		Address phys_addr;
+		entry() : dirty(false), fixed(false), hotness(0) {}
 		bool dirty;
 		bool fixed;
 		short hotness;
 	};
 
+	void flush_mapping(double time);
+	void iterate(long& victim_key, entry& victim_entry, map<long, entry>::iterator start, map<long, entry>::iterator finish);
+	void create_mapping_read(long translation_page_id, double time, Event* dependant);
+	void lock_all_entires_in_a_translation_page(long translation_page_id, bool lock);
+
 	map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
 	vector<Address> global_translation_directory; // tracks where translation pages are
 
-	map<long, long> ongoing_mapping_operations; // maps IO id to the translation page id
+	set<long> ongoing_mapping_operations; // contains the logical addresses of ongoing mapping IOs
 
 	map<long, vector<Event*> > application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
 
@@ -913,6 +916,7 @@ private:
 	const int CACHED_ENTRIES_THRESHOLD;
 	int num_dirty_cached_entries;
 	int dial;
+	const int ENTRIES_PER_TRANSLATION_PAGE;
 };
 
 /*class FtlImpl_DftlParent : public FtlParent
