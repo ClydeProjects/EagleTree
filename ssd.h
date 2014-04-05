@@ -889,7 +889,8 @@ public:
 	Address get_physical_address(uint logical_address) const;
 	void set_replace_address(Event& event) const;
 	void set_read_address(Event& event) const;
-	void flush_mapping();
+	void flush_mapping(double time);
+	void create_mapping_read(long translation_page_id, double time, Event* dependant);
 private:
 
 	struct entry {

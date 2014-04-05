@@ -76,10 +76,11 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 		e.fixed = false;
 		e.dirty = true;
 		if (++num_dirty_cached_entries == CACHED_ENTRIES_THRESHOLD) {
-			flush_mapping();
+			flush_mapping(event.get_current_time());
 		}
 		return;
 	}
+
 	// if write is a mapping IO that just finished
 	long translation_page_id = ongoing_mapping_operations[event.get_application_io_id()];
 	ongoing_mapping_operations.erase(event.get_application_io_id());
@@ -101,20 +102,14 @@ void DFTL::submit_or_translate(Event *event) {
 
 	// find which translation page is the logical address is on
 	long translation_page_id = la / BLOCK_SIZE;
-	Address physical_addr_of_translation_page = global_translation_directory[translation_page_id];
+
 
 	// There is an ongoing IO to get this translation page
 	if (application_ios_waiting_for_translation.count(translation_page_id) == 1) {
 		application_ios_waiting_for_translation[translation_page_id].push_back(event);
 	}
 	else {
-		Event* mapping_event = new Event(READ, NUM_PAGES_IN_SSD - translation_page_id, 1, event->get_current_time());
-		mapping_event->set_mapping_op(true);
-		mapping_event->set_address(physical_addr_of_translation_page);
-		application_ios_waiting_for_translation[translation_page_id] = vector<Event*>();
-		application_ios_waiting_for_translation[translation_page_id].push_back(event);
-		ongoing_mapping_operations[mapping_event->get_application_io_id()] = translation_page_id;
-		scheduler->schedule_event(mapping_event);
+		create_mapping_read(translation_page_id, event->get_current_time(), event);
 	}
 }
 
@@ -143,8 +138,19 @@ void DFTL::set_read_address(Event& event) const {
 
 }
 
+void DFTL::create_mapping_read(long translation_page_id, double time, Event* dependant) {
+	Event* mapping_event = new Event(READ, NUM_PAGES_IN_SSD - translation_page_id, 1, time);
+	mapping_event->set_mapping_op(true);
+	Address physical_addr_of_translation_page = global_translation_directory[translation_page_id];
+	mapping_event->set_address(physical_addr_of_translation_page);
+	application_ios_waiting_for_translation[translation_page_id] = vector<Event*>();
+	application_ios_waiting_for_translation[translation_page_id].push_back(dependant);
+	ongoing_mapping_operations[mapping_event->get_application_io_id()] = translation_page_id;
+	scheduler->schedule_event(mapping_event);
+}
+
 // Uses a clock entry replacement policy
-void DFTL::flush_mapping() {
+void DFTL::flush_mapping(double time) {
 
 	// start at a given location
 	// find first entry with hotness 0 and make that the target, or make full traversal and identify least hot entry
@@ -153,7 +159,7 @@ void DFTL::flush_mapping() {
 
 	for (auto it = cached_mapping_table.upper_bound(dial); it != cached_mapping_table.lower_bound(dial); ++it) {
 		entry e = (*it).second;
-		entry key = (*it).first;
+		long key = (*it).first;
 		if (e.dirty && e.hotness == 0 && !e.fixed) {
 			victim = key;
 			min_hotness = 0;
@@ -162,6 +168,7 @@ void DFTL::flush_mapping() {
 		else if (e.dirty && e.hotness < min_hotness && !e.fixed) {
 			victim = key;
 			min_hotness = e.hotness;
+			e.hotness--;
 		}
 	}
 	dial = victim;
@@ -183,11 +190,17 @@ void DFTL::flush_mapping() {
 		}
 	}
 
+	// create mapping write
+	Event* mapping_event = new Event(WRITE, NUM_PAGES_IN_SSD - translation_page_id, 1, time);
+	mapping_event->set_mapping_op(true);
+
 	if (are_all_mapping_entries_cached) {
-		// Yes
+		application_ios_waiting_for_translation[translation_page_id] = vector<Event*>();
+		ongoing_mapping_operations[mapping_event->get_application_io_id()] = translation_page_id;
+		scheduler->schedule_event(mapping_event);
 	}
 	else {
-		// issue mapping IO
+		create_mapping_read(translation_page_id, time, mapping_event);
 	}
 
 	// find translation page and first logical address in the translation page
