@@ -366,11 +366,9 @@ void IOScheduler::handle_flexible_read(Event* event) {
 void IOScheduler::handle_write(Event* event) {
 	Address addr = bm->choose_write_address(*event);
 
-	if (event->get_id() == 37632 && event->get_iteration_count() >= 66671) {
+	if (event->get_logical_address() == 4102) {
 		int i = 0;
 		i++;
-		migrator->print_pending_migrations();
-		//VisualTracer::print_horizontally(1000);
 	}
 	try_to_put_in_safe_cache(event);
 	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time(), WRITE);
@@ -508,18 +506,8 @@ enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd->issue(event);
 	assert(result == SUCCESS);
 
-	/*if (event->is_garbage_collection_op() && event->get_address().get_block_id() == 31) {
+	if (PRINT_LEVEL > 0 && !event->is_garbage_collection_op()) {
 		event->print();
-	}
-	if (event->get_event_type() == WRITE && event->is_garbage_collection_op() && event->get_replace_address().get_block_id() == 31) {
-		event->print();
-	}
-	if (event->get_event_type() == ERASE) {
-		event->print();
-	}*/
-
-	if (PRINT_LEVEL > 0 && event->is_garbage_collection_op()) {
-		//event->print();
 		if (event->is_flexible_read()) {
 			//printf("FLEX\n");
 		}
@@ -694,7 +682,7 @@ void IOScheduler::trigger_next_migration(Event* event) {
 	dependency_code_to_LBA[first->get_application_io_id()] = first->get_logical_address();
 	dependency_code_to_type[first->get_application_io_id()] = second->get_event_type(); // = WRITE for normal GC, COPY_BACK for copy backs
 	init_event(first);
-	first->incr_bus_wait_time(first->get_current_time() - event->get_current_time());
+	//first->incr_bus_wait_time(first->get_current_time() - event->get_current_time());
 	if (event->get_address().get_block_id() != first->get_address().get_block_id()) {
 		if (LBA_currently_executing.at(first->get_logical_address()) == first->get_application_io_id()) {
 			LBA_currently_executing.erase(first->get_logical_address());

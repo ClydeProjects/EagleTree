@@ -40,12 +40,6 @@ FtlImpl_Page::FtlImpl_Page() :
 FtlImpl_Page::~FtlImpl_Page(void)
 {}
 
-Address FtlImpl_Page::get_physical_address(Event const& event) const {
-	long la = event.get_logical_address();
-	long phys_addr = logical_to_physical_map[la];
-	return phys_addr == UNDEFINED ? Address() : Address(phys_addr, PAGE);
-}
-
 void FtlImpl_Page::read(Event *event)
 {
 	scheduler->schedule_event(event);
@@ -96,12 +90,12 @@ Address FtlImpl_Page::get_physical_address(uint logical_address) const {
 }
 
 void FtlImpl_Page::set_replace_address(Event& event) const {
-	Address target = get_physical_address(event);
+	Address target = get_physical_address(event.get_logical_address());
 	event.set_replace_address(target);
 }
 
 void FtlImpl_Page::set_read_address(Event& event) const {
-	Address target = get_physical_address(event);
+	Address target = get_physical_address(event.get_logical_address());
 	if (target.valid == NONE) {
 		fprintf(stderr, "You are trying to read logical address %d, but this address does not have a corresponding physical page in the mapping table.\n", event.get_logical_address());
 		fprintf(stderr, "It is most likely that nothing has been written to this address so far.\n");

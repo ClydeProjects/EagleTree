@@ -866,7 +866,7 @@ public:
     }
 
 private:
-	Address get_physical_address(Event const& event) const;
+
 	vector<long> logical_to_physical_map;
 	vector<long> physical_to_logical_map;
 };
@@ -880,7 +880,7 @@ public:
 	~DFTL();
 	void read(Event *event);
 	void write(Event *event);
-	void submit_or_translate(Event *event);
+
 	void trim(Event *event);
 	void register_write_completion(Event const& event, enum status result);
 	void register_read_completion(Event const& event, enum status result);
@@ -895,14 +895,16 @@ private:
 	struct entry {
 		entry() : dirty(false), fixed(false), hotness(0) {}
 		bool dirty;
-		bool fixed;
+		int fixed;
 		short hotness;
 	};
 
+	void submit_or_translate(Event *event);
 	void flush_mapping(double time);
 	void iterate(long& victim_key, entry& victim_entry, map<long, entry>::iterator start, map<long, entry>::iterator finish);
 	void create_mapping_read(long translation_page_id, double time, Event* dependant);
-	void lock_all_entires_in_a_translation_page(long translation_page_id, bool lock);
+	void lock_all_entries_in_a_translation_page(long translation_page_id, int lock);
+	int evict_cold_entries();
 
 	map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
 	vector<Address> global_translation_directory; // tracks where translation pages are
