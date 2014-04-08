@@ -828,6 +828,7 @@ public:
 	virtual Address get_physical_address(uint logical_address) const = 0;
 	virtual void set_replace_address(Event& event) const = 0;
 	virtual void set_read_address(Event& event) const = 0;
+	virtual void print() const {};
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
@@ -889,22 +890,24 @@ public:
 	Address get_physical_address(uint logical_address) const;
 	void set_replace_address(Event& event) const;
 	void set_read_address(Event& event) const;
-
+	void print() const;
 private:
 
 	struct entry {
-		entry() : dirty(false), fixed(false), hotness(0) {}
+		entry() : dirty(false), fixed(false), hotness(0), timestamp(numeric_limits<double>::infinity()) {}
 		bool dirty;
 		int fixed;
 		short hotness;
+		double timestamp; // when was the entry added to the cache
 	};
 
 	void submit_or_translate(Event *event);
 	void flush_mapping(double time);
 	void iterate(long& victim_key, entry& victim_entry, map<long, entry>::iterator start, map<long, entry>::iterator finish);
 	void create_mapping_read(long translation_page_id, double time, Event* dependant);
-	void lock_all_entries_in_a_translation_page(long translation_page_id, int lock);
+	void lock_all_entries_in_a_translation_page(long translation_page_id, int lock, double time);
 	int evict_cold_entries();
+
 
 	map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
 	vector<Address> global_translation_directory; // tracks where translation pages are

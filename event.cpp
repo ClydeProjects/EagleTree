@@ -126,7 +126,8 @@ void Event::print(FILE *stream) const
 	}
 	if (garbage_collection_op) {
 		fprintf(stream, " GC");
-	} else if (mapping_op)  {
+	}
+	if (mapping_op)  {
 		fprintf(stream, " MAPPING");
 	}
 	if (wear_leveling_op) {
