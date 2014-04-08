@@ -23,6 +23,8 @@ StatisticsGatherer::StatisticsGatherer()
 	  num_gc_cancelled_gc_already_happening(0),
 	  bus_wait_time_for_reads_per_LUN(SSD_SIZE, vector<vector<double> >(PACKAGE_SIZE, vector<double>())),
 	  num_reads_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
+	  num_mapping_reads_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
+	  num_mapping_writes_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  bus_wait_time_for_writes_per_LUN(SSD_SIZE, vector<vector<double> >(PACKAGE_SIZE, vector<double>())),
 	  num_writes_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 	  num_gc_reads_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
@@ -100,12 +102,17 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 			sum_gc_wait_time_per_LUN[a.package][a.die] += event.get_latency();
 			gc_wait_time_per_LUN[a.package][a.die].push_back(event.get_latency());
 		}
+		else if (event.is_mapping_op()) {
+			num_mapping_writes_per_LUN[a.package][a.die]++;
+		}
 	} else if (event.get_event_type() == READ_TRANSFER) {
 		if (event.is_original_application_io()) {
 			bus_wait_time_for_reads_per_LUN[a.package][a.die].push_back(event.get_latency());
 			num_reads_per_LUN[a.package][a.die]++;
 		} else if (event.is_garbage_collection_op()) {
 			num_gc_reads_per_LUN[a.package][a.die]++;
+		} else if (event.is_mapping_op()) {
+			num_mapping_reads_per_LUN[a.package][a.die]++;
 		}
 	} else if (event.get_event_type() == ERASE) {
 		num_erases_per_LUN[a.package][a.die]++;
@@ -387,6 +394,33 @@ void StatisticsGatherer::print() {
 
 	double queue_length = get_average(queue_length_tracker);
 	printf("avg queue length: %f\n", queue_length);
+	printf("\n\n");
+}
+
+void StatisticsGatherer::print_mapping_info() {
+	int all_mapping_reads = get_sum(num_mapping_reads_per_LUN);
+	if (all_mapping_reads == 0) {
+		return;
+	}
+
+	printf("\n\t");
+	printf("map writes\t");
+	printf("map reads\t");
+	printf("\n");
+
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			printf("C%d D%d\t", i, j);
+			printf("%d\t\t", num_mapping_writes_per_LUN[i][j]);
+			printf("%d\t\t", num_mapping_reads_per_LUN[i][j]);
+			printf("\n");
+		}
+	}
+
+	printf("\nTotals:\t");
+
+	printf("%d\t\t", (int) get_sum(num_mapping_writes_per_LUN));
+	printf("%d\t\t", (int) all_mapping_reads);
 	printf("\n\n");
 }
 

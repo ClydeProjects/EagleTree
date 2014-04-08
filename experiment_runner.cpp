@@ -98,7 +98,7 @@ void Experiment::run_single_point(string name) {
 	Queue_Length_Statistics::init();
 
 	OperatingSystem* os = calibration_file.empty() ? new OperatingSystem() : load_state(calibration_file);
-
+	os->set_progress_meter_granularity(20);
 	if (workload != NULL) {
 		vector<Thread*> experiment_threads = workload->generate_instance();
 		os->set_threads(experiment_threads);
@@ -107,6 +107,7 @@ void Experiment::run_single_point(string name) {
 	os->run();
 
 	StatisticsGatherer::get_global_instance()->print();
+	StatisticsGatherer::get_global_instance()->print_mapping_info();
 	//StatisticsGatherer::get_global_instance()->print_gc_info();
 	Utilization_Meter::print();
 	//Individual_Threads_Statistics::print();

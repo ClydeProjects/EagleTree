@@ -1185,6 +1185,7 @@ public:
 	void print();
 	void print_simple(FILE* file = stdout);
 	void print_gc_info();
+	void print_mapping_info();
 	void print_csv();
 	inline double get_wait_time_histogram_bin_size() { return wait_time_histogram_bin_size; }
 
@@ -1221,6 +1222,9 @@ private:
 
 	vector<vector<vector<double> > > bus_wait_time_for_reads_per_LUN;
 	vector<vector<uint> > num_reads_per_LUN;
+
+	vector<vector<uint> > num_mapping_reads_per_LUN;
+	vector<vector<uint> > num_mapping_writes_per_LUN;
 
 	vector<vector<vector<double> > > bus_wait_time_for_writes_per_LUN;
 	vector<vector<uint> > num_writes_per_LUN;
