@@ -13,10 +13,10 @@ DFTL::DFTL(Ssd *ssd) :
 		application_ios_waiting_for_translation(),
 		NUM_PAGES_IN_SSD(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE),
 		page_mapping(FtlImpl_Page(ssd)),
-		CACHED_ENTRIES_THRESHOLD(1000),
+		CACHED_ENTRIES_THRESHOLD(DFTL_CACHE_SIZE),
 		num_dirty_cached_entries(0),
 		dial(0),
-		ENTRIES_PER_TRANSLATION_PAGE(512)
+		ENTRIES_PER_TRANSLATION_PAGE(DFTL_ENTRIES_PER_TRANSLATION_PAGE)
 {}
 
 DFTL::DFTL() :
@@ -30,34 +30,45 @@ DFTL::~DFTL(void)
 
 void DFTL::read(Event *event)
 {
+	//PRINT_LEVEL = 1;
+	long la = event->get_logical_address();
+	// If the logical address is in the cached mapping table, submit the IO
+	if (cached_mapping_table.count(la) == 1) {
+		entry& e = cached_mapping_table.at(la);
+		e.hotness++;
+		scheduler->schedule_event(event);
+		return;
+	}
 
+	// find which translation page is the logical address is on
+	long translation_page_id = la / ENTRIES_PER_TRANSLATION_PAGE;
 
-	submit_or_translate(event);
+	// If the mapping entry does not exist in cache and there is no translation page in flash, cancel the read
+	if (global_translation_directory[translation_page_id].valid == NONE) {
+		event->set_noop(true);
+		return;
+	}
+
+	// If there is no mapping IO currently targeting the translation page, create on. Otherwise, invoke current event when ongoing mapping IO finishes.
+	if (ongoing_mapping_operations.count(NUM_PAGES_IN_SSD - translation_page_id) == 1) {
+		application_ios_waiting_for_translation[translation_page_id].push_back(event);
+	}
+	else {
+		//printf("creating mapping read %d for app write %d\n", translation_page_id, event->get_logical_address());
+		create_mapping_read(translation_page_id, event->get_current_time(), event);
+	}
 }
 
 void DFTL::register_read_completion(Event const& event, enum status result) {
-
-	if (event.get_id() == 183922) {
-		int i = 0;
-		i++;
-	}
-
-	if (event.is_mapping_op()) {
-		//event.print();
-	}
-
 	// if normal application read, do nothing
 	if (ongoing_mapping_operations.count(event.get_logical_address()) == 0) {
 		return;
 	}
 	// If mapping read
-
 	ongoing_mapping_operations.erase(event.get_logical_address());
 
 	// identify translation page we finished reading
 	long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
-
-	//printf("finished mapping read %d\n", translation_page_id);
 
 	// Insert all entries into cached mapping table with hotness 0
 	for (int i = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE; i < (translation_page_id + 1) * ENTRIES_PER_TRANSLATION_PAGE; i++) {
@@ -70,12 +81,6 @@ void DFTL::register_read_completion(Event const& event, enum status result) {
 	vector<Event*> waiting_events = application_ios_waiting_for_translation[translation_page_id];
 	application_ios_waiting_for_translation.erase(translation_page_id);
 	for (auto e : waiting_events) {
-
-		if (e->get_id() == 961955) {
-			int i = 0;
-			i++;
-		}
-
 		if (e->is_mapping_op()) {
 			if (ongoing_mapping_operations.count(e->get_logical_address()) == 1) {
 				assert(false);
@@ -87,10 +92,6 @@ void DFTL::register_read_completion(Event const& event, enum status result) {
 			ongoing_mapping_operations.insert(e->get_logical_address());
 		}
 		else if (e->get_event_type() == WRITE) {
-			if (e->get_id() == 1878368) {
-				int i = 0;
-				i++;
-			}
 			assert(cached_mapping_table.count(e->get_logical_address()) == 1);
 			entry& en = cached_mapping_table.at(e->get_logical_address());
 			en.hotness++;
@@ -104,7 +105,6 @@ void DFTL::register_read_completion(Event const& event, enum status result) {
 			entry& en = cached_mapping_table.at(e->get_logical_address());
 			en.hotness++;
 		}
-		// TODO: set physical address for this IO
 		scheduler->schedule_event(e);
 	}
 
@@ -124,16 +124,6 @@ void DFTL::write(Event *event)
 {
 	long la = event->get_logical_address();
 
-	if (event->get_id() == 1878368) {
-		int i = 0;
-		i++;
-	}
-
-	if (event->get_logical_address() == 182273) {
-		int i = 0;
-		i++;
-	}
-
 	// If the logical address is in the cached mapping table, submit the IO
 	if (cached_mapping_table.count(la) == 1) {
 		entry& e = cached_mapping_table.at(la);
@@ -151,10 +141,6 @@ void DFTL::write(Event *event)
 		entry e;
 		e.fixed = 1;
 		e.hotness = 1;
-		if (la == 261972) {
-			int i = 0;
-			i++;
-		}
 		cached_mapping_table[la] = e;
 		scheduler->schedule_event(event);
 		return;
@@ -172,20 +158,6 @@ void DFTL::write(Event *event)
 
 void DFTL::register_write_completion(Event const& event, enum status result) {
 	page_mapping.register_write_completion(event, result);
-
-	if (event.is_mapping_op()) {
-		//event.print();
-	}
-
-	if (event.get_id() == 1878368) {
-		int i = 0;
-		i++;
-	}
-
-	if (event.get_logical_address() == 182273) {
-		int i = 0;
-		i++;
-	}
 
 	// assume that the logical address of a GCed page is in the out of bound area of the page, so we can use it to update the mapping
 	if (event.is_garbage_collection_op() && !event.is_original_application_io()) {
@@ -211,11 +183,6 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 			assert(false);
 		}
 		entry& e = cached_mapping_table.at(event.get_logical_address());
-
-		if (event.get_logical_address() == 44584) {
-			int i = 0;
-			i++;
-		}
 		e.fixed = 0;
 		e.dirty = true;
 		e.timestamp = event.get_current_time();
@@ -231,12 +198,6 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 	long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
 
 	//printf("finished mapping write %d\n", translation_page_id);
-
-	if (translation_page_id == 356) {
-		int i = 0;
-		i++;
-	}
-
 	global_translation_directory[translation_page_id] = event.get_address();
 
 	// mark all pages included as clean
@@ -253,10 +214,6 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 	vector<Event*> waiting_events = application_ios_waiting_for_translation[translation_page_id];
 	application_ios_waiting_for_translation.erase(translation_page_id);
 	for (auto e : waiting_events) {
-		if (e->get_id() == 1878368) {
-			int i = 0;
-			i++;
-		}
 		if (e->get_event_type() == READ) {
 			read(e);
 		} else {
@@ -266,40 +223,10 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 }
 
 
-
-void DFTL::submit_or_translate(Event *event) {
-	long la = event->get_logical_address();
-	// If the logical address is in the cached mapping table, submit the IO
-	if (cached_mapping_table.count(la) == 1) {
-		entry& e = cached_mapping_table.at(la);
-		e.hotness++;
-		scheduler->schedule_event(event);
-
-		return;
-	}
-
-	// find which translation page is the logical address is on
-	long translation_page_id = la / ENTRIES_PER_TRANSLATION_PAGE;
-
-	// does this translation page exist? If not (because the SSD is new) just create an entry in the cached mapping table
-	if (global_translation_directory[translation_page_id].valid == NONE) {
-		cached_mapping_table[la] = entry();
-		cached_mapping_table[la].hotness++;
-		return;
-	}
-
-	// If there is no mapping IO currently targeting the translation page, create on. Otherwise, invoke current event when ongoing mapping IO finishes.
-	if (application_ios_waiting_for_translation.count(translation_page_id) == 1) {
-		application_ios_waiting_for_translation[translation_page_id].push_back(event);
-	}
-	else {
-		create_mapping_read(translation_page_id, event->get_current_time(), event);
-	}
-}
-
 void DFTL::trim(Event *event)
 {
-
+	// For now we don't handle trims for DFTL
+	assert(false);
 }
 
 void DFTL::register_trim_completion(Event & event) {
@@ -355,11 +282,6 @@ void DFTL::lock_all_entries_in_a_translation_page(long translation_page_id, int 
 		long curr_key = (*it).first;
 		entry& e = (*it).second;
 
-		if (curr_key == 8596 && time > 100458980) {
-			int i = 0;
-			i++;
-		}
-
 		if (lock == 1 && e.timestamp <= time && e.fixed == 0 && e.dirty) {
 			e.fixed++;
 		}
@@ -407,18 +329,6 @@ int DFTL::evict_cold_entries() {
 
 void DFTL::create_mapping_read(long translation_page_id, double time, Event* dependant) {
 	Event* mapping_event = new Event(READ, NUM_PAGES_IN_SSD - translation_page_id, 1, time);
-
-	if (mapping_event->get_id() == 186783) {
-		int i = 0;
-		i++;
-	}
-
-	if (mapping_event->get_id() == 186789) {
-
-		int i = 0;
-		i++;
-	}
-
 	mapping_event->set_mapping_op(true);
 	Address physical_addr_of_translation_page = global_translation_directory[translation_page_id];
 	mapping_event->set_address(physical_addr_of_translation_page);
@@ -483,12 +393,6 @@ void DFTL::flush_mapping(double time) {
 		return;
 	}
 
-
-
-
-
-
-
 	// create mapping write
 	Event* mapping_event = new Event(WRITE, NUM_PAGES_IN_SSD - translation_page_id, 1, time);
 	mapping_event->set_mapping_op(true);
@@ -507,12 +411,6 @@ void DFTL::flush_mapping(double time) {
 	long first_key_in_translation_page = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE;
 	bool are_all_mapping_entries_cached = cached_mapping_table.count(first_key_in_translation_page) == 1 &&
 			cached_mapping_table.count(first_key_in_translation_page + ENTRIES_PER_TRANSLATION_PAGE) == 1;
-
-	if (translation_page_id == 356) {
-		int i = 0;
-		i++;
-		//print_cache();
-	}
 
 	long last_addr = first_key_in_translation_page;
 	for (auto it = cached_mapping_table.find(first_key_in_translation_page);
@@ -535,9 +433,6 @@ void DFTL::flush_mapping(double time) {
 		//printf("submitting mapping read, since not all entries are in RAM %d\n", translation_page_id);
 		create_mapping_read(translation_page_id, time, mapping_event);
 	}
-
-	// find translation page and first logical address in the translation page
-
 }
 
 // used for debugging
@@ -548,15 +443,9 @@ void DFTL::print() const {
 	}
 
 	for (auto i : application_ios_waiting_for_translation) {
-
 		for (auto e : i.second) {
 			printf("waiting for %i", i.first);
-
 			e->print();
 		}
-
 	}
-
-
-
 }

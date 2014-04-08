@@ -146,6 +146,7 @@ void IOScheduler::execute_soonest_events() {
 		update_current_events(current_time);
 		current_time = get_current_time();
 	}
+
 }
 
 // this is used to signal the SSD object when all events have finished executing
@@ -726,12 +727,6 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	if (existing_event == NULL) {
 		existing_event = overdue_events->find(dependency_code_of_other_event);
 	}
-
-	/*if (new_event->get_logical_address() == 7486) {
-		int i = 0;
-		i++;
-	}*/
-
 	//bool both_events_are_gc = new_event->is_garbage_collection_op() && existing_event->is_garbage_collection_op();
 	//assert(!both_events_are_gc);
 

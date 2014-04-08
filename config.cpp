@@ -138,6 +138,11 @@ int GREED_SCALE = 2;
  */
 int FTL_DESIGN = 0;
 
+// The number of entries that fit into the in-RAM cache of DFTL
+int DFTL_CACHE_SIZE = 10000;
+// The number of entries that fit into one flash translation page in DFTL
+int DFTL_ENTRIES_PER_TRANSLATION_PAGE = 512;
+
 /* Output level of detail:
  * 0 -> Nothing
  * 1 -> Semi-detailed

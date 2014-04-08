@@ -182,6 +182,11 @@ extern int READ_TRANSFER_DEADLINE;
 
 extern int FTL_DESIGN;
 
+// The number of entries that fit into the in-RAM cache of DFTL
+extern int DFTL_CACHE_SIZE;
+// The number of entries that fit into one flash translation page in DFTL
+extern int DFTL_ENTRIES_PER_TRANSLATION_PAGE;
+
 /*
  * Controls the level of detail of output
  */
@@ -901,7 +906,6 @@ private:
 		double timestamp; // when was the entry added to the cache
 	};
 
-	void submit_or_translate(Event *event);
 	void flush_mapping(double time);
 	void iterate(long& victim_key, entry& victim_entry, map<long, entry>::iterator start, map<long, entry>::iterator finish);
 	void create_mapping_read(long translation_page_id, double time, Event* dependant);
