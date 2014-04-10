@@ -257,19 +257,6 @@ enum status{FAILURE, SUCCESS};
 enum address_valid{NONE, PACKAGE, DIE, PLANE, BLOCK, PAGE};
 
 /*
- * Block type status
- * used for the garbage collector specify what pool
- * it should work with.
- * the block types are log, data and map (Directory map usually)
- */
-enum block_type {LOG, DATA, LOG_SEQ};
-
-/*
- * Enumeration of the different FTL implementations.
- */
-enum ftl_implementation {IMPL_PAGE, IMPL_BAST, IMPL_FAST, IMPL_DFTL, IMPL_BIMODAL};
-
-/*
  * Enumeration of page access patterns
  */
 enum write_hotness {WRITE_HOT, WRITE_COLD};
@@ -927,118 +914,6 @@ private:
 	int dial;
 	const int ENTRIES_PER_TRANSLATION_PAGE;
 };
-
-/*class FtlImpl_DftlParent : public FtlParent
-{
-public:
-	FtlImpl_DftlParent(Ssd &ssd);
-	~FtlImpl_DftlParent();
-	virtual void read(Event *event) = 0;
-	virtual void write(Event *event) = 0;
-	virtual void trim(Event *event) = 0;
-protected:
-	struct MPage {
-		long vpn;
-		long ppn;
-		double create_ts;		//when its added to the CTM
-		double modified_ts;		//when its modified within the CTM
-		bool cached;
-		MPage(long vpn);
-		bool has_been_modified();
-	};
-
-	long int cmt;
-
-	static double mpage_modified_ts_compare(const MPage& mpage);
-
-	typedef boost::multi_index_container<
-		FtlImpl_DftlParent::MPage,
-			boost::multi_index::indexed_by<
-		    // sort by MPage::operator<
-    			boost::multi_index::random_access<>,
-
-    			// Sort by modified ts
-    			boost::multi_index::ordered_non_unique<boost::multi_index::global_fun<const FtlImpl_DftlParent::MPage&,double,&FtlImpl_DftlParent::mpage_modified_ts_compare> >
-		  >
-		> trans_set;
-
-	typedef trans_set::nth_index<0>::type MpageByID;
-	typedef trans_set::nth_index<1>::type MpageByModified;
-	trans_set trans_map;
-	long *reverse_trans_map;
-
-	void consult_GTD(long dppn, Event *event);
-	void reset_MPage(FtlImpl_DftlParent::MPage &mpage);
-	void resolve_mapping(Event *event, bool isWrite);
-	void update_translation_map(FtlImpl_DftlParent::MPage &mpage, long ppn);
-	bool lookup_CMT(long dlpn, Event *event);
-	void evict_page_from_cache(double time);
-	long get_logical_address(uint physical_address) const;
-	long get_mapping_virtual_address(long event_lba);
-	void update_mapping_on_flash(long lba, double time);
-	void remove_from_cache(long lba);
-
-	// Mapping information
-	const int addressSize;
-	const int addressPerPage;
-	const int num_mapping_pages;
-	const uint totalCMTentries;
-
-	deque<Event*> current_dependent_events;
-	map<long, long> global_translation_directory; // a map from virtual translation pages to physical translation pages
-	map<long, vector<long> > ongoing_mapping_reads; // maps the address of ongoing mapping reads to LBAs that need to be inserted into the cache
-
-	long num_pages_written;
-};
-*/
-/*class FtlImpl_Dftl : public FtlImpl_DftlParent
-{
-public:
-	FtlImpl_Dftl(Ssd &ssd);
-	~FtlImpl_Dftl();
-	void read(Event *event);
-	void write(Event *event);
-	void trim(Event *event);
-	void register_write_completion(Event const& event, enum status result);
-	void register_read_completion(Event const& event, enum status result);
-	void register_trim_completion(Event & event);
-	void set_replace_address(Event& event) const;
-	void set_read_address(Event& event);
-private:
-	const double over_provisioning_percentage;
-};*/
-
-/*class FtlImpl_BDftl : public FtlImpl_DftlParent
-{
-public:
-	FtlImpl_BDftl(Controller &controller);
-	~FtlImpl_BDftl();
-	enum status read(Event &event);
-	enum status write(Event &event);
-	enum status trim(Event &event);
-	void cleanup_block(Event &event, Block *block);
-private:
-	struct BPage {
-		uint pbn;
-		unsigned char nextPage;
-		bool optimal;
-
-		BPage();
-	};
-
-	BPage *block_map;
-	bool *trim_map;
-
-	queue<Block*> blockQueue;
-
-	Block* inuseBlock;
-	bool block_next_new();
-	long get_free_biftl_page(Event &event);
-	void print_ftl_statistics();
-};
-*/
-
-
 
 /* The SSD is the single main object that will be created to simulate a real
  * SSD.  Creating a SSD causes all other objects in the SSD to be created.  The
