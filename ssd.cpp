@@ -49,14 +49,18 @@ Ssd::Ssd():
 		}
 	}*/
 
+	Block_manager_parent* bm = Block_manager_parent::get_new_instance();
+
 	if (FTL_DESIGN == 0) {
 		ftl = new FtlImpl_Page(this);
-	} else {
+	} else if (FTL_DESIGN == 1) {
 		ftl = new DFTL(this);
+	} else {
+		ftl = new FAST(this, bm);
 	}
 
+
 	scheduler = new IOScheduler();
-	Block_manager_parent* bm = Block_manager_parent::get_new_instance();
 
 	Free_Space_Meter::init();
 	Free_Space_Per_LUN_Meter::init();

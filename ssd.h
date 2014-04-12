@@ -357,6 +357,11 @@ public:
 		valid = rhs.valid;
 		return *this;
 	}
+
+	bool operator<(const Address &rhs) const {
+		return this->get_linear_address() < rhs.get_linear_address();
+	}
+
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
@@ -883,14 +888,37 @@ public:
 	void set_replace_address(Event& event) const;
 	void set_read_address(Event& event) const;
 	void print() const;
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & boost::serialization::base_object<FtlParent>(*this);
+    	ar & cached_mapping_table;
+    	ar & global_translation_directory;
+    	ar & ongoing_mapping_operations;
+    	ar & application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
+    	ar & NUM_PAGES_IN_SSD;
+    	ar & page_mapping;
+    	ar & CACHED_ENTRIES_THRESHOLD;
+    	ar & num_dirty_cached_entries;
+    	ar & dial;
+    	ar & ENTRIES_PER_TRANSLATION_PAGE;
+    }
 private:
-
 	struct entry {
 		entry() : dirty(false), fixed(false), hotness(0), timestamp(numeric_limits<double>::infinity()) {}
 		bool dirty;
 		int fixed;
 		short hotness;
 		double timestamp; // when was the entry added to the cache
+	    /*friend class boost::serialization::access;
+	    template<class Archive> void
+	    serialize(Archive & ar, const unsigned int version) {
+	    	ar & dirty;
+	    	ar & fixed;
+	    	ar & hotness;
+	    	ar & timestamp;
+	    }*/
 	};
 
 	void flush_mapping(double time);
@@ -913,6 +941,45 @@ private:
 	int num_dirty_cached_entries;
 	int dial;
 	const int ENTRIES_PER_TRANSLATION_PAGE;
+};
+
+class FAST : public FtlParent {
+public:
+	FAST(Ssd *ssd, Block_manager_parent* bm);
+	FAST();
+	~FAST();
+	void read(Event *event);
+	void write(Event *event);
+	void trim(Event *event);
+	void register_write_completion(Event const& event, enum status result);
+	void register_read_completion(Event const& event, enum status result);
+	void register_trim_completion(Event & event);
+	long get_logical_address(uint physical_address) const;
+	Address get_physical_address(uint logical_address) const;
+	void set_replace_address(Event& event) const;
+	void set_read_address(Event& event) const;
+	void print() const;
+private:
+	void schedule(Event* e);
+	void choose_existing_log_block(Event* e);
+	vector<Address> translation_table;		  // maps block ID to a block address in flash. This is the main mapping table
+
+	struct log_block {
+		log_block(Address& addr) : addr(addr), num_blocks_mapped_inside() {}
+		Address addr;
+		vector<int> num_blocks_mapped_inside;
+	};
+
+	map<int, log_block*> active_log_blocks_map;  // Maps a block ID to the address of the corresponding log block. Used to quickly determine where to place an update
+
+	int dial;
+	const int NUM_LOG_BLOCKS;
+	int num_active_log_blocks;
+	Block_manager_parent* bm;
+	//map<Address, Event*> event_retainer;  // Used when the page being written
+	map<long, Address> logical_addresses_to_pages_in_log_blocks;  // a RAM map from location of a logged page
+
+	map<int, map<int, queue<Event*> > > queued_events; // stores events tar
 };
 
 /* The SSD is the single main object that will be created to simulate a real

@@ -135,6 +135,7 @@ int GREED_SCALE = 2;
 /* FTL Design
  * 0 -> Page FTL
  * 1 -> DFTL
+ * 2 -> FAST
  */
 int FTL_DESIGN = 0;
 
@@ -248,8 +249,8 @@ void set_small_SSD_config() {
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 8;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 128;
-	BLOCK_SIZE = 64;
+	PLANE_SIZE = 64;
+	BLOCK_SIZE = 16;
 
 	PAGE_READ_DELAY = 115;
 	PAGE_WRITE_DELAY = 1600;

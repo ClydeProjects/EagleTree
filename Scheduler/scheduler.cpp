@@ -130,6 +130,7 @@ void IOScheduler::execute_soonest_events() {
 	double current_time = get_current_time();
 	double next_events_time = current_time + 1;
 	update_current_events(current_time);
+
 	while (current_time < next_events_time && (!current_events->empty() || !overdue_events->empty())) {
 		if (!completed_events->empty() && current_time >= completed_events->get_earliest_time()) {
 			send_earliest_completed_events_back();
@@ -365,11 +366,9 @@ void IOScheduler::handle_flexible_read(Event* event) {
 
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_write(Event* event) {
-	Address addr = bm->choose_write_address(*event);
-
-	if (event->get_logical_address() == 4102) {
-		int i = 0;
-		i++;
+	Address addr = event->get_address();
+	if (event->get_address().valid == NONE) {
+		addr = bm->choose_write_address(*event);
 	}
 	try_to_put_in_safe_cache(event);
 	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time(), WRITE);
@@ -507,7 +506,7 @@ enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd->issue(event);
 	assert(result == SUCCESS);
 
-	if (PRINT_LEVEL > 0 && !event->is_garbage_collection_op()) {
+	if (PRINT_LEVEL > 0 /*&& !event->is_garbage_collection_op()*/) {
 		event->print();
 		if (event->is_flexible_read()) {
 			//printf("FLEX\n");

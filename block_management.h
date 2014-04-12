@@ -112,6 +112,7 @@ public:
     	ar & gc;
     	ar & migrator;
     }
+    Address find_free_unused_block(double time);
 protected:
 	virtual Address choose_best_address(Event const& write) = 0;
 	virtual Address choose_any_address(Event const& write) = 0;
@@ -123,7 +124,7 @@ protected:
 	Address find_free_unused_block(uint package_id, uint die_id, enum age age, double time);
 	Address find_free_unused_block(uint package_id, uint die_id, double time);
 	Address find_free_unused_block(uint package_id, double time);
-	Address find_free_unused_block(double time);
+
 	Address find_free_unused_block(enum age age, double time);
 
 	void return_unfilled_block(Address block_address, double current_time);
