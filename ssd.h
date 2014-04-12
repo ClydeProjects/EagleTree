@@ -979,7 +979,7 @@ private:
 	//map<Address, Event*> event_retainer;  // Used when the page being written
 	map<long, Address> logical_addresses_to_pages_in_log_blocks;  // a RAM map from location of a logged page
 
-	map<int, map<int, queue<Event*> > > queued_events; // stores events tar
+	map<int, queue<Event*> > queued_events; // stores events tar
 };
 
 /* The SSD is the single main object that will be created to simulate a real
