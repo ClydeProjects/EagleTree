@@ -787,10 +787,11 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	else */
 
 	if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
-		promote_to_gc(existing_event);
-		remove_current_operation(new_event);
-		push(new_event); // Make sure the old GC READ is run, even though it is now a NOOP command
-		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
+		make_dependent(new_event, dependency_code_of_other_event);
+		//promote_to_gc(existing_event);
+		//remove_current_operation(new_event);
+		//push(new_event); // Make sure the old GC READ is run, even though it is now a NOOP command
+		//LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 	}
 	else if (new_event->is_garbage_collection_op() && scheduled_op_code == TRIM) {
 		remove_current_operation(new_event);

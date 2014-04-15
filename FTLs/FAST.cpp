@@ -35,7 +35,7 @@ void FAST::read(Event *event)
 
 void FAST::register_read_completion(Event const& event, enum status result) {
 	int block_id = event.get_logical_address() / BLOCK_SIZE;
-	event.print();
+	//event.print();
 	if (event.get_application_io_id() == 45136) {
 		//event.print();
 		int i =0;
@@ -82,10 +82,17 @@ void FAST::write(Event *event)
 	set_replace_address(*event);
 
 
-	if (event->get_application_io_id() == 57517) {
+	if (event->get_application_io_id() == 76037) {
 		int i =0;
 		i++;
 	}
+
+	if (event->get_application_io_id() == 76634) {
+			int i =0;
+			i++;
+	}
+
+
 
 	// Choose new address. Get one from block manager
 	if (addr.valid == NONE) {
@@ -207,8 +214,8 @@ void FAST::choose_existing_log_block(Event* event) {
 			return;
 		}
 	}
-	if (event->get_application_io_id() == 45136) {
-		int i = 0;
+	if (event->get_application_io_id() == 76037) {
+		int i =0;
 		i++;
 	}
 	assert(!event->is_garbage_collection_op());
@@ -220,8 +227,8 @@ void FAST::release_events_there_was_no_space_for() {
 	int initial_size = q.size();
 	for (int i = 0; i < initial_size; i++) {
 		Event* e = q.front();
-		if (e->get_application_io_id() == 45136) {
-			int i = 0;
+		if (e->get_application_io_id() == 76037) {
+			int i =0;
 			i++;
 		}
 		q.pop();
@@ -405,7 +412,7 @@ void FAST::consider_doing_garbage_collection(double time) {
 	log_block* lb = full_log_blocks.top();
 	full_log_blocks.pop();
 
-	printf("picked block %d which contains pages from %d blocks\n", lb->addr.get_block_id(), lb->num_blocks_mapped_inside.size());
+	//printf("picked block %d which contains pages from %d blocks\n", lb->addr.get_block_id(), lb->num_blocks_mapped_inside.size());
 
 	// Issue the garbage collection operation
 	for (int i = 0; i < lb->num_blocks_mapped_inside.size(); i++) {
@@ -424,8 +431,8 @@ void FAST::garbage_collect(int block_id, log_block* log_block, double time) {
 	Address new_addr = bm->find_free_unused_block(time);
 	assert(queued_events.count(new_addr.get_block_id()) == 0);
 	assert(new_addr.valid >= BLOCK);
-	new_addr.print();
-	printf("\t%d\n", block_id);
+	//new_addr.print();
+	//printf("\t%d\n", block_id);
 	long first_logical_addr = block_id * BLOCK_SIZE;
 	gc_queue[block_id] = queue<Event*>();
 	for (int i = 0; i < BLOCK_SIZE; i++) {
