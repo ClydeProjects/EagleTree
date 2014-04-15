@@ -407,9 +407,9 @@ void IOScheduler::handle_write(Event* event) {
 	}
 	else {
 		event->set_address(addr);
-		if (event->get_replace_address().valid == NONE) {
+		//if (event->get_replace_address().valid == NONE) {
 			ftl->set_replace_address(*event);
-		}
+		//}
 		assert(addr.page < BLOCK_SIZE);
 		execute_next(event);
 	}
@@ -536,7 +536,7 @@ enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd->issue(event);
 	assert(result == SUCCESS);
 
-	if (PRINT_LEVEL > 0 /*&& event->is_garbage_collection_op() && event->get_event_type() == WRITE*/) {
+	if (PRINT_LEVEL > 0 /*&& event->is_garbage_collection_op()*/  && event->get_event_type() == WRITE) {
 		event->print();
 		if (event->is_flexible_read()) {
 			//printf("FLEX\n");
@@ -803,9 +803,14 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 			bm->register_trim_making_gc_redundant(new_event);
 		}
 
-		promote_to_gc(new_event);
-		remove_current_operation(existing_event);
-		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
+		//promote_to_gc(new_event);
+		//remove_current_operation(existing_event);
+		make_dependent(new_event, dependency_code_of_other_event);
+		//if (existing_event->get_event_type() == WRITE) {
+		//	new_event->set_address(existing_event->get_address());
+		//	new_event->set_replace_address(existing_event->get_replace_address());
+		//}
+		//LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 	}
 
 	// if two writes are scheduled, the one before is irrelevant and may as well be cancelled
