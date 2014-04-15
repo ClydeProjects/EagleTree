@@ -35,8 +35,8 @@ void FAST::read(Event *event)
 
 void FAST::register_read_completion(Event const& event, enum status result) {
 	int block_id = event.get_logical_address() / BLOCK_SIZE;
-	//event.print();
-	if (block_id == 743) {
+	event.print();
+	if (event.get_id() == 34036) {
 		//event.print();
 		int i =0;
 		i++;
@@ -74,7 +74,7 @@ void FAST::schedule(Event* e) {
 // TODO: going to experience problems with writes canceling each other. Incrementing the block pointer should be elsewhere.
 void FAST::write(Event *event)
 {
-	if (event->get_application_io_id() == 31237) {
+	if (event->get_application_io_id() == 33123) {
 		int i = 0;
 		i++;
 	}
@@ -214,13 +214,14 @@ void FAST::choose_existing_log_block(Event* event) {
 			return;
 		}
 	}
+	assert(!event->is_garbage_collection_op());
 	queued_events[-1].push(event);
 }
 
 void FAST::release_events_there_was_no_space_for() {
-	queue<Event*> q = queued_events[-1];
+	queue<Event*>& q = queued_events[-1];
 	int seen_so_far = 0;
-	while (!q.empty() || seen_so_far < queued_events.size()) {
+	while (!q.empty() && seen_so_far < queued_events.size()) {
 		seen_so_far++;
 		Event* e = q.front();
 		q.pop();
@@ -245,6 +246,7 @@ void FAST::unlock_block(Event const& event) {
 				scheduler->schedule_event(e);
 			}
 		}
+		queued_events.erase(event.get_address().get_block_id());
 	}
 	else {
 		Event* e = dependants.front();
@@ -266,7 +268,7 @@ void FAST::register_write_completion(Event const& event, enum status result) {
 	Address& normal_block = translation_table[block_id];
 	assert(normal_block.valid == PAGE);
 
-	if (165 == block_id && event.get_current_time() > 12789005) {
+	if (event.get_application_io_id() == 30683) {
 		int i =0;
 		i++;
 	}
@@ -289,10 +291,12 @@ void FAST::register_write_completion(Event const& event, enum status result) {
 		if (q.empty() && event.get_address().page == BLOCK_SIZE - 1) {
 			num_ongoing_garbage_collection_operations--;
 			gc_queue.erase(block_id);
-			consider_doing_garbage_collection(event.get_current_time());
 		}
+		int size = gc_queue.size();
 		if (gc_queue.empty()) {
+			num_active_log_blocks--;
 			release_events_there_was_no_space_for();
+			consider_doing_garbage_collection(event.get_current_time());
 		}
 		logical_addresses_to_pages_in_log_blocks.erase(event.get_logical_address());
 	}
@@ -317,7 +321,7 @@ void FAST::register_write_completion(Event const& event, enum status result) {
 
 	int block_id_ = log_block_addr.get_block_id();
 
-	if (147 == log_block_addr.get_block_id() && event.get_current_time() > 12789005) {
+	if (484 == log_block_addr.get_block_id() && event.get_current_time() > 13002600) {
 		int i =0;
 		i++;
 	}
@@ -409,6 +413,7 @@ void FAST::consider_doing_garbage_collection(double time) {
 void FAST::garbage_collect(int block_id, log_block* log_block, double time) {
 
 	Address new_addr = bm->find_free_unused_block(time);
+	assert(queued_events.count(new_addr.get_block_id()) == 0);
 	assert(new_addr.valid >= BLOCK);
 	new_addr.print();
 	printf("\t%d\n", block_id);
