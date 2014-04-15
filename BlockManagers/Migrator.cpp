@@ -164,6 +164,7 @@ void Migrator::schedule_gc(double time, int package, int die, int block, int kla
 		address.valid = DIE;
 	} else if (package >= 0 && die >= 0 && block >= 0) {
 		address.valid = BLOCK;
+		// TODO add the wear leveling as a parameter to this method
 		gc_event->set_wear_leveling_op(true);
 	} else {
 		assert(false);
@@ -202,6 +203,15 @@ void Migrator::register_ECC_check_on(uint logical_address) {
 	page_copy_back_count.erase(logical_address);
 }
 
+void Migrator::update_structures(Address const& a) {
+	Block* victim = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
+	gc->remove_as_gc_candidate(a);
+	blocks_being_garbage_collected[victim->get_physical_address()] = victim->get_pages_valid();
+	num_blocks_being_garbaged_collected_per_LUN[a.package][a.die]++;
+	bm->subtract_from_available_for_new_writes(victim->get_pages_valid());
+	StatisticsGatherer::get_global_instance()->register_executed_gc(*victim);
+}
+
 vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	Address a = gc_event->get_address();
 	vector<deque<Event*> > migrations;
@@ -221,6 +231,8 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	bool is_wear_leveling_op = gc_event->is_wear_leveling_op();
 
 	Block * victim;
+	a.print();
+	printf("\n%d\t%d\n", a.get_block_id(), a.get_linear_address());
 	if (is_wear_leveling_op) {
 		victim = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
 	}
@@ -251,14 +263,12 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 		return migrations;
 	}*/
 
-	if (is_wear_leveling_op && !wl->schedule_wear_leveling_op(victim)) {
+	/*if (is_wear_leveling_op && !wl->schedule_wear_leveling_op(victim)) {
 		return migrations;
-	}
+	}*/
 
-	gc->remove_as_gc_candidate(addr);
 
-	blocks_being_garbage_collected[victim->get_physical_address()] = victim->get_pages_valid();
-	num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die]++;
+	update_structures(addr);
 
 	if (PRINT_LEVEL > 1) {
 		printf("num gc operations in (%d %d) : %d  ", addr.package, addr.die, num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die]);
@@ -273,11 +283,11 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	assert(victim->get_state() != FREE);
 	assert(victim->get_state() != PARTIALLY_FREE);
 
-	bm->subtract_from_available_for_new_writes(victim->get_pages_valid());
+
 	//printf("num_available_pages_for_new_writes:  %d\n", num_available_pages_for_new_writes);
 
 	//deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
-	StatisticsGatherer::get_global_instance()->register_executed_gc(*gc_event, *victim);
+
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	//PRINT_LEVEL = 1;
 	for (uint i = 0; i < BLOCK_SIZE; i++) {

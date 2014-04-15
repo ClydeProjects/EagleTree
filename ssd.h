@@ -540,7 +540,7 @@ public:
 	inline uint get_pages_invalid() const { return pages_invalid; }
 	inline enum block_state get_state() const {
 		return 	pages_invalid == BLOCK_SIZE ? INACTIVE :
-				pages_valid == BLOCK_SIZE ? FREE :
+				pages_valid == BLOCK_SIZE ? ACTIVE :
 				pages_invalid + pages_valid == BLOCK_SIZE ? ACTIVE : PARTIALLY_FREE;
 	}
 	inline ulong get_erases_remaining() const { return erases_remaining; }
@@ -945,7 +945,7 @@ private:
 
 class FAST : public FtlParent {
 public:
-	FAST(Ssd *ssd, Block_manager_parent* bm);
+	FAST(Ssd *ssd, Block_manager_parent* bm, Migrator* migrator);
 	FAST();
 	~FAST();
 	void read(Event *event);
@@ -958,10 +958,12 @@ public:
 	Address get_physical_address(uint logical_address) const;
 	void set_replace_address(Event& event) const;
 	void set_read_address(Event& event) const;
+
 	void print() const;
 private:
 	void schedule(Event* e);
 	void choose_existing_log_block(Event* e);
+	void unlock_block(Event const& event);
 	vector<Address> translation_table;		  // maps block ID to a block address in flash. This is the main mapping table
 
 	struct log_block {
@@ -969,6 +971,18 @@ private:
 		Address addr;
 		vector<int> num_blocks_mapped_inside;
 	};
+	void consider_doing_garbage_collection(double time);
+	struct mycomparison
+	{
+	  bool operator() (const log_block* lhs, const log_block* rhs) const
+	  {
+	    return lhs->num_blocks_mapped_inside.size() < rhs->num_blocks_mapped_inside.size();
+	  }
+	};
+	void write_in_log_block(Event* event);
+	priority_queue<log_block*, std::vector<log_block*>, mycomparison> full_log_blocks;
+
+	void garbage_collect(int block_id, log_block* log_block, double time);
 
 	map<int, log_block*> active_log_blocks_map;  // Maps a block ID to the address of the corresponding log block. Used to quickly determine where to place an update
 
@@ -980,6 +994,10 @@ private:
 	map<long, Address> logical_addresses_to_pages_in_log_blocks;  // a RAM map from location of a logged page
 
 	map<int, queue<Event*> > queued_events; // stores events tar
+	Migrator* migrator;
+	FtlImpl_Page page_mapping;
+	map<int, queue<Event*> > gc_queue;
+	int num_ongoing_garbage_collection_operations;
 };
 
 /* The SSD is the single main object that will be created to simulate a real
@@ -1126,7 +1144,7 @@ public:
 
 	void register_completed_event(Event const& event);
 	void register_scheduled_gc(Event const& gc);
-	void register_executed_gc(Event const& gc, Block const& victim);
+	void register_executed_gc(Block const& victim);
 	void register_events_queue_length(uint queue_size, double time);
 	void print();
 	void print_simple(FILE* file = stdout);

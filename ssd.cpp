@@ -50,15 +50,15 @@ Ssd::Ssd():
 	}*/
 
 	Block_manager_parent* bm = Block_manager_parent::get_new_instance();
+	Migrator* migrator = new Migrator();
 
 	if (FTL_DESIGN == 0) {
 		ftl = new FtlImpl_Page(this);
 	} else if (FTL_DESIGN == 1) {
 		ftl = new DFTL(this);
 	} else {
-		ftl = new FAST(this, bm);
+		ftl = new FAST(this, bm, migrator);
 	}
-
 
 	scheduler = new IOScheduler();
 
@@ -66,7 +66,7 @@ Ssd::Ssd():
 	Free_Space_Per_LUN_Meter::init();
 
 	ftl->set_scheduler(scheduler);
-	Migrator* migrator = new Migrator();
+
 	Garbage_Collector* gc = new Garbage_Collector(this, bm);
 	Wear_Leveling_Strategy* wl = new Wear_Leveling_Strategy(this, migrator);
 

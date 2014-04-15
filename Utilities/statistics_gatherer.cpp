@@ -167,11 +167,11 @@ void StatisticsGatherer::register_scheduled_gc(Event const& gc) {
 	}
 }
 
-void StatisticsGatherer::register_executed_gc(Event const& gc, Block const& victim) {
+void StatisticsGatherer::register_executed_gc(Block const& victim) {
 	if (!record_statistics) {
 		return;
 	}
-	if (inst != this) inst->register_executed_gc(gc, victim); // Do the same for global instance
+	if (inst != this) inst->register_executed_gc(victim); // Do the same for global instance
 	num_gc_executed++;
 	num_migrations += victim.get_pages_valid();
 	Address a = Address(victim.get_physical_address(), BLOCK);
