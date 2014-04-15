@@ -114,6 +114,7 @@ public:
 	void execute_soonest_events();
 	void handle(vector<Event*>& events);
 	void handle_noop_events(vector<Event*>& events);
+	void inform_FTL_of_noop_completion(Event* event);
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)

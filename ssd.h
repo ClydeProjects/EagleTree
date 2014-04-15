@@ -976,12 +976,12 @@ private:
 	{
 	  bool operator() (const log_block* lhs, const log_block* rhs) const
 	  {
-	    return lhs->num_blocks_mapped_inside.size() < rhs->num_blocks_mapped_inside.size();
+	    return lhs->num_blocks_mapped_inside.size() > rhs->num_blocks_mapped_inside.size();
 	  }
 	};
 	void write_in_log_block(Event* event);
 	priority_queue<log_block*, std::vector<log_block*>, mycomparison> full_log_blocks;
-
+	void release_events_there_was_no_space_for();
 	void garbage_collect(int block_id, log_block* log_block, double time);
 
 	map<int, log_block*> active_log_blocks_map;  // Maps a block ID to the address of the corresponding log block. Used to quickly determine where to place an update

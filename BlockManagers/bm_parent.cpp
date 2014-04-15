@@ -144,10 +144,11 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 
 	num_free_pages += BLOCK_SIZE;
 	num_available_pages_for_new_writes += BLOCK_SIZE;
+	//printf("%d   %d\n", num_available_pages_for_new_writes, num_free_pages);
 	Free_Space_Meter::register_num_free_pages_for_app_writes(num_available_pages_for_new_writes, event.get_current_time());
 
 	if (migrator->how_many_gc_operations_are_scheduled() == 0) {
-		assert(num_free_pages == num_available_pages_for_new_writes);
+		//assert(num_free_pages == num_available_pages_for_new_writes);
 	}
 
 	Block_manager_parent::check_if_should_trigger_more_GC(event.get_current_time());
@@ -188,6 +189,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 		num_available_pages_for_new_writes--;
 		Free_Space_Meter::register_num_free_pages_for_app_writes(num_available_pages_for_new_writes, event.get_current_time());
 	}
+	//printf("%d   %d\n", num_available_pages_for_new_writes, num_free_pages);
 	// if there are very few pages left, need to trigger emergency GC
 	if (num_free_pages <= BLOCK_SIZE && migrator->how_many_gc_operations_are_scheduled() == 0) {
 		migrator->schedule_gc(event.get_current_time(), -1, -1, -1, -1);
@@ -413,7 +415,9 @@ void Block_manager_parent::register_trim_making_gc_redundant(Event* trim) {
 	if (PRINT_LEVEL > 1) {
 		printf("a trim made a gc event redundant\n");
 	}
+
 	num_available_pages_for_new_writes++;
+	//printf("%d   %d\n", num_available_pages_for_new_writes, num_free_pages);
 	Free_Space_Meter::register_num_free_pages_for_app_writes(num_available_pages_for_new_writes, trim->get_current_time());
 }
 

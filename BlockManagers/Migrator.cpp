@@ -208,7 +208,7 @@ void Migrator::update_structures(Address const& a) {
 	gc->remove_as_gc_candidate(a);
 	blocks_being_garbage_collected[victim->get_physical_address()] = victim->get_pages_valid();
 	num_blocks_being_garbaged_collected_per_LUN[a.package][a.die]++;
-	bm->subtract_from_available_for_new_writes(victim->get_pages_valid());
+
 	StatisticsGatherer::get_global_instance()->register_executed_gc(*victim);
 }
 
@@ -269,6 +269,7 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 
 
 	update_structures(addr);
+	bm->subtract_from_available_for_new_writes(victim->get_pages_valid());
 
 	if (PRINT_LEVEL > 1) {
 		printf("num gc operations in (%d %d) : %d  ", addr.package, addr.die, num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die]);

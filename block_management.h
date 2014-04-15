@@ -88,7 +88,10 @@ public:
 	double get_average_migrations_per_gc() const;
 	int get_num_age_classes() const { return num_age_classes; }
 	int get_num_pages_available_for_new_writes() const { return num_available_pages_for_new_writes; }
-	void subtract_from_available_for_new_writes(int num) { num_available_pages_for_new_writes -= num; }
+	void subtract_from_available_for_new_writes(int num) {
+		num_available_pages_for_new_writes -= num;
+		//printf("%d   %d\n", num_available_pages_for_new_writes, num_free_pages);
+	}
 	vector<Block*> const& get_all_blocks() const { return all_blocks; }
 	uint sort_into_age_class(Address const& address) const;
 	void copy_state(Block_manager_parent* bm);
