@@ -821,6 +821,7 @@ public:
 	virtual void register_write_completion(Event const& event, enum status result) = 0;
 	virtual void register_read_completion(Event const& event, enum status result) = 0;
 	virtual void register_trim_completion(Event & event) = 0;
+	virtual void register_erase_completion(Event & event) {};
 	virtual long get_logical_address(uint physical_address) const = 0;
 	virtual Address get_physical_address(uint logical_address) const = 0;
 	virtual void set_replace_address(Event& event) const = 0;
@@ -958,7 +959,7 @@ public:
 	Address get_physical_address(uint logical_address) const;
 	void set_replace_address(Event& event) const;
 	void set_read_address(Event& event) const;
-
+	void register_erase_completion(Event & event);
 	void print() const;
 private:
 	void schedule(Event* e);

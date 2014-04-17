@@ -63,7 +63,7 @@ void Migrator::handle_erase_completion(Event* event) {
 
 	if (PRINT_LEVEL > 1) {
 		printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
-		for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
+		for (map<int, int>::const_iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
 			printf("%d  ", (*iter).first);
 		}
 		printf("\n");
@@ -89,8 +89,8 @@ void Migrator::handle_trim_completion(Event* event) {
 	assert(ra.get_linear_address() == phys_addr);
 
 	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 1) {
-		assert(blocks_being_garbage_collected[block.get_physical_address()] > 0);
-		blocks_being_garbage_collected[block.get_physical_address()]--;
+		assert(blocks_being_garbage_collected.at(block.get_physical_address()) > 0);
+		blocks_being_garbage_collected.at(block.get_physical_address())--;
 	}
 
 	// TODO: fix thresholds for inserting blocks into GC lists. ALSO Revise the condition.
@@ -101,12 +101,11 @@ void Migrator::handle_trim_completion(Event* event) {
 
 	if (blocks_being_garbage_collected.count(phys_addr) == 0 && block.get_state() == INACTIVE) {
 		gc->remove_as_gc_candidate(ra);
-		//gc_candidates[ra.package][ra.die][age_class].erase(phys_addr);
 		blocks_being_garbage_collected[phys_addr] = 0;
 		num_blocks_being_garbaged_collected_per_LUN[ra.package][ra.die]++;
 		issue_erase(ra, event->get_current_time());
 	}
-	else if (blocks_being_garbage_collected.count(phys_addr) == 1 && blocks_being_garbage_collected[phys_addr] == 0) {
+	else if (blocks_being_garbage_collected.count(phys_addr) == 1 && blocks_being_garbage_collected.at(phys_addr) == 0) {
 		assert(block.get_state() == INACTIVE);
 		blocks_being_garbage_collected[phys_addr]--;
 		issue_erase(ra, event->get_current_time());
@@ -128,7 +127,7 @@ void Migrator::issue_erase(Address ra, double time) {
 	if (PRINT_LEVEL > 1) {
 		printf("block %lu", ra.get_linear_address()); printf(" is now invalid. An erase is issued: "); erase->print();
 		printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
-		for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
+		for (map<int, int>::const_iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
 			printf("%d  ", (*iter).first);
 		}
 		printf("\n");
@@ -208,7 +207,6 @@ void Migrator::update_structures(Address const& a) {
 	gc->remove_as_gc_candidate(a);
 	blocks_being_garbage_collected[victim->get_physical_address()] = victim->get_pages_valid();
 	num_blocks_being_garbaged_collected_per_LUN[a.package][a.die]++;
-
 	StatisticsGatherer::get_global_instance()->register_executed_gc(*victim);
 }
 
@@ -275,7 +273,7 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 		printf("num gc operations in (%d %d) : %d  ", addr.package, addr.die, num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die]);
 		printf("Triggering GC in %ld    time: %f  ", victim->get_physical_address(), gc_event->get_current_time()); addr.print(); printf(". Migrating %d \n", victim->get_pages_valid());
 		printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
-		for (map<int, int>::iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
+		for (map<int, int>::const_iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
 			printf("%d  ", (*iter).first);
 		}
 		printf("\n");

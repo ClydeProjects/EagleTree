@@ -536,7 +536,7 @@ enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd->issue(event);
 	assert(result == SUCCESS);
 
-	if (PRINT_LEVEL > 0 /*&& event->is_garbage_collection_op()*/  && event->get_event_type() == WRITE) {
+	if (PRINT_LEVEL > 0/* && event->is_garbage_collection_op()*/ && (event->get_event_type() == WRITE || event->get_event_type() == ERASE) ) {
 		event->print();
 		if (event->is_flexible_read()) {
 			//printf("FLEX\n");
@@ -621,6 +621,7 @@ void IOScheduler::handle_finished_event(Event *event) {
 		//StateTracer::print();
 	} else if (event->get_event_type() == ERASE) {
 		bm->register_erase_outcome(*event, SUCCESS);
+		ftl->register_erase_completion(*event);
 	} else if (event->get_event_type() == READ_COMMAND) {
 		bm->register_read_command_outcome(*event, SUCCESS);
 	} else if (event->get_event_type() == READ_TRANSFER) {
