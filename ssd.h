@@ -967,9 +967,10 @@ private:
 	vector<Address> translation_table;		  // maps block ID to a block address in flash. This is the main mapping table
 
 	struct log_block {
-		log_block(Address& addr) : addr(addr), num_blocks_mapped_inside() {}
+		log_block(Address& addr) : addr(addr), num_blocks_mapped_inside(), num_blocks_released() {}
 		Address addr;
-		vector<int> num_blocks_mapped_inside;
+		set<int> num_blocks_mapped_inside;
+		set<int> num_blocks_released;
 	};
 	void consider_doing_garbage_collection(double time);
 	struct mycomparison
@@ -980,6 +981,7 @@ private:
 	  }
 	};
 	void write_in_log_block(Event* event);
+	void queue_up(Event* e, Address const& lock);
 	priority_queue<log_block*, std::vector<log_block*>, mycomparison> full_log_blocks;
 	void release_events_there_was_no_space_for();
 	void garbage_collect(int block_id, log_block* log_block, double time);
@@ -998,6 +1000,7 @@ private:
 	FtlImpl_Page page_mapping;
 	map<int, queue<Event*> > gc_queue;
 	int num_ongoing_garbage_collection_operations;
+	map<int, set<log_block*> > logical_to_log_block_multimap;
 };
 
 /* The SSD is the single main object that will be created to simulate a real

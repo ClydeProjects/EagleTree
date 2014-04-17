@@ -62,12 +62,22 @@ void FAST::register_read_completion(Event const& event, enum status result) {
 void FAST::schedule(Event* e) {
 	int phys_block_id = e->get_address().get_block_id();
 	if (queued_events.count(phys_block_id) == 0) {
-
-		queued_events[phys_block_id] = queue<Event*>();
 		scheduler->schedule_event(e);
 	}
+	queue_up(e, e->get_address());
+}
+
+void FAST::queue_up(Event* e, Address const& lock) {
+	int phys_block_id = lock.get_block_id();
+	if (phys_block_id == 1227) {
+		int i = 0;
+		i++;
+	}
+	if (queued_events.count(phys_block_id) == 0) {
+		queued_events[phys_block_id] = queue<Event*>();
+	}
 	else {
-		queued_events[phys_block_id].push(e);
+		queued_events.at(phys_block_id).push(e);
 	}
 }
 
@@ -82,17 +92,10 @@ void FAST::write(Event *event)
 	set_replace_address(*event);
 
 
-	if (event->get_application_io_id() == 76037) {
+	if (event->get_application_io_id() == 77645) {
 		int i =0;
 		i++;
 	}
-
-	if (event->get_application_io_id() == 76634) {
-			int i =0;
-			i++;
-	}
-
-
 
 	// Choose new address. Get one from block manager
 	if (addr.valid == NONE) {
@@ -118,20 +121,21 @@ void FAST::write(Event *event)
 	else if (page_id > addr.page) {
 		Address ideal_addr = addr;
 		ideal_addr.page = page_id;
-		queued_events[ideal_addr.get_block_id()].push(event);
+		queue_up(event, ideal_addr);
+		//queued_events[ideal_addr.get_block_id()].push(event);
 	}
 	else {
 		write_in_log_block(event);
 	}
-
-
 }
+
+
 
 void FAST::write_in_log_block(Event* event) {
 	int block_id = event->get_logical_address() / BLOCK_SIZE;
 	// this block is mapped to an existing log block
 	if (active_log_blocks_map.count(block_id) == 1 && active_log_blocks_map.at(block_id)->addr.page < BLOCK_SIZE) {
-		log_block* log_block_id = active_log_blocks_map[block_id];
+		log_block* log_block_id = active_log_blocks_map.at(block_id);
 		Address& log_block_addr = log_block_id->addr;
 		if (log_block_addr.get_block_id() == 1544) {
 			int i = 0;
@@ -144,13 +148,14 @@ void FAST::write_in_log_block(Event* event) {
 	}
 	// the log block is full.
 	else if (active_log_blocks_map.count(block_id) == 1 /*&& active_log_blocks_map.at(block_id)->addr.page == BLOCK_SIZE */) {
-		log_block* log_block_id = active_log_blocks_map[block_id];
+		log_block* log_block_id = active_log_blocks_map.at(block_id);
 		Address& log_block_addr = log_block_id->addr;
 		int block_id_log = log_block_addr.get_block_id();
 		//printf("block_id_log  %d\n");
 		assert(queued_events.count(log_block_addr.get_block_id()) == 1);
-		int size = queued_events[log_block_addr.get_block_id()].size();
-		queued_events[log_block_addr.get_block_id()].push(event);
+		int size = queued_events.at(log_block_addr.get_block_id()).size();
+		queue_up(event, log_block_addr);
+		//queued_events[log_block_addr.get_block_id()].push(event);
 	}
 	// While we have not exceeded the allotted number of log blocks, just get a new log block for the write
 	else if (num_active_log_blocks < NUM_LOG_BLOCKS) {
@@ -163,8 +168,9 @@ void FAST::write_in_log_block(Event* event) {
 			event->set_address(new_addr);
 			new_addr.page++;
 			log_block* lb = new log_block(new_addr);
-			lb->num_blocks_mapped_inside.push_back(block_id);
+			lb->num_blocks_mapped_inside.insert(block_id);
 			active_log_blocks_map[block_id] = lb;
+			logical_to_log_block_multimap[block_id].insert(lb);
 			num_active_log_blocks++;
 			schedule(event);
 		}
@@ -186,8 +192,9 @@ void FAST::choose_existing_log_block(Event* event) {
 		if (lb->addr.page < BLOCK_SIZE - 1) {
 			event->set_address(lb->addr);
 			lb->addr.page++;
-			lb->num_blocks_mapped_inside.push_back(block_id);
+			lb->num_blocks_mapped_inside.insert(block_id);
 			active_log_blocks_map[block_id] = lb;
+			logical_to_log_block_multimap[block_id].insert(lb);
 			dial = (*it).first + 1;
 			if (event->get_id() == 32017) {
 				int i = 0;
@@ -199,12 +206,14 @@ void FAST::choose_existing_log_block(Event* event) {
 	}
 	it = active_log_blocks_map.begin();
 	for (; it != active_log_blocks_map.lower_bound(dial); it++) {
+		int key  = (*it).first;
 		log_block* lb = (*it).second;
 		if (lb->addr.page < BLOCK_SIZE - 1) {
 			event->set_address(lb->addr);
 			lb->addr.page++;
-			lb->num_blocks_mapped_inside.push_back(block_id);
+			lb->num_blocks_mapped_inside.insert(block_id);
 			active_log_blocks_map[block_id] = lb;
+			logical_to_log_block_multimap[block_id].insert(lb);
 			dial = (*it).first + 1;
 			if (event->get_id() == 32017) {
 				int i = 0;
@@ -214,7 +223,7 @@ void FAST::choose_existing_log_block(Event* event) {
 			return;
 		}
 	}
-	if (event->get_application_io_id() == 76037) {
+	if (event->get_application_io_id() == 77645) {
 		int i =0;
 		i++;
 	}
@@ -223,11 +232,14 @@ void FAST::choose_existing_log_block(Event* event) {
 }
 
 void FAST::release_events_there_was_no_space_for() {
-	queue<Event*>& q = queued_events[-1];
+	if (queued_events.count(-1) == 0) {
+		return;
+	}
+	queue<Event*>& q = queued_events.at(-1);
 	int initial_size = q.size();
 	for (int i = 0; i < initial_size; i++) {
 		Event* e = q.front();
-		if (e->get_application_io_id() == 76037) {
+		if (e->get_application_io_id() == 77645) {
 			int i =0;
 			i++;
 		}
@@ -275,36 +287,16 @@ void FAST::register_write_completion(Event const& event, enum status result) {
 	Address& normal_block = translation_table[block_id];
 	assert(normal_block.valid == PAGE);
 
-	if (event.get_application_io_id() == 57517) {
+	if (event.get_application_io_id() == 31738) {
 		int i =0;
 		i++;
 	}
-
-	/*if (event.is_garbage_collection_op() && event.is_original_application_io()) {
-		queue<Event*>& q = gc_queue[block_id];
-		if (!q.empty()) {
-			Event* gc_write = q.front();
-			assert(gc_write->get_logical_address() == event.get_logical_address());
-			q.pop();
-			delete gc_write;
-			Event* gc_read = q.front();
-			q.pop();
-			scheduler->schedule_event(gc_read);
-		}
-	}*/
 
 	if (event.is_garbage_collection_op()) {
 		queue<Event*>& q = gc_queue[block_id];
 		if (q.empty() && event.get_address().page == BLOCK_SIZE - 1) {
 			num_ongoing_garbage_collection_operations--;
 			gc_queue.erase(block_id);
-			/*int phys_block_id = event.get_address().get_block_id();
-			while (queued_app_events_waiting_for_gc[phys_block_id].size() > 0) {
-				Event * queued_app_event = queued_app_events_waiting_for_gc[phys_block_id].front();
-				queued_app_events_waiting_for_gc[phys_block_id].pop();
-				write(queued_app_event);
-			}
-			queued_app_events_waiting_for_gc.erase(phys_block_id);*/
 		}
 		int size = gc_queue.size();
 		if (gc_queue.empty()) {
@@ -328,19 +320,14 @@ void FAST::register_write_completion(Event const& event, enum status result) {
 	}
 
 	// page was written in log block.
-	assert(active_log_blocks_map.count(block_id) == 1 || gc_queue.count(block_id) == 1);
+	assert(active_log_blocks_map.count(block_id) == 1);
 
 	// Update page mapping in RAM
-	log_block* lb = active_log_blocks_map[block_id];
+	log_block* lb = active_log_blocks_map.at(block_id);
 	Address& log_block_addr = lb->addr;
 	assert(log_block_addr.compare(event.get_address()) >= BLOCK);
 
 	int block_id_ = log_block_addr.get_block_id();
-
-	if (484 == log_block_addr.get_block_id() && event.get_current_time() > 13002600) {
-		int i =0;
-		i++;
-	}
 
 	// there is still more space in the log block
 	if (event.get_address().page < BLOCK_SIZE - 1) {
@@ -349,13 +336,14 @@ void FAST::register_write_completion(Event const& event, enum status result) {
 	}
 
 	// Remove active mapping of this log block
+	active_log_blocks_map.erase(block_id);
 	for (auto i : lb->num_blocks_mapped_inside) {
-		if (i == 697) {
-			int i = 0;
+		if (event.get_application_io_id() == 42698) {
+			int i =0;
 			i++;
-			//event.print();
+			printf("%d\n", i);
 		}
-		if (active_log_blocks_map[i] == lb) {
+		if (active_log_blocks_map.count(i) == 1 && active_log_blocks_map.at(i) == lb) {
 			active_log_blocks_map.erase(i);
 		}
 		else {
@@ -386,17 +374,6 @@ void FAST::register_write_completion(Event const& event, enum status result) {
 		}
 	}
 
-	// trigger GC
-	// allocate all blocks we need. Change addresses in translation table.
-	/*printf("log block %d contains pages from %d blocks\n", lb->addr.get_block_id(), lb->num_blocks_mapped_inside.size());
-	for (int i = 0; i < lb->num_blocks_mapped_inside.size(); i++) {
-		int cur_block_id = lb->num_blocks_mapped_inside[i];
-		Address& cur_block_addr = translation_table[cur_block_id];
-		migrator->schedule_gc(event.get_current_time(), cur_block_addr.package, cur_block_addr.die, cur_block_addr.block, -1);
-	}
-	migrator->schedule_gc(event.get_current_time(), log_block_addr.package, log_block_addr.die, log_block_addr.block, -1);
-	*/
-
 	consider_doing_garbage_collection(event.get_current_time());
 
 	unlock_block(event);
@@ -412,22 +389,63 @@ void FAST::consider_doing_garbage_collection(double time) {
 	log_block* lb = full_log_blocks.top();
 	full_log_blocks.pop();
 
-	//printf("picked block %d which contains pages from %d blocks\n", lb->addr.get_block_id(), lb->num_blocks_mapped_inside.size());
+	while (lb->num_blocks_mapped_inside.size() == lb->num_blocks_released.size()) {
+		delete lb;
+		lb = full_log_blocks.top();
+		full_log_blocks.pop();
+		//logical_to_log_block_multimap.erase(cur_block_id);
+		//consider_doing_garbage_collection(time);
+		//return;
+	}
+
+	/*printf("picked block %d which contains pages from %d blocks\n", lb->addr.get_block_id(), lb->num_blocks_mapped_inside.size() - lb->num_blocks_released.size());
+	printf("log block addr: ");
+	lb->addr.print();
+	printf("\n");*/
+
+	/*set<long> logical_blocks_to_garbage_collect;
+	Address it = lb->addr;
+	it.page = 0;
+	for (; it.page < BLOCK_SIZE; it.page++) {
+		long page_logical_address = page_mapping.get_logical_address(it.get_linear_address());
+		if (page_logical_address != UNDEFINED) {
+			long logical_block_address = page_logical_address / BLOCK_SIZE;
+			logical_blocks_to_garbage_collect.insert(logical_block_address);
+		}
+	}
+	for (auto b : logical_blocks_to_garbage_collect) {
+		//printf("%d\n", b);
+		garbage_collect(b, lb, time);
+	}*/
 
 	// Issue the garbage collection operation
-	for (int i = 0; i < lb->num_blocks_mapped_inside.size(); i++) {
-		int cur_block_id = lb->num_blocks_mapped_inside[i];
+	for (auto cur_block_id : lb->num_blocks_mapped_inside) {
+		if (lb->num_blocks_released.count(cur_block_id) == 1) {
+			continue;
+		}
+		//int cur_block_id = lb->num_blocks_mapped_inside[i];
 		Address& cur_block_addr = translation_table[cur_block_id];
 		garbage_collect(cur_block_id, lb, time);
-		//active_log_blocks_map.erase(cur_block_id);
 		num_ongoing_garbage_collection_operations++;
+		for (auto log_block : logical_to_log_block_multimap.at(cur_block_id)) {
+			if (log_block->addr.page == BLOCK_SIZE) {		// TODO: consider removing this if statement.
+				log_block->num_blocks_released.insert(cur_block_id);
+				logical_to_log_block_multimap.at(cur_block_id).erase(log_block);
+				//printf("deleting %d from log block  ", cur_block_id);
+				//log_block->addr.print();
+				//printf("\n");
+			}
+		}
+		if (logical_to_log_block_multimap.at(cur_block_id).empty()) {
+			logical_to_log_block_multimap.erase(cur_block_id);
+		}
 	}
+
 	delete lb;
 }
 
 // TODO: an optimization is possible here. When rewriting a block, the reads are on different blocks. Issue them in parallel
 void FAST::garbage_collect(int block_id, log_block* log_block, double time) {
-
 	Address new_addr = bm->find_free_unused_block(time);
 	assert(queued_events.count(new_addr.get_block_id()) == 0);
 	assert(new_addr.valid >= BLOCK);
@@ -452,6 +470,7 @@ void FAST::garbage_collect(int block_id, log_block* log_block, double time) {
 		gc_queue[block_id].push(read);
 		gc_queue[block_id].push(write);
 	}
+
 	migrator->update_structures(log_block->addr);
 	bm->subtract_from_available_for_new_writes(BLOCK_SIZE);
 	translation_table[block_id] = new_addr;
