@@ -170,7 +170,6 @@ void FAST::write_in_log_block(Event* event) {
 			log_block* lb = new log_block(new_addr);
 			lb->num_blocks_mapped_inside.insert(block_id);
 			active_log_blocks_map[block_id] = lb;
-			logical_to_log_block_multimap[block_id].insert(lb);
 			num_active_log_blocks++;
 			schedule(event);
 		}
@@ -194,7 +193,6 @@ void FAST::choose_existing_log_block(Event* event) {
 			lb->addr.page++;
 			lb->num_blocks_mapped_inside.insert(block_id);
 			active_log_blocks_map[block_id] = lb;
-			logical_to_log_block_multimap[block_id].insert(lb);
 			dial = (*it).first + 1;
 			if (event->get_id() == 32017) {
 				int i = 0;
@@ -213,7 +211,6 @@ void FAST::choose_existing_log_block(Event* event) {
 			lb->addr.page++;
 			lb->num_blocks_mapped_inside.insert(block_id);
 			active_log_blocks_map[block_id] = lb;
-			logical_to_log_block_multimap[block_id].insert(lb);
 			dial = (*it).first + 1;
 			if (event->get_id() == 32017) {
 				int i = 0;
@@ -365,7 +362,7 @@ void FAST::register_write_completion(Event const& event, enum status result) {
 	if (lb->num_blocks_mapped_inside.size() == 1) {
 		// check if they are in order
 		bool in_order = true;
-		int first_logical_address = (event.get_logical_address() / NUMBER_OF_ADDRESSABLE_BLOCKS()) * NUMBER_OF_ADDRESSABLE_BLOCKS();
+		int first_logical_address = event.get_logical_address() / BLOCK_SIZE * BLOCK_SIZE;
 		for (int i = 0; i < BLOCK_SIZE; i++) {
 			Address logical_page_i = logical_addresses_to_pages_in_log_blocks[first_logical_address + i];
 			if (!(logical_page_i.compare(log_block_addr) >= BLOCK && logical_page_i.page == i)) {
@@ -532,10 +529,10 @@ void FAST::set_replace_address(Event& event) const {
 		i++;
 	}
 
-	if (logical_addresses_to_pages_in_log_blocks.count(event.get_logical_address()) == 1) {
+	/*if (logical_addresses_to_pages_in_log_blocks.count(event.get_logical_address()) == 1) {
 		event.set_replace_address( logical_addresses_to_pages_in_log_blocks.at(event.get_logical_address()) );
 		return;
-	}
+	}*/
 
 	Address const& ra = page_mapping.get_physical_address(event.get_logical_address());
 	event.set_replace_address(ra);
