@@ -42,7 +42,6 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 		printf("invalid logical address, too big  %d   %d\n", logical_address, NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE);
 		assert(false);
 	}
-
 }
 
 Event::Event(Event const& event) :
@@ -108,6 +107,9 @@ void Event::print(FILE *stream) const
 	if (type != TRIM) {
 		address.print(stream);
 	} else {
+		replace_address.print(stream);
+	}
+	if (type == WRITE) {
 		replace_address.print(stream);
 	}
 	//if(type == MERGE)

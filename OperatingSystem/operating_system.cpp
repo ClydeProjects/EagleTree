@@ -19,7 +19,7 @@ OperatingSystem::OperatingSystem()
 	  idle_time(0),
 	  time(0),
 	  scheduler(NULL),
-	  progress_meter_granularity(10)
+	  progress_meter_granularity(20)
 {
 	ssd->set_operating_system(this);
 	thread_id_generator = 0;
@@ -65,7 +65,7 @@ OperatingSystem::~OperatingSystem() {
 }
 
 void OperatingSystem::check_if_stuck(bool no_pending_event, bool queue_is_full) {
-	const int idle_limit = 5000000;
+	const int idle_limit = 3000000;
 	if (idle_time > 100000 && idle_time % 100000 == 0) {
 		printf("Idle for %f seconds. No_pending_event=%d  Queue_is_full=%d\n", (double) idle_time / 1000000, no_pending_event, queue_is_full);
 	}
@@ -95,8 +95,8 @@ void OperatingSystem::check_if_stuck(bool no_pending_event, bool queue_is_full) 
 void OperatingSystem::print_progess() {
 	if ((double)num_writes_completed / NUM_WRITES_TO_STOP_AFTER > (double)counter_for_user / progress_meter_granularity) {
 		printf("finished %f%%.\t\tNum writes completed:  %d \n", counter_for_user * 100 / (double)progress_meter_granularity , num_writes_completed);
-		/*if (counter_for_user == 9) {
-			PRINT_LEVEL = 1;
+		/*if (counter_for_user == 90) {
+			PRINT_LEVEL = 0;
 			VisualTracer::get_instance()->print_horizontally(10000);
 			VisualTracer::get_instance()->print_horizontally_with_breaks_last(10000);
 		}*/
