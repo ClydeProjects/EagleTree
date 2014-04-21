@@ -77,7 +77,7 @@ void Garbage_Collector::register_trim(Event const& event, uint age_class, int nu
 	ra.page = 0;
 	remove_as_gc_candidate(ra);
 	if (PRINT_LEVEL > 1) {
-		printf("Inserting as GC candidate: %ld ", ra.get_linear_address()); ra.print(); printf(" with age_class %d and valid blocks: %d\n", num_live_pages);
+		//printf("Inserting as GC candidate: %ld ", ra.get_linear_address()); ra.print(); printf(" with age_class %d and valid blocks: %d\n", num_live_pages);
 	}
 	gc_candidates[ra.package][ra.die][age_class].insert(ra.get_linear_address());
 	if (gc_candidates[ra.package][ra.die][age_class].size() == 1) {

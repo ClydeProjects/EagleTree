@@ -6,31 +6,45 @@
 
 using namespace ssd;
 
-DFTL::DFTL(Ssd *ssd) :
+DFTL::DFTL(Ssd *ssd, Block_manager_parent* bm) :
+		FtlParent(ssd, bm),
 		cached_mapping_table(),
 		global_translation_directory(NUMBER_OF_ADDRESSABLE_BLOCKS(), Address()),
 		ongoing_mapping_operations(),
 		application_ios_waiting_for_translation(),
 		NUM_PAGES_IN_SSD(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE),
-		page_mapping(FtlImpl_Page(ssd)),
+		page_mapping(FtlImpl_Page(ssd, bm)),
 		CACHED_ENTRIES_THRESHOLD(DFTL_CACHE_SIZE),
 		num_dirty_cached_entries(0),
 		dial(0),
 		ENTRIES_PER_TRANSLATION_PAGE(DFTL_ENTRIES_PER_TRANSLATION_PAGE)
-{}
+{
+	IS_FTL_PAGE_MAPPING = true;
+}
 
 DFTL::DFTL() :
+		FtlParent(),
+		cached_mapping_table(),
+		global_translation_directory(),
+		ongoing_mapping_operations(),
+		application_ios_waiting_for_translation(),
 		NUM_PAGES_IN_SSD(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE),
-		CACHED_ENTRIES_THRESHOLD(1000),
+		page_mapping(),
+		CACHED_ENTRIES_THRESHOLD(),
+		num_dirty_cached_entries(),
+		dial(),
 		ENTRIES_PER_TRANSLATION_PAGE(512)
-{}
+{
+	IS_FTL_PAGE_MAPPING = true;
+}
 
 DFTL::~DFTL(void)
-{}
+{
+	assert(application_ios_waiting_for_translation.size() == 0);
+}
 
 void DFTL::read(Event *event)
 {
-	//PRINT_LEVEL = 1;
 	long la = event->get_logical_address();
 	// If the logical address is in the cached mapping table, submit the IO
 	if (cached_mapping_table.count(la) == 1) {
@@ -124,6 +138,11 @@ void DFTL::write(Event *event)
 {
 	long la = event->get_logical_address();
 
+	if (event->get_id() == 101850) {
+		int i =0 ;
+		i++;
+	}
+
 	// If the logical address is in the cached mapping table, submit the IO
 	if (cached_mapping_table.count(la) == 1) {
 		entry& e = cached_mapping_table.at(la);
@@ -159,8 +178,12 @@ void DFTL::write(Event *event)
 void DFTL::register_write_completion(Event const& event, enum status result) {
 	page_mapping.register_write_completion(event, result);
 
+	if (event.get_noop()) {
+		return;
+	}
+
 	// assume that the logical address of a GCed page is in the out of bound area of the page, so we can use it to update the mapping
-	if (event.is_garbage_collection_op() && !event.is_original_application_io()) {
+	if (event.is_garbage_collection_op() && !event.is_original_application_io() && !event.is_mapping_op()) {
 		if (cached_mapping_table.count(event.get_logical_address()) == 0) {
 			entry e;
 			e.timestamp = event.get_current_time();
@@ -176,7 +199,7 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 	}
 
 	// If the write that just finished is a normal IO, update the mapping
-	if (ongoing_mapping_operations.count(event.get_logical_address()) == 0) {
+	if (ongoing_mapping_operations.count(event.get_logical_address()) == 0 && !event.is_mapping_op()) {
 		if (cached_mapping_table.count(event.get_logical_address()) == 0) {
 			printf("The entry was not in the cache \n");
 			event.print();
@@ -252,6 +275,7 @@ void DFTL::set_replace_address(Event& event) const {
 		long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
 		Address ra = global_translation_directory[translation_page_id];
 		event.set_replace_address(ra);
+		event.set_mapping_op(true);
 	}
 	else {
 		page_mapping.set_replace_address(event);

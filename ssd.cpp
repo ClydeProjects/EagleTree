@@ -53,9 +53,9 @@ Ssd::Ssd():
 	Migrator* migrator = new Migrator();
 
 	if (FTL_DESIGN == 0) {
-		ftl = new FtlImpl_Page(this);
+		ftl = new FtlImpl_Page(this, bm);
 	} else if (FTL_DESIGN == 1) {
-		ftl = new DFTL(this);
+		ftl = new DFTL(this, bm);
 	} else {
 		ftl = new FAST(this, bm, migrator);
 	}

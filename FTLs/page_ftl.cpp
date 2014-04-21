@@ -25,17 +25,21 @@
 
 using namespace ssd;
 
-FtlImpl_Page::FtlImpl_Page(Ssd *ssd):
-	FtlParent(ssd),
+FtlImpl_Page::FtlImpl_Page(Ssd *ssd, Block_manager_parent* bm):
+	FtlParent(ssd, bm),
 	logical_to_physical_map(NUMBER_OF_ADDRESSABLE_PAGES(), UNDEFINED),
 	physical_to_logical_map(NUMBER_OF_ADDRESSABLE_PAGES(), UNDEFINED)
-{}
+{
+	IS_FTL_PAGE_MAPPING = true;
+}
 
 FtlImpl_Page::FtlImpl_Page() :
-	FtlParent(NULL),
+	FtlParent(),
 	logical_to_physical_map(NUMBER_OF_ADDRESSABLE_PAGES(), UNDEFINED),
 	physical_to_logical_map(NUMBER_OF_ADDRESSABLE_PAGES(), UNDEFINED)
-{}
+{
+	IS_FTL_PAGE_MAPPING = true;
+}
 
 FtlImpl_Page::~FtlImpl_Page(void)
 {}
@@ -56,6 +60,10 @@ void FtlImpl_Page::trim(Event *event)
 }
 
 void FtlImpl_Page::register_write_completion(Event const& event, enum status result) {
+
+	if (event.get_noop()) {
+		return;
+	}
 	long new_phys_addr = event.get_address().get_linear_address();
 
 	long logi_addr = event.get_logical_address();
@@ -91,6 +99,7 @@ Address FtlImpl_Page::get_physical_address(uint logical_address) const {
 
 void FtlImpl_Page::set_replace_address(Event& event) const {
 	Address target = get_physical_address(event.get_logical_address());
+
 	event.set_replace_address(target);
 }
 
@@ -101,7 +110,12 @@ void FtlImpl_Page::set_read_address(Event& event) const {
 		fprintf(stderr, "It is most likely that nothing has been written to this address so far.\n");
 		assert(false);
 	}
-	event.set_address(target);
+	/*if (event.get_address().valid == PAGE && event.is_garbage_collection_op() && event.get_address().compare(target) < BLOCK) {
+		event.set_noop(true);
+	}*/
+	else {
+		event.set_address(target);
+	}
 }
 
 

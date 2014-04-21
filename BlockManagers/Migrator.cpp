@@ -61,16 +61,17 @@ void Migrator::handle_erase_completion(Event* event) {
 		}
 	}
 
+	num_blocks_being_garbaged_collected_per_LUN[a.package][a.die]--;
+	blocks_being_garbage_collected.erase(a.get_linear_address());
+
 	if (PRINT_LEVEL > 1) {
+		printf("Finishing GC in %d \n", a.get_linear_address());
 		printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
 		for (map<int, int>::const_iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
 			printf("%d  ", (*iter).first);
 		}
 		printf("\n");
 	}
-
-	num_blocks_being_garbaged_collected_per_LUN[a.package][a.die]--;
-	blocks_being_garbage_collected.erase(a.get_linear_address());
 }
 
 void Migrator::handle_trim_completion(Event* event) {
@@ -229,8 +230,6 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	bool is_wear_leveling_op = gc_event->is_wear_leveling_op();
 
 	Block * victim;
-	a.print();
-	printf("\n%d\t%d\n", a.get_block_id(), a.get_linear_address());
 	if (is_wear_leveling_op) {
 		victim = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
 	}
@@ -265,6 +264,10 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 		return migrations;
 	}*/
 
+	if (victim->get_physical_address() == 976 && gc_event->get_start_time() > 39548840) {
+		int i = 0;
+		i++;
+	}
 
 	update_structures(addr);
 	bm->subtract_from_available_for_new_writes(victim->get_pages_valid());
@@ -320,6 +323,11 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 				read->set_address(addr);
 				read->set_garbage_collection_op(true);
 
+				if (victim->get_physical_address() == 976) {
+					int i = 0;
+					i++;
+				}
+
 				Event* write = new Event(WRITE, logical_address, 1, gc_event->get_current_time());
 				write->set_garbage_collection_op(true);
 				write->set_replace_address(addr);
@@ -341,7 +349,7 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 				dependent_gc[block_id] = vector<deque<Event* > >();
 			}
 			else {
-				dependent_gc[block_id].push_back(migration);
+				dependent_gc.at(block_id).push_back(migration);
 			}
 		}
 	}
@@ -352,7 +360,7 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 
 void Migrator::print_pending_migrations() {
 	for (auto block : dependent_gc) {
-		cout << block.first << endl;
+		cout << block.first * BLOCK_SIZE << endl;
 		for (auto migration : block.second) {
 			migration[0]->get_address().print();
 			cout << endl;
@@ -362,27 +370,24 @@ void Migrator::print_pending_migrations() {
 
 bool Migrator::more_migrations(Event * gc_read) {
 	int block_id = gc_read->get_address().get_block_id();
-	return dependent_gc.count(block_id) == 1;
+	if (dependent_gc.count(block_id) == 1 && dependent_gc.at(block_id).size() > 0) {
+		return true;
+	}
+	else if (dependent_gc.count(block_id) == 1) {
+		dependent_gc.erase(block_id);
+	}
+	return false;
 }
 
 deque<Event*> Migrator::trigger_next_migration(Event * gc_read) {
 	int block_id = gc_read->get_address().get_block_id();
-	/*if (gc_read->get_address().get_block_id() == 31) {
-		cout << dependent_gc[block_id].size() << endl;
-		int i = 0;
-		i++;
-	}*/
+	assert(dependent_gc.count(block_id) == 1 && dependent_gc.at(block_id).size() > 0);
+	deque<Event*> next_migration = dependent_gc.at(block_id).back();
+	dependent_gc.at(block_id).pop_back();
 
-
-	assert(dependent_gc.count(block_id) == 1);
-
-	deque<Event*> next_migration = dependent_gc[block_id].back();
-	dependent_gc[block_id].pop_back();
-
-	if (dependent_gc[block_id].size() == 0) {
+	if ( dependent_gc.at(block_id).empty()) {
 		dependent_gc.erase(block_id);
 	}
-
 
 	return next_migration;
 }

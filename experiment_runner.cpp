@@ -98,7 +98,7 @@ void Experiment::run_single_point(string name) {
 	Queue_Length_Statistics::init();
 
 	OperatingSystem* os = calibration_file.empty() ? new OperatingSystem() : load_state(calibration_file);
-	os->set_progress_meter_granularity(20);
+	//os->set_progress_meter_granularity(10);
 	if (workload != NULL) {
 		vector<Thread*> experiment_threads = workload->generate_instance();
 		os->set_threads(experiment_threads);
@@ -356,6 +356,7 @@ void Experiment::calibrate_and_save(Workload_Definition* workload, string name, 
 	//Free_Space_Per_LUN_Meter::init();
 	printf("Creating calibrated SSD state.\n");
 	OperatingSystem* os = new OperatingSystem();
+	//num_IOs /= 2;
 	os->set_num_writes_to_stop_after(num_IOs);
 	vector<Thread*> init_threads = workload->generate_instance();
 	os->set_threads(init_threads);
@@ -416,6 +417,8 @@ void Experiment::save_state(OperatingSystem* os, string file_name) {
 	printf("%s\n", file_name.c_str());
 	boost::archive::text_oarchive oa(file);
 	oa.register_type<FtlImpl_Page>( );
+	oa.register_type<FAST>( );
+	oa.register_type<DFTL>( );
 	oa.register_type<Block_manager_parallel>( );
 	oa.register_type<Sequential_Locality_BM>( );
 	oa.register_type<File_Manager>( );
@@ -444,6 +447,8 @@ OperatingSystem* Experiment::load_state(string name) {
 	std::ifstream file(file_name.c_str());
 	boost::archive::text_iarchive ia(file);
 	ia.register_type<FtlImpl_Page>( );
+	ia.register_type<FAST>();
+	ia.register_type<DFTL>();
 	ia.register_type<Block_manager_parallel>();
 	ia.register_type<Sequential_Locality_BM>( );
 	ia.register_type<File_Manager>( );
@@ -456,7 +461,6 @@ OperatingSystem* Experiment::load_state(string name) {
 	ia.register_type<READS_OR_WRITES>();
 	ia.register_type<Asynchronous_Random_Writer>();
 	ia.register_type<Asynchronous_Random_Reader>();
-
 	ia.register_type<MTRand>();
 	ia.register_type<MTRand_closed>();
 	ia.register_type<MTRand_open>();
@@ -477,7 +481,11 @@ OperatingSystem* Experiment::load_state(string name) {
 	Block_manager_parent* bm = Block_manager_parent::get_new_instance();
 	bm->copy_state(scheduler->get_bm());
 	delete scheduler->get_bm();
+
 	scheduler->set_block_manager(bm);
+	FtlParent* ftl = os->get_ssd()->get_ftl();
+	//delete ftl->get_block_manager();
+	ftl->set_block_manager(bm);
 	Migrator* m = scheduler->get_migrator();
 	m->set_block_manager(bm);
 	Garbage_Collector* gc = m->get_garbage_collector();

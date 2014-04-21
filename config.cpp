@@ -138,6 +138,7 @@ int GREED_SCALE = 2;
  * 2 -> FAST
  */
 int FTL_DESIGN = 0;
+bool IS_FTL_PAGE_MAPPING = 0;
 
 // The number of entries that fit into the in-RAM cache of DFTL
 int DFTL_CACHE_SIZE = 10000;
@@ -271,6 +272,8 @@ void set_small_SSD_config() {
 	OVER_PROVISIONING_FACTOR = 0.7;
 
 	OS_SCHEDULER = 0;
+
+	FTL_DESIGN = 0;
 
 	READ_TRANSFER_DEADLINE = PAGE_READ_DELAY + 1;// PAGE_READ_DELAY + 1;
 }

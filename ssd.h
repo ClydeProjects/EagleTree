@@ -181,6 +181,7 @@ extern int READ_DEADLINE;
 extern int READ_TRANSFER_DEADLINE;
 
 extern int FTL_DESIGN;
+extern bool IS_FTL_PAGE_MAPPING;
 
 // The number of entries that fit into the in-RAM cache of DFTL
 extern int DFTL_CACHE_SIZE;
@@ -286,12 +287,8 @@ class Package;
 
 class FtlParent;
 class FtlImpl_Page;
-class FtlImpl_Bast;
-class FtlImpl_Fast;
-//class FtlImpl_DftlParent;
-//class FtlImpl_Dftl;
-class FtlImpl_BDftl;
-
+class DFTL;
+class FAST;
 class Ssd;
 
 class event_queue;
@@ -811,8 +808,8 @@ private:
 class FtlParent
 {
 public:
-	FtlParent(Ssd *ssd) : ssd(ssd), scheduler(NULL) {};
-	FtlParent() : ssd(NULL), scheduler(NULL) {};
+	FtlParent(Ssd *ssd, Block_manager_parent* bm) : ssd(ssd), scheduler(NULL), bm(bm) {};
+	FtlParent() : ssd(NULL), scheduler(NULL), bm(NULL) {};
 	inline void set_scheduler(IOScheduler* sched) { scheduler = sched; }
 	virtual ~FtlParent () {};
 	virtual void read(Event *event) = 0;
@@ -827,22 +824,26 @@ public:
 	virtual void set_replace_address(Event& event) const = 0;
 	virtual void set_read_address(Event& event) const = 0;
 	virtual void print() const {};
+	void set_block_manager(Block_manager_parent* b) { bm = b; }
+	Block_manager_parent* get_block_manager() { return bm; }
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
     {
     	ar & ssd;
     	ar & scheduler;
+    	ar & bm;
     }
 protected:
 	Ssd *ssd;
 	IOScheduler *scheduler;
+	Block_manager_parent* bm;
 };
 
 class FtlImpl_Page : public FtlParent
 {
 public:
-	FtlImpl_Page(Ssd *ssd);
+	FtlImpl_Page(Ssd *ssd, Block_manager_parent* bm);
 	FtlImpl_Page();
 	~FtlImpl_Page();
 	void read(Event *event);
@@ -874,12 +875,11 @@ private:
 //
 class DFTL : public FtlParent {
 public:
-	DFTL(Ssd *ssd);
+	DFTL(Ssd *ssd, Block_manager_parent* bm);
 	DFTL();
 	~DFTL();
 	void read(Event *event);
 	void write(Event *event);
-
 	void trim(Event *event);
 	void register_write_completion(Event const& event, enum status result);
 	void register_read_completion(Event const& event, enum status result);
@@ -897,7 +897,6 @@ public:
     	ar & cached_mapping_table;
     	ar & global_translation_directory;
     	ar & ongoing_mapping_operations;
-    	ar & application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
     	ar & NUM_PAGES_IN_SSD;
     	ar & page_mapping;
     	ar & CACHED_ENTRIES_THRESHOLD;
@@ -912,14 +911,14 @@ private:
 		int fixed;
 		short hotness;
 		double timestamp; // when was the entry added to the cache
-	    /*friend class boost::serialization::access;
+	    friend class boost::serialization::access;
 	    template<class Archive> void
 	    serialize(Archive & ar, const unsigned int version) {
 	    	ar & dirty;
 	    	ar & fixed;
 	    	ar & hotness;
 	    	ar & timestamp;
-	    }*/
+	    }
 	};
 
 	void flush_mapping(double time);
@@ -927,21 +926,16 @@ private:
 	void create_mapping_read(long translation_page_id, double time, Event* dependant);
 	void lock_all_entries_in_a_translation_page(long translation_page_id, int lock, double time);
 	int evict_cold_entries();
-
-
 	map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
 	vector<Address> global_translation_directory; // tracks where translation pages are
-
 	set<long> ongoing_mapping_operations; // contains the logical addresses of ongoing mapping IOs
-
 	map<long, vector<Event*> > application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
-
-	const int NUM_PAGES_IN_SSD;
+	int NUM_PAGES_IN_SSD;
 	FtlImpl_Page page_mapping;
-	const int CACHED_ENTRIES_THRESHOLD;
+	int CACHED_ENTRIES_THRESHOLD;
 	int num_dirty_cached_entries;
 	int dial;
-	const int ENTRIES_PER_TRANSLATION_PAGE;
+	int ENTRIES_PER_TRANSLATION_PAGE;
 };
 
 class FAST : public FtlParent {
@@ -961,18 +955,40 @@ public:
 	void set_read_address(Event& event) const;
 	void register_erase_completion(Event & event);
 	void print() const;
+    friend class boost::serialization::access;
+    template<class Archive> void
+    serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<FtlParent>(*this);
+    	ar & translation_table;
+    	ar & active_log_blocks_map;
+    	ar & dial;
+    	ar & NUM_LOG_BLOCKS;
+    	ar & num_active_log_blocks;
+    	ar & bm;
+    	//ar & queued_events;
+    	ar & migrator;
+    	ar & page_mapping;
+    	//ar & gc_queue;
+    }
 private:
 	void schedule(Event* e);
 	void choose_existing_log_block(Event* e);
 	void unlock_block(Event const& event);
-	vector<Address> translation_table;		  // maps block ID to a block address in flash. This is the main mapping table
+	void consider_doing_garbage_collection(double time);
 
 	struct log_block {
 		log_block(Address& addr) : addr(addr), num_blocks_mapped_inside() {}
+		log_block() : addr(), num_blocks_mapped_inside() {}
 		Address addr;
 		set<int> num_blocks_mapped_inside;
+	    friend class boost::serialization::access;
+	    template<class Archive> void
+	    serialize(Archive & ar, const unsigned int version) {
+	    	ar & addr;
+	    	ar & num_blocks_mapped_inside;
+	    }
 	};
-	void consider_doing_garbage_collection(double time);
+
 	struct mycomparison
 	{
 	  bool operator() (const log_block* lhs, const log_block* rhs) const
@@ -980,26 +996,23 @@ private:
 	    return lhs->num_blocks_mapped_inside.size() > rhs->num_blocks_mapped_inside.size();
 	  }
 	};
+
 	void write_in_log_block(Event* event);
 	void queue_up(Event* e, Address const& lock);
 	priority_queue<log_block*, std::vector<log_block*>, mycomparison> full_log_blocks;
 	void release_events_there_was_no_space_for();
 	void garbage_collect(int block_id, log_block* log_block, double time);
 
+	vector<Address> translation_table;		  // maps block ID to a block address in flash. This is the main mapping table
 	map<int, log_block*> active_log_blocks_map;  // Maps a block ID to the address of the corresponding log block. Used to quickly determine where to place an update
-
 	int dial;
-	const int NUM_LOG_BLOCKS;
+	int NUM_LOG_BLOCKS;
 	int num_active_log_blocks;
-	Block_manager_parent* bm;
-	//map<Address, Event*> event_retainer;  // Used when the page being written
-	map<long, Address> logical_addresses_to_pages_in_log_blocks;  // a RAM map from location of a logged page
-
 	map<int, queue<Event*> > queued_events; // stores events tar
 	Migrator* migrator;
 	FtlImpl_Page page_mapping;
 	map<int, queue<Event*> > gc_queue;
-	int num_ongoing_garbage_collection_operations;
+	map<long, queue<Event*> > logical_dependencies;  // a locking table with page granularity
 };
 
 /* The SSD is the single main object that will be created to simulate a real

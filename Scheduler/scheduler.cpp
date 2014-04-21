@@ -242,12 +242,6 @@ void IOScheduler::handle(vector<Event*>& events) {
 
 // executes read_commands, read_transfers and erases
 void IOScheduler::handle_event(Event* event) {
-
-	/*if (event->get_application_io_id() == 15949) {
-		int i = 0;
-		i++;
-	}*/
-
 	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
 	bool can_schedule = bm->can_schedule_on_die(event->get_address(), event->get_event_type(), event->get_application_io_id());
 	if (!can_schedule) {
@@ -264,18 +258,6 @@ void IOScheduler::handle_event(Event* event) {
 }
 
 void IOScheduler::handle_read(Event* event) {
-
-	if (event->get_application_io_id() == 26514) {
-		int i =0 ;
-		i++;
-		static int d = 0;
-		//printf("num  %d\n", d++);
-		if (d == 52) {
-			int a;
-			a++;
-		}
-	}
-
 	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
 	bool can_schedule = bm->can_schedule_on_die(event->get_address(), event->get_event_type(), event->get_application_io_id());
 
@@ -372,12 +354,6 @@ void IOScheduler::handle_flexible_read(Event* event) {
 
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_write(Event* event) {
-
-	if (event->get_logical_address() == 3056 && event->get_start_time() > 11721320) {
-		int i = 0;
-		 i++;
-	}
-
 	Address addr = event->get_address();
 	if (event->get_address().valid == NONE) {
 		addr = bm->choose_write_address(*event);
@@ -480,6 +456,9 @@ void IOScheduler::handle_noop_events(vector<Event*>& events) {
 void IOScheduler::inform_FTL_of_noop_completion(Event* event) {
 	if (event->get_event_type() == READ_TRANSFER) {
 		ftl->register_read_completion(*event, SUCCESS);
+		if (event->is_garbage_collection_op()) {
+			trigger_next_migration(event);
+		}
 	}
 	else if (event->get_event_type() == WRITE) {
 		ftl->register_write_completion(*event, SUCCESS);
@@ -527,16 +506,10 @@ void IOScheduler::setup_dependent_event(Event* event, Event* dependent) {
 
 
 enum status IOScheduler::execute_next(Event* event) {
-
-	if (event->get_application_io_id() == 26514) {
-		int i =0 ;
-		i++;
-	}
-
 	enum status result = ssd->issue(event);
 	assert(result == SUCCESS);
 
-	if (PRINT_LEVEL > 0/* && event->is_garbage_collection_op()*/ && (event->get_event_type() == WRITE || event->get_event_type() == ERASE) ) {
+	if (PRINT_LEVEL > 0/* && event->is_garbage_collection_op() && (event->get_event_type() == WRITE || event->get_event_type() == ERASE)*/ ) {
 		event->print();
 		if (event->is_flexible_read()) {
 			//printf("FLEX\n");
@@ -640,11 +613,6 @@ void IOScheduler::init_event(Event* event) {
 	uint dep_code = event->get_application_io_id();
 	event_type type = event->get_event_type();
 
-	if (event->get_application_io_id() == 26514) {
-		int i =0 ;
-		i++;
-	}
-
 	if (event->get_noop() && event->get_event_type() != GARBAGE_COLLECTION) {
 		push(event);
 		return;
@@ -707,6 +675,10 @@ void IOScheduler::init_event(Event* event) {
 
 
 void IOScheduler::trigger_next_migration(Event* event) {
+	if (event->get_replace_address().get_block_id() == 1136) {
+			int i = 0;
+			i++;
+		}
 	if (!migrator->more_migrations(event)) {
 		return;
 	}
@@ -787,12 +759,15 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	else */
 
-	if (new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
+
+	if (IS_FTL_PAGE_MAPPING && new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
+		promote_to_gc(existing_event);
+		remove_current_operation(new_event);
+		push(new_event); // Make sure the old GC READ is run, even though it is now a NOOP command
+		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
+	}
+	else if (!IS_FTL_PAGE_MAPPING && new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
 		make_dependent(new_event, dependency_code_of_other_event);
-		//promote_to_gc(existing_event);
-		//remove_current_operation(new_event);
-		//push(new_event); // Make sure the old GC READ is run, even though it is now a NOOP command
-		//LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
 	}
 	else if (new_event->is_garbage_collection_op() && scheduled_op_code == TRIM) {
 		remove_current_operation(new_event);
