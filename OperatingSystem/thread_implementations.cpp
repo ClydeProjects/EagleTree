@@ -229,3 +229,49 @@ void Collision_Free_Asynchronous_Random_Thread::issue_first_IOs() {
 void Collision_Free_Asynchronous_Random_Thread::handle_event_completion(Event* event) {
 	logical_addresses_submitted.erase(event->get_logical_address());
 }*/
+
+void K_Modal_Thread::create_io() {
+
+	int group_decider = random_number_generator() * 100;
+	int cumulative_prob = 0;
+	int selected_group_start_lba = 0;
+	int selected_group_size = 0;
+	for (int i = 0; i < k_modes.size(); i++) {
+		cumulative_prob += k_modes[i].first;
+		if (group_decider <= cumulative_prob) {
+			selected_group_size = k_modes[i].second;
+			break;
+		}
+		selected_group_start_lba += k_modes[i].second;
+	}
+
+	long lba = selected_group_start_lba + random_number_generator() * selected_group_size;
+	/*printf("%d\n", lba);
+	if (lba == 314572) {
+		int i = 0;
+		i++;
+	}*/
+
+	long max_addr = NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
+	if (lba > max_addr) {
+		int i = 0;
+		i++;
+	}
+	Event* e = new Event(WRITE, lba, 1, get_time());
+	e->set_tag(selected_group_start_lba);
+	e->set_size(selected_group_size);
+	submit(e);
+}
+
+void K_Modal_Thread::issue_first_IOs() {
+	while (get_num_ongoing_IOs() < 1 && !is_finished() && !is_stopped()) {
+		create_io();
+	}
+}
+
+void K_Modal_Thread::handle_event_completion(Event* event) {
+	while (get_num_ongoing_IOs() < 1 && !is_finished() && !is_stopped()) {
+		create_io();
+	}
+}
+

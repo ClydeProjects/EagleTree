@@ -54,14 +54,16 @@ void Experiment_Result::start_experiment() {
     (*stats_file) << "\"" << variable_parameter_name << "\", " << StatisticsGatherer::get_global_instance()->totals_csv_header() << ", \"" << throughput_column_name << "\", \"" << write_throughput_column_name << "\", \"" << read_throughput_column_name << "\"" << "\n";
 }
 
-void Experiment_Result::collect_stats(double variable_parameter_value) {
+void Experiment_Result::collect_stats(string variable_parameter_value) {
 	collect_stats(variable_parameter_value, StatisticsGatherer::get_global_instance());
 }
 
-void Experiment_Result::collect_stats(double variable_parameter_value, StatisticsGatherer* statistics_gatherer) {
+void Experiment_Result::collect_stats(string variable_parameter_value, StatisticsGatherer* statistics_gatherer) {
 	assert(experiment_started && !experiment_finished);
 
 	chdir(data_folder.c_str());
+
+	points.push_back(variable_parameter_value);
 
 	// Compute throughput
 	int total_read_IOs_issued  = statistics_gatherer->total_reads();
@@ -115,9 +117,20 @@ void Experiment_Result::collect_stats(double variable_parameter_value, Statistic
 	queue_file << statistics_gatherer->latency_csv();
 	queue_file.close();
 
-	vp_num_IOs[variable_parameter_value].push_back(total_write_IOs_issued);
-	vp_num_IOs[variable_parameter_value].push_back(total_read_IOs_issued);
-	vp_num_IOs[variable_parameter_value].push_back(total_write_IOs_issued + total_read_IOs_issued);
+	map<string, StatisticData>::const_iterator it = StatisticData::statistics.begin();
+	while (it != StatisticData::statistics.end()) {
+		std::ofstream stat_file;
+		stringstream file_name;
+		file_name << (*it).first << "-" << variable_parameter_value << datafile_postfix;
+		stat_file.open(file_name.str().c_str());
+		stat_file << StatisticData::to_csv((*it).first);
+		stat_file.close();
+		it++;
+	}
+
+	//vp_num_IOs[variable_parameter_value].push_back(total_write_IOs_issued);
+	//vp_num_IOs[variable_parameter_value].push_back(total_read_IOs_issued);
+	//vp_num_IOs[variable_parameter_value].push_back(total_write_IOs_issued + total_read_IOs_issued);
 }
 
 void Experiment_Result::end_experiment() {

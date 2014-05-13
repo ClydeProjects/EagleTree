@@ -113,6 +113,7 @@ void OperatingSystem::run() {
 		int thread_id = scheduler->pick(threads);
 		bool no_pending_event = thread_id == UNDEFINED;
 		bool queue_is_full = currently_executing_ios.size() >= MAX_SSD_QUEUE_SIZE;
+		int queue_size = currently_executing_ios.size();
 		if (no_pending_event || queue_is_full) {
 			check_if_stuck(no_pending_event, queue_is_full);
 			ssd->progress_since_os_is_waiting();

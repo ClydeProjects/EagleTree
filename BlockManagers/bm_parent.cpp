@@ -86,12 +86,14 @@ Address Block_manager_parent::choose_flexible_read_address(Flexible_Read_Event* 
 	return candidates[coor.first][coor.second];
 }
 
-Address Block_manager_parent::choose_write_address(Event const& write) {
+Address Block_manager_parent::choose_write_address(Event& write) {
 	//printf("num_available_pages_for_new_writes   %d\n", num_available_pages_for_new_writes);
 	bool can_write = num_available_pages_for_new_writes > 0 || write.is_garbage_collection_op();
 	if (!can_write) {
 		return Address();
 	}
+	int num_free_blocks = get_num_free_blocks();
+	int num_gc = migrator->how_many_gc_operations_are_scheduled();
 
 	if (write.get_event_type() == COPY_BACK) {
 		return choose_copbyback_address(write);
@@ -148,7 +150,7 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	Free_Space_Meter::register_num_free_pages_for_app_writes(num_available_pages_for_new_writes, event.get_current_time());
 
 	if (migrator->how_many_gc_operations_are_scheduled() == 0) {
-		//assert(num_free_pages == num_available_pages_for_new_writes);
+		assert(num_free_pages == num_available_pages_for_new_writes);
 	}
 
 	Block_manager_parent::check_if_should_trigger_more_GC(event.get_current_time());
@@ -219,6 +221,16 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 
 void Block_manager_parent::trim(Event const& event) {
 	IO_has_completed_since_last_shortest_queue_search = true;
+}
+
+int Block_manager_parent::get_num_free_blocks() {
+	int sum = 0;
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			sum += get_num_free_blocks(i, j);
+		}
+	}
+	return sum;
 }
 
 int Block_manager_parent::get_num_free_blocks(int package, int die) {
@@ -458,6 +470,12 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 		order.pop_back();
 		Address address = find_free_unused_block(package_id, die_id, index, time);
 		if (address.valid != NONE) {
+
+			if (address.package == 1 && address.block == 11) {
+				int i = 0;
+				i++;
+			}
+
 			return address;
 		}
 	}
@@ -552,6 +570,7 @@ Block_manager_parent* Block_manager_parent::get_new_instance() {
 		case 2: bm = new Sequential_Locality_BM(); break;
 		case 3: bm = new Block_manager_roundrobin(); break;
 		case 4: bm = new Wearwolf(); break;
+		case 5: bm = new Block_Manager_Tag_Groups(); break;
 		default: bm = new Block_manager_parallel(); break;
 	}
 	return bm;

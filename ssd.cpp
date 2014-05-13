@@ -118,7 +118,7 @@ void Ssd::submit(Event* event) {
 	// If the IO spans several flash pages, we break it into multiple flash page IOs
 	// When these page IOs are all finished, we return to the OS
 	static int ssd_id_generator = 0;
-	if (event->get_size() > 1) {
+	if (event->get_size() > 1 && event->get_tag() == UNDEFINED) {
 		int ssd_id = ssd_id_generator++;
 		event->set_ssd_id(ssd_id);
 		large_events_map.resiger_large_event(event);

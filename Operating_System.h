@@ -224,8 +224,13 @@ private:
 class Synchronous_Random_Writer : public Simple_Thread
 {
 public:
+	Synchronous_Random_Writer() : Simple_Thread() {}
 	Synchronous_Random_Writer(long min_LBA, long max_LBA, ulong randseed)
 		: Simple_Thread(new Random_IO_Pattern(min_LBA, max_LBA, randseed), new WRITES(), 1, INFINITE) {}
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<Simple_Thread>(*this);
+    }
 };
 
 // This thread performs synchronous random reads across the target address space
@@ -274,6 +279,7 @@ public:
 class Asynchronous_Sequential_Writer : public Simple_Thread
 {
 public:
+	Asynchronous_Sequential_Writer() : Simple_Thread() {}
 	Asynchronous_Sequential_Writer(long min_LBA, long max_LBA)
 		: Simple_Thread(new Sequential_IO_Pattern(min_LBA, max_LBA), MAX_SSD_QUEUE_SIZE * 2, new WRITES()) {
 	}
@@ -318,6 +324,28 @@ public:
     template<class Archive> void serialize(Archive & ar, const unsigned int version) {
     	ar & boost::serialization::base_object<Simple_Thread>(*this);
     }
+};
+
+// Divides the workload across the logical address space into K groups
+class K_Modal_Thread : public Thread
+{
+public:
+	K_Modal_Thread(vector<pair<int, int> > k_modes) : k_modes(k_modes), random_number_generator(2) {
+		random_number_generator.seed(10);
+	}
+	K_Modal_Thread() : k_modes(), random_number_generator(35) {}
+	void issue_first_IOs();
+	void handle_event_completion(Event* event);
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<Thread>(*this);
+    	ar & k_modes;
+    	ar & random_number_generator;
+    }
+private:
+	void create_io();
+	vector<pair<int, int> > k_modes;
+	MTRand_open random_number_generator;
 };
 
 // This thread simulates the IO pattern of an external sort algorithm
@@ -453,11 +481,11 @@ private:
 		int id;
 		uint num_pages_written;
 		deque<Address_Range > ranges_comprising_file;
-
+		set<pair<int, int>> on_how_many_luns_is_this_file;
 		File(uint size, double death_probability, double time_created, int id);
 
 		bool is_finished() const;
-		void register_write_completion();
+		void register_write_completion(Event* event);
 		void finish(double time_finished);
 	    friend class boost::serialization::access;
 	    template<class Archive> void

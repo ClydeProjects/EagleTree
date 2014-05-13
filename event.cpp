@@ -141,6 +141,9 @@ void Event::print(FILE *stream) const
 	if (type == GARBAGE_COLLECTION) {
 		fprintf(stream, " age class: %d", age_class);
 	}
+	if (tag != UNDEFINED) {
+		fprintf(stream, " tag: %d", tag);
+	}
 	fprintf(stream, "\n");
 }
 

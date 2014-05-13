@@ -50,6 +50,7 @@ void IOScheduler::init() {
 		case 3: ps = new gcRe_gcWr_Er_Re_Wr_Priorty_Scheme(this); break;
 		case 4: ps = new Er_Wr_Re_gcRe_gcWr_Priorty_Scheme(this); break;
 		case 5: ps = new We_Re_gcWr_E_gcR_Priorty_Scheme(this); break;
+		case 6: ps = new Re_Er_Wr_Priorty_Scheme(this); break;
 		default: ps = new Fifo_Priorty_Scheme(this); break;
 	}
 	current_events = new Scheduling_Strategy(this, ssd, ps);
@@ -354,6 +355,12 @@ void IOScheduler::handle_flexible_read(Event* event) {
 
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_write(Event* event) {
+
+	if (event->get_id() == 370418 && event->get_bus_wait_time() > 120800) {
+		int i = 0;
+		i++;
+	}
+
 	Address addr = event->get_address();
 	if (event->get_address().valid == NONE) {
 		addr = bm->choose_write_address(*event);
@@ -509,12 +516,17 @@ enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd->issue(event);
 	assert(result == SUCCESS);
 
-	if (PRINT_LEVEL > 0/* && event->is_garbage_collection_op() && (event->get_event_type() == WRITE || event->get_event_type() == ERASE)*/ ) {
+	if (PRINT_LEVEL > 0  /* && event->is_garbage_collection_op() && (event->get_event_type() == WRITE || event->get_event_type() == ERASE)*/ ) {
 		event->print();
 		if (event->is_flexible_read()) {
 			//printf("FLEX\n");
 		}
 	}
+
+	/*if ((event->get_address().package == 1 && event->get_address().die == 1 && event->get_address().block == 98) ||
+			(event->get_replace_address().package == 1 && event->get_replace_address().die == 1 && event->get_replace_address().block == 98)) {
+		event->print();
+	}*/
 
 	handle_finished_event(event);
 

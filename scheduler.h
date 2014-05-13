@@ -36,11 +36,11 @@ public:
 	void schedule(vector<Event*>& events);
 };
 
-/*class Re_Er_Wr_Priorty_Scheme : public Priorty_Scheme {
+class Re_Er_Wr_Priorty_Scheme : public Priorty_Scheme {
 public:
 	Re_Er_Wr_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
-	void schedule(vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
-};*/
+	void schedule(vector<Event*>& events);
+};
 
 class Er_Wr_Re_gcRe_gcWr_Priorty_Scheme : public Priorty_Scheme {
 public:

@@ -101,7 +101,7 @@ vector<Thread*> Asynch_Random_Workload::generate() {
 
 vector<Thread*> Init_Workload::generate() {
 	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
-	Simple_Thread* thread = new Asynchronous_Random_Writer(min_lba, max_lba, 23623);
+	Simple_Thread* thread = new Synchronous_Random_Writer(min_lba, max_lba, 23623);
 	init_write->add_follow_up_thread(thread);
 	vector<Thread*> threads(1, init_write);
 	return threads;
@@ -150,7 +150,7 @@ vector<Thread*> File_System_With_Noise::generate() {
 	seq->add_follow_up_thread(t3);
 
 	vector<Thread*> threads;
-	threads.push_back(seq);
+	threads.push_back(t3);
 	//threads.push_back(t4);
 
 	Individual_Threads_Statistics::init();
@@ -161,5 +161,33 @@ vector<Thread*> File_System_With_Noise::generate() {
 	//Individual_Threads_Statistics::register_thread(t4, "File Manager 2");
 
 	return threads;
+}
+
+vector<Thread*> K_Modal_Workload::generate() {
+	vector<pair<int, int> > modes;
+
+	//pair<double, int> m1(0.666, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * 0.375);
+	//pair<double, int> m2(0.333, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * 0.625);
+
+	double prob_1 = relative_prob / (relative_prob + 1.0);
+	double prob_2 = 1 / (relative_prob + 1.0);
+
+	double size_1 = relative_size / (relative_size + 1.0);
+	double size_2 = 1 / (relative_size + 1.0);
+
+	pair<int, int> m1(prob_1 * 100, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * size_1);
+	pair<int, int> m2(prob_2 * 100, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * size_2);
+
+	printf("division point %d\n", m1.second);
+
+	modes.push_back(m1);
+	modes.push_back(m2);
+
+	Thread* modes_t = new K_Modal_Thread(modes);
+
+	Simple_Thread* seq = new Asynchronous_Sequential_Writer(0, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR);
+	seq->add_follow_up_thread(modes_t);
+
+	return vector<Thread*>(1, seq);
 }
 

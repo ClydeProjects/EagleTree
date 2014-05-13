@@ -251,10 +251,10 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 
 	Address addr = Address(victim->get_physical_address(), BLOCK);
 
-	if (num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die] >= 1) {
+	/*if (num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die] >= 1) {
 		StatisticsGatherer::get_global_instance()->num_gc_cancelled_gc_already_happening++;
 		return migrations;
-	}
+	}*/
 
 	/*if (blocks_being_wl.count(victim) == 1) {
 		return migrations;
@@ -270,6 +270,7 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	}
 
 	update_structures(addr);
+	//printf("blocks being gced %d\n", blocks_being_garbage_collected.size());
 	bm->subtract_from_available_for_new_writes(victim->get_pages_valid());
 
 	if (PRINT_LEVEL > 1) {
@@ -285,10 +286,15 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	assert(victim->get_state() != FREE);
 	assert(victim->get_state() != PARTIALLY_FREE);
 
-
+	StatisticData::register_statistic("Garbage Collection Efficiency", {
+			new Integer(victim->get_pages_valid())
+	});
+	//printf("gc eff: %f\n", StatisticData::get_average("Garbage Collection Efficiency") );
 	//printf("num_available_pages_for_new_writes:  %d\n", num_available_pages_for_new_writes);
-
 	//deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
+
+	int below = 0;
+	int above = 0;
 
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	//PRINT_LEVEL = 1;
@@ -298,6 +304,12 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 			Address addr = Address(victim->get_physical_address(), PAGE);
 			addr.page = i;
 			long logical_address = ftl->get_logical_address(addr.get_linear_address());
+
+			if (logical_address > 296068) {
+				above++;
+			} else {
+				below++;
+			}
 
 			deque<Event*> migration;
 
@@ -353,6 +365,7 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 			}
 		}
 	}
+	//printf("above\t%d\tbelow:\t%d\ttotal:%d\n", above, below, above + below);
 	//if (cb_migrations.size() > 0) migrations.push_back(cb_migrations);
 	//StateVisualiser::pr
 	return migrations;

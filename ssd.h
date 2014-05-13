@@ -24,7 +24,7 @@
 #include <boost/serialization/utility.hpp>
 #include <boost/serialization/base_object.hpp>
 #include <sstream>
-
+#include <initializer_list>
 #include <boost/archive/xml_iarchive.hpp>
 #include <boost/archive/xml_oarchive.hpp>
 
@@ -938,6 +938,80 @@ private:
 	int ENTRIES_PER_TRANSLATION_PAGE;
 };
 
+class LSM_FTL : public FtlParent {
+public:
+	LSM_FTL(Ssd *ssd, Block_manager_parent* bm);
+	LSM_FTL();
+	~LSM_FTL();
+	void read(Event *event);
+	void write(Event *event);
+	void trim(Event *event);
+	void register_write_completion(Event const& event, enum status result);
+	void register_read_completion(Event const& event, enum status result);
+	void register_trim_completion(Event & event);
+	long get_logical_address(uint physical_address) const;
+	Address get_physical_address(uint logical_address) const;
+	void set_replace_address(Event& event) const;
+	void set_read_address(Event& event) const;
+	void print() const;
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & boost::serialization::base_object<FtlParent>(*this);
+    	ar & cached_mapping_table;
+    	ar & global_translation_directory;
+    	ar & ongoing_mapping_operations;
+    	ar & NUM_PAGES_IN_SSD;
+    	ar & page_mapping;
+    	ar & CACHED_ENTRIES_THRESHOLD;
+    	ar & num_dirty_cached_entries;
+    	ar & dial;
+    	ar & ENTRIES_PER_TRANSLATION_PAGE;
+    }
+private:
+	struct entry {
+		entry() : dirty(false), fixed(false), hotness(0), timestamp(numeric_limits<double>::infinity()) {}
+		bool dirty;
+		int fixed;
+		short hotness;
+		double timestamp; // when was the entry added to the cache
+	    friend class boost::serialization::access;
+	    template<class Archive> void
+	    serialize(Archive & ar, const unsigned int version) {
+	    	ar & dirty;
+	    	ar & fixed;
+	    	ar & hotness;
+	    	ar & timestamp;
+	    }
+	};
+
+	struct level {
+		level() : num_entries(0), bf() {};
+		int num_entries;
+		bloom_filter bf;
+	};
+	map<int, level> levels;
+
+
+	void flush_mapping(double time);
+	void iterate(long& victim_key, entry& victim_entry, map<long, entry>::iterator start, map<long, entry>::iterator finish);
+	void create_mapping_read(long translation_page_id, double time, Event* dependant);
+	void lock_all_entries_in_a_translation_page(long translation_page_id, int lock, double time);
+	int evict_cold_entries();
+	map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
+	vector<Address> global_translation_directory; // tracks where translation pages are
+
+	set<long> ongoing_mapping_operations; // contains the logical addresses of ongoing mapping IOs
+	map<long, vector<Event*> > application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
+	int NUM_PAGES_IN_SSD;
+	FtlImpl_Page page_mapping;
+	int CACHED_ENTRIES_THRESHOLD;
+	int num_dirty_cached_entries;
+	int dial;
+	int ENTRIES_PER_TRANSLATION_PAGE;
+};
+
 class FAST : public FtlParent {
 public:
 	FAST(Ssd *ssd, Block_manager_parent* bm, Migrator* migrator);
@@ -1148,6 +1222,36 @@ private:
 	static const double age_histogram_bin_size;
 };
 
+class Number {
+public:
+	virtual string toString() = 0;
+};
+class Integer : public Number {
+public:
+	Integer(int num) : value(num) {};
+	int value;
+	string toString() { return to_string(value); };
+};
+class Double : public Number {
+public:
+	double value;
+	string toString() { return to_string(value); };
+};
+
+class StatisticData {
+public:
+	~StatisticData();
+	static void init();
+	static void register_statistic(string name, std::initializer_list<Number*> list);
+	static long get_sum(string name);
+	static double get_average(string name);
+	static string to_csv(string name);
+	static map<string, StatisticData> statistics;
+private:
+
+	vector<vector<Number*> > data;	// a table of data.
+};
+
 class StatisticsGatherer
 {
 public:
@@ -1335,8 +1439,8 @@ public:
 	Experiment_Result(string experiment_name, string data_folder, string sub_folder, string variable_parameter_name);
 	~Experiment_Result();
 	void start_experiment();
-	void collect_stats(double variable_parameter_value);
-	void collect_stats(double variable_parameter_value, StatisticsGatherer* statistics_gatherer);
+	void collect_stats(string variable_parameter_value);
+	void collect_stats(string variable_parameter_value, StatisticsGatherer* statistics_gatherer);
 	void end_experiment();
 	double time_elapsed() { return end_time - start_time; }
 
@@ -1351,14 +1455,15 @@ public:
 	uint max_age_freq;
 	string graph_filename_prefix;
 	vector<double> max_waittimes;
-	map<double, vector<double> > vp_max_waittimes; // Varable parameter --> max waittimes for each waittime measurement type
-	map<double, vector<uint> > vp_num_IOs; // Varable parameter --> num_ios[write, read, write+read]
+	map<string, vector<double> > vp_max_waittimes; // Varable parameter --> max waittimes for each waittime measurement type
+	//map<double, vector<uint> > vp_num_IOs; // Varable parameter --> num_ios[write, read, write+read]
     static const string throughput_column_name; // e.g. "Average throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
     static const string write_throughput_column_name;
     static const string read_throughput_column_name;
     std::ofstream* stats_file;
     double start_time;
     double end_time;
+    vector<string> points;
 
 	static const string datafile_postfix;
 	static const string stats_filename;
@@ -1402,6 +1507,14 @@ private:
 class File_System_With_Noise : public Workload_Definition {
 public:
 	vector<Thread*> generate();
+};
+
+class K_Modal_Workload : public Workload_Definition {
+public:
+	K_Modal_Workload(double relative_prob, double relative_size) : relative_prob(relative_prob), relative_size(relative_size) {}
+	vector<Thread*> generate();
+	double relative_prob;
+	double relative_size;
 };
 
 class Random_Workload : public Workload_Definition {
@@ -1449,13 +1562,13 @@ public:
 	static void draw_graph(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command);
 	static void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command, vector<string> histogram_commands);
 	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<Experiment_Result> experiments, int y_max = UNDEFINED, string subfolder = "");
-	static void latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, Experiment_Result experiment, int y_max = UNDEFINED);
+	//static void latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, Experiment_Result experiment, int y_max = UNDEFINED);
 	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Experiment_Result experiment);
-	static void waittime_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points, int black_column, int red_column = -1);
-    static void cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<Experiment_Result> experiments, double point, int black_column, int red_column = -1);
-	static void age_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points);
-	static void queue_length_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points);
-	static void throughput_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points);
+	static void waittime_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, int black_column, int red_column = -1);
+    static void cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<Experiment_Result> experiments, string point, int black_column, int red_column = -1);
+	static void age_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment);
+	static void queue_length_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment);
+	static void plot(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, string csv_name, string title, string x_axis_label, string y_axis_label, int num_lines, int x_min = UNDEFINED, int x_max = UNDEFINED, int y_min = UNDEFINED, int y_max = UNDEFINED);
 	static string get_working_dir();
 	static void unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer);
 	template <class T> void simple_experiment_double(string name, T* variable, T min, T max, T inc);
@@ -1467,7 +1580,7 @@ public:
 	static vector<Experiment_Result> random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba);
 	static Experiment_Result copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
 	static Experiment_Result copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);
-
+	void set_exponential_increase(bool e) { exponential_increase = e; }
 	void draw_graphs();
 	void draw_aggregate_graphs();
 	void draw_experiment_spesific_graphs();
@@ -1504,7 +1617,7 @@ private:
 
 	string alternate_location_for_results_file;
 
-	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
+	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>(), int x_min = UNDEFINED, int x_max = UNDEFINED, int y_min = UNDEFINED, int y_max = UNDEFINED);
 
 	static uint max_age;
 	static const bool REMOVE_GLE_SCRIPTS_AGAIN;
@@ -1515,6 +1628,7 @@ private:
 	static double calibration_precision;      // microseconds
 	static double calibration_starting_point; // microseconds
 	static string base_folder;
+	bool exponential_increase;
 };
 
 class MTRand_int32 { // Mersenne Twister random number generator

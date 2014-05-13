@@ -108,7 +108,7 @@ void Experiment::run_single_point(string name) {
 
 	StatisticsGatherer::get_global_instance()->print();
 	StatisticsGatherer::get_global_instance()->print_mapping_info();
-	//StatisticsGatherer::get_global_instance()->print_gc_info();
+	StatisticsGatherer::get_global_instance()->print_gc_info();
 	Utilization_Meter::print();
 	//Individual_Threads_Statistics::print();
 	//Queue_Length_Statistics::print_distribution();
@@ -137,7 +137,7 @@ void Experiment::simple_experiment_double(string name, T* var, T min, T max, T i
 	Experiment_Result global_result(name, data_folder, "Global/", variable_name);
 	global_result.start_experiment();
 	T& variable = *var;
-	for (variable = min; variable <= max; variable += inc) {
+	for (variable = min; variable <= max; ) {
 		printf("----------------------------------------------------------------------------------------------------------\n");
 		printf("%s :  %s \n", name.c_str(), to_string(variable).c_str());
 		printf("----------------------------------------------------------------------------------------------------------\n");
@@ -156,9 +156,11 @@ void Experiment::simple_experiment_double(string name, T* var, T min, T max, T i
 
 		OperatingSystem* os;
 		if (calibrate_for_each_point && calibration_workload != NULL) {
-			string calib_file_name = "calib-" + to_string(variable) + ".txt";
-			Experiment::calibrate_and_save(calibration_workload, calib_file_name);
+			string calib_file_name = "calib-" + name + "-" + to_string(variable) + ".txt";
+			cout << "num pages: " << NUMBER_OF_ADDRESSABLE_PAGES() * 9 << endl;
+			Experiment::calibrate_and_save(calibration_workload, calib_file_name, NUMBER_OF_ADDRESSABLE_PAGES() * 5);
 			os = load_state(calib_file_name);
+			StateVisualiser::print_page_status();
 		} else if (!calibration_file.empty()) {
 			os = load_state(calibration_file);
 		} else {
@@ -169,16 +171,28 @@ void Experiment::simple_experiment_double(string name, T* var, T min, T max, T i
 			vector<Thread*> experiment_threads = workload->generate_instance();
 			os->set_threads(experiment_threads);
 		}
+		StatisticsGatherer::set_record_statistics(true);
 		os->set_num_writes_to_stop_after(io_limit);
 		os->run();
-		StatisticsGatherer::get_global_instance()->print();
-		Utilization_Meter::print();
-		Queue_Length_Statistics::print_avg();
-		Free_Space_Meter::print();
-		Free_Space_Per_LUN_Meter::print();
-		global_result.collect_stats(variable, StatisticsGatherer::get_global_instance());
+		//StatisticsGatherer::get_global_instance()->print();
+		StatisticsGatherer::get_global_instance()->print_gc_info();
+		//Utilization_Meter::print();
+		//Queue_Length_Statistics::print_avg();
+		//Free_Space_Meter::print();
+		//Free_Space_Per_LUN_Meter::print();
+		stringstream var_str;
+		var_str << variable;
+		global_result.collect_stats(var_str.str(), StatisticsGatherer::get_global_instance());
+		StatisticData::init();
 		write_results_file(point_folder_name);
 		delete os;
+
+		if (exponential_increase) {
+			variable *= inc;
+		}
+		else {
+			variable += inc;
+		}
 	}
 	global_result.end_experiment();
 	vector<Experiment_Result> result;
@@ -233,10 +247,13 @@ vector<Experiment_Result> Experiment::random_writes_on_the_side_experiment(Workl
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
 
+		stringstream var_str;
+		var_str << random_write_threads;
+
 			// Collect statistics from this experiment iteration (save in csv files)
-		global_result.collect_stats       (random_write_threads, StatisticsGatherer::get_global_instance());
-		experiment_result.collect_stats   (random_write_threads, experiment_statistics_gatherer);
-		write_threads_result.collect_stats(random_write_threads, random_writes_statics_gatherer);
+		global_result.collect_stats       (var_str.str(), StatisticsGatherer::get_global_instance());
+		experiment_result.collect_stats   (var_str.str(), experiment_statistics_gatherer);
+		write_threads_result.collect_stats(var_str.str(), random_writes_statics_gatherer);
 
 		if (workload == NULL) {
 			StatisticsGatherer::get_global_instance()->print();
@@ -287,8 +304,11 @@ Experiment_Result Experiment::copyback_experiment(vector<Thread*> (*experiment)(
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
 
+		stringstream var_str;
+		var_str << copybacks_allowed;
+
 		// Collect statistics from this experiment iteration (save in csv files)
-		experiment_result.collect_stats(copybacks_allowed);
+		experiment_result.collect_stats(var_str.str());
 
 		StatisticsGatherer::get_global_instance()->print();
 		if (PRINT_LEVEL >= 1) {
@@ -323,8 +343,11 @@ Experiment_Result Experiment::copyback_map_experiment(vector<Thread*> (*experime
 		os->set_num_writes_to_stop_after(IO_limit);
 		os->run();
 
+		stringstream var_str;
+		var_str << copyback_map_size;
+
 		// Collect statistics from this experiment iteration (save in csv files)
-		experiment_result.collect_stats(copyback_map_size);
+		experiment_result.collect_stats(var_str.str());
 
 		StatisticsGatherer::get_global_instance()->print();
 		if (PRINT_LEVEL >= 1) {
@@ -364,7 +387,12 @@ void Experiment::calibrate_and_save(Workload_Definition* workload, string name, 
 
 	os->run();
 	os->get_ssd()->execute_all_remaining_events();
+
+	Block_Manager_Tag_Groups* bm = (Block_Manager_Tag_Groups*) os->get_ssd()->get_scheduler()->get_bm();
+	bm->print();
+
 	save_state(os, file_name);
+	//StateVisualiser::print_page_status();
 	//StatisticsGatherer::get_global_instance()->print();
 	//Free_Space_Meter::print();
 	//Free_Space_Per_LUN_Meter::print();
@@ -421,6 +449,7 @@ void Experiment::save_state(OperatingSystem* os, string file_name) {
 	oa.register_type<DFTL>( );
 	oa.register_type<Block_manager_parallel>( );
 	oa.register_type<Sequential_Locality_BM>( );
+	oa.register_type<Block_Manager_Tag_Groups>( );
 	oa.register_type<File_Manager>( );
 	oa.register_type<Simple_Thread>( );
 	oa.register_type<Random_IO_Pattern>( );
@@ -431,6 +460,8 @@ void Experiment::save_state(OperatingSystem* os, string file_name) {
 	oa.register_type<READS_OR_WRITES>();
 	oa.register_type<Asynchronous_Random_Writer>();
 	oa.register_type<Asynchronous_Random_Reader>();
+	oa.register_type<Synchronous_Random_Writer>( );
+	oa.register_type<K_Modal_Thread>();
 	oa.register_type<MTRand>();
 	oa.register_type<MTRand_closed>();
 	oa.register_type<MTRand_open>();
@@ -451,6 +482,7 @@ OperatingSystem* Experiment::load_state(string name) {
 	ia.register_type<DFTL>();
 	ia.register_type<Block_manager_parallel>();
 	ia.register_type<Sequential_Locality_BM>( );
+	ia.register_type<Block_Manager_Tag_Groups>( );
 	ia.register_type<File_Manager>( );
 	ia.register_type<Simple_Thread>( );
 	ia.register_type<Random_IO_Pattern>( );
@@ -461,6 +493,8 @@ OperatingSystem* Experiment::load_state(string name) {
 	ia.register_type<READS_OR_WRITES>();
 	ia.register_type<Asynchronous_Random_Writer>();
 	ia.register_type<Asynchronous_Random_Reader>();
+	ia.register_type<Synchronous_Random_Writer>( );
+	ia.register_type<K_Modal_Thread>();
 	ia.register_type<MTRand>();
 	ia.register_type<MTRand_closed>();
 	ia.register_type<MTRand_open>();

@@ -90,7 +90,7 @@ void Wearwolf::reset_any_filled_pointers(Event const& event) {
 }
 
 
-Address Wearwolf::choose_best_address(Event const& write) {
+Address Wearwolf::choose_best_address(Event& write) {
 	enum write_hotness w_hotness = page_hotness_measurer->get_write_hotness(write.get_logical_address());
 	enum read_hotness r_hotness = page_hotness_measurer->get_read_hotness(write.get_logical_address());
 

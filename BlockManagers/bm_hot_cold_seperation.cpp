@@ -50,7 +50,7 @@ void Shortest_Queue_Hot_Cold_BM::register_erase_outcome(Event const& event, enum
 }
 
 
-Address Shortest_Queue_Hot_Cold_BM::choose_best_address(Event const& write) {
+Address Shortest_Queue_Hot_Cold_BM::choose_best_address(Event& write) {
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
 	//w_hotness = WRITE_HOT;
 	return w_hotness == WRITE_HOT ? get_free_block_pointer_with_shortest_IO_queue() : cold_pointer;

@@ -63,12 +63,14 @@ void Noop_Priorty_Scheme::schedule(vector<Event*>& events) {
 	scheduler->handle(events);
 }
 
-/*void Re_Er_Wr_Priorty_Scheme::schedule(vector<Event*>& reads, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases) {
+void Re_Er_Wr_Priorty_Scheme::schedule(vector<Event*>& events) {
+	vector<Event*> reads, copybacks, writes, erases;
+	seperate_by_type(events, reads, copybacks, writes, erases);
 	scheduler->handle(reads);
-	scheduler->handle(copyback_commands);
+	scheduler->handle(copybacks);
 	scheduler->handle(erases);
 	scheduler->handle(writes);
-}*/
+}
 
 void Smart_App_Priorty_Scheme::schedule(vector<Event*>& events) {
 	vector<Event*> reads, copybacks, writes, erases;

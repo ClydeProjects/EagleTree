@@ -247,11 +247,11 @@ void load_entry(char *name, double value, uint line_number) {
 }
 
 void set_small_SSD_config() {
-	SSD_SIZE = 4;
+	SSD_SIZE = 8;
 	PACKAGE_SIZE = 8;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 64;
-	BLOCK_SIZE = 16;
+	PLANE_SIZE = 128 * 8;
+	BLOCK_SIZE = 64;
 
 	PAGE_READ_DELAY = 115;
 	PAGE_WRITE_DELAY = 1600;
@@ -261,7 +261,7 @@ void set_small_SSD_config() {
 
 	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
-	SCHEDULING_SCHEME = 0;
+	SCHEDULING_SCHEME = 6;
 
 	USE_ERASE_QUEUE = false;
 	ENABLE_WEAR_LEVELING = false;
@@ -269,7 +269,7 @@ void set_small_SSD_config() {
 	MAX_CONCURRENT_GC_OPS = PACKAGE_SIZE * SSD_SIZE;
 	GREED_SCALE = 2;
 	ALLOW_DEFERRING_TRANSFERS = true;
-	OVER_PROVISIONING_FACTOR = 0.7;
+	OVER_PROVISIONING_FACTOR = 0.6;
 
 	OS_SCHEDULER = 0;
 

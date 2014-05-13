@@ -31,9 +31,9 @@ vector<Thread*> Example_Workload::generate() {
 	// and prints statistics.
 	int seed1 = 13515;
 	int seed2 = 264;
-	Simple_Thread* writer = new Asynchronous_Random_Writer(min_lba, max_lba, seed1);
+	Simple_Thread* writer = new Asynchronous_Random_Reader_Writer(min_lba, max_lba, seed1, 0.8);
 	Simple_Thread* reader = new Asynchronous_Random_Reader(min_lba, max_lba, seed2);
-	init_write->add_follow_up_thread(reader);
+	//init_write->add_follow_up_thread(reader);
 	init_write->add_follow_up_thread(writer);
 	writer->set_num_ios(INFINITE);
 	reader->set_num_ios(INFINITE);
@@ -45,12 +45,21 @@ int main()
 {
 	printf("Running EagleTree\n");
 	set_small_SSD_config();
+	SSD_SIZE = 4;
+	PACKAGE_SIZE = 2;
+	GREED_SCALE = 4;
+	BLOCK_MANAGER_ID = 5;
+	SSD_SIZE = 4;
+	PACKAGE_SIZE = 1;
+	ENABLE_TAGGING = true;
+	PRINT_LEVEL = 0;
 	string name  = "/demo_output/";
 	Experiment::create_base_folder(name.c_str());
 	Experiment* e = new Experiment();
-	Workload_Definition* workload = new Example_Workload();
+	BLOCK_MANAGER_ID = 5;
+	Workload_Definition* workload = new K_Modal_Workload(1, 1);
 	e->set_workload(workload);
-	e->set_io_limit(1000000);
+	e->set_io_limit(NUMBER_OF_ADDRESSABLE_PAGES() * 2);
 	e->run("test");
 	e->draw_graphs();
 	delete workload;

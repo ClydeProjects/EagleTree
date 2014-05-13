@@ -71,7 +71,7 @@ public:
 	virtual void register_read_transfer_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
 	virtual void register_register_cleared();
-	virtual Address choose_write_address(Event const& write);
+	virtual Address choose_write_address(Event& write);
 	Address choose_flexible_read_address(Flexible_Read_Event* fr);
 	virtual void register_write_arrival(Event const& write);
 	virtual void trim(Event const& write);
@@ -118,7 +118,7 @@ public:
     }
     Address find_free_unused_block(double time);
 protected:
-	virtual Address choose_best_address(Event const& write) = 0;
+	virtual Address choose_best_address(Event& write) = 0;
 	virtual Address choose_any_address(Event const& write) = 0;
 	void increment_pointer(Address& pointer);
 	bool can_schedule_write_immediately(Address const& prospective_dest, double current_time);
@@ -141,10 +141,11 @@ protected:
 	FtlParent* ftl;
 	IOScheduler *scheduler;
 	vector<vector<Address> > free_block_pointers;
-
+	Migrator* migrator;
 private:
 	Address find_free_unused_block(uint package_id, uint die_id, uint age_class, double time);
 	void issue_erase(Address a, double time);
+	int get_num_free_blocks();
 	int get_num_free_blocks(int package, int die);
 	bool copy_back_allowed_on(long logical_address);
 	void register_copy_back_operation_on(uint logical_address);
@@ -169,7 +170,7 @@ private:
 	vector<int> num_erases_scheduled_per_package;
 	Wear_Leveling_Strategy* wl;
 	Garbage_Collector* gc;
-	Migrator* migrator;
+
 };
 
 
@@ -244,8 +245,32 @@ public:
     	ar & boost::serialization::base_object<Block_manager_parent>(*this);
     }
 protected:
-	Address choose_best_address(Event const& write);
+	Address choose_best_address(Event& write);
 	Address choose_any_address(Event const& write);
+};
+
+// A BM that seperates blocks based on tags
+class Block_Manager_Tag_Groups : public Block_manager_parent {
+public:
+	Block_Manager_Tag_Groups();
+	~Block_Manager_Tag_Groups() {}
+	void register_write_arrival(Event const& e);
+	void register_write_outcome(Event const& event, enum status status);
+	void register_erase_outcome(Event const& event, enum status status);
+	//void increment_pointer_and_find_free(Address& block, double time);
+    friend class boost::serialization::access;
+    void print();
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & boost::serialization::base_object<Block_manager_parent>(*this);
+    	ar & free_block_pointers_tags;
+    }
+protected:
+	Address choose_best_address(Event& write);
+	Address choose_any_address(Event const& write);
+private:
+	map<int, vector<vector<Address> > > free_block_pointers_tags;  // tags, packages, dies
 };
 
 // A simple BM that assigns writes sequentially to dies in a round-robin fashion. No hot-cold separation or anything else intelligent
@@ -256,7 +281,7 @@ public:
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
 protected:
-	Address choose_best_address(Event const& write);
+	Address choose_best_address(Event& write);
 	Address choose_any_address(Event const& write);
 private:
 	void move_address_cursor();
@@ -273,7 +298,7 @@ public:
 	void register_read_command_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
 protected:
-	Address choose_best_address(Event const& write);
+	Address choose_best_address(Event& write);
 	virtual Address choose_any_address(Event const& write);
 	void check_if_should_trigger_more_GC(double start_time);
 private:
@@ -292,7 +317,7 @@ public:
 	virtual void register_erase_outcome(Event const& event, enum status status);
 protected:
 	virtual void check_if_should_trigger_more_GC(double start_time);
-	virtual Address choose_best_address(Event const& write);
+	virtual Address choose_best_address(Event& write);
 	virtual Address choose_any_address(Event const& write);
 	Page_Hotness_Measurer* page_hotness_measurer;
 private:
@@ -352,7 +377,7 @@ public:
     	ar & boost::serialization::base_object<Block_manager_parent>(*this);
     }
 protected:
-	Address choose_best_address(Event const& write);
+	Address choose_best_address(Event& write);
 	Address choose_any_address(Event const& write);
 private:
 	enum parallel_degree_for_sequential_files { ONE, LUN, CHANNEL };
@@ -378,7 +403,7 @@ private:
 
 	void set_pointers_for_sequential_write(long key, double time);
 	void set_pointers_for_tagged_sequential_write(int tag, double time);
-	Address perform_sequential_write(Event const& event, long key);
+	Address perform_sequential_write(Event& event, long key);
 	Address perform_sequential_write_shortest_queue(sequential_writes_pointers& swp);
 	Address perform_sequential_write_round_robin(sequential_writes_pointers& swp);
 	void process_write_completion(Event const& event, long key, pair<long, long> index);

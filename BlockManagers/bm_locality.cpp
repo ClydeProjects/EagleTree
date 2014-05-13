@@ -61,7 +61,7 @@ void Sequential_Locality_BM::register_write_arrival(Event const& event) {
 }
 
 
-Address Sequential_Locality_BM::choose_best_address(Event const& event) {
+Address Sequential_Locality_BM::choose_best_address(Event& event) {
 
 	if (event.is_garbage_collection_op()) {
 		num_misses++;
@@ -120,7 +120,7 @@ Address Sequential_Locality_BM::choose_any_address(Event const& write) {
 	return Address();
 }
 
-Address Sequential_Locality_BM::perform_sequential_write(Event const& event, long key) {
+Address Sequential_Locality_BM::perform_sequential_write(Event& event, long key) {
 	Address to_return;
 	assert(key >= 0);
 	sequential_writes_pointers& swp = seq_write_key_to_pointers_mapping[key];
@@ -206,6 +206,7 @@ void Sequential_Locality_BM::set_pointers_for_tagged_sequential_write(int tag, d
 	seq_write_key_to_pointers_mapping[key].tag = tag;
 	vector<vector<Address> >& pointers = seq_write_key_to_pointers_mapping[key].pointers = vector<vector<Address> >(SSD_SIZE, vector<Address>(PACKAGE_SIZE));
 	int random_offset = random_number_generator();
+	//num_blocks_to_allocate_now = 1;
 	for (int i = 0 ; i < num_blocks_to_allocate_now; i++) {
 		int random_index = random_offset + i;
 		uint package = random_index % SSD_SIZE;
