@@ -116,7 +116,7 @@ void Experiment::run_single_point(string name) {
 	Free_Space_Meter::print();
 	Free_Space_Per_LUN_Meter::print();
 
-	global_result.collect_stats(0, StatisticsGatherer::get_global_instance());
+	global_result.collect_stats("0", StatisticsGatherer::get_global_instance());
 	write_results_file(data_folder);
 	if (!alternate_location_for_results_file.compare("") == 0) {
 		printf("writing results in %s\n", alternate_location_for_results_file.c_str());
@@ -157,10 +157,9 @@ void Experiment::simple_experiment_double(string name, T* var, T min, T max, T i
 		OperatingSystem* os;
 		if (calibrate_for_each_point && calibration_workload != NULL) {
 			string calib_file_name = "calib-" + name + "-" + to_string(variable) + ".txt";
-			cout << "num pages: " << NUMBER_OF_ADDRESSABLE_PAGES() * 9 << endl;
-			Experiment::calibrate_and_save(calibration_workload, calib_file_name, NUMBER_OF_ADDRESSABLE_PAGES() * 5);
+			Experiment::calibrate_and_save(calibration_workload, calib_file_name, NUMBER_OF_ADDRESSABLE_PAGES() * 8);
 			os = load_state(calib_file_name);
-			StateVisualiser::print_page_status();
+			//StateVisualiser::print_page_status();
 		} else if (!calibration_file.empty()) {
 			os = load_state(calibration_file);
 		} else {
@@ -388,8 +387,8 @@ void Experiment::calibrate_and_save(Workload_Definition* workload, string name, 
 	os->run();
 	os->get_ssd()->execute_all_remaining_events();
 
-	Block_Manager_Tag_Groups* bm = (Block_Manager_Tag_Groups*) os->get_ssd()->get_scheduler()->get_bm();
-	bm->print();
+	//Block_Manager_Tag_Groups* bm = (Block_Manager_Tag_Groups*) os->get_ssd()->get_scheduler()->get_bm();
+	//bm->print();
 
 	save_state(os, file_name);
 	//StateVisualiser::print_page_status();
@@ -466,7 +465,8 @@ void Experiment::save_state(OperatingSystem* os, string file_name) {
 	oa.register_type<MTRand_closed>();
 	oa.register_type<MTRand_open>();
 	oa.register_type<MTRand53>();
-
+	oa.register_type<Garbage_Collector_Greedy>();
+	oa.register_type<Garbage_Collector_LRU>();
 	oa << os;
 	oa << threads;
 	file.close();
@@ -499,7 +499,8 @@ OperatingSystem* Experiment::load_state(string name) {
 	ia.register_type<MTRand_closed>();
 	ia.register_type<MTRand_open>();
 	ia.register_type<MTRand53>();
-
+	ia.register_type<Garbage_Collector_Greedy>();
+	ia.register_type<Garbage_Collector_LRU>();
 	OperatingSystem* os;
 	ia >> os;
 	vector<Thread*> threads;

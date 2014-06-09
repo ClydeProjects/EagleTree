@@ -88,6 +88,15 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 		if (event.is_original_application_io()) {
 			num_writes_per_LUN[a.package][a.die]++;
 			bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_latency());
+
+			StatisticData::register_statistic("all_writes", {
+					new Integer(event.get_latency())
+			});
+
+			StatisticData::register_field_names("all_writes", {
+					"write_latency"
+			});
+
 		}
 		else if (event.is_wear_leveling_op()) {
 			Address replace_add = event.get_replace_address();
@@ -109,6 +118,16 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 		if (event.is_original_application_io()) {
 			bus_wait_time_for_reads_per_LUN[a.package][a.die].push_back(event.get_latency());
 			num_reads_per_LUN[a.package][a.die]++;
+
+
+			StatisticData::register_statistic("all_reads", {
+					new Integer(event.get_latency())
+			});
+
+			StatisticData::register_field_names("all_reads", {
+					"read_latency"
+			});
+
 		} else if (event.is_garbage_collection_op()) {
 			num_gc_reads_per_LUN[a.package][a.die]++;
 		} else if (event.is_mapping_op()) {
@@ -514,6 +533,7 @@ void StatisticsGatherer::print_gc_info() {
 	printf("num scheduled gc: %ld \n", num_gc_scheduled);
 	printf("num executed gc: %ld \n", num_gc_executed);
 	printf("num migrations per gc: %f \n", (double)num_migrations / num_gc_executed);
+	printf("standard dev num migrations per gc: %f \n", StatisticData::get_standard_deviation("GC_eff_with_writes", 1));
 	printf("\n");
 	printf("gc targeting package die class: %ld \n", num_gc_targeting_package_die_class);
 	printf("gc targeting package die: %ld \n", num_gc_targeting_package_die);

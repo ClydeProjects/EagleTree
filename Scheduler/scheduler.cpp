@@ -259,14 +259,23 @@ void IOScheduler::handle_event(Event* event) {
 }
 
 void IOScheduler::handle_read(Event* event) {
+
+	if (event->get_application_io_id() == 2353679) {
+		/*printf("\t");
+		event->print();
+		PRINT_LEVEL = 1;
+	*/}
+
 	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
 	bool can_schedule = bm->can_schedule_on_die(event->get_address(), event->get_event_type(), event->get_application_io_id());
 
 	if (!can_schedule) {
+		//if (event->get_application_io_id() == 2353679) printf("cannot schedule\n");
 		event->incr_bus_wait_time(BUS_DATA_DELAY + BUS_CTRL_DELAY + time);
 		push(event);
 	}
 	else if (time > 0) {
+		//if (event->get_application_io_id() == 2353679) printf("time %f\n", time);
 		event->incr_bus_wait_time(time);
 		push(event);
 	}
@@ -356,7 +365,7 @@ void IOScheduler::handle_flexible_read(Event* event) {
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_write(Event* event) {
 
-	if (event->get_id() == 370418 && event->get_bus_wait_time() > 120800) {
+	if (event->get_id() == 263066 && event->get_bus_wait_time() > 243947765) {
 		int i = 0;
 		i++;
 	}
@@ -523,6 +532,16 @@ enum status IOScheduler::execute_next(Event* event) {
 		}
 	}
 
+	if (event->get_address().package == 0 && event->get_address().die == 0 && event->get_address().block == 285) {
+		//event->print();
+	}
+
+
+
+	/*if (event->get_replace_address().package == 0 && event->get_replace_address().die == 0 && event->get_replace_address().block == 270) {
+			//event->print();
+		}*/
+
 	/*if ((event->get_address().package == 1 && event->get_address().die == 1 && event->get_address().block == 98) ||
 			(event->get_replace_address().package == 1 && event->get_replace_address().die == 1 && event->get_replace_address().block == 98)) {
 		event->print();
@@ -625,6 +644,10 @@ void IOScheduler::init_event(Event* event) {
 	uint dep_code = event->get_application_io_id();
 	event_type type = event->get_event_type();
 
+	if (dep_code == 3714556) {
+		event->print();
+	}
+
 	if (event->get_noop() && event->get_event_type() != GARBAGE_COLLECTION) {
 		push(event);
 		return;
@@ -683,14 +706,14 @@ void IOScheduler::init_event(Event* event) {
 	else if (type == ERASE) {
 		push(event);
 	}
+	else if (type == MESSAGE) {
+		bm->receive_message(*event);
+		completed_events->push(event);
+	}
 }
 
 
 void IOScheduler::trigger_next_migration(Event* event) {
-	if (event->get_replace_address().get_block_id() == 1136) {
-			int i = 0;
-			i++;
-		}
 	if (!migrator->more_migrations(event)) {
 		return;
 	}
@@ -771,6 +794,13 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	else */
 
+	if (new_event->get_application_io_id() == 3714556 || (existing_event != NULL && existing_event->get_application_io_id() == 3714556)) {
+		int i = 0;
+		i++;
+		new_event->print();
+		existing_event->print();
+
+	}
 
 	if (IS_FTL_PAGE_MAPPING && new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
 		promote_to_gc(existing_event);

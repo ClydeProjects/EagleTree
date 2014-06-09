@@ -332,20 +332,39 @@ class K_Modal_Thread : public Thread
 public:
 	K_Modal_Thread(vector<pair<int, int> > k_modes) : k_modes(k_modes), random_number_generator(2) {
 		random_number_generator.seed(10);
+		for (auto k : k_modes) {
+			printf("%d   %d\n", k.first, k.second);
+		}
 	}
 	K_Modal_Thread() : k_modes(), random_number_generator(35) {}
-	void issue_first_IOs();
-	void handle_event_completion(Event* event);
+	virtual void issue_first_IOs();
+	virtual void handle_event_completion(Event* event);
     friend class boost::serialization::access;
     template<class Archive> void serialize(Archive & ar, const unsigned int version) {
     	ar & boost::serialization::base_object<Thread>(*this);
     	ar & k_modes;
     	ar & random_number_generator;
     }
-private:
+protected:
 	void create_io();
 	vector<pair<int, int> > k_modes;
 	MTRand_open random_number_generator;
+};
+
+class K_Modal_Thread_Messaging : public K_Modal_Thread
+{
+public:
+	K_Modal_Thread_Messaging(vector<pair<int, int> > k_modes) : K_Modal_Thread(k_modes), counter(0) {}
+	K_Modal_Thread_Messaging() : K_Modal_Thread(), counter(0) {}
+	void issue_first_IOs();
+	void handle_event_completion(Event* event);
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<K_Modal_Thread>(*this);
+    }
+private:
+	void create_io();
+	long counter;
 };
 
 // This thread simulates the IO pattern of an external sort algorithm

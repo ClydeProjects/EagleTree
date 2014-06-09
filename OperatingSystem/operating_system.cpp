@@ -153,6 +153,7 @@ void OperatingSystem::dispatch_event(int thread_id) {
 void OperatingSystem::setup_follow_up_threads(int thread_id, double current_time) {
 	vector<Thread*>& follow_up_threads = threads[thread_id]->get_follow_up_threads();
 	if (PRINT_LEVEL >= 1) printf("Switching to new follow up thread\n");
+	printf("Switching to new follow up thread\n");
 	for (auto t : follow_up_threads) {
 		t->init(this, current_time);
 		int new_id = ++thread_id_generator;

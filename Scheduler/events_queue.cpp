@@ -18,7 +18,7 @@ void event_queue::push(Event* event, double value) {
 		new_events.reserve(10);
 		events[value] = new_events;
 	} else {
-		vector<Event*>& events_with_this_time = events[value];
+		vector<Event*>& events_with_this_time = events.at(value);
 		events_with_this_time.push_back(event);
 	}
 }

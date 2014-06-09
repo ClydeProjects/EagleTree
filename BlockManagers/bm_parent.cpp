@@ -104,7 +104,7 @@ Address Block_manager_parent::choose_write_address(Event& write) {
 		return a;
 	}
 
-	if (!write.is_garbage_collection_op() && migrator->how_many_gc_operations_are_scheduled() == 0) {
+	if (GREED_SCALE > 0 && !write.is_garbage_collection_op() && migrator->how_many_gc_operations_are_scheduled() == 0) {
 		migrator->schedule_gc(write.get_current_time(), -1, -1, -1 ,-1);
 	}
 	if (write.is_garbage_collection_op() || migrator->how_many_gc_operations_are_scheduled() == 0) {
@@ -153,7 +153,8 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 		assert(num_free_pages == num_available_pages_for_new_writes);
 	}
 
-	Block_manager_parent::check_if_should_trigger_more_GC(event.get_current_time());
+	check_if_should_trigger_more_GC(event.get_current_time());
+
 }
 
 void Block_manager_parent::register_write_arrival(Event const& write) {
@@ -471,9 +472,9 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 		Address address = find_free_unused_block(package_id, die_id, index, time);
 		if (address.valid != NONE) {
 
-			if (address.package == 1 && address.block == 11) {
-				int i = 0;
-				i++;
+			if (address.package == 0 && address.die == 0 && address.block == 285) {
+				//address.print();
+				//printf("\n");
 			}
 
 			return address;
@@ -571,7 +572,54 @@ Block_manager_parent* Block_manager_parent::get_new_instance() {
 		case 3: bm = new Block_manager_roundrobin(); break;
 		case 4: bm = new Wearwolf(); break;
 		case 5: bm = new Block_Manager_Tag_Groups(); break;
+		case 6: bm = new Block_Manager_Groups(); break;
 		default: bm = new Block_manager_parallel(); break;
 	}
 	return bm;
 }
+
+pointers::pointers(Block_manager_parent* bm) : bm(bm), blocks(SSD_SIZE, vector<Address>(PACKAGE_SIZE, Address())) {
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			blocks[i][j] = bm->find_free_unused_block(i, j, 0);
+		}
+	}
+}
+void pointers::find_free_blocks(Block_manager_parent* bm, double time) {
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			blocks[i][j] = bm->find_free_unused_block(i, j, time);
+		}
+	}
+}
+
+void pointers::register_completion(Event const& e) {
+	blocks[e.get_address().package][e.get_address().die].page++;
+}
+Address pointers::get_best_block(Block_manager_parent* bm) {
+	pair<bool, pair<int, int> > result = bm->get_free_block_pointer_with_shortest_IO_queue(blocks);
+	if (result.first) {
+		return blocks[result.second.first][result.second.second];
+	}
+	return Address();
+}
+
+Address pointers::get_any_free_block() {
+	for (int i = 0; i < blocks.size(); i++) {
+		for (int j = 0; j < blocks[i].size(); j++) {
+			if (blocks[i][j].valid == PAGE && blocks[i][j].page < BLOCK_SIZE) {
+				return blocks[i][j];
+			}
+		}
+	}
+	return Address();
+}
+void pointers::print() {
+	for (int i = 0; i < blocks.size(); i++) {
+		for (int j = 0; j < blocks[i].size(); j++) {
+			printf("%d %d %d\n", i, j, blocks[i][j].page);
+		}
+	}
+}
+
+

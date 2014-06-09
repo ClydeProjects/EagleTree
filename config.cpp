@@ -116,8 +116,17 @@ int MAX_CONCURRENT_GC_OPS = 1;
  * 		across the logical address space. After a certain threshold of such writes, defined by the variable SEQUENTIAL_LOCALITY_THRESHOLD,
  * 		it clusters pages from the same sequential write in the same flash blocks.
  * 4 -> Round Robin
+ * 5 -> Group tags
+ * 6 -> Groups explicit communication
  */
 int BLOCK_MANAGER_ID = 3;
+
+/*
+ * The policy used to choose a garbage-collection victim
+ * 0 -> Greedy - for each LUN, always picks the block with the least number of pages
+ * 1 -> LRU -- for each LUN, always picks the block that was cleaned last
+ */
+int GARBAGE_COLLECTION_POLICY = 0;
 
 // This parameter is special for block manager 3. If is the threshold governing when to start dedicating blocks
 // exclusively for a given sequential write
@@ -251,7 +260,7 @@ void set_small_SSD_config() {
 	PACKAGE_SIZE = 8;
 	DIE_SIZE = 1;
 	PLANE_SIZE = 128 * 8;
-	BLOCK_SIZE = 64;
+	BLOCK_SIZE = 128;
 
 	PAGE_READ_DELAY = 115;
 	PAGE_WRITE_DELAY = 1600;
@@ -266,10 +275,11 @@ void set_small_SSD_config() {
 	USE_ERASE_QUEUE = false;
 	ENABLE_WEAR_LEVELING = false;
 	BLOCK_MANAGER_ID = 0;
+	GARBAGE_COLLECTION_POLICY = 0;
 	MAX_CONCURRENT_GC_OPS = PACKAGE_SIZE * SSD_SIZE;
 	GREED_SCALE = 2;
 	ALLOW_DEFERRING_TRANSFERS = true;
-	OVER_PROVISIONING_FACTOR = 0.6;
+	OVER_PROVISIONING_FACTOR = 0.7;
 
 	OS_SCHEDULER = 0;
 
@@ -298,6 +308,7 @@ void set_big_SSD_config() {
 	USE_ERASE_QUEUE = false;
 	ENABLE_WEAR_LEVELING = false;
 	BLOCK_MANAGER_ID = 0;
+	GARBAGE_COLLECTION_POLICY = 0;
 	MAX_CONCURRENT_GC_OPS = PACKAGE_SIZE * SSD_SIZE;
 	GREED_SCALE = 2;
 	ALLOW_DEFERRING_TRANSFERS = true;

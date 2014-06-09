@@ -165,7 +165,7 @@ void Migrator::schedule_gc(double time, int package, int die, int block, int kla
 	} else if (package >= 0 && die >= 0 && block >= 0) {
 		address.valid = BLOCK;
 		// TODO add the wear leveling as a parameter to this method
-		gc_event->set_wear_leveling_op(true);
+		//gc_event->set_wear_leveling_op(true);
 	} else {
 		assert(false);
 	}
@@ -205,7 +205,7 @@ void Migrator::register_ECC_check_on(uint logical_address) {
 
 void Migrator::update_structures(Address const& a) {
 	Block* victim = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
-	gc->remove_as_gc_candidate(a);
+	gc->commit_choice_of_victim(a);
 	blocks_being_garbage_collected[victim->get_physical_address()] = victim->get_pages_valid();
 	num_blocks_being_garbaged_collected_per_LUN[a.package][a.die]++;
 	StatisticsGatherer::get_global_instance()->register_executed_gc(*victim);
@@ -214,7 +214,6 @@ void Migrator::update_structures(Address const& a) {
 vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	Address a = gc_event->get_address();
 	vector<deque<Event*> > migrations;
-
 	if (how_many_gc_operations_are_scheduled() >= MAX_CONCURRENT_GC_OPS) {
 		return migrations;
 	}
@@ -230,13 +229,13 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	bool is_wear_leveling_op = gc_event->is_wear_leveling_op();
 
 	Block * victim;
-	if (is_wear_leveling_op) {
+	if (a.valid == BLOCK) {
 		victim = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
 	}
 	else {
 		victim = gc->choose_gc_victim(package_id, die_id, gc_event->get_age_class());
 	}
-
+	//printf("num valid:  %d\n", victim->get_pages_valid());
 	StatisticsGatherer::get_global_instance()->register_scheduled_gc(*gc_event);
 
 	if (victim == NULL) {
@@ -251,10 +250,10 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 
 	Address addr = Address(victim->get_physical_address(), BLOCK);
 
-	/*if (num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die] >= 1) {
+	if (num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die] >= 1) {
 		StatisticsGatherer::get_global_instance()->num_gc_cancelled_gc_already_happening++;
 		return migrations;
-	}*/
+	}
 
 	/*if (blocks_being_wl.count(victim) == 1) {
 		return migrations;
@@ -265,6 +264,21 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	}*/
 
 	if (victim->get_physical_address() == 976 && gc_event->get_start_time() > 39548840) {
+		int i = 0;
+		i++;
+	}
+
+	if (victim->get_state() == FREE) {
+		//printf("warning: trying to garbage collect a block that is completely free. This will be ignored.\n");
+		return migrations;
+	}
+
+	if (victim->get_state() == PARTIALLY_FREE) {
+		//printf("warning: trying to garbage collect a block that is partially free. This will be ignored.\n");
+		return migrations;
+	}
+
+	if (a.package == 3 && a.die == 1 && a.block == 1018) {
 		int i = 0;
 		i++;
 	}
@@ -283,12 +297,36 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 		printf("\n");
 	}
 
+	if (victim->get_physical_address() == 185856) {
+		int i = 0;
+		i++;
+	}
+
 	assert(victim->get_state() != FREE);
 	assert(victim->get_state() != PARTIALLY_FREE);
 
 	StatisticData::register_statistic("Garbage Collection Efficiency", {
 			new Integer(victim->get_pages_valid())
 	});
+
+	StatisticData::register_statistic("GC_eff_with_writes", {
+			new Integer(StatisticsGatherer::get_global_instance()->total_writes()),
+			new Integer(victim->get_pages_valid())
+	});
+
+	StatisticData::register_field_names("GC_eff_with_writes", {
+			"num_writes",
+			"num_pages_to_migrate"
+	});
+
+	/*static int min_valid_pages = BLOCK_SIZE;
+	if (victim->get_pages_valid() < min_valid_pages) {
+		min_valid_pages = victim->get_pages_valid();
+		cout << "min: " << min_valid_pages << "\t" << StatisticsGatherer::get_global_instance()->total_writes() << "\t" << StatisticData::get_sum("GC_eff_with_writes", 1) << "\t" << StatisticData::get_count("GC_eff_with_writes", 1) << "\t";
+		addr.print();
+		cout << endl;
+	}*/
+
 	//printf("gc eff: %f\n", StatisticData::get_average("Garbage Collection Efficiency") );
 	//printf("num_available_pages_for_new_writes:  %d\n", num_available_pages_for_new_writes);
 	//deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
@@ -305,7 +343,7 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 			addr.page = i;
 			long logical_address = ftl->get_logical_address(addr.get_linear_address());
 
-			if (logical_address > 296068) {
+			if (logical_address > 587202) {
 				above++;
 			} else {
 				below++;
@@ -365,7 +403,7 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 			}
 		}
 	}
-	//printf("above\t%d\tbelow:\t%d\ttotal:%d\n", above, below, above + below);
+	//printf("above\t%d\tbelow:\t%d\ttotal:%d\tpack:%d\tdie:%d\n", above, below, above + below, package_id, die_id);
 	//if (cb_migrations.size() > 0) migrations.push_back(cb_migrations);
 	//StateVisualiser::pr
 	return migrations;
@@ -396,6 +434,8 @@ deque<Event*> Migrator::trigger_next_migration(Event * gc_read) {
 	int block_id = gc_read->get_address().get_block_id();
 	assert(dependent_gc.count(block_id) == 1 && dependent_gc.at(block_id).size() > 0);
 	deque<Event*> next_migration = dependent_gc.at(block_id).back();
+	//next_migration[0]->set_start_time(gc_read->get_current_time());
+	//next_migration[1]->set_start_time(gc_read->get_current_time());
 	dependent_gc.at(block_id).pop_back();
 
 	if ( dependent_gc.at(block_id).empty()) {

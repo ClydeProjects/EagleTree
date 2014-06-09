@@ -236,15 +236,17 @@ void K_Modal_Thread::create_io() {
 	int cumulative_prob = 0;
 	int selected_group_start_lba = 0;
 	int selected_group_size = 0;
+	static vector<int> group_hist(k_modes.size());
 	for (int i = 0; i < k_modes.size(); i++) {
 		cumulative_prob += k_modes[i].first;
 		if (group_decider <= cumulative_prob) {
-			selected_group_size = k_modes[i].second;
+			selected_group_size = (k_modes[i].second / 100.0) * NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
+			group_hist[i]++;
 			break;
 		}
-		selected_group_start_lba += k_modes[i].second;
+		selected_group_start_lba += (k_modes[i].second / 100.0) * NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
 	}
-
+	//printf("%d  %d\n", group_hist[0], group_hist[1]);
 	long lba = selected_group_start_lba + random_number_generator() * selected_group_size;
 	/*printf("%d\n", lba);
 	if (lba == 314572) {
@@ -270,8 +272,20 @@ void K_Modal_Thread::issue_first_IOs() {
 }
 
 void K_Modal_Thread::handle_event_completion(Event* event) {
-	while (get_num_ongoing_IOs() < 1 && !is_finished() && !is_stopped()) {
-		create_io();
-	}
+	issue_first_IOs();
 }
 
+void K_Modal_Thread_Messaging::issue_first_IOs() {
+	Groups_Message* gm = new Groups_Message(get_time());
+	gm->groups = k_modes;
+	//submit(gm);
+	K_Modal_Thread::issue_first_IOs();
+}
+
+void K_Modal_Thread_Messaging::handle_event_completion(Event* event) {
+	counter++;
+	if (counter % NUMBER_OF_ADDRESSABLE_PAGES() == 0) {
+		//
+	}
+	K_Modal_Thread::issue_first_IOs();
+}

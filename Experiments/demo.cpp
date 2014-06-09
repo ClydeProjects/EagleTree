@@ -11,7 +11,7 @@ public:
 vector<Thread*> Example_Workload::generate() {
 
 	// This workload begins with a large sequential write of the entire logical address space.
-	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
+	Simple_Thread* init_write = new Synchronous_Sequential_Writer(min_lba, max_lba);
 	init_write->set_io_size(1);
 	vector<Thread*> starting_threads;
 	starting_threads.push_back(init_write);
@@ -47,19 +47,24 @@ int main()
 	set_small_SSD_config();
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
-	GREED_SCALE = 4;
+	GREED_SCALE = 2;
 	BLOCK_MANAGER_ID = 5;
-	SSD_SIZE = 4;
-	PACKAGE_SIZE = 1;
-	ENABLE_TAGGING = true;
+	BLOCK_SIZE = 128;
 	PRINT_LEVEL = 0;
+	OVER_PROVISIONING_FACTOR = 0.7;
+	GARBAGE_COLLECTION_POLICY = 0;
 	string name  = "/demo_output/";
 	Experiment::create_base_folder(name.c_str());
 	Experiment* e = new Experiment();
-	BLOCK_MANAGER_ID = 5;
-	Workload_Definition* workload = new K_Modal_Workload(1, 1);
+
+	vector<pair<int, int> > groups;
+	groups.push_back(pair<int, int>(80, 20));
+	groups.push_back(pair<int, int>(20, 80));
+	K_Modal_Workload* workload = new K_Modal_Workload(groups);
+	workload->initialize_with_sequential_write = true;
+
 	e->set_workload(workload);
-	e->set_io_limit(NUMBER_OF_ADDRESSABLE_PAGES() * 2);
+	e->set_io_limit(NUMBER_OF_ADDRESSABLE_PAGES() * 6);
 	e->run("test");
 	e->draw_graphs();
 	delete workload;

@@ -51,10 +51,16 @@ int get_num_mimatches(vector<Event*>& events) {
 void Fifo_Priorty_Scheme::schedule(vector<Event*>& events) {
 	event_queue q;
 	for (auto e : events) {
-		q.push(e, e->get_bus_wait_time());
+		q.push(e, INFINITE - e->get_bus_wait_time());
 	}
+	int time = INFINITE;
 	while (q.size() > 0) {
 		vector<Event*> ordered_events = q.get_soonest_events();
+		/*if (ordered_events[0]->get_bus_wait_time() >= time) {
+			printf("%f  %f \n", ordered_events[0]->get_bus_wait_time(), time);
+			assert(false);
+		}*/
+		time = ordered_events[0]->get_bus_wait_time();
 		scheduler->handle(ordered_events);
 	}
 }

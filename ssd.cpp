@@ -67,7 +67,14 @@ Ssd::Ssd():
 
 	ftl->set_scheduler(scheduler);
 
-	Garbage_Collector* gc = new Garbage_Collector(this, bm);
+	Garbage_Collector* gc = NULL;
+	if (GARBAGE_COLLECTION_POLICY == 0){
+		gc = new Garbage_Collector_Greedy(this, bm);
+	}
+	else {
+		gc = new Garbage_Collector_LRU(this, bm);
+	}
+
 	Wear_Leveling_Strategy* wl = new Wear_Leveling_Strategy(this, migrator);
 
 	bm->init(this, ftl, scheduler, gc, wl, migrator);
@@ -137,9 +144,10 @@ void Ssd::submit(Event* event) {
 }
 
 void Ssd::submit_to_ftl(Event* event) {
-	if(event->get_event_type() 		== READ) 	ftl->read(event);
-	else if(event->get_event_type() == WRITE) 	ftl->write(event);
-	else if(event->get_event_type() == TRIM) 	ftl->trim(event);
+	if(event->get_event_type() 		== READ) 		ftl->read(event);
+	else if(event->get_event_type() == WRITE) 		ftl->write(event);
+	else if(event->get_event_type() == TRIM) 		ftl->trim(event);
+	else if(event->get_event_type() == MESSAGE) 	scheduler->schedule_event(event);
 }
 
 void Ssd::io_map::resiger_large_event(Event* e) {

@@ -173,6 +173,7 @@ extern void *global_buffer;
  * Controls the block manager to be used
  */
 extern int BLOCK_MANAGER_ID;
+extern int GARBAGE_COLLECTION_POLICY;
 extern int GREED_SCALE;
 extern int SEQUENTIAL_LOCALITY_THRESHOLD;
 extern bool ENABLE_TAGGING;
@@ -243,7 +244,7 @@ enum block_state{FREE, PARTIALLY_FREE, ACTIVE, INACTIVE};
  * 	                                page states set to empty)
  * 	merge - move valid pages from block at address (page state set to invalid)
  * 	           to free pages in block at merge_address */
-enum event_type{NOT_VALID, READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, MERGE, TRIM, GARBAGE_COLLECTION, COPY_BACK};
+enum event_type{NOT_VALID, READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, MERGE, TRIM, GARBAGE_COLLECTION, COPY_BACK, MESSAGE};
 
 /* General return status
  * return status for simulator operations that only need to provide general
@@ -499,6 +500,17 @@ protected:
 	int thread_id;
 	double pure_ssd_wait_time;
 	int num_iterations_in_scheduler;
+};
+
+class Message : public Event {
+public:
+	Message(double time) : Event(MESSAGE, 0, 1, time) {}
+};
+
+class Groups_Message : public Message {
+public:
+	Groups_Message(double time) : Message(time) {}
+	vector<pair<int, int> > groups; // one pair for each group. The first double is the update frequency, between 0 and 1, and the second is the group size as a fraction of the whole
 };
 
 /* The page is the lowest level data storage unit that is the size unit of
@@ -1225,17 +1237,20 @@ private:
 class Number {
 public:
 	virtual string toString() = 0;
+	virtual double toDouble() = 0;
 };
 class Integer : public Number {
 public:
 	Integer(int num) : value(num) {};
 	int value;
 	string toString() { return to_string(value); };
+	double toDouble() { return value; }
 };
 class Double : public Number {
 public:
 	double value;
 	string toString() { return to_string(value); };
+	double toDouble() { return value; }
 };
 
 class StatisticData {
@@ -1243,12 +1258,15 @@ public:
 	~StatisticData();
 	static void init();
 	static void register_statistic(string name, std::initializer_list<Number*> list);
-	static long get_sum(string name);
-	static double get_average(string name);
+	static void register_field_names(string name, std::initializer_list<string> list);
+	static double get_count(string name, int column);
+	static double get_sum(string name, int column);
+	static double get_average(string name, int column);
+	static double get_standard_deviation(string name, int column);
 	static string to_csv(string name);
 	static map<string, StatisticData> statistics;
 private:
-
+	vector<string> names;
 	vector<vector<Number*> > data;	// a table of data.
 };
 
@@ -1509,12 +1527,26 @@ public:
 	vector<Thread*> generate();
 };
 
+class K2_Modal_Workload : public Workload_Definition {
+public:
+	K2_Modal_Workload(double relative_prob, double relative_size) :
+		relative_prob(relative_prob), relative_size(relative_size) {}
+	double relative_prob, relative_size;
+	vector<Thread*> generate();
+
+};
+
 class K_Modal_Workload : public Workload_Definition {
 public:
-	K_Modal_Workload(double relative_prob, double relative_size) : relative_prob(relative_prob), relative_size(relative_size) {}
+	K_Modal_Workload(vector<pair<int, int> > groups) : groups(groups), initialize_with_sequential_write(false) {}
 	vector<Thread*> generate();
-	double relative_prob;
-	double relative_size;
+	vector<pair<int, int> > groups;
+	bool initialize_with_sequential_write;
+};
+
+class Synch_Random_Workload : public Workload_Definition {
+public:
+	vector<Thread*> generate();
 };
 
 class Random_Workload : public Workload_Definition {

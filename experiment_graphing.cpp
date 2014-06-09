@@ -416,6 +416,8 @@ void Experiment::multigraph(int sizeX, int sizeY, string outputFile, vector<stri
 	"      end if" << endl <<
 	"      " << x_boundary.str() << endl <<
 	"      " << y_boundary.str() << endl <<
+	"      " << "axis grid" << endl <<
+	"      " << "ticks color grey10" << endl <<
 	"   end graph" << endl <<
 	"end sub" << endl;
 
@@ -512,7 +514,7 @@ void Experiment::draw_experiment_spesific_graphs() {
 				//Experiment::queue_length_history	(sx, sy/2, "queue_length", exp[i]);
 				//Experiment::throughput_history		(sx, sy/2, "throughput_history", exp[i]);
 				Experiment::plot					(sx, sy/2, "throughput_history", exp[i], Experiment_Result::throughput_filename_prefix, "Throughput history", "Timeline (µs progressed)", "Throughput (IOs/s)", 2);
-				Experiment::plot					(sx, sy/2, "gc_efficiency", exp[i], "Garbage Collection Efficiency-", "Garbage Collection Efficiency", "GC operation #", "Num pages to migrate", 1, 0, UNDEFINED, 0, BLOCK_SIZE);
+				Experiment::plot					(sx, sy/2, "gc_efficiency", exp[i], "GC_eff_with_writes-", "", "page writes #", "Num pages to migrate", 1, 0, UNDEFINED, 0, BLOCK_SIZE);
 			}
 		}
 }

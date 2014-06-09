@@ -65,7 +65,7 @@ class Block_manager_parent {
 public:
 	Block_manager_parent(int classes = 1);
 	virtual ~Block_manager_parent();
-	void init(Ssd*, FtlParent*, IOScheduler*, Garbage_Collector*, Wear_Leveling_Strategy*, Migrator*);
+	virtual void init(Ssd*, FtlParent*, IOScheduler*, Garbage_Collector*, Wear_Leveling_Strategy*, Migrator*);
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_command_outcome(Event const& event, enum status status);
 	virtual void register_read_transfer_outcome(Event const& event, enum status status);
@@ -75,6 +75,7 @@ public:
 	Address choose_flexible_read_address(Flexible_Read_Event* fr);
 	virtual void register_write_arrival(Event const& write);
 	virtual void trim(Event const& write);
+	virtual void receive_message(Event const& message) {}
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double current_time, event_type type = NOT_VALID) const;
 	double in_how_long_can_this_write_be_scheduled(double current_time) const;
 	vector<deque<Event*> > migrate(Event * gc_event);
@@ -117,6 +118,12 @@ public:
     	ar & migrator;
     }
     Address find_free_unused_block(double time);
+	Address find_free_unused_block(uint package_id, uint die_id, enum age age, double time);
+	Address find_free_unused_block(uint package_id, uint die_id, double time);
+	Address find_free_unused_block(uint package_id, double time);
+	Address find_free_unused_block(enum age age, double time);
+	pair<bool, pair<int, int> > get_free_block_pointer_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
+
 protected:
 	virtual Address choose_best_address(Event& write) = 0;
 	virtual Address choose_any_address(Event const& write) = 0;
@@ -125,14 +132,9 @@ protected:
 	bool can_write(Event const& write) const;
 
 
-	Address find_free_unused_block(uint package_id, uint die_id, enum age age, double time);
-	Address find_free_unused_block(uint package_id, uint die_id, double time);
-	Address find_free_unused_block(uint package_id, double time);
-
-	Address find_free_unused_block(enum age age, double time);
 
 	void return_unfilled_block(Address block_address, double current_time);
-	pair<bool, pair<int, int> > get_free_block_pointer_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
+
 	Address get_free_block_pointer_with_shortest_IO_queue();
 
 	inline bool has_free_pages(Address const& address) const { return address.valid == PAGE && address.page < BLOCK_SIZE; }
@@ -142,17 +144,18 @@ protected:
 	IOScheduler *scheduler;
 	vector<vector<Address> > free_block_pointers;
 	Migrator* migrator;
+	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
+	int get_num_free_blocks();
 private:
 	Address find_free_unused_block(uint package_id, uint die_id, uint age_class, double time);
 	void issue_erase(Address a, double time);
-	int get_num_free_blocks();
+
 	int get_num_free_blocks(int package, int die);
 	bool copy_back_allowed_on(long logical_address);
 	void register_copy_back_operation_on(uint logical_address);
 	void register_ECC_check_on(uint logical_address);
 	bool schedule_queued_erase(Address location);
 
-	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	vector<Block*> all_blocks;
 
 	// The num_age_classes variable controls into how many age classes we divide blocks.
@@ -271,6 +274,87 @@ protected:
 	Address choose_any_address(Event const& write);
 private:
 	map<int, vector<vector<Address> > > free_block_pointers_tags;  // tags, packages, dies
+};
+
+enum write_amp_choice {greedy, prob, opt};
+
+struct pointers {
+	pointers(Block_manager_parent* bm);
+	void find_free_blocks(Block_manager_parent* bm, double time);
+	void register_completion(Event const& e);
+	Address get_best_block(Block_manager_parent* bm);
+	Address get_any_free_block();
+	void print();
+	Block_manager_parent* bm;
+	vector<vector<Address> > blocks;
+};
+
+class group {
+public:
+	group(double prob, double size, Block_manager_parent* bm, Ssd* ssd);
+	void print();
+	double get_prob_op(double PBA, double LBA);
+	double get_greedy_op(double PBA, double LBA);
+	double get_average_op(double PBA, double LBA);
+	double get_write_amp(write_amp_choice choice);
+	Block* get_gc_victim();
+	Block* get_gc_victim(int package, int die);
+	static double get_average_write_amp(vector<group>& groups, write_amp_choice choice = opt);
+	static vector<group> iterate(vector<group> const& groups);
+	static void print(vector<group>& groups);
+	static void init_stats(vector<group>& groups);
+
+	double prob;
+	double size;
+	double offset;
+	double OP;
+	double OP_greedy;
+	double OP_prob;
+	double OP_average;
+	pointers free_blocks;
+	pointers next_free_blocks;
+	set<Block*> block_ids;
+	struct group_stats {
+		group_stats() : num_gc_in_group(0), num_writes_to_group(0), num_gc_writes_to_group(0) {}
+		int num_gc_in_group;
+		int num_writes_to_group;
+		int num_gc_writes_to_group;
+		void print();
+	};
+	group_stats stats;
+};
+
+// A BM that seperates blocks based on tags
+class Block_Manager_Groups : public Block_manager_parent {
+public:
+	Block_Manager_Groups();
+	~Block_Manager_Groups() {}
+	void init(Ssd*, FtlParent*, IOScheduler*, Garbage_Collector*, Wear_Leveling_Strategy*, Migrator*);
+	void register_write_arrival(Event const& e);
+	void register_write_outcome(Event const& event, enum status status);
+	void register_erase_outcome(Event const& event, enum status status);
+	void handle_block_out_of_space(Event const& event, int group_id);
+	void receive_message(Event const& message);
+	void check_if_should_trigger_more_GC(double start_time);
+	bool try_to_allocate_block_to_group(int group_id, int package, int die, double time);
+    friend class boost::serialization::access;
+    void print();
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & boost::serialization::base_object<Block_manager_parent>(*this);
+    }
+protected:
+	Address choose_best_address(Event& write);
+	Address choose_any_address(Event const& write);
+private:
+	int which_group_does_this_page_belong_to(Event const& event);
+	vector<group> groups;
+	struct stats {
+		stats() : num_group_misses(0) {}
+		int num_group_misses;
+	};
+	stats stats;
 };
 
 // A simple BM that assigns writes sequentially to dies in a round-robin fashion. No hot-cold separation or anything else intelligent
@@ -422,6 +506,30 @@ private:
 	int num_misses;
 };
 
+class Garbage_Collector {
+public:
+	Garbage_Collector() : ssd(NULL), bm(NULL), num_age_classes(1) {}
+	Garbage_Collector(Ssd* ssd, Block_manager_parent* bm) : ssd(ssd), bm(bm), num_age_classes(bm->get_num_age_classes()) {}
+	virtual ~Garbage_Collector() {}
+	virtual void register_trim(Event const& event, uint age_class, int num_live_pages) = 0;
+	virtual Block* choose_gc_victim(int package_id, int die_id, int klass) const = 0;
+	virtual void remove_as_gc_candidate(Address const& phys_address) = 0;
+	virtual void commit_choice_of_victim(Address const& phys_address) = 0;
+	void set_block_manager(Block_manager_parent* b) { bm = b; }
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & ssd;
+    	ar & bm;
+    	ar & num_age_classes;
+    }
+protected:
+	Ssd* ssd;
+	Block_manager_parent* bm;
+	int num_age_classes;
+};
+
 // The garbage collector organizes blocks in a data structure that is convenient for choosing which block to garbage-collect next
 // This organization happens within the gc_candidates structure.
 // Blocks that are candidates for garbage collection are first organized based on which package and die they belong to.
@@ -429,10 +537,10 @@ private:
 // The variable num_age_classes controls how many groups we use for blocks of different ages.
 // Note that the block manager maintains a free block for every age class in every LUN. This allows us to implement efficient
 // dynamic wear-leveling by putting pages of a certain temperature in blocks of a certain age.
-class Garbage_Collector {
+class Garbage_Collector_Greedy : public Garbage_Collector {
 public:
-	Garbage_Collector();
-	Garbage_Collector(Ssd* ssd, Block_manager_parent* bm);
+	Garbage_Collector_Greedy();
+	Garbage_Collector_Greedy(Ssd* ssd, Block_manager_parent* bm);
 	// Called by the block manager after any page in the SSD is invalidated, as a result of a trim or a write.
 	// This is used to keep the gc_candidates structure updated.
 	void register_trim(Event const& event, uint age_class, int num_live_pages);
@@ -440,27 +548,41 @@ public:
 	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
 	// Called by the block manager when a GC operation for a certain block has been issued. This block is removed from the gc_candidates structure.
 	void remove_as_gc_candidate(Address const& phys_address);
-	void set_block_manager(Block_manager_parent* b) { bm = b; }
-    friend class boost::serialization::access;
+	void commit_choice_of_victim(Address const& phys_address) {remove_as_gc_candidate(phys_address);}
+	friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
     {
+    	ar & boost::serialization::base_object<Garbage_Collector>(*this);
     	ar & gc_candidates;
-    	//ar & blocks_per_lun_with_min_live_pages;
-    	ar & ssd;
-    	ar & bm;
-    	ar & num_age_classes;
     }
-    //double get_average_live_pages_per_best_candidate() const;
 private:
 	vector<long> get_relevant_gc_candidates(int package_id, int die_id, int klass) const;
 	vector<vector<vector<set<long> > > > gc_candidates;  // each age class has a vector of candidates for GC
-	Ssd* ssd;
-	Block_manager_parent* bm;
-	int num_age_classes;
-	//vector<vector<pair<Address, int> > > blocks_per_lun_with_min_live_pages;
 };
 
+class Garbage_Collector_LRU : public Garbage_Collector {
+public:
+	Garbage_Collector_LRU();
+	Garbage_Collector_LRU(Ssd* ssd, Block_manager_parent* bm);
+	// Called by the block manager after any page in the SSD is invalidated, as a result of a trim or a write.
+	// This is used to keep the gc_candidates structure updated.
+	void register_trim(Event const& event, uint age_class, int num_live_pages) {}
+	// Called by the block manager to ask the garbage-collector for a good block to garbage-collect in a given package, die, and with a certain age.
+	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
+	// Called by the block manager when a GC operation for a certain block has been issued. This block is removed from the gc_candidates structure.
+	void remove_as_gc_candidate(Address const& phys_address) {}
+	void commit_choice_of_victim(Address const& phys_address);
+	friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & boost::serialization::base_object<Garbage_Collector>(*this);
+    	ar & gc_candidates;
+    }
+private:
+	vector<vector<int> > gc_candidates;  // each age class has a vector of candidates for GC
+};
 
 
 }
