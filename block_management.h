@@ -285,6 +285,7 @@ struct pointers {
 	Address get_best_block(Block_manager_parent* bm);
 	Address get_any_free_block();
 	void print();
+	int get_num_free_blocks() const;
 	Block_manager_parent* bm;
 	vector<vector<Address> > blocks;
 };
@@ -299,6 +300,7 @@ public:
 	double get_write_amp(write_amp_choice choice);
 	Block* get_gc_victim();
 	Block* get_gc_victim(int package, int die);
+	bool is_starved() const;
 	static double get_average_write_amp(vector<group>& groups, write_amp_choice choice = opt);
 	static vector<group> iterate(vector<group> const& groups);
 	static void print(vector<group>& groups);
@@ -335,6 +337,7 @@ public:
 	void register_erase_outcome(Event const& event, enum status status);
 	void handle_block_out_of_space(Event const& event, int group_id);
 	void receive_message(Event const& message);
+	void change_update_frequencies(Groups_Message const& message);
 	void check_if_should_trigger_more_GC(double start_time);
 	bool try_to_allocate_block_to_group(int group_id, int package, int die, double time);
     friend class boost::serialization::access;

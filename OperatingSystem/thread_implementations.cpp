@@ -283,9 +283,14 @@ void K_Modal_Thread_Messaging::issue_first_IOs() {
 }
 
 void K_Modal_Thread_Messaging::handle_event_completion(Event* event) {
-	counter++;
-	if (counter % NUMBER_OF_ADDRESSABLE_PAGES() == 0) {
-		//
+	if (++counter % NUMBER_OF_ADDRESSABLE_PAGES() * 3 == 0) {
+		int prob_temp = k_modes[0].first;
+		k_modes[0].first = k_modes[1].first;
+		k_modes[1].first = prob_temp;
+		Groups_Message* gm = new Groups_Message(get_time());
+		gm->redistribution_of_update_frequencies = true;
+		gm->groups = k_modes;
+		submit(gm);
 	}
 	K_Modal_Thread::issue_first_IOs();
 }

@@ -509,7 +509,8 @@ public:
 
 class Groups_Message : public Message {
 public:
-	Groups_Message(double time) : Message(time) {}
+	Groups_Message(double time) : Message(time), redistribution_of_update_frequencies(false) {}
+	bool redistribution_of_update_frequencies;
 	vector<pair<int, int> > groups; // one pair for each group. The first double is the update frequency, between 0 and 1, and the second is the group size as a fraction of the whole
 };
 

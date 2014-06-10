@@ -319,6 +319,10 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 			"num_pages_to_migrate"
 	});
 
+	/*printf("schedule gc in ");
+	addr.print();
+	printf("\n");*/
+
 	/*static int min_valid_pages = BLOCK_SIZE;
 	if (victim->get_pages_valid() < min_valid_pages) {
 		min_valid_pages = victim->get_pages_valid();

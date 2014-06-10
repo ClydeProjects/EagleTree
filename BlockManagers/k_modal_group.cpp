@@ -162,4 +162,8 @@ Block* group::get_gc_victim(int package, int die) {
 	return victim;
 }
 
+bool group::is_starved() const {
+	int num_live_blocks = 0;
+	return free_blocks.get_num_free_blocks() < SSD_SIZE * PACKAGE_SIZE / 2;
+}
 

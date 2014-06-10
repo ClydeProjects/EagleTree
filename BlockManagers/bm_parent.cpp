@@ -622,4 +622,16 @@ void pointers::print() {
 	}
 }
 
+int pointers::get_num_free_blocks() const {
+	int num_free_blocks = 0;
+	for (int i = 0; i < blocks.size(); i++) {
+		for (int j = 0; j < blocks[i].size(); j++) {
+			if (blocks[i][j].page < BLOCK_SIZE && blocks[i][j].valid == PAGE) {
+				num_free_blocks++;
+			}
+		}
+	}
+	return num_free_blocks;
+}
+
 

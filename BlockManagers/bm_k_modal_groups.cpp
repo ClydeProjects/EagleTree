@@ -31,10 +31,26 @@ void Block_Manager_Groups::init(Ssd* ssd, FtlParent* ftl, IOScheduler* sched, Ga
 	}
 }
 
+void Block_Manager_Groups::change_update_frequencies(Groups_Message const& msg) {
+	for (int i = 0; i < msg.groups.size(); i++) {
+		groups[i].prob = msg.groups[i].first / 100.0;
+	}
+	vector<group> opt_groups = group::iterate(groups);
+	groups = opt_groups;
+	group::init_stats(groups);
+	printf("\n\n-------------------------------------------------------------------------\n\n");
+	print();
+
+	//PRINT_LEVEL = 1;
+}
+
 void Block_Manager_Groups::receive_message(Event const& message) {
 	assert(message.get_event_type() == MESSAGE);
-
 	Groups_Message const& msg = dynamic_cast<const Groups_Message&>(message);
+	if (msg.redistribution_of_update_frequencies) {
+		change_update_frequencies(msg);
+		return;
+	}
 	vector<pair<int, int> > new_groups = msg.groups;
 	assert(new_groups.size() > 0);
 	int offset = 0;
@@ -129,17 +145,21 @@ void Block_Manager_Groups::handle_block_out_of_space(Event const& event, int gro
 		groups[group_id].next_free_blocks.blocks[package][die] = Address();
 	}
 	bool enough_free_blocks = try_to_allocate_block_to_group(group_id, package, die, event.get_current_time());
-	if (!enough_free_blocks /* && groups[group_id].block_ids.size() * BLOCK_SIZE > groups[group_id].OP + groups[group_id].size*/) {
+	if (!enough_free_blocks) {
 		Block* b = groups[group_id].get_gc_victim(package, die);
 		if (b != NULL) {
 			Address block_addr = Address(b->get_physical_address() , BLOCK);
+
 			migrator->schedule_gc(event.get_current_time(), package, die, block_addr.block, UNDEFINED);
 		}
 	}
 }
 
 bool Block_Manager_Groups::try_to_allocate_block_to_group(int group_id, int package, int die, double time) {
-	if (groups[group_id].block_ids.size() * BLOCK_SIZE <= groups[group_id].OP + groups[group_id].size) {
+	if (groups[group_id].is_starved()) {
+		printf("starved!\n");
+	}
+	if (groups[group_id].block_ids.size() * BLOCK_SIZE <= groups[group_id].OP + groups[group_id].size || groups[group_id].is_starved()) {
 		if (!has_free_pages(groups[group_id].free_blocks.blocks[package][die])) {
 			Address block_addr = find_free_unused_block(package, die, time);
 			if (has_free_pages(block_addr)) {
@@ -190,16 +210,16 @@ void Block_Manager_Groups::register_erase_outcome(Event const& event, enum statu
 		event.print();
 		assert(false);
 	}
+	/*printf("erased block from group %d  ", group_id);
+	event.get_address().print();
+	printf("\n");*/
 	Block_manager_parent::register_erase_outcome(event, status);
-
 	//try_to_allocate_block_to_group(group_id, a.package, a.die, event.get_current_time());
-
-
-
 	// see which groups need the free space, and give it to it.
 }
 
 void Block_Manager_Groups::check_if_should_trigger_more_GC(double start_time) {
+
 
  	for (int i = 0; i < groups.size(); i++) {
 		for (int p = 0; p < SSD_SIZE; p++) {
@@ -226,13 +246,13 @@ Address Block_Manager_Groups::choose_best_address(Event& write) {
 }
 
 Address Block_Manager_Groups::choose_any_address(Event const& write) {
-	Address a = get_free_block_pointer_with_shortest_IO_queue();
+	/*Address a = get_free_block_pointer_with_shortest_IO_queue();
 	if (has_free_pages(a)) {
 		assert(false);
 		return a;
-	}
+	}*/
 	for (auto g : groups) {
-		Address a = g.free_blocks.get_any_free_block();
+		Address a = g.free_blocks.get_best_block(this);
 		if (has_free_pages(a)) {
 			return a;
 		}
