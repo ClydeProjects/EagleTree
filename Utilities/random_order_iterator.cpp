@@ -15,14 +15,14 @@ MTRand_int32 Random_Order_Iterator::random_number_generator = MTRand_int32(23652
 
 void Random_Order_Iterator::shuffle (std::vector<int> & order)
 {
-    int i = order.size();
-    while (i > 1)
+    int i = 0;
+    while (i < order.size())
     {
        int k = random_number_generator() % order.size();
-       i--;
        int temp = order[i];
        order[i] = order[k];
        order[k] = temp;
+       i++;
     }
 }
 

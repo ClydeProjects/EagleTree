@@ -1,11 +1,11 @@
 #include "../ssd.h"
 using namespace ssd;
 
-class Initial_Message : public K_Modal_Thread
+class Initial_Message : public Thread
 {
 public:
-	Initial_Message(vector<pair<int, int> > k_modes) : K_Modal_Thread(k_modes) {}
-	Initial_Message() : K_Modal_Thread() {}
+	Initial_Message(vector<group_def> k_modes) : k_modes(k_modes) {}
+	Initial_Message() : k_modes() {}
 	void issue_first_IOs() {
 		Groups_Message* gm = new Groups_Message(get_time());
 		gm->groups = k_modes;
@@ -16,7 +16,47 @@ public:
     template<class Archive> void serialize(Archive & ar, const unsigned int version) {
     	ar & boost::serialization::base_object<K_Modal_Thread>(*this);
     }
+    vector<group_def> k_modes;
 };
+
+class K_Modal_Thread_Messaging : public K_Modal_Thread
+{
+public:
+	K_Modal_Thread_Messaging(vector<group_def> k_modes) : K_Modal_Thread(k_modes), counter(0), fac_num_ios_to_change_workload(2) {}
+	K_Modal_Thread_Messaging() : K_Modal_Thread(), counter(0), fac_num_ios_to_change_workload(2) {}
+	void issue_first_IOs();
+	void handle_event_completion(Event* event);
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<K_Modal_Thread>(*this);
+    }
+    double fac_num_ios_to_change_workload;
+private:
+	long counter;
+};
+
+void K_Modal_Thread_Messaging::issue_first_IOs() {
+	Groups_Message* gm = new Groups_Message(get_time());
+	gm->groups = k_modes;
+	K_Modal_Thread::issue_first_IOs();
+}
+
+void K_Modal_Thread_Messaging::handle_event_completion(Event* event) {
+	if (++counter % (int)(NUMBER_OF_ADDRESSABLE_PAGES() * fac_num_ios_to_change_workload) == 0) {
+		//printf("%d    %d    %d   \n", counter, NUMBER_OF_ADDRESSABLE_PAGES() * 8, counter % NUMBER_OF_ADDRESSABLE_PAGES() * 8 == 0);
+		int prob_temp = k_modes[0].update_frequency;
+		k_modes[0].update_frequency = k_modes[1].update_frequency;
+		k_modes[1].update_frequency = prob_temp;
+		int tag_temp = k_modes[0].tag;
+		k_modes[0].tag = k_modes[1].tag;
+		k_modes[1].tag = tag_temp;
+		/*Groups_Message* gm = new Groups_Message(get_time());
+		gm->redistribution_of_update_frequencies = true;
+		gm->groups = k_modes;
+		submit(gm);*/
+	}
+	K_Modal_Thread::issue_first_IOs();
+}
 
 // All we need to do to declare a workload is extend the Workload_Definition class and override the generate method
 // This method returns a vector of threads, which the operating system will start running.
@@ -29,17 +69,20 @@ public:
 
 vector<Thread*> Example_Workload::generate() {
 	vector<Thread*> starting_threads;
-	vector<pair<int, int> > k_modes;
-	k_modes.push_back(pair<int, int>(20, 80));
-	k_modes.push_back(pair<int, int>(80, 20));
+	vector<group_def> k_modes;
+	k_modes.push_back(group_def(30, 80, 0));
+	k_modes.push_back(group_def(70, 20, 1));
 
 	Initial_Message* t1 = new Initial_Message(k_modes);
 	starting_threads.push_back(t1);
 
-	// This workload begins with a large sequential write of the entire logical address space.
-	Thread* t2 = new K_Modal_Thread_Messaging(k_modes);
-	//t->set_io_size(1);
+	//k_modes[0].size = 80;
+	//k_modes[1].size = 20;
 
+	// This workload begins with a large sequential write of the entire logical address space.
+	K_Modal_Thread_Messaging* t2 = new K_Modal_Thread_Messaging(k_modes);
+	t2->fac_num_ios_to_change_workload = 100;
+	//t->set_io_size(1);
 
 	if (initialize_with_sequential_write) {
 		Simple_Thread* seq = new Synchronous_Sequential_Writer(0, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR - 1);
@@ -76,7 +119,7 @@ int main()
 	workload->initialize_with_sequential_write = true;
 
 	e->set_workload(workload);
-	e->set_io_limit(NUMBER_OF_ADDRESSABLE_PAGES() * 6);
+	e->set_io_limit(NUMBER_OF_ADDRESSABLE_PAGES() * 15);
 	e->run("test");
 	e->draw_graphs();
 	delete workload;

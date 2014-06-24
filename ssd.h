@@ -507,12 +507,7 @@ public:
 	Message(double time) : Event(MESSAGE, 0, 1, time) {}
 };
 
-class Groups_Message : public Message {
-public:
-	Groups_Message(double time) : Message(time), redistribution_of_update_frequencies(false) {}
-	bool redistribution_of_update_frequencies;
-	vector<pair<int, int> > groups; // one pair for each group. The first double is the update frequency, between 0 and 1, and the second is the group size as a fraction of the whole
-};
+
 
 /* The page is the lowest level data storage unit that is the size unit of
  * requests (events).  Pages maintain their state as events modify them. */
@@ -1315,6 +1310,10 @@ public:
 
 	long get_num_erases_executed() { return num_erases; }
 	static void set_record_statistics(bool val) { record_statistics = val; }
+	vector<vector<uint> > num_erases_per_LUN;
+	vector<vector<uint> > num_writes_per_LUN;
+	vector<vector<uint> > num_gc_writes_per_LUN_origin;
+	vector<vector<uint> > num_gc_writes_per_LUN_destination;
 private:
 	static StatisticsGatherer *inst;
 //	Ssd & ssd;
@@ -1329,18 +1328,16 @@ private:
 	vector<vector<uint> > num_mapping_writes_per_LUN;
 
 	vector<vector<vector<double> > > bus_wait_time_for_writes_per_LUN;
-	vector<vector<uint> > num_writes_per_LUN;
+
 
 	vector<vector<uint> > num_gc_reads_per_LUN;
-	vector<vector<uint> > num_gc_writes_per_LUN_origin;
-	vector<vector<uint> > num_gc_writes_per_LUN_destination;
 	vector<vector<double> > sum_gc_wait_time_per_LUN;
 	vector<vector<vector<double> > > gc_wait_time_per_LUN;
 	vector<vector<uint> > num_copy_backs_per_LUN;
 
 	long num_erases;
 	long num_gc_writes;
-	vector<vector<uint> > num_erases_per_LUN;
+
 
 	vector<vector<uint> > num_gc_scheduled_per_LUN;
 
@@ -1537,13 +1534,6 @@ public:
 
 };
 
-class K_Modal_Workload : public Workload_Definition {
-public:
-	K_Modal_Workload(vector<pair<int, int> > groups) : groups(groups), initialize_with_sequential_write(false) {}
-	vector<Thread*> generate();
-	vector<pair<int, int> > groups;
-	bool initialize_with_sequential_write;
-};
 
 class Synch_Random_Workload : public Workload_Definition {
 public:

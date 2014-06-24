@@ -337,24 +337,6 @@ Address Block_manager_parent::get_free_block_pointer_with_shortest_IO_queue() {
 }
 
 bool Block_manager_parent::Copy_backs_in_progress(Address const& addr) {
-	/*if (addr.page > 0) {
-		BlockAnastasia
-3 days ago
-Hi, Niv Ok, thank you for answer ) Anastasia
-Thorsgade, Copenhagen, Capital Region of Denmark (May 7 - 12, 2013)
-Inquiry
-2246 kr DKK
-Julie
-4 days ago
-Hi Julie, I'm just on my way home, I'll try to be as fast as p...
-Thorsgade, Copenhagen, Capital Region of Denmark
-Delete
-Hanna
-4 days ago
-Hey Niv, Thanks that sounds fairy easy! A& block = ssd.get_package()[addr.package]->get_die()[addr.die].getPlanes()[addr.plane].getBlocks()[addr.block];
-		Page const& page_before = block.getPages()[addr.page - 1];
-		return page_before.get_state() == EMPTY;
-	}*/
 	return false;
 }
 
@@ -472,9 +454,9 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 		Address address = find_free_unused_block(package_id, die_id, index, time);
 		if (address.valid != NONE) {
 
-			if (address.package == 0 && address.die == 0 && address.block == 285) {
-				//address.print();
-				//printf("\n");
+			if (address.package == 1 && address.die == 1 && address.block == 1021) {
+				address.print();
+				printf("\n");
 			}
 
 			return address;
@@ -585,13 +567,6 @@ pointers::pointers(Block_manager_parent* bm) : bm(bm), blocks(SSD_SIZE, vector<A
 		}
 	}
 }
-void pointers::find_free_blocks(Block_manager_parent* bm, double time) {
-	for (int i = 0; i < SSD_SIZE; i++) {
-		for (int j = 0; j < PACKAGE_SIZE; j++) {
-			blocks[i][j] = bm->find_free_unused_block(i, j, time);
-		}
-	}
-}
 
 void pointers::register_completion(Event const& e) {
 	blocks[e.get_address().package][e.get_address().die].page++;
@@ -604,16 +579,6 @@ Address pointers::get_best_block(Block_manager_parent* bm) {
 	return Address();
 }
 
-Address pointers::get_any_free_block() {
-	for (int i = 0; i < blocks.size(); i++) {
-		for (int j = 0; j < blocks[i].size(); j++) {
-			if (blocks[i][j].valid == PAGE && blocks[i][j].page < BLOCK_SIZE) {
-				return blocks[i][j];
-			}
-		}
-	}
-	return Address();
-}
 void pointers::print() {
 	for (int i = 0; i < blocks.size(); i++) {
 		for (int j = 0; j < blocks[i].size(); j++) {

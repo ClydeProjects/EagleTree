@@ -96,6 +96,7 @@ public:
 	vector<Block*> const& get_all_blocks() const { return all_blocks; }
 	uint sort_into_age_class(Address const& address) const;
 	void copy_state(Block_manager_parent* bm);
+	virtual bool may_garbage_collect_this_block(Block* block) { return true; }
 	static Block_manager_parent* get_new_instance();
     friend class boost::serialization::access;
     template<class Archive>
@@ -146,11 +147,12 @@ protected:
 	Migrator* migrator;
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
 	int get_num_free_blocks();
+	int get_num_free_blocks(int package, int die);
 private:
 	Address find_free_unused_block(uint package_id, uint die_id, uint age_class, double time);
 	void issue_erase(Address a, double time);
 
-	int get_num_free_blocks(int package, int die);
+
 	bool copy_back_allowed_on(long logical_address);
 	void register_copy_back_operation_on(uint logical_address);
 	void register_ECC_check_on(uint logical_address);
@@ -280,10 +282,8 @@ enum write_amp_choice {greedy, prob, opt};
 
 struct pointers {
 	pointers(Block_manager_parent* bm);
-	void find_free_blocks(Block_manager_parent* bm, double time);
 	void register_completion(Event const& e);
 	Address get_best_block(Block_manager_parent* bm);
-	Address get_any_free_block();
 	void print();
 	int get_num_free_blocks() const;
 	Block_manager_parent* bm;
@@ -294,6 +294,7 @@ class group {
 public:
 	group(double prob, double size, Block_manager_parent* bm, Ssd* ssd);
 	void print();
+	vector<vector<int> > count_blocks_per_die() const;
 	double get_prob_op(double PBA, double LBA);
 	double get_greedy_op(double PBA, double LBA);
 	double get_average_op(double PBA, double LBA);
@@ -301,11 +302,16 @@ public:
 	Block* get_gc_victim();
 	Block* get_gc_victim(int package, int die);
 	bool is_starved() const;
+	bool needs_more_blocks() const;
+	bool in_equilbirium() const;
+	static bool in_total_equilibrium(vector<group> const& groups, int group_id);
 	static double get_average_write_amp(vector<group>& groups, write_amp_choice choice = opt);
 	static vector<group> iterate(vector<group> const& groups);
 	static void print(vector<group>& groups);
 	static void init_stats(vector<group>& groups);
-
+	static void register_erase_completion(vector<group> const& groups);
+	double get_avg_pages_per_die() const;
+	double get_min_pages_per_die() const;
 	double prob;
 	double size;
 	double offset;
@@ -316,21 +322,32 @@ public:
 	pointers free_blocks;
 	pointers next_free_blocks;
 	set<Block*> block_ids;
+	set<Block*> blocks_being_garbage_collected;
 	struct group_stats {
-		group_stats() : num_gc_in_group(0), num_writes_to_group(0), num_gc_writes_to_group(0) {}
+		group_stats() : num_gc_in_group(0), num_writes_to_group(0), num_gc_writes_to_group(0){}
 		int num_gc_in_group;
 		int num_writes_to_group;
 		int num_gc_writes_to_group;
 		void print();
 	};
+	int num_pages;
 	group_stats stats;
+	static vector<int> mapping_pages_to_groups;
+
+	static int num_groups_that_need_more_blocks;
+	static int num_groups_that_need_less_blocks;
+
+	vector<vector<int> > num_pages_per_die;
+	vector<vector<int> > num_blocks_ever_given;
+	StatisticsGatherer stats_gatherer;
+
 };
 
 // A BM that seperates blocks based on tags
 class Block_Manager_Groups : public Block_manager_parent {
 public:
 	Block_Manager_Groups();
-	~Block_Manager_Groups() {}
+	~Block_Manager_Groups();
 	void init(Ssd*, FtlParent*, IOScheduler*, Garbage_Collector*, Wear_Leveling_Strategy*, Migrator*);
 	void register_write_arrival(Event const& e);
 	void register_write_outcome(Event const& event, enum status status);
@@ -340,8 +357,11 @@ public:
 	void change_update_frequencies(Groups_Message const& message);
 	void check_if_should_trigger_more_GC(double start_time);
 	bool try_to_allocate_block_to_group(int group_id, int package, int die, double time);
+	bool may_garbage_collect_this_block(Block* block);
+	void register_logical_address(Event const& event, int group_id);
     friend class boost::serialization::access;
     void print();
+    bool is_in_equilibrium() const;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
     {
@@ -351,7 +371,7 @@ protected:
 	Address choose_best_address(Event& write);
 	Address choose_any_address(Event const& write);
 private:
-	int which_group_does_this_page_belong_to(Event const& event);
+	int which_group_does_this_page_belong_to(Event const& event) const;
 	vector<group> groups;
 	struct stats {
 		stats() : num_group_misses(0) {}

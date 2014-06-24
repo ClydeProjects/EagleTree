@@ -532,15 +532,15 @@ enum status IOScheduler::execute_next(Event* event) {
 		}
 	}
 
-	if (event->get_address().package == 0 && event->get_address().die == 0 && event->get_address().block == 285) {
+	if (event->get_address().package == 1 && event->get_address().die == 1 && event->get_address().block == 1021) {
 		//event->print();
 	}
 
 
 
-	/*if (event->get_replace_address().package == 0 && event->get_replace_address().die == 0 && event->get_replace_address().block == 270) {
-			//event->print();
-		}*/
+	if (event->get_replace_address().package == 1 && event->get_replace_address().die == 1 && event->get_replace_address().block == 1021) {
+		//event->print();
+	}
 
 	/*if ((event->get_address().package == 1 && event->get_address().die == 1 && event->get_address().block == 98) ||
 			(event->get_replace_address().package == 1 && event->get_replace_address().die == 1 && event->get_replace_address().block == 98)) {

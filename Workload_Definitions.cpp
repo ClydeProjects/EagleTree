@@ -175,12 +175,12 @@ vector<Thread*> K2_Modal_Workload::generate() {
 	double size_1 = relative_size / (relative_size + 1.0);
 	double size_2 = 1 / (relative_size + 1.0);
 
-	pair<int, int> m1(prob_1 * 100, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * size_1);
-	pair<int, int> m2(prob_2 * 100, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * size_2);
+	group_def m1(prob_1 * 100, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * size_1);
+	group_def m2(prob_2 * 100, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * size_2);
 
-	printf("division point %d\n", m1.second);
+	printf("division point %d\n", m1.size);
 
-	vector<pair<int, int> > groups;
+	vector<group_def > groups;
 	groups.push_back(m1);
 	groups.push_back(m2);
 
@@ -188,17 +188,5 @@ vector<Thread*> K2_Modal_Workload::generate() {
 	return vector<Thread*>(1, modes_t);
 }
 
-vector<Thread*> K_Modal_Workload::generate() {
-	Thread* modes_t = new K_Modal_Thread(groups);
-	vector<Thread*> init;
-	if (initialize_with_sequential_write) {
-		Simple_Thread* seq = new Asynchronous_Sequential_Writer(0, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR);
-		seq->add_follow_up_thread(modes_t);
-		init.push_back(seq);
-	}
-	else {
-		init.push_back(modes_t);
-	}
-	return init;
-}
+
 

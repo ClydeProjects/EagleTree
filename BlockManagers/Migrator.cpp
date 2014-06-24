@@ -283,6 +283,10 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 		i++;
 	}
 
+	if (!bm->may_garbage_collect_this_block(victim)) {
+		return migrations;
+	}
+
 	update_structures(addr);
 	//printf("blocks being gced %d\n", blocks_being_garbage_collected.size());
 	bm->subtract_from_available_for_new_writes(victim->get_pages_valid());

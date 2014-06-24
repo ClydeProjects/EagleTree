@@ -232,19 +232,21 @@ void Collision_Free_Asynchronous_Random_Thread::handle_event_completion(Event* e
 
 void K_Modal_Thread::create_io() {
 
-	int group_decider = random_number_generator() * 100;
+	int group_decider = random_number_generator() * 101;
 	int cumulative_prob = 0;
 	int selected_group_start_lba = 0;
 	int selected_group_size = 0;
 	static vector<int> group_hist(k_modes.size());
+	int group_index = UNDEFINED;
 	for (int i = 0; i < k_modes.size(); i++) {
-		cumulative_prob += k_modes[i].first;
+		cumulative_prob += k_modes[i].update_frequency;
 		if (group_decider <= cumulative_prob) {
-			selected_group_size = (k_modes[i].second / 100.0) * NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
+			selected_group_size = (k_modes[i].size / 100.0) * NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
 			group_hist[i]++;
+			group_index = i;
 			break;
 		}
-		selected_group_start_lba += (k_modes[i].second / 100.0) * NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
+		selected_group_start_lba += (k_modes[i].size / 100.0) * NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
 	}
 	//printf("%d  %d\n", group_hist[0], group_hist[1]);
 	long lba = selected_group_start_lba + random_number_generator() * selected_group_size;
@@ -260,8 +262,14 @@ void K_Modal_Thread::create_io() {
 		i++;
 	}
 	Event* e = new Event(WRITE, lba, 1, get_time());
-	e->set_tag(selected_group_start_lba);
-	e->set_size(selected_group_size);
+	if (k_modes[group_index].tag == UNDEFINED) {
+		e->set_tag(selected_group_start_lba);
+	}
+	else {
+		e->set_tag(k_modes[group_index].tag);
+	}
+
+	//e->set_size(selected_group_size);
 	submit(e);
 }
 
@@ -275,22 +283,4 @@ void K_Modal_Thread::handle_event_completion(Event* event) {
 	issue_first_IOs();
 }
 
-void K_Modal_Thread_Messaging::issue_first_IOs() {
-	Groups_Message* gm = new Groups_Message(get_time());
-	gm->groups = k_modes;
-	//submit(gm);
-	K_Modal_Thread::issue_first_IOs();
-}
 
-void K_Modal_Thread_Messaging::handle_event_completion(Event* event) {
-	if (++counter % NUMBER_OF_ADDRESSABLE_PAGES() * 3 == 0) {
-		int prob_temp = k_modes[0].first;
-		k_modes[0].first = k_modes[1].first;
-		k_modes[1].first = prob_temp;
-		Groups_Message* gm = new Groups_Message(get_time());
-		gm->redistribution_of_update_frequencies = true;
-		gm->groups = k_modes;
-		submit(gm);
-	}
-	K_Modal_Thread::issue_first_IOs();
-}

@@ -326,14 +326,37 @@ public:
     }
 };
 
+
+struct group_def {
+	group_def(int update_frequency, int size, int tag = UNDEFINED) : update_frequency(update_frequency), size(size), tag(tag) {}
+	group_def() : update_frequency(), size(), tag() {}
+	int update_frequency;
+	int size;
+	int tag;
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & update_frequency;
+    	ar & size;
+    	ar & tag;
+    }
+};
+
+class Groups_Message : public Message {
+public:
+	Groups_Message(double time) : Message(time), redistribution_of_update_frequencies(false) {}
+	bool redistribution_of_update_frequencies;
+	vector<group_def> groups; // one pair for each group. The first double is the update frequency, between 0 and 1, and the second is the group size as a fraction of the whole
+};
+
 // Divides the workload across the logical address space into K groups
 class K_Modal_Thread : public Thread
 {
 public:
-	K_Modal_Thread(vector<pair<int, int> > k_modes) : k_modes(k_modes), random_number_generator(2) {
+
+	K_Modal_Thread(vector<group_def> k_modes) : k_modes(k_modes), random_number_generator(2) {
 		random_number_generator.seed(10);
 		for (auto k : k_modes) {
-			printf("%d   %d\n", k.first, k.second);
+			printf("%d   %d\n", k.update_frequency, k.size);
 		}
 	}
 	K_Modal_Thread() : k_modes(), random_number_generator(35) {}
@@ -347,24 +370,9 @@ public:
     }
 protected:
 	void create_io();
-	vector<pair<int, int> > k_modes;
-	MTRand_open random_number_generator;
-};
 
-class K_Modal_Thread_Messaging : public K_Modal_Thread
-{
-public:
-	K_Modal_Thread_Messaging(vector<pair<int, int> > k_modes) : K_Modal_Thread(k_modes), counter(0) {}
-	K_Modal_Thread_Messaging() : K_Modal_Thread(), counter(0) {}
-	void issue_first_IOs();
-	void handle_event_completion(Event* event);
-    friend class boost::serialization::access;
-    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
-    	ar & boost::serialization::base_object<K_Modal_Thread>(*this);
-    }
-private:
-	void create_io();
-	long counter;
+	vector<group_def> k_modes;
+	MTRand_open random_number_generator;
 };
 
 // This thread simulates the IO pattern of an external sort algorithm

@@ -1,6 +1,30 @@
 #include "../ssd.h"
 using namespace ssd;
 
+
+class K_Modal_Workload : public Workload_Definition {
+public:
+	K_Modal_Workload(vector<group_def> groups) : groups(groups), initialize_with_sequential_write(false) {}
+	vector<Thread*> generate();
+	vector<group_def> groups;
+	bool initialize_with_sequential_write;
+};
+
+
+vector<Thread*> K_Modal_Workload::generate() {
+	Thread* modes_t = new K_Modal_Thread(groups);
+	vector<Thread*> init;
+	if (initialize_with_sequential_write) {
+		Simple_Thread* seq = new Asynchronous_Sequential_Writer(0, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR);
+		seq->add_follow_up_thread(modes_t);
+		init.push_back(seq);
+	}
+	else {
+		init.push_back(modes_t);
+	}
+	return init;
+}
+
 // All we need to do to declare a workload is extend the Workload_Definition class and override the generate method
 // This method returns a vector of threads, which the operating system will start running.
 class Example_Workload : public Workload_Definition {
@@ -57,9 +81,9 @@ int main()
 	Experiment::create_base_folder(name.c_str());
 	Experiment* e = new Experiment();
 
-	vector<pair<int, int> > groups;
-	groups.push_back(pair<int, int>(80, 20));
-	groups.push_back(pair<int, int>(20, 80));
+	vector<group_def > groups;
+	groups.push_back(group_def(80, 20));
+	groups.push_back(group_def(20, 80));
 	K_Modal_Workload* workload = new K_Modal_Workload(groups);
 	workload->initialize_with_sequential_write = true;
 

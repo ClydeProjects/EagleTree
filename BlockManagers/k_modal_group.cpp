@@ -14,8 +14,15 @@
 
 using namespace ssd;
 
+vector<int> group::mapping_pages_to_groups =  vector<int>();
+int group::num_groups_that_need_more_blocks = 0;
+int group::num_groups_that_need_less_blocks = 0;
+
 group::group(double prob, double size, Block_manager_parent* bm, Ssd* ssd) : prob(prob), size(size), OP(0), OP_greedy(0),
-			OP_prob(0), OP_average(0), free_blocks(bm), next_free_blocks(bm), block_ids(), stats() {
+			OP_prob(0), OP_average(0), free_blocks(bm), next_free_blocks(bm), block_ids(), blocks_being_garbage_collected(), stats(), num_pages(0),
+			num_pages_per_die(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
+			num_blocks_ever_given(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
+			stats_gatherer(StatisticsGatherer())  {
 	double PBA = NUMBER_OF_ADDRESSABLE_PAGES();
 	double LBA = NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
 	get_prob_op(PBA, LBA);
@@ -31,11 +38,49 @@ group::group(double prob, double size, Block_manager_parent* bm, Ssd* ssd) : pro
 	}
 }
 
+vector<vector<int> > group::count_blocks_per_die() const {
+	vector<vector<int> > count = vector<vector<int>>(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0));
+	for (auto b : block_ids) {
+		Address a = Address(b->get_physical_address(), BLOCK);
+		count[a.package][a.die]++;
+	}
+	return count;
+}
+
+
 void group::print() {
-	printf("size: %d\tprob: %f\tOP_greedy: %d\tOP_prob: %d\tOP_avg: %d\tOP: %d\tamp: %f\tblocks: %d\tpages: %d\n",
-			(int)size, prob, (int)OP_greedy, (int) OP_prob, (int) OP_average, (int)OP, get_write_amp(opt), prob, block_ids.size(), block_ids.size() * BLOCK_SIZE);
+	printf("size: %d\t", (int)size);
+	printf("actual num pages: %d\t", (int)num_pages);
+	printf("prob: %f\t", prob);
+	printf("OP_greedy: %d\t", (int)OP_greedy);
+	printf("OP_prob: %d\t", (int)OP_prob);
+	printf("OP_avg: %d\t", (int)OP_average);
+	printf("OP: %d\t", (int)OP);
+	printf("amp: %f\t", get_write_amp(opt));
+	printf("blocks: %d\t", (int)block_ids.size());
+	printf("pages: %d\t", (int)block_ids.size() * BLOCK_SIZE);
+	printf("\n");
 	stats.print();
+
+	vector<vector<int> > num_blocks_per_die = count_blocks_per_die();
+
+
+	for (int i = 0; i < num_pages_per_die.size(); i++) {
+		for (int j = 0; j < num_pages_per_die[i].size(); j++) {
+			printf("\tnum pages in %d %d: %d  %d  %d    %d    %d    %d     %d\n", i, j,
+					num_pages_per_die[i][j],
+					num_blocks_per_die[i][j],
+					num_blocks_ever_given[i][j],
+					stats_gatherer.num_erases_per_LUN[i][j],
+					stats_gatherer.num_writes_per_LUN[i][j],
+					stats_gatherer.num_gc_writes_per_LUN_origin[i][j],
+					stats_gatherer.num_gc_writes_per_LUN_destination[i][j]);
+		}
+	}
+	printf("\tnum ongoing gc in group: %d\n", this->blocks_being_garbage_collected.size());
+	printf("\tin equib: %d\n", this->in_equilbirium());
 	free_blocks.print();
+	//stats_gatherer.print();
 }
 
 double group::get_prob_op(double PBA, double LBA) {
@@ -76,14 +121,30 @@ double group::get_average_write_amp(vector<group>& groups, write_amp_choice choi
 }
 
 vector<group> group::iterate(vector<group> const& groups) {
+
 	double PBA = NUMBER_OF_ADDRESSABLE_PAGES();
 	double LBA = NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
+	/*
+	 * 	for (auto g : groups) {
+		LBA += g.size;
+	}
+	 */
 	vector<double> incrementals(groups.size());
 	vector<group> groups_opt = groups;
 
+	double total_OP = 0;
 	for (unsigned int i = 0; i < groups.size(); i++) {
+		groups_opt[i].get_average_op(PBA, LBA);
 		groups_opt[i].OP = groups[i].OP_average;
 		incrementals[i] = groups[i].OP_average / 2;
+		total_OP += groups_opt[i].OP;
+	}
+	if (total_OP < NUMBER_OF_ADDRESSABLE_PAGES() * (1 - OVER_PROVISIONING_FACTOR)) {
+		double diff = NUMBER_OF_ADDRESSABLE_PAGES() * (1 - OVER_PROVISIONING_FACTOR) - total_OP;
+		printf("extra OP %f\n", diff);
+		for (unsigned int i = 0; i < groups.size(); i++) {
+			groups_opt[i].OP += diff / groups.size();
+		}
 	}
 
 	double current_write_amp = get_average_write_amp(groups_opt);
@@ -127,10 +188,34 @@ void group::init_stats(vector<group>& groups) {
 	}
 }
 
+double group::get_avg_pages_per_die() const {
+	double avg = 0;
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			avg += num_pages_per_die[i][j];
+		}
+	}
+	return avg / (SSD_SIZE * PACKAGE_SIZE);
+}
+
+double group::get_min_pages_per_die() const {
+	double min = NUMBER_OF_ADDRESSABLE_PAGES();
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			if (min > num_pages_per_die[i][j]) {
+				min = num_pages_per_die[i][j];
+			}
+		}
+	}
+	return min;
+}
+
 void group::group_stats::print() {
 	printf("\tnum_gc_in_group:\t%d\n", num_gc_in_group);
 	printf("\tnum_writes_to_group:\t%d\n", num_writes_to_group);
 	printf("\tnum_gc_writes_to_group:\t%d\n", num_gc_writes_to_group);
+	printf("\tactual write amp:\t%f\n", (num_writes_to_group + num_gc_writes_to_group) / (double)num_writes_to_group);
+
 }
 
 Block* group::get_gc_victim() {
@@ -153,17 +238,55 @@ Block* group::get_gc_victim(int package, int die) {
 		if (b->get_pages_valid() < min && b->get_state() == ACTIVE && a.package == package && a.die == die) {
 			min = b->get_pages_valid();
 			victim = b;
+			//cout << b->get_pages_valid() << " ";
 		}
 	}
-	if (victim->get_physical_address() == 36480) {
-		int i = 0;
-		i++;
-	}
+	//cout << endl;
 	return victim;
 }
 
 bool group::is_starved() const {
 	int num_live_blocks = 0;
-	return free_blocks.get_num_free_blocks() < SSD_SIZE * PACKAGE_SIZE / 2;
+	return free_blocks.get_num_free_blocks() < SSD_SIZE * PACKAGE_SIZE * 0.75;
 }
 
+bool group::needs_more_blocks() const {
+	return block_ids.size() * BLOCK_SIZE <= OP + size;
+}
+
+bool group::in_equilbirium() const {
+	int diff = abs(block_ids.size() * BLOCK_SIZE - (OP + size));
+	if (diff > BLOCK_SIZE * 10) {
+		return false;
+	}
+	return true;
+}
+
+void group::register_erase_completion(vector<group> const& groups) {
+	num_groups_that_need_more_blocks = 0;
+	num_groups_that_need_less_blocks = 0;
+	int num_not_in_equib_need_less_blocks = 0;
+	for (int i = 0; i < groups.size(); i++) {
+		if (!groups[i].in_equilbirium() && groups[i].needs_more_blocks()) {
+			num_groups_that_need_more_blocks++;
+		}
+		else if (!groups[i].in_equilbirium() && !groups[i].needs_more_blocks()) {
+			num_groups_that_need_less_blocks++;
+		}
+	}
+}
+
+
+bool group::in_total_equilibrium(vector<group> const& groups, int group_id) {
+	if (groups[group_id].in_equilbirium()) {
+		return true;
+	}
+
+	if (groups[group_id].needs_more_blocks() && num_groups_that_need_less_blocks > 0) {
+		return false;
+	}
+	if (!groups[group_id].needs_more_blocks() && num_groups_that_need_more_blocks > 0) {
+		return false;
+	}
+	return true;
+}
