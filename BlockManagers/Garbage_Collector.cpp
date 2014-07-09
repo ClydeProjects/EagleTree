@@ -69,6 +69,6 @@ void Garbage_Collector_Greedy::register_trim(Event const& event, uint age_class,
 	}
 	gc_candidates[ra.package][ra.die][age_class].insert(ra.get_linear_address());
 	if (gc_candidates[ra.package][ra.die][age_class].size() == 1) {
-		bm->check_if_should_trigger_more_GC(event.get_current_time());
+		bm->check_if_should_trigger_more_GC(event);
 	}
 }

@@ -18,11 +18,14 @@ vector<int> group::mapping_pages_to_groups =  vector<int>();
 int group::num_groups_that_need_more_blocks = 0;
 int group::num_groups_that_need_less_blocks = 0;
 
-group::group(double prob, double size, Block_manager_parent* bm, Ssd* ssd) : prob(prob), size(size), OP(0), OP_greedy(0),
-			OP_prob(0), OP_average(0), free_blocks(bm), next_free_blocks(bm), block_ids(), blocks_being_garbage_collected(), stats(), num_pages(0),
+group::group(double prob, double size, Block_manager_parent* bm, Ssd* ssd, int id) : prob(prob), size(size), offset(0), OP(0), OP_greedy(0),
+			OP_prob(0), OP_average(0), free_blocks(bm), next_free_blocks(bm), block_ids(), blocks_being_garbage_collected(), stats(), num_pages(0), actual_prob(prob),
 			num_pages_per_die(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 			num_blocks_ever_given(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
-			stats_gatherer(StatisticsGatherer())  {
+			num_blocks_per_die(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
+			blocks_queue_per_die(SSD_SIZE, vector<vector<Block*> >(PACKAGE_SIZE, vector<Block*>())),
+			stats_gatherer(StatisticsGatherer()),
+			id(id), ssd(ssd){
 	double PBA = NUMBER_OF_ADDRESSABLE_PAGES();
 	double LBA = NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
 	get_prob_op(PBA, LBA);
@@ -34,21 +37,22 @@ group::group(double prob, double size, Block_manager_parent* bm, Ssd* ssd) : pro
 			block_ids.insert(block1);
 			Block* block2 = ssd->get_package(next_free_blocks.blocks[i][j].package)->get_die(next_free_blocks.blocks[i][j].die)->get_plane(next_free_blocks.blocks[i][j].plane)->get_block(next_free_blocks.blocks[i][j].block);
 			block_ids.insert(block2);
+			num_blocks_per_die[i][j] += 2;
 		}
 	}
 }
 
-vector<vector<int> > group::count_blocks_per_die() const {
-	vector<vector<int> > count = vector<vector<int>>(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0));
-	for (auto b : block_ids) {
-		Address a = Address(b->get_physical_address(), BLOCK);
-		count[a.package][a.die]++;
-	}
-	return count;
-}
+group::group() : prob(0), size(0), offset(), OP(0), OP_greedy(0),
+		OP_prob(0), OP_average(0), free_blocks(), next_free_blocks(), block_ids(), blocks_being_garbage_collected(), stats(), num_pages(0), actual_prob(0),
+		num_pages_per_die(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
+		num_blocks_ever_given(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
+		num_blocks_per_die(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
+		stats_gatherer(StatisticsGatherer()),
+		id(id)
+{}
 
-
-void group::print() {
+void group::print() const {
+	printf("id: %d\t", (int)id);
 	printf("size: %d\t", (int)size);
 	printf("actual num pages: %d\t", (int)num_pages);
 	printf("prob: %f\t", prob);
@@ -61,13 +65,18 @@ void group::print() {
 	printf("pages: %d\t", (int)block_ids.size() * BLOCK_SIZE);
 	printf("\n");
 	stats.print();
+	printf("\tnum ongoing gc in group: %d\n", this->blocks_being_garbage_collected.size());
+	printf("\tin equib: %d\n", this->in_equilbirium());
+	//free_blocks.print();
+	//stats_gatherer.print();
+	//print_die_spesific_info();
+	//print_blocks_valid_pages_per_die();
+}
 
-	vector<vector<int> > num_blocks_per_die = count_blocks_per_die();
-
-
+void group::print_die_spesific_info() const {
 	for (int i = 0; i < num_pages_per_die.size(); i++) {
 		for (int j = 0; j < num_pages_per_die[i].size(); j++) {
-			printf("\tnum pages in %d %d: %d  %d  %d    %d    %d    %d     %d\n", i, j,
+			printf("\tnum pages in %d %d: %d  %d   %d    %d    %d    %d     %d\n", i, j,
 					num_pages_per_die[i][j],
 					num_blocks_per_die[i][j],
 					num_blocks_ever_given[i][j],
@@ -77,10 +86,20 @@ void group::print() {
 					stats_gatherer.num_gc_writes_per_LUN_destination[i][j]);
 		}
 	}
-	printf("\tnum ongoing gc in group: %d\n", this->blocks_being_garbage_collected.size());
-	printf("\tin equib: %d\n", this->in_equilbirium());
-	free_blocks.print();
-	//stats_gatherer.print();
+}
+
+void group::print_blocks_valid_pages_per_die() const {
+	for (int i = 0; i < blocks_queue_per_die.size(); i++) {
+		for (int j = 0; j < blocks_queue_per_die[i].size(); j++) {
+			printf("%d %d: ", i, j);
+			for (int b = 0; b < blocks_queue_per_die[i][j].size(); b++) {
+				printf("%d ", blocks_queue_per_die[i][j][b]->get_pages_valid());
+			}
+			//assert(blocks_queue_per_die[i][j].size() == num_blocks_per_die[i][j]);
+			printf("\n");
+			//printf("%d %d\n", blocks_queue_per_die[i][j].size(), num_blocks_per_die[i][j]);
+		}
+	}
 }
 
 double group::get_prob_op(double PBA, double LBA) {
@@ -96,7 +115,7 @@ double group::get_average_op(double PBA, double LBA) {
 	return OP_average = OP = (get_greedy_op(PBA, LBA) * weight + get_prob_op(PBA, LBA) * (1 - weight));
 }
 
-double group::get_write_amp(write_amp_choice choice) {
+double group::get_write_amp(write_amp_choice choice) const {
 	double OP_chosen = 0;
 	if (choice == opt) {
 		OP_chosen = OP;
@@ -177,14 +196,17 @@ vector<group> group::iterate(vector<group> const& groups) {
 }
 
 void group::print(vector<group>& groups) {
-	for (unsigned int i = 0; i < groups.size(); i++) {
-		groups[i].print();
+	vector<group> copy = groups;
+	sort(copy.begin(), copy.end(), [](group const& a, group const& b) { return a.prob / a.size < b.prob / b.size; });
+	for (unsigned int i = 0; i < copy.size(); i++) {
+		copy[i].print();
 	}
 }
 
 void group::init_stats(vector<group>& groups) {
 	for (unsigned int i = 0; i < groups.size(); i++) {
 		groups[i].stats = group_stats();
+		groups[i].stats_gatherer = StatisticsGatherer();
 	}
 }
 
@@ -198,6 +220,17 @@ double group::get_avg_pages_per_die() const {
 	return avg / (SSD_SIZE * PACKAGE_SIZE);
 }
 
+double group::get_avg_blocks_per_die() const {
+	double avg = 0;
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			avg += num_blocks_per_die[i][j];
+		}
+	}
+	return avg / (SSD_SIZE * PACKAGE_SIZE);
+}
+
+
 double group::get_min_pages_per_die() const {
 	double min = NUMBER_OF_ADDRESSABLE_PAGES();
 	for (int i = 0; i < SSD_SIZE; i++) {
@@ -210,15 +243,18 @@ double group::get_min_pages_per_die() const {
 	return min;
 }
 
-void group::group_stats::print() {
+void group::group_stats::print() const {
 	printf("\tnum_gc_in_group:\t%d\n", num_gc_in_group);
 	printf("\tnum_writes_to_group:\t%d\n", num_writes_to_group);
 	printf("\tnum_gc_writes_to_group:\t%d\n", num_gc_writes_to_group);
-	printf("\tactual write amp:\t%f\n", (num_writes_to_group + num_gc_writes_to_group) / (double)num_writes_to_group);
-
+	double write_amp = (num_writes_to_group + num_gc_writes_to_group) / (double)num_writes_to_group;
+	printf("\tactual write amp:\t%f\n", write_amp);
+	printf("\tfactor:\t%f\n", (double) num_gc_writes_to_group  / (double)num_gc_in_group );
+	printf("\tmigrated in: %d\n", migrated_in);
+	printf("\tmigrated out: %d\n", migrated_out);
 }
 
-Block* group::get_gc_victim() {
+Block* group::get_gc_victim() const {
 	int min = BLOCK_SIZE;
 	Block* victim = NULL;
 	for (auto b : block_ids) {
@@ -230,7 +266,41 @@ Block* group::get_gc_victim() {
 	return victim;
 }
 
-Block* group::get_gc_victim(int package, int die) {
+void group::register_write_outcome(Event const& event) {
+
+	stats_gatherer.register_completed_event(event);
+
+	if (event.get_address().page == 0) {
+		Address a = event.get_address();
+		num_blocks_ever_given[a.package][a.die]++;
+		Block* block = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
+		blocks_queue_per_die[a.package][a.die].push_back(block);
+	}
+
+}
+
+
+
+void group::register_erase_outcome(Event const& event) {
+	Address a = event.get_address();
+	Block* block = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
+	assert(block_ids.count(block) == 1);
+	block_ids.erase(block);
+	blocks_being_garbage_collected.erase(block);
+	stats.num_gc_in_group++;
+	stats_gatherer.register_completed_event(event);
+	num_blocks_per_die[a.package][a.die]--;
+	for (int i = 0; i < blocks_queue_per_die[a.package][a.die].size(); i++) {
+		if (blocks_queue_per_die[a.package][a.die][i] == block) {
+			blocks_queue_per_die[a.package][a.die].erase(blocks_queue_per_die[a.package][a.die].begin() + i);
+			break;
+		}
+	}
+	//vec.erase(std::remove(vec.begin(), vec.end(), int_to_remove), vec.end());
+	//blocks_queue_per_die[a.package][a.die].erase()
+}
+
+Block* group::get_gc_victim(int package, int die) const {
 	int min = BLOCK_SIZE;
 	Block* victim = NULL;
 	for (auto b : block_ids) {
@@ -238,16 +308,20 @@ Block* group::get_gc_victim(int package, int die) {
 		if (b->get_pages_valid() < min && b->get_state() == ACTIVE && a.package == package && a.die == die) {
 			min = b->get_pages_valid();
 			victim = b;
-			//cout << b->get_pages_valid() << " ";
+			/*if (id == 0) {
+				cout << b->get_pages_valid() << " ";
+			}*/
 		}
 	}
-	//cout << endl;
+	/*if (id == 0) {
+		cout << endl;
+	}*/
 	return victim;
 }
 
 bool group::is_starved() const {
 	int num_live_blocks = 0;
-	return free_blocks.get_num_free_blocks() < SSD_SIZE * PACKAGE_SIZE * 0.75;
+	return free_blocks.get_num_free_blocks() < SSD_SIZE * PACKAGE_SIZE * 0.5;
 }
 
 bool group::needs_more_blocks() const {
@@ -262,7 +336,7 @@ bool group::in_equilbirium() const {
 	return true;
 }
 
-void group::register_erase_completion(vector<group> const& groups) {
+void group::count_num_groups_that_need_more_blocks(vector<group> const& groups) {
 	num_groups_that_need_more_blocks = 0;
 	num_groups_that_need_less_blocks = 0;
 	int num_not_in_equib_need_less_blocks = 0;

@@ -44,7 +44,7 @@ void Block_manager_roundrobin::register_erase_outcome(Event const& event, enum s
 		free_block_pointers[a.package][a.die] = find_free_unused_block(a.package, a.die);
 	}
 
-	check_if_should_trigger_more_GC(event.get_current_time());
+	check_if_should_trigger_more_GC(event);
 }
 
 Address Block_manager_roundrobin::choose_best_address(Event& write) { // const

@@ -153,7 +153,7 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 		assert(num_free_pages == num_available_pages_for_new_writes);
 	}
 
-	check_if_should_trigger_more_GC(event.get_current_time());
+	check_if_should_trigger_more_GC(event);
 
 }
 
@@ -199,6 +199,7 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	}
 
 	Address ba = event.get_address();
+
 	if (ba.compare(free_block_pointers[ba.package][ba.die]) >= BLOCK) {
 		increment_pointer(free_block_pointers[ba.package][ba.die]);
 		if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
@@ -209,14 +210,18 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 			if (has_free_pages(free_pointer)) {
 				free_block_pointers[ba.package][ba.die] = free_pointer;
 			}
-			else {
-				Free_Space_Per_LUN_Meter::mark_out_of_space(ba, event.get_current_time() );
-			}
 			if (PRINT_LEVEL > 1) {
 				if (free_pointer.valid == NONE) printf(", and a new unused block could not be found.\n");
 				else printf(".\n");
 			}
 		}
+	}
+
+	if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
+		Free_Space_Per_LUN_Meter::mark_out_of_space(ba, event.get_current_time());
+	}
+	else {
+		Free_Space_Per_LUN_Meter::mark_new_space(ba, event.get_current_time());
 	}
 }
 
@@ -224,7 +229,19 @@ void Block_manager_parent::trim(Event const& event) {
 	IO_has_completed_since_last_shortest_queue_search = true;
 }
 
-int Block_manager_parent::get_num_free_blocks() {
+int Block_manager_parent::get_num_pointers_with_free_space() const {
+	int sum = 0;
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			if (has_free_pages(free_block_pointers[i][j])) {
+				sum++;
+			}
+		}
+	}
+	return sum;
+}
+
+int Block_manager_parent::get_num_free_blocks() const {
 	int sum = 0;
 	for (int i = 0; i < SSD_SIZE; i++) {
 		for (int j = 0; j < PACKAGE_SIZE; j++) {
@@ -234,7 +251,7 @@ int Block_manager_parent::get_num_free_blocks() {
 	return sum;
 }
 
-int Block_manager_parent::get_num_free_blocks(int package, int die) {
+int Block_manager_parent::get_num_free_blocks(int package, int die) const {
 	int num_free_blocks = 0;
 	for (int i = 0; i < num_age_classes; i++) {
 		num_free_blocks += free_blocks[package][die][i].size();
@@ -257,16 +274,16 @@ bool Block_manager_parent::can_write(Event const& write) const {
 	return num_available_pages_for_new_writes > 0 || write.is_garbage_collection_op();
 }
 
-void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
+void Block_manager_parent::check_if_should_trigger_more_GC(Event const& event) {
 	if (num_free_pages <= BLOCK_SIZE) {
-		migrator->schedule_gc(start_time, -1, -1, -1, -1);
+		migrator->schedule_gc(event.get_current_time(), -1, -1, -1, -1);
 	}
 
 	int num_luns_with_space = SSD_SIZE * PACKAGE_SIZE;
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			if (!has_free_pages(free_block_pointers[i][j]) || get_num_free_blocks(i, j) < GREED_SCALE) {
-				migrator->schedule_gc(start_time, i, j, -1, -1);
+				migrator->schedule_gc(event.get_current_time(), i, j, -1, -1);
 			}
 			if (!has_free_pages(free_block_pointers[i][j])) {
 				num_luns_with_space--;
@@ -455,8 +472,8 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 		if (address.valid != NONE) {
 
 			if (address.package == 1 && address.die == 1 && address.block == 1021) {
-				address.print();
-				printf("\n");
+				//address.print();
+				//printf("\n");
 			}
 
 			return address;
@@ -474,6 +491,10 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 		free_blocks[package_id][die_id][klass].pop_back();
 		num_free_blocks_left--;
 		assert(has_free_pages(to_return));
+	}
+	if (to_return.valid != NONE &&  num_free_blocks_left == 0) {
+		//printf("here yo\n");
+		//StateVisualiser::print_page_status();
 	}
 	if (num_free_blocks_left < GREED_SCALE) {
 		migrator->schedule_gc(time, package_id, die_id, -1, -1);
@@ -555,6 +576,7 @@ Block_manager_parent* Block_manager_parent::get_new_instance() {
 		case 4: bm = new Wearwolf(); break;
 		case 5: bm = new Block_Manager_Tag_Groups(); break;
 		case 6: bm = new Block_Manager_Groups(); break;
+		case 7: bm = new bm_gc_locality(); break;
 		default: bm = new Block_manager_parallel(); break;
 	}
 	return bm;
@@ -567,6 +589,10 @@ pointers::pointers(Block_manager_parent* bm) : bm(bm), blocks(SSD_SIZE, vector<A
 		}
 	}
 }
+
+pointers::pointers() : bm(NULL), blocks(SSD_SIZE, vector<Address>(PACKAGE_SIZE, Address())) {
+}
+
 
 void pointers::register_completion(Event const& e) {
 	blocks[e.get_address().package][e.get_address().die].page++;

@@ -59,6 +59,7 @@ private:
 	vector<queue<Event*> > erase_queue;
 	vector<int> num_erases_scheduled_per_package;
 	map<long, vector<deque<Event*> > > dependent_gc;
+	map<Block*, double> gc_time_stat;
 };
 
 class Block_manager_parent {
@@ -85,7 +86,7 @@ public:
 	void register_trim_making_gc_redundant(Event* trim);
 	Address choose_copbyback_address(Event const& write);
 	void schedule_gc(double time, int package_id, int die_id, int block, int klass);
-	virtual void check_if_should_trigger_more_GC(double start_time);
+	virtual void check_if_should_trigger_more_GC(Event const& event);
 	double get_average_migrations_per_gc() const;
 	int get_num_age_classes() const { return num_age_classes; }
 	int get_num_pages_available_for_new_writes() const { return num_available_pages_for_new_writes; }
@@ -96,7 +97,8 @@ public:
 	vector<Block*> const& get_all_blocks() const { return all_blocks; }
 	uint sort_into_age_class(Address const& address) const;
 	void copy_state(Block_manager_parent* bm);
-	virtual bool may_garbage_collect_this_block(Block* block) { return true; }
+	virtual bool bm(Block* block, double current_time) { return true; }
+	virtual bool may_garbage_collect_this_block(Block* block, double current_time) { return true;}
 	static Block_manager_parent* get_new_instance();
     friend class boost::serialization::access;
     template<class Archive>
@@ -146,8 +148,9 @@ protected:
 	vector<vector<Address> > free_block_pointers;
 	Migrator* migrator;
 	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
-	int get_num_free_blocks();
-	int get_num_free_blocks(int package, int die);
+	int get_num_free_blocks() const;
+	int get_num_free_blocks(int package, int die) const;
+	int get_num_pointers_with_free_space() const;
 private:
 	Address find_free_unused_block(uint package_id, uint die_id, uint age_class, double time);
 	void issue_erase(Address a, double time);
@@ -254,6 +257,31 @@ protected:
 	Address choose_any_address(Event const& write);
 };
 
+// A BM that assigns each write to the die with the shortest queue. No hot-cold seperation
+class bm_gc_locality : public Block_manager_parent {
+public:
+	bm_gc_locality();
+	~bm_gc_locality() {}
+	void register_write_outcome(Event const& event, enum status status);
+	void check_if_should_trigger_more_GC(Event const& event);
+	void register_erase_outcome(Event const& event, enum status status);
+	bool may_garbage_collect_this_block(Block* block, double current_time);
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & boost::serialization::base_object<Block_manager_parent>(*this);
+    }
+protected:
+	Address choose_best_address(Event& write);
+	Address choose_any_address(Event const& write);
+	map<Block*, Address> pointers_for_ongoing_gc_operations;
+	vector<vector<queue<Address> > > partially_used_blocks;
+private:
+	int get_num_partially_empty_blocks() const;
+	Address get_block_for_gc(int package, int die, double current_time);
+};
+
 // A BM that seperates blocks based on tags
 class Block_Manager_Tag_Groups : public Block_manager_parent {
 public:
@@ -281,6 +309,7 @@ private:
 enum write_amp_choice {greedy, prob, opt};
 
 struct pointers {
+	pointers();
 	pointers(Block_manager_parent* bm);
 	void register_completion(Event const& e);
 	Address get_best_block(Block_manager_parent* bm);
@@ -292,15 +321,19 @@ struct pointers {
 
 class group {
 public:
-	group(double prob, double size, Block_manager_parent* bm, Ssd* ssd);
-	void print();
-	vector<vector<int> > count_blocks_per_die() const;
+	group(double prob, double size, Block_manager_parent* bm, Ssd* ssd, int id);
+	group();
+	void print() const;
+	void print_die_spesific_info() const;
+	void print_blocks_valid_pages_per_die() const;
 	double get_prob_op(double PBA, double LBA);
 	double get_greedy_op(double PBA, double LBA);
 	double get_average_op(double PBA, double LBA);
-	double get_write_amp(write_amp_choice choice);
-	Block* get_gc_victim();
-	Block* get_gc_victim(int package, int die);
+	double get_write_amp(write_amp_choice choice) const;
+	Block* get_gc_victim() const;
+	Block* get_gc_victim(int package, int die) const;
+	void register_write_outcome(Event const& event);
+	void register_erase_outcome(Event const& event);
 	bool is_starved() const;
 	bool needs_more_blocks() const;
 	bool in_equilbirium() const;
@@ -309,8 +342,9 @@ public:
 	static vector<group> iterate(vector<group> const& groups);
 	static void print(vector<group>& groups);
 	static void init_stats(vector<group>& groups);
-	static void register_erase_completion(vector<group> const& groups);
+	static void count_num_groups_that_need_more_blocks(vector<group> const& groups);
 	double get_avg_pages_per_die() const;
+	double get_avg_blocks_per_die() const;
 	double get_min_pages_per_die() const;
 	double prob;
 	double size;
@@ -324,24 +358,47 @@ public:
 	set<Block*> block_ids;
 	set<Block*> blocks_being_garbage_collected;
 	struct group_stats {
-		group_stats() : num_gc_in_group(0), num_writes_to_group(0), num_gc_writes_to_group(0){}
-		int num_gc_in_group;
-		int num_writes_to_group;
-		int num_gc_writes_to_group;
-		void print();
+		group_stats() : num_gc_in_group(0), num_writes_to_group(0), num_gc_writes_to_group(0),
+				migrated_in(0), migrated_out(0) {}
+		int num_gc_in_group, num_writes_to_group, num_gc_writes_to_group;
+		int migrated_in, migrated_out;
+		void print() const;
 	};
+
 	int num_pages;
+	double actual_prob;
 	group_stats stats;
 	static vector<int> mapping_pages_to_groups;
 
-	static int num_groups_that_need_more_blocks;
-	static int num_groups_that_need_less_blocks;
+	static int num_groups_that_need_more_blocks, num_groups_that_need_less_blocks;
 
-	vector<vector<int> > num_pages_per_die;
-	vector<vector<int> > num_blocks_ever_given;
+	vector<vector<int> > num_pages_per_die, num_blocks_per_die, num_blocks_ever_given;
+	vector<vector<vector<Block*> > > blocks_queue_per_die;
 	StatisticsGatherer stats_gatherer;
-
+	int id;
+	Ssd* ssd;
 };
+
+// A temperature detector interface to be used by Block_Manager_Groups
+class temperature_detector {
+public:
+	temperature_detector(vector<group>& groups) : groups(groups) {};
+	virtual ~temperature_detector() {}
+	virtual int which_group_should_this_page_belong_to(Event const& event) = 0;
+	virtual void register_write_completed(Event const& event, int prior_group, int group_id) { }
+	virtual void change_in_groups(vector<group> const& groups) {}
+protected:
+	vector<group>& groups;
+};
+
+// Conceptually and oracle that uses tags on a page to infer which group the page belongs to
+class tag_detector : public temperature_detector {
+public:
+	tag_detector(vector<group>& groups) : temperature_detector(groups) {};
+	int which_group_should_this_page_belong_to(Event const& event);
+};
+
+
 
 // A BM that seperates blocks based on tags
 class Block_Manager_Groups : public Block_manager_parent {
@@ -349,36 +406,75 @@ public:
 	Block_Manager_Groups();
 	~Block_Manager_Groups();
 	void init(Ssd*, FtlParent*, IOScheduler*, Garbage_Collector*, Wear_Leveling_Strategy*, Migrator*);
+	void init_detector();
 	void register_write_arrival(Event const& e);
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event const& event, enum status status);
+	void trigger_gc_in_same_lun_but_different_group(int package, int die, int group_id, double time);
 	void handle_block_out_of_space(Event const& event, int group_id);
 	void receive_message(Event const& message);
 	void change_update_frequencies(Groups_Message const& message);
-	void check_if_should_trigger_more_GC(double start_time);
+	void check_if_should_trigger_more_GC(Event const&);
 	bool try_to_allocate_block_to_group(int group_id, int package, int die, double time);
-	bool may_garbage_collect_this_block(Block* block);
+	bool may_garbage_collect_this_block(Block* block, double current_time);
 	void register_logical_address(Event const& event, int group_id);
     friend class boost::serialization::access;
     void print();
     bool is_in_equilibrium() const;
+    void add_group(double starting_prob_val = 0);
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
     {
     	ar & boost::serialization::base_object<Block_manager_parent>(*this);
     }
+    static int detector_type;
 protected:
 	Address choose_best_address(Event& write);
 	Address choose_any_address(Event const& write);
 private:
-	int which_group_does_this_page_belong_to(Event const& event) const;
+	void request_gc(int group_id, int package, int die, double time);
 	vector<group> groups;
 	struct stats {
 		stats() : num_group_misses(0) {}
 		int num_group_misses;
 	};
 	stats stats;
+	temperature_detector* detector;
 };
+
+// Conceptually and oracle that uses tags on a page to infer which group the page belongs to
+class bloom_detector : public temperature_detector {
+public:
+	bloom_detector(vector<group>& groups, Block_Manager_Groups* bm);
+	virtual ~bloom_detector() {};
+	int which_group_should_this_page_belong_to(Event const& event);
+	void change_in_groups(vector<group> const& groups);
+	virtual void register_write_completed(Event const& event, int prior_group, int new_group_id);
+
+private:
+	int get_interval_length() { return NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * interval_size_of_the_lba_space; }
+	void update_probilities();
+	void group_interval_finished(int group_id);
+	struct group_data {
+		group_data(group const& group_ref, vector<group> const& data);
+		bloom_filter current_filter, filter2, filter3;
+		int bloom_filter_hits;
+		int interval_hit_count;
+		double update_probability;
+		inline double get_hits_per_page() const { return update_probability / groups[id].size; }
+		inline group get_group() { return groups[id]; }
+		const int id;
+		int lower_group_id, upper_group_id;
+		const vector<group>& groups;
+	};
+private:
+	vector<group_data*> data;	// sorted by group update probability
+	Block_Manager_Groups* bm;
+	int current_interval_counter;
+	const double interval_size_of_the_lba_space;
+	group_data* highest_group, *lowest_group;
+};
+
 
 // A simple BM that assigns writes sequentially to dies in a round-robin fashion. No hot-cold separation or anything else intelligent
 class Block_manager_roundrobin : public Block_manager_parent {
@@ -407,7 +503,7 @@ public:
 protected:
 	Address choose_best_address(Event& write);
 	virtual Address choose_any_address(Event const& write);
-	void check_if_should_trigger_more_GC(double start_time);
+	void check_if_should_trigger_more_GC(Event const& event);
 private:
 	void handle_cold_pointer_out_of_space(double start_time);
 	BloomFilter_Page_Hotness_Measurer page_hotness_measurer;
@@ -423,7 +519,7 @@ public:
 	virtual void register_read_command_outcome(Event const& event, enum status status);
 	virtual void register_erase_outcome(Event const& event, enum status status);
 protected:
-	virtual void check_if_should_trigger_more_GC(double start_time);
+	virtual void check_if_should_trigger_more_GC(Event const&);
 	virtual Address choose_best_address(Event& write);
 	virtual Address choose_any_address(Event const& write);
 	Page_Hotness_Measurer* page_hotness_measurer;

@@ -15,7 +15,6 @@ OperatingSystem::OperatingSystem()
 	  threads(),
 	  NUM_WRITES_TO_STOP_AFTER(UNDEFINED),
 	  num_writes_completed(0),
-	  counter_for_user(1),
 	  idle_time(0),
 	  time(0),
 	  scheduler(NULL),
@@ -68,6 +67,7 @@ void OperatingSystem::check_if_stuck(bool no_pending_event, bool queue_is_full) 
 	const int idle_limit = 3000000;
 	if (idle_time > 100000 && idle_time % 100000 == 0) {
 		printf("Idle for %f seconds. No_pending_event=%d  Queue_is_full=%d\n", (double) idle_time / 1000000, no_pending_event, queue_is_full);
+		PRINT_LEVEL = 2;
 	}
 	if (idle_time >= idle_limit) {
 		printf("\n");

@@ -317,7 +317,7 @@ void flatten(vector<vector<vector<T> > > const& vec, vector<T>& outcome)
 }
 
 
-void StatisticsGatherer::print() {
+void StatisticsGatherer::print() const {
 	printf("\n\t");
 	printf("num writes\t");
 	printf("num reads\t");
@@ -601,23 +601,23 @@ vector<string> StatisticsGatherer::totals_vector_header() {
 	return result;
 }
 
-uint StatisticsGatherer::total_reads() {
+uint StatisticsGatherer::total_reads() const {
 	return get_sum(num_reads_per_LUN);
 }
 
-uint StatisticsGatherer::total_writes() {
+uint StatisticsGatherer::total_writes() const {
 	return get_sum(num_writes_per_LUN);
 }
 
-double StatisticsGatherer::get_reads_throughput() {
+double StatisticsGatherer::get_reads_throughput() const {
 	return (total_reads() / end_time) * 1000 * 1000;
 }
 
-double StatisticsGatherer::get_writes_throughput() {
+double StatisticsGatherer::get_writes_throughput() const {
 	return (total_writes() / end_time) * 1000 * 1000;
 }
 
-double StatisticsGatherer::get_total_throughput() {
+double StatisticsGatherer::get_total_throughput() const {
 	return get_reads_throughput() + get_writes_throughput();
 }
 

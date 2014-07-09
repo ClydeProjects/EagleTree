@@ -14,16 +14,23 @@ public:
 	void handle_event_completion(Event* event) {}
     friend class boost::serialization::access;
     template<class Archive> void serialize(Archive & ar, const unsigned int version) {
-    	ar & boost::serialization::base_object<K_Modal_Thread>(*this);
+    	ar & boost::serialization::base_object<Thread>(*this);
     }
     vector<group_def> k_modes;
+};
+
+class noop_thread : public Thread
+{
+public:
+	void issue_first_IOs() {}
+	void handle_event_completion(Event* event) {}
 };
 
 class K_Modal_Thread_Messaging : public K_Modal_Thread
 {
 public:
-	K_Modal_Thread_Messaging(vector<group_def> k_modes) : K_Modal_Thread(k_modes), counter(0), fac_num_ios_to_change_workload(2) {}
-	K_Modal_Thread_Messaging() : K_Modal_Thread(), counter(0), fac_num_ios_to_change_workload(2) {}
+	K_Modal_Thread_Messaging(vector<group_def> k_modes) : K_Modal_Thread(k_modes), counter(0), fac_num_ios_to_change_workload(2), fixed_groups(false) {}
+	K_Modal_Thread_Messaging() : K_Modal_Thread(), counter(0), fac_num_ios_to_change_workload(2), fixed_groups(false) {}
 	void issue_first_IOs();
 	void handle_event_completion(Event* event);
     friend class boost::serialization::access;
@@ -31,6 +38,7 @@ public:
     	ar & boost::serialization::base_object<K_Modal_Thread>(*this);
     }
     double fac_num_ios_to_change_workload;
+    double fixed_groups;
 private:
 	long counter;
 };
@@ -47,13 +55,19 @@ void K_Modal_Thread_Messaging::handle_event_completion(Event* event) {
 		int prob_temp = k_modes[0].update_frequency;
 		k_modes[0].update_frequency = k_modes[1].update_frequency;
 		k_modes[1].update_frequency = prob_temp;
-		int tag_temp = k_modes[0].tag;
-		k_modes[0].tag = k_modes[1].tag;
-		k_modes[1].tag = tag_temp;
-		/*Groups_Message* gm = new Groups_Message(get_time());
-		gm->redistribution_of_update_frequencies = true;
-		gm->groups = k_modes;
-		submit(gm);*/
+		fac_num_ios_to_change_workload = 100;
+
+		if (fixed_groups) {
+			int tag_temp = k_modes[0].tag;
+			k_modes[0].tag = k_modes[1].tag;
+			k_modes[1].tag = tag_temp;
+		}
+		else {
+			Groups_Message* gm = new Groups_Message(get_time());
+			gm->redistribution_of_update_frequencies = true;
+			gm->groups = k_modes;
+			submit(gm);
+		}
 	}
 	K_Modal_Thread::issue_first_IOs();
 }
@@ -70,18 +84,25 @@ public:
 vector<Thread*> Example_Workload::generate() {
 	vector<Thread*> starting_threads;
 	vector<group_def> k_modes;
-	k_modes.push_back(group_def(30, 80, 0));
-	k_modes.push_back(group_def(70, 20, 1));
+	k_modes.push_back(group_def(10, 50, 0));
+	k_modes.push_back(group_def(90, 50, 1));
 
-	Initial_Message* t1 = new Initial_Message(k_modes);
+	bool include_init_message = Block_Manager_Groups::detector_type == 0;
+	Thread* t1 = NULL;
+	if (include_init_message) {
+		t1 = new Initial_Message(k_modes);
+	}
+	else {
+		t1 = new Initial_Message();
+	}
 	starting_threads.push_back(t1);
-
-	//k_modes[0].size = 80;
-	//k_modes[1].size = 20;
 
 	// This workload begins with a large sequential write of the entire logical address space.
 	K_Modal_Thread_Messaging* t2 = new K_Modal_Thread_Messaging(k_modes);
-	t2->fac_num_ios_to_change_workload = 100;
+
+
+	t2->fixed_groups = true;
+	t2->fac_num_ios_to_change_workload = 7;
 	//t->set_io_size(1);
 
 	if (initialize_with_sequential_write) {
@@ -108,7 +129,8 @@ int main()
 	PRINT_LEVEL = 0;
 	OVER_PROVISIONING_FACTOR = 0.7;
 	GARBAGE_COLLECTION_POLICY = 0;
-	string name  = "/demo_output/";
+	Block_Manager_Groups::detector_type = 1;
+	string name  = "/changing_workload/";
 	Experiment::create_base_folder(name.c_str());
 	Experiment* e = new Experiment();
 

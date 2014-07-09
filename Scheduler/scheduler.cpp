@@ -365,7 +365,8 @@ void IOScheduler::handle_flexible_read(Event* event) {
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_write(Event* event) {
 
-	if (event->get_id() == 263066 && event->get_bus_wait_time() > 243947765) {
+	if (event->get_application_io_id() == 1050083) {
+		//PRINT_LEVEL = 1;
 		int i = 0;
 		i++;
 	}
@@ -532,13 +533,38 @@ enum status IOScheduler::execute_next(Event* event) {
 		}
 	}
 
-	if (event->get_address().package == 1 && event->get_address().die == 1 && event->get_address().block == 1021) {
+	/*if (StatisticsGatherer::get_global_instance()->total_writes() > 1000000) {
+		VisualTracer::write_to_file = true;
+	}
+
+	if (StatisticsGatherer::get_global_instance()->total_writes() > 1100000) {
+		VisualTracer::print_horizontally(40000);
+		Utilization_Meter::print();
+		exit(1);
+	}*/
+
+
+	/*if (StatisticsGatherer::get_global_instance()->total_writes() > 1240000) {
+		StateVisualiser::print_page_status();
+		VisualTracer::write_to_file = true;
+		int i = 0;
+		i++;
+	}
+
+	if (StatisticsGatherer::get_global_instance()->total_writes() > 1300000) {
+		VisualTracer::print_horizontally(50000);
+		Utilization_Meter::print();
+		StatisticsGatherer::get_global_instance()->print();
+		StatisticsGatherer::get_global_instance()->print_gc_info();
+		exit(1);
+	}*/
+
+
+	if (event->get_address().package == 3 && event->get_address().die == 0 && event->get_address().block == 881 && event->get_event_type() == READ_TRANSFER) {
 		//event->print();
 	}
 
-
-
-	if (event->get_replace_address().package == 1 && event->get_replace_address().die == 1 && event->get_replace_address().block == 1021) {
+	if (event->get_replace_address().package == 0 && event->get_replace_address().die == 0 && event->get_replace_address().block == 554 && event->get_current_time() > 2409819035 - 10) {
 		//event->print();
 	}
 

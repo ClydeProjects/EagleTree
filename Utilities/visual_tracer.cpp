@@ -66,13 +66,19 @@ void VisualTracer::register_completed_event(Event& event) {
 	Address add = event.get_address();
 
 	int i = event.get_current_time() - event.get_execution_time() - trace[add.package][add.die].size() - amount_written_to_file;
+
+	/*if (event.get_id() == 2147221) {
+		printf("%d   %d    %d\n", i, trace[add.package][add.die].size(), amount_written_to_file);
+		event.print();
+	}*/
+
 	write(add.package, add.die, ' ', i);
 
 	event_type type = event.get_event_type();
 	if (type == WRITE) {
 		write(add.package, add.die, 't', 2 * BUS_CTRL_DELAY + BUS_DATA_DELAY);
 		vector<vector<char> > symbols;
-		vector<char> logical_address = get_int_as_char_vector(event.get_logical_address());
+		vector<char> logical_address = get_int_as_char_vector(event.get_id());
 		symbols.push_back(logical_address);
 		vector<char> wait_time = get_int_as_char_vector(floor(event.get_bus_wait_time()));
 		symbols.push_back(wait_time);
@@ -134,9 +140,9 @@ void VisualTracer::register_completed_event(Event& event) {
 		//print_horizontally(10000);
 		//Utilization_Meter::print();
 		if (write_to_file) {
-			write_file();
+			//write_file();
 		} else {
-			trim_from_start(100000 / 2);
+			//trim_from_start(100000 / 2);
 		}
 	}
 

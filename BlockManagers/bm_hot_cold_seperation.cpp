@@ -46,7 +46,7 @@ void Shortest_Queue_Hot_Cold_BM::register_erase_outcome(Event const& event, enum
 		cold_pointer = find_free_unused_block(OLD, event.get_current_time());
 	}
 
-	check_if_should_trigger_more_GC(event.get_current_time());
+	check_if_should_trigger_more_GC(event);
 }
 
 
@@ -67,8 +67,8 @@ void Shortest_Queue_Hot_Cold_BM::register_read_command_outcome(Event const& even
 	}
 }
 
-void Shortest_Queue_Hot_Cold_BM::check_if_should_trigger_more_GC(double start_time) {
+void Shortest_Queue_Hot_Cold_BM::check_if_should_trigger_more_GC(Event const& event) {
 	if (!has_free_pages(cold_pointer)) {
-		handle_cold_pointer_out_of_space(start_time);
+		handle_cold_pointer_out_of_space(event.get_current_time());
 	}
 }

@@ -6,8 +6,10 @@ Migrator::Migrator() :
 		num_blocks_being_garbaged_collected_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 		blocks_being_garbage_collected(),
 		num_erases_scheduled_per_package(SSD_SIZE),
-		dependent_gc()
-{}
+		dependent_gc(),
+		gc_time_stat()
+{
+}
 
 Migrator::~Migrator() {
 	/*for (int i = 0; i < num_blocks_being_garbaged_collected_per_LUN.size(); i++) {
@@ -21,6 +23,7 @@ Migrator::~Migrator() {
 		printf("blocks_being_garbage_collected    %d:  %d\n", (*it).first, (*it).second);
 		it++;
 	}*/
+	printf("average time for a whole GC operation:\t%f\n", StatisticData::get_average("gc_op_length", 0));
 	delete gc;
 	delete wl;
 }
@@ -61,6 +64,16 @@ void Migrator::handle_erase_completion(Event* event) {
 		}
 	}
 
+	Block* block = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
+	double time_to_completion = 0;
+	if (gc_time_stat.count(block) == 1) {
+		double time_to_completion = event->get_current_time() - gc_time_stat.at(block);
+	}
+	gc_time_stat.erase(block);
+	StatisticData::register_statistic("gc_op_length", {
+			new Integer(time_to_completion)
+	});
+
 	num_blocks_being_garbaged_collected_per_LUN[a.package][a.die]--;
 	blocks_being_garbage_collected.erase(a.get_linear_address());
 
@@ -84,6 +97,10 @@ void Migrator::handle_trim_completion(Event* event) {
 	assert(page.get_state() == VALID);
 	block.invalidate_page(ra.page);
 	assert(block.get_state() != FREE);
+
+	/*if (event->get_replace_address().package == 3 && event->get_replace_address().die == 0 && event->get_replace_address().block == 881) {
+		printf("num pages live: %d\n", block.get_pages_valid());
+	}*/
 
 	ra.valid = BLOCK;
 	ra.page = 0;
@@ -217,7 +234,6 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	if (how_many_gc_operations_are_scheduled() >= MAX_CONCURRENT_GC_OPS) {
 		return migrations;
 	}
-
 	/*bool scheduled_erase_successfully = schedule_queued_erase(a);
 	if (scheduled_erase_successfully) {
 		return migrations;
@@ -283,7 +299,7 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 		i++;
 	}
 
-	if (!bm->may_garbage_collect_this_block(victim)) {
+	if (!bm->may_garbage_collect_this_block(victim, gc_event->get_current_time())) {
 		return migrations;
 	}
 
@@ -322,6 +338,8 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 			"num_writes",
 			"num_pages_to_migrate"
 	});
+
+	gc_time_stat[victim] = gc_event->get_current_time();
 
 	/*printf("schedule gc in ");
 	addr.print();

@@ -101,8 +101,10 @@ vector<Thread*> Asynch_Random_Workload::generate() {
 
 vector<Thread*> Init_Workload::generate() {
 	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
-	Simple_Thread* thread = new Synchronous_Random_Writer(min_lba, max_lba, 23623);
+	Simple_Thread* thread = new Asynchronous_Random_Writer(min_lba, max_lba, 23623);
+	//Simple_Thread* thread1 = new Asynchronous_Random_Reader(min_lba, max_lba, 2363);
 	init_write->add_follow_up_thread(thread);
+	//init_write->add_follow_up_thread(thread1);
 	vector<Thread*> threads(1, init_write);
 	return threads;
 }
