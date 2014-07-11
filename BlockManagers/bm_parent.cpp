@@ -625,4 +625,12 @@ int pointers::get_num_free_blocks() const {
 	return num_free_blocks;
 }
 
+void pointers::retire(double current_time) {
+	int num_free_blocks = 0;
+	for (int i = 0; i < blocks.size(); i++) {
+		for (int j = 0; j < blocks[i].size(); j++) {
+			bm->return_unfilled_block(blocks[i][j], current_time);
+		}
+	}
+}
 

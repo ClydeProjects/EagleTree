@@ -102,7 +102,7 @@ vector<Thread*> Example_Workload::generate() {
 
 
 	t2->fixed_groups = true;
-	t2->fac_num_ios_to_change_workload = 7;
+	t2->fac_num_ios_to_change_workload = 100;
 	//t->set_io_size(1);
 
 	if (initialize_with_sequential_write) {

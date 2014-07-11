@@ -126,7 +126,7 @@ public:
 	Address find_free_unused_block(uint package_id, double time);
 	Address find_free_unused_block(enum age age, double time);
 	pair<bool, pair<int, int> > get_free_block_pointer_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
-
+	void return_unfilled_block(Address block_address, double current_time);
 protected:
 	virtual Address choose_best_address(Event& write) = 0;
 	virtual Address choose_any_address(Event const& write) = 0;
@@ -136,7 +136,7 @@ protected:
 
 
 
-	void return_unfilled_block(Address block_address, double current_time);
+
 
 	Address get_free_block_pointer_with_shortest_IO_queue();
 
@@ -315,6 +315,7 @@ struct pointers {
 	Address get_best_block(Block_manager_parent* bm);
 	void print();
 	int get_num_free_blocks() const;
+	void retire(double current_time);
 	Block_manager_parent* bm;
 	vector<vector<Address> > blocks;
 };
@@ -337,6 +338,7 @@ public:
 	bool is_starved() const;
 	bool needs_more_blocks() const;
 	bool in_equilbirium() const;
+	void retire_active_blocks(double current_time);
 	static bool in_total_equilibrium(vector<group> const& groups, int group_id);
 	static double get_average_write_amp(vector<group>& groups, write_amp_choice choice = opt);
 	static vector<group> iterate(vector<group> const& groups);
@@ -386,7 +388,7 @@ public:
 	virtual ~temperature_detector() {}
 	virtual int which_group_should_this_page_belong_to(Event const& event) = 0;
 	virtual void register_write_completed(Event const& event, int prior_group, int group_id) { }
-	virtual void change_in_groups(vector<group> const& groups) {}
+	virtual void change_in_groups(vector<group> const& groups, double current_time) {}
 protected:
 	vector<group>& groups;
 };
@@ -448,12 +450,12 @@ public:
 	bloom_detector(vector<group>& groups, Block_Manager_Groups* bm);
 	virtual ~bloom_detector() {};
 	int which_group_should_this_page_belong_to(Event const& event);
-	void change_in_groups(vector<group> const& groups);
+	void change_in_groups(vector<group> const& groups, double current_time);
 	virtual void register_write_completed(Event const& event, int prior_group, int new_group_id);
 
 private:
 	int get_interval_length() { return NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * interval_size_of_the_lba_space; }
-	void update_probilities();
+	void update_probilities(double current_time);
 	void group_interval_finished(int group_id);
 	struct group_data {
 		group_data(group const& group_ref, vector<group> const& data);
@@ -463,11 +465,14 @@ private:
 		double update_probability;
 		inline double get_hits_per_page() const { return update_probability / groups[id].size; }
 		inline group get_group() { return groups[id]; }
-		const int id;
+		int id;
 		int lower_group_id, upper_group_id;
+		int age_in_intervals;
 		const vector<group>& groups;
 	};
+	void merge_groups(group_data* gd1, group_data* gd2, double current_time);
 private:
+	void change_id_for_pages(int old_id, int new_id);
 	vector<group_data*> data;	// sorted by group update probability
 	Block_Manager_Groups* bm;
 	int current_interval_counter;

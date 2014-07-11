@@ -160,7 +160,7 @@ vector<group> group::iterate(vector<group> const& groups) {
 	}
 	if (total_OP < NUMBER_OF_ADDRESSABLE_PAGES() * (1 - OVER_PROVISIONING_FACTOR)) {
 		double diff = NUMBER_OF_ADDRESSABLE_PAGES() * (1 - OVER_PROVISIONING_FACTOR) - total_OP;
-		printf("extra OP %f\n", diff);
+		//printf("extra OP %f\n", diff);
 		for (unsigned int i = 0; i < groups.size(); i++) {
 			groups_opt[i].OP += diff / groups.size();
 		}
@@ -230,7 +230,6 @@ double group::get_avg_blocks_per_die() const {
 	return avg / (SSD_SIZE * PACKAGE_SIZE);
 }
 
-
 double group::get_min_pages_per_die() const {
 	double min = NUMBER_OF_ADDRESSABLE_PAGES();
 	for (int i = 0; i < SSD_SIZE; i++) {
@@ -244,13 +243,13 @@ double group::get_min_pages_per_die() const {
 }
 
 void group::group_stats::print() const {
-	printf("\tnum_gc_in_group:\t%d\n", num_gc_in_group);
-	printf("\tnum_writes_to_group:\t%d\n", num_writes_to_group);
+	printf("\tnum_gc_in_group:\t%d", num_gc_in_group);
+	printf("\tnum_writes_to_group:\t%d", num_writes_to_group);
 	printf("\tnum_gc_writes_to_group:\t%d\n", num_gc_writes_to_group);
 	double write_amp = (num_writes_to_group + num_gc_writes_to_group) / (double)num_writes_to_group;
-	printf("\tactual write amp:\t%f\n", write_amp);
+	printf("\tactual write amp:\t%f", write_amp);
 	printf("\tfactor:\t%f\n", (double) num_gc_writes_to_group  / (double)num_gc_in_group );
-	printf("\tmigrated in: %d\n", migrated_in);
+	printf("\tmigrated in: %d", migrated_in);
 	printf("\tmigrated out: %d\n", migrated_out);
 }
 
@@ -326,6 +325,21 @@ bool group::is_starved() const {
 
 bool group::needs_more_blocks() const {
 	return block_ids.size() * BLOCK_SIZE <= OP + size;
+}
+
+void group::retire_active_blocks(double current_time) {
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			Address a = free_blocks.blocks[i][j];
+			Block* block = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
+			block_ids.erase(block);
+			a = next_free_blocks.blocks[i][j];
+			block = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
+			block_ids.erase(block);
+		}
+	}
+	free_blocks.retire(current_time);
+	next_free_blocks.retire(current_time);
 }
 
 bool group::in_equilbirium() const {

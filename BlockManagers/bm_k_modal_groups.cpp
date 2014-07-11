@@ -52,7 +52,7 @@ void Block_Manager_Groups::init(Ssd* ssd, FtlParent* ftl, IOScheduler* sched, Ga
 	init_detector();
 	group new_group(1, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR, this, ssd, 0);
 	groups.push_back(new_group);
-	detector->change_in_groups(groups);
+	detector->change_in_groups(groups, 0);
 }
 
 void Block_Manager_Groups::change_update_frequencies(Groups_Message const& msg) {
@@ -172,7 +172,7 @@ void Block_Manager_Groups::register_write_outcome(Event const& event, enum statu
 		printf("alert!\n");
 	}*/
 
-	detector->register_write_completed(event, prior_group_id, ideal_group_id);
+
 
 	groups[ideal_group_id].register_write_outcome(event);
 
@@ -183,6 +183,7 @@ void Block_Manager_Groups::register_write_outcome(Event const& event, enum statu
 		groups[prior_group_id].stats.num_gc_writes_to_group++;
 	}
 
+	detector->register_write_completed(event, prior_group_id, ideal_group_id);
 
 	if (groups[ideal_group_id].num_pages > groups[ideal_group_id].size * 1.02 || groups[ideal_group_id].actual_prob > groups[ideal_group_id].prob * 1.02) {
 		printf("regrouping due to change!!!\n");
@@ -492,6 +493,9 @@ Address Block_Manager_Groups::choose_best_address(Event& write) {
 		write.set_tag(group_id);
 	}
 	int group_id = detector->which_group_should_this_page_belong_to(write);
+	if ( groups.size() <= group_id) {
+		print();
+	}
 	assert(groups.size() > 0);
 	assert(group_id >= 0 && group_id < groups.size());
 	return groups[group_id].free_blocks.get_best_block(this);
@@ -549,11 +553,11 @@ bloom_detector::bloom_detector(vector<group>& groups, Block_Manager_Groups* bm) 
 		group_data* gd = new group_data(groups[i], groups);
 		data.push_back(gd);
 	}
-	update_probilities();
+	update_probilities(0);
 }
 
 
-void bloom_detector::change_in_groups(vector<group> const& groups) {
+void bloom_detector::change_in_groups(vector<group> const& groups, double current_time) {
 	for (int i = 0; i < data.size(); i++) {
 		delete data[i];
 	}
@@ -563,7 +567,7 @@ void bloom_detector::change_in_groups(vector<group> const& groups) {
 		data.push_back(gd);
 	}
 	current_interval_counter = get_interval_length();
-	update_probilities();
+	update_probilities(current_time);
 }
 
 int bloom_detector::which_group_should_this_page_belong_to(Event const& event) {
@@ -574,6 +578,7 @@ int bloom_detector::which_group_should_this_page_belong_to(Event const& event) {
 	if (group_id == UNDEFINED) {
 		return lowest_group->id;
 	}
+
 	int num_occurances_in_filters = 0;
 	num_occurances_in_filters += data[group_id]->current_filter.contains(la);
 	num_occurances_in_filters += data[group_id]->filter2.contains(la);
@@ -597,7 +602,7 @@ int bloom_detector::which_group_should_this_page_belong_to(Event const& event) {
 			gd->lower_group_id = UNDEFINED;
 		}
 	}
-	else if (/*data.size() < 8 &&*/ num_occurances_in_filters == 3 && data[group_id]->upper_group_id == UNDEFINED && groups[group_id].num_pages > 10 * BLOCK_SIZE && event.is_original_application_io()) {
+	else if (data.size() < 4 && num_occurances_in_filters == 3 && data[group_id]->upper_group_id == UNDEFINED && groups[group_id].num_pages > 10 * BLOCK_SIZE && event.is_original_application_io()) {
 		group_data* next_hottest = data[highest_group->lower_group_id];
 		if (data.size() == 1 || highest_group->get_hits_per_page() * 0.5 > next_hottest->get_hits_per_page()) {
 			if (data.size() > 1) {
@@ -613,10 +618,22 @@ int bloom_detector::which_group_should_this_page_belong_to(Event const& event) {
 		}
 	}
 	if (num_occurances_in_filters == 0 && data[group_id]->lower_group_id != UNDEFINED && !event.is_original_application_io()) {
+		if (groups.size() <= group_id) {
+			event.print();
+			assert(false);
+		}
 		return data[group_id]->lower_group_id;
 	}
 	else if (num_occurances_in_filters == 3 && data[group_id]->upper_group_id != UNDEFINED && event.is_original_application_io()) {
+		if (groups.size() <= group_id) {
+			event.print();
+			assert(false);
+		}
 		return data[group_id]->upper_group_id;
+	}
+	if (groups.size() <= group_id) {
+		event.print();
+		assert(false);
 	}
 	return group_id;
 }
@@ -626,8 +643,15 @@ void bloom_detector::register_write_completed(Event const& event, int prior_grou
 	if (!event.is_original_application_io()) {
 		return;
 	}
+	if (event.get_logical_address() == 599111) {
+		printf("599111 to group %d\n", new_group_id);
+	}
+
 	//assert(!data[group_id]->current_filter.contains(event.get_logical_address()));
 	data[new_group_id]->current_filter.insert(event.get_logical_address());
+	/*if (prior_group_id != new_group_id) {
+		data[new_group_id]->filter2.insert(event.get_logical_address());
+	}*/
 	data[new_group_id]->interval_hit_count++;
 
 	if (--data[new_group_id]->bloom_filter_hits == 0) {
@@ -635,7 +659,7 @@ void bloom_detector::register_write_completed(Event const& event, int prior_grou
 	}
 
 	if (--current_interval_counter == 0) {
-		bloom_detector::update_probilities();
+		bloom_detector::update_probilities(event.get_current_time());
 	}
 }
 
@@ -652,7 +676,66 @@ void bloom_detector::group_interval_finished(int group_id) {
 	data[group_id]->current_filter = bloom_filter(params);
 }
 
-void bloom_detector::update_probilities() {
+void bloom_detector::change_id_for_pages(int old_id, int new_id) {
+	for (int i = 0; i < group::mapping_pages_to_groups.size(); i++) {
+		/*if (i == 404531) {
+			printf("404531  bef %d\n", group::mapping_pages_to_groups[i], group::mapping_pages_to_groups[i] == old_id);
+		}*/
+		if (group::mapping_pages_to_groups[i] == old_id) {
+			group::mapping_pages_to_groups[i] = new_id;
+		}
+		/*if (i == 404531) {
+			printf("404531   aft  %d\n", group::mapping_pages_to_groups[i]);
+		}*/
+	}
+}
+
+void bloom_detector::merge_groups(group_data* gd1, group_data* gd2, double current_time) {
+	group& g1 = groups[gd1->id];
+	group& g2 = groups[gd2->id];
+	group::print(groups);
+	printf("age:  %d\n ", gd1->age_in_intervals);
+	g1.prob += g2.prob;
+	g1.size += g2.size;
+	g1.num_pages += g2.num_pages;
+	g1.offset = UNDEFINED;
+	g1.OP += g2.OP;
+	g1.OP_average += g2.OP_average;
+	g1.OP_greedy += g2.OP_greedy;
+	g1.OP_prob += g2.OP_prob;
+
+	g2.retire_active_blocks(current_time);
+
+	g1.block_ids.insert(g2.block_ids.begin(), g2.block_ids.end());
+	g1.blocks_being_garbage_collected.insert(g2.blocks_being_garbage_collected.begin(), g2.blocks_being_garbage_collected.end());
+	g1.actual_prob += g2.actual_prob;
+
+
+
+	change_id_for_pages(g2.id, g1.id);
+
+	// erase the group
+	groups.erase(groups.begin() + gd2->id);
+	delete data[gd2->id];
+	data.erase(data.begin() + gd2->id);
+
+	// update the ids of the groups to match the indicies
+	for (int i = 0; i < groups.size(); i++) {
+		if (groups[i].id != i) {
+			printf("changing %d to %d\n", groups[i].id, i);
+			change_id_for_pages(groups[i].id, i);
+			groups[i].id = i;
+			data[i]->id = i;
+		}
+	}
+
+
+
+	group::iterate(groups);
+}
+
+
+void bloom_detector::update_probilities(double current_time) {
 	// Update probabilities of groups
 
 	if (data.size() == 0) {
@@ -666,15 +749,29 @@ void bloom_detector::update_probilities() {
 		data[i]->update_probability = data[i]->update_probability * (1.0 - interval_size_of_the_lba_space * 3) + new_prob * interval_size_of_the_lba_space * 3;
 		groups[i].actual_prob = data[i]->update_probability;
 		data[i]->interval_hit_count = 0;
+		data[i]->age_in_intervals++;
 	}
 
 	vector<group_data*> copy = data;
-	assert(data.size() > 0);
-	assert(copy.size() > 0);
-	// sort them by probabilities
 	sort(copy.begin(), copy.end(), [](group_data* a, group_data* b) { return a->get_hits_per_page() < b->get_hits_per_page(); });
-	assert(copy.size() > 0);
 
+	for (int i = 1; i < copy.size() - 1; i++) {
+		if (copy[i]->get_hits_per_page() < copy[i-1]->get_hits_per_page() * 1.5 &&
+				copy[i]->get_hits_per_page() * 1.5 > copy[i+1]->get_hits_per_page() &&
+				copy[i]->age_in_intervals > 1.0 / interval_size_of_the_lba_space) {
+			printf("%f   %f    %f  destroy group %d, others are %d and %d\n",
+					copy[i-1]->get_hits_per_page(),
+					copy[i]->get_hits_per_page(),
+					copy[i+1]->get_hits_per_page(),
+					copy[i]->id,
+					copy[i-1]->id,
+					copy[i+1]->id);
+			merge_groups(copy[i-1], copy[i], current_time);
+			copy.erase(copy.begin() + i);
+
+			break;
+		}
+	}
 
 	int lowest_group_id = copy[0]->id;
 	data[lowest_group_id]->lower_group_id = UNDEFINED;
@@ -701,7 +798,7 @@ bloom_detector::group_data::group_data(group const& group_ref, vector<group> con
 		current_filter(), filter2(), filter3(),
 		bloom_filter_hits(group_ref.size),
 		update_probability(group_ref.prob), interval_hit_count(0),
-				lower_group_id(0), upper_group_id(0), id(group_ref.id), groups(groups)
+				lower_group_id(0), upper_group_id(0), id(group_ref.id), groups(groups), age_in_intervals(0)
 {
 	bloom_parameters params;
 	params.false_positive_probability = 0.01;

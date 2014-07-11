@@ -1185,13 +1185,14 @@ public:
 	static string get_as_string(ulong cursor, ulong max, int chars_per_line);
 	static void print_vertically();
 	static void write_file();
+	static bool write_to_file;
 private:
 	static void trim_from_start(int num_characters_from_start);
 	static void write(int package, int die, char symbol, int length);
 	static void write_with_id(int package, int die, char symbol, int length, vector<vector<char> > symbols);
 	static vector<vector<vector<char> > > trace;
 	static string file_name;
-	static bool write_to_file;
+
 	static long amount_written_to_file;
 };
 
@@ -1234,6 +1235,7 @@ class Number {
 public:
 	virtual string toString() = 0;
 	virtual double toDouble() = 0;
+	virtual int toInt() = 0;
 };
 class Integer : public Number {
 public:
@@ -1241,12 +1243,14 @@ public:
 	int value;
 	string toString() { return to_string(value); };
 	double toDouble() { return value; }
+	int toInt() { return value; }
 };
 class Double : public Number {
 public:
 	double value;
 	string toString() { return to_string(value); };
 	double toDouble() { return value; }
+	int toInt() { return value; }
 };
 
 class StatisticData {
@@ -1279,7 +1283,7 @@ public:
 	void register_scheduled_gc(Event const& gc);
 	void register_executed_gc(Block const& victim);
 	void register_events_queue_length(uint queue_size, double time);
-	void print();
+	void print() const;
 	void print_simple(FILE* file = stdout);
 	void print_gc_info();
 	void print_mapping_info();
@@ -1298,11 +1302,11 @@ public:
 	uint max_age();
 	uint max_age_freq();
 	vector<double> max_waittimes();
-	uint total_reads();
-	uint total_writes();
-	double get_reads_throughput();
-	double get_writes_throughput();
-	double get_total_throughput();
+	uint total_reads() const;
+	uint total_writes() const;
+	double get_reads_throughput() const;
+	double get_writes_throughput() const;
+	double get_total_throughput() const;
 
 	long num_gc_cancelled_no_candidate;
 	long num_gc_cancelled_not_enough_free_space;
