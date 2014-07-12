@@ -318,6 +318,11 @@ struct pointers {
 	void retire(double current_time);
 	Block_manager_parent* bm;
 	vector<vector<Address> > blocks;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & bm; ar & blocks;
+    }
 };
 
 class group {
@@ -348,17 +353,11 @@ public:
 	double get_avg_pages_per_die() const;
 	double get_avg_blocks_per_die() const;
 	double get_min_pages_per_die() const;
-	double prob;
-	double size;
-	double offset;
-	double OP;
-	double OP_greedy;
-	double OP_prob;
-	double OP_average;
-	pointers free_blocks;
-	pointers next_free_blocks;
-	set<Block*> block_ids;
-	set<Block*> blocks_being_garbage_collected;
+	double prob, size, offset, OP, OP_greedy, OP_prob, OP_average, actual_prob;
+	pointers free_blocks, next_free_blocks;
+	set<Block*> block_ids, blocks_being_garbage_collected;
+	vector<vector<int> > num_pages_per_die, num_blocks_per_die, num_blocks_ever_given;
+	vector<vector<vector<Block*> > > blocks_queue_per_die;
 	struct group_stats {
 		group_stats() : num_gc_in_group(0), num_writes_to_group(0), num_gc_writes_to_group(0),
 				migrated_in(0), migrated_out(0) {}
@@ -368,36 +367,54 @@ public:
 	};
 
 	int num_pages;
-	double actual_prob;
 	group_stats stats;
 	static vector<int> mapping_pages_to_groups;
-
 	static int num_groups_that_need_more_blocks, num_groups_that_need_less_blocks;
 
-	vector<vector<int> > num_pages_per_die, num_blocks_per_die, num_blocks_ever_given;
-	vector<vector<vector<Block*> > > blocks_queue_per_die;
 	StatisticsGatherer stats_gatherer;
 	int id;
 	Ssd* ssd;
+	static int num_writes_since_last_regrouping;
+	static bool is_stable();
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & prob; ar & size; ar & offset; ar & OP; ar & OP_greedy; ar & OP_prob; ar & OP_average; ar & actual_prob;
+    	ar & free_blocks; ar & next_free_blocks; ar & block_ids; ar & blocks_being_garbage_collected;
+    	ar & num_pages_per_die; ar & num_blocks_per_die; ar & num_blocks_ever_given; ar & blocks_queue_per_die;
+    	ar & num_pages; ar & mapping_pages_to_groups; ar & id;
+    	ar & num_writes_since_last_regrouping;
+    }
 };
 
 // A temperature detector interface to be used by Block_Manager_Groups
 class temperature_detector {
 public:
-	temperature_detector(vector<group>& groups) : groups(groups) {};
+	temperature_detector(vector<group>& groups) : groups_demo(), groups(groups) {};
+	temperature_detector() : groups_demo(), groups(groups_demo) {}
 	virtual ~temperature_detector() {}
 	virtual int which_group_should_this_page_belong_to(Event const& event) = 0;
 	virtual void register_write_completed(Event const& event, int prior_group, int group_id) { }
-	virtual void change_in_groups(vector<group> const& groups, double current_time) {}
+	virtual void change_in_groups(vector<group>& groups, double current_time) {}
+	template<class Archive> void serialize(Archive & ar, const unsigned int version)
+	{
+		ar & groups;
+		ar & groups_demo;
+	}
 protected:
 	vector<group>& groups;
+private:
+	vector<group> groups_demo;
 };
 
 // Conceptually and oracle that uses tags on a page to infer which group the page belongs to
 class tag_detector : public temperature_detector {
 public:
 	tag_detector(vector<group>& groups) : temperature_detector(groups) {};
-	int which_group_should_this_page_belong_to(Event const& event);
+	tag_detector() : temperature_detector() {}
+ 	int which_group_should_this_page_belong_to(Event const& event);
+	template<class Archive> void serialize(Archive & ar, const unsigned int version)
+	{ ar & boost::serialization::base_object<temperature_detector>(*this); }
 };
 
 
@@ -424,10 +441,11 @@ public:
     void print();
     bool is_in_equilibrium() const;
     void add_group(double starting_prob_val = 0);
-    template<class Archive>
-    void serialize(Archive & ar, const unsigned int version)
+    template<class Archive> void serialize(Archive & ar, const unsigned int version)
     {
     	ar & boost::serialization::base_object<Block_manager_parent>(*this);
+    	//ar & groups;
+    	//ar & detector;
     }
     static int detector_type;
 protected:
@@ -448,35 +466,52 @@ private:
 class bloom_detector : public temperature_detector {
 public:
 	bloom_detector(vector<group>& groups, Block_Manager_Groups* bm);
+	bloom_detector();
 	virtual ~bloom_detector() {};
 	int which_group_should_this_page_belong_to(Event const& event);
-	void change_in_groups(vector<group> const& groups, double current_time);
+	void change_in_groups(vector<group>& groups, double current_time);
 	virtual void register_write_completed(Event const& event, int prior_group, int new_group_id);
-
+    template<class Archive> void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & boost::serialization::base_object<temperature_detector>(*this);
+    	ar & data; ar & bm; ar & current_interval_counter;
+    	ar & interval_size_of_the_lba_space; ar & highest_group; ar & lowest_group;
+    }
 private:
 	int get_interval_length() { return NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * interval_size_of_the_lba_space; }
 	void update_probilities(double current_time);
 	void group_interval_finished(int group_id);
 	struct group_data {
-		group_data(group const& group_ref, vector<group> const& data);
+		group_data(group const& group_ref, vector<group>& data);
+		group_data();
 		bloom_filter current_filter, filter2, filter3;
 		int bloom_filter_hits;
 		int interval_hit_count;
 		double update_probability;
-		inline double get_hits_per_page() const { return update_probability / groups[id].size; }
+		inline double get_hits_per_page() const { return groups[id].prob / groups[id].size; }
 		inline group get_group() { return groups[id]; }
 		int id;
 		int lower_group_id, upper_group_id;
 		int age_in_intervals;
-		const vector<group>& groups;
+		vector<group>& groups;
+	    template<class Archive> void serialize(Archive & ar, const unsigned int version)
+	    {
+	    	ar & current_filter; ar & filter2; ar & filter3;
+	    	ar & bloom_filter_hits; ar & interval_hit_count; ar & update_probability;
+	    	ar & id; ar & lower_group_id; ar & upper_group_id; ar & age_in_intervals;
+	    	ar & groups;
+	    }
+	private:
+	    vector<group> groups_none;
 	};
+
 	void merge_groups(group_data* gd1, group_data* gd2, double current_time);
 private:
 	void change_id_for_pages(int old_id, int new_id);
 	vector<group_data*> data;	// sorted by group update probability
 	Block_Manager_Groups* bm;
 	int current_interval_counter;
-	const double interval_size_of_the_lba_space;
+	double interval_size_of_the_lba_space;
 	group_data* highest_group, *lowest_group;
 };
 

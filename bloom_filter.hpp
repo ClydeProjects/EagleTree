@@ -578,6 +578,14 @@ protected:
    unsigned int            inserted_element_count_;
    unsigned long long int  random_seed_;
    double                  desired_false_positive_probability_;
+   friend class boost::serialization::access;
+public:
+   template<class Archive> void serialize(Archive & ar, const unsigned int version)
+   {
+	   ar & salt_; ar & bit_table_; ar & salt_count_; ar & table_size_; ar & raw_table_size_;
+	   ar & projected_element_count_; ar & inserted_element_count_; ar & random_seed_;
+	   ar & desired_false_positive_probability_;
+   }
 };
 
 inline bloom_filter operator & (const bloom_filter& a, const bloom_filter& b)

@@ -682,6 +682,43 @@ private:
 	int progress_meter_granularity;
 };
 
+class Initial_Message : public Thread
+{
+public:
+	Initial_Message(vector<group_def> k_modes) : k_modes(k_modes) {}
+	Initial_Message() : k_modes() {}
+	void issue_first_IOs() {
+		Groups_Message* gm = new Groups_Message(get_time());
+		gm->groups = k_modes;
+		submit(gm);
+	}
+	void handle_event_completion(Event* event) {}
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<Thread>(*this);
+    	ar & k_modes;
+    }
+    vector<group_def> k_modes;
+};
+
+class K_Modal_Thread_Messaging : public K_Modal_Thread
+{
+public:
+	K_Modal_Thread_Messaging(vector<group_def> k_modes) : K_Modal_Thread(k_modes), counter(0), fac_num_ios_to_change_workload(2), fixed_groups(false) {}
+	K_Modal_Thread_Messaging() : K_Modal_Thread(), counter(0), fac_num_ios_to_change_workload(2), fixed_groups(false) {}
+	void issue_first_IOs();
+	void handle_event_completion(Event* event);
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<K_Modal_Thread>(*this);
+    	ar & fac_num_ios_to_change_workload; ar & fixed_groups; ar & counter;
+    }
+    double fac_num_ios_to_change_workload;
+    double fixed_groups;
+private:
+	long counter;
+};
+
 }
 
 

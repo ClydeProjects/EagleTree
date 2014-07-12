@@ -185,18 +185,20 @@ void Block_Manager_Groups::register_write_outcome(Event const& event, enum statu
 
 	detector->register_write_completed(event, prior_group_id, ideal_group_id);
 
-	if (groups[ideal_group_id].num_pages > groups[ideal_group_id].size * 1.02 || groups[ideal_group_id].actual_prob > groups[ideal_group_id].prob * 1.02) {
+	if (groups[ideal_group_id].num_pages > groups[ideal_group_id].size * 1.05 || groups[ideal_group_id].actual_prob > groups[ideal_group_id].prob * 1.05) {
 		printf("regrouping due to change!!!\n");
 		for (int i = 0; i < groups.size(); i++) {
 			groups[i].size = groups[i].num_pages;
 			groups[i].prob = groups[i].actual_prob;
 		}
 		groups = group::iterate(groups);
+		group::num_writes_since_last_regrouping = 0;
 		print();
 		//group::init_stats(groups);
 		//StatisticsGatherer::get_global_instance()->print();
 		//StatisticsGatherer::init();
 	}
+	group::num_writes_since_last_regrouping++;
 
 	/*if (event.get_id() == NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR || event.get_id() == 2 * NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR) {
 		printf("reseting stats\n");
@@ -547,7 +549,7 @@ void Block_Manager_Groups::print() {
 
 bloom_detector::bloom_detector(vector<group>& groups, Block_Manager_Groups* bm) :
 	temperature_detector(groups), data(), bm(bm), current_interval_counter(get_interval_length()),
-	interval_size_of_the_lba_space(0.002), lowest_group(NULL), highest_group(NULL)
+	interval_size_of_the_lba_space(0.003), lowest_group(NULL), highest_group(NULL)
 {
 	for (int i = 0; i < groups.size(); i++) {
 		group_data* gd = new group_data(groups[i], groups);
@@ -556,8 +558,12 @@ bloom_detector::bloom_detector(vector<group>& groups, Block_Manager_Groups* bm) 
 	update_probilities(0);
 }
 
+bloom_detector::bloom_detector() :
+	temperature_detector(), data(), bm(NULL), current_interval_counter(0),
+	interval_size_of_the_lba_space(), lowest_group(NULL), highest_group(NULL)
+{}
 
-void bloom_detector::change_in_groups(vector<group> const& groups, double current_time) {
+void bloom_detector::change_in_groups(vector<group>& groups, double current_time) {
 	for (int i = 0; i < data.size(); i++) {
 		delete data[i];
 	}
@@ -585,36 +591,47 @@ int bloom_detector::which_group_should_this_page_belong_to(Event const& event) {
 	num_occurances_in_filters += data[group_id]->filter3.contains(la);
 
 	// create new groups if needed
-	if (false && num_occurances_in_filters == 0 && data[group_id]->lower_group_id == UNDEFINED && groups[group_id].num_pages > 10 * BLOCK_SIZE && !event.is_original_application_io()) {
+	if (false && num_occurances_in_filters == 0 &&
+			data[group_id]->lower_group_id == UNDEFINED && groups[group_id].num_pages > 10 * BLOCK_SIZE &&
+			!event.is_original_application_io() && data[group_id]->age_in_intervals > 100 &&
+			data[group_id] == lowest_group) {
 		group_data* next_coldest = data[lowest_group->upper_group_id];
-		if (data.size() == 1 || (lowest_group->get_hits_per_page() < next_coldest->get_hits_per_page() * 0.5 && lowest_group->get_group().size > next_coldest->get_group().size)) {
-			printf("creating new cold group. coldest is: %d with %f and next is %d with %f\n", lowest_group->id, lowest_group->get_hits_per_page(), next_coldest->id, next_coldest->get_hits_per_page());
-			groups[lowest_group->id].print();
-			printf("update prob:    %f  size:    %f\n", lowest_group->update_probability, lowest_group->get_group().size);
-			groups[next_coldest->id].print();
-			printf("update prob:    %f  size:    %f\n", next_coldest->update_probability, next_coldest->get_group().size);
+		if (data.size() == 1 || lowest_group->get_hits_per_page() * 2 < next_coldest->get_hits_per_page()) {
+			if (data.size() > 1) {
+				printf("creating new coldest group. coldest is: %d with %f and next is %d with %f\n", lowest_group->id, lowest_group->get_hits_per_page(), next_coldest->id, next_coldest->get_hits_per_page());
+			}
+			group::print(groups);
 			bm->add_group(0);
 			group const& new_group = groups.back();
 			group_data* gd = new group_data(new_group, groups);
 			data.push_back(gd);
 			data[group_id]->lower_group_id = data.size() - 1;
+			data[group_id]->age_in_intervals = 0;
 			gd->upper_group_id = group_id;
 			gd->lower_group_id = UNDEFINED;
+			lowest_group = gd;
 		}
 	}
-	else if (data.size() < 4 && num_occurances_in_filters == 3 && data[group_id]->upper_group_id == UNDEFINED && groups[group_id].num_pages > 10 * BLOCK_SIZE && event.is_original_application_io()) {
+	else if (/*data.size() < 4 &&*/ num_occurances_in_filters == 3 &&
+			data[group_id]->upper_group_id == UNDEFINED && groups[group_id].num_pages > 10 * BLOCK_SIZE &&
+			event.is_original_application_io() && data[group_id]->age_in_intervals > 100 &&
+			data[group_id] == highest_group) {
 		group_data* next_hottest = data[highest_group->lower_group_id];
 		if (data.size() == 1 || highest_group->get_hits_per_page() * 0.5 > next_hottest->get_hits_per_page()) {
 			if (data.size() > 1) {
 				printf("creating new hot group. hottest is: %d with %f and next is %d with %f\n", highest_group->id, highest_group->get_hits_per_page(), next_hottest->id, next_hottest->get_hits_per_page());
 			}
+			group::print(groups);
 			bm->add_group(0);
 			group const& new_group = groups.back();
 			group_data* gd = new group_data(new_group, groups);
 			data.push_back(gd);
 			data[group_id]->upper_group_id = data.size() - 1;
+			data[group_id]->age_in_intervals = 0;
 			gd->lower_group_id = group_id;
 			gd->upper_group_id = UNDEFINED;
+			highest_group = gd;
+
 		}
 	}
 	if (num_occurances_in_filters == 0 && data[group_id]->lower_group_id != UNDEFINED && !event.is_original_application_io()) {
@@ -710,7 +727,20 @@ void bloom_detector::merge_groups(group_data* gd1, group_data* gd2, double curre
 	g1.blocks_being_garbage_collected.insert(g2.blocks_being_garbage_collected.begin(), g2.blocks_being_garbage_collected.end());
 	g1.actual_prob += g2.actual_prob;
 
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			g1.num_pages_per_die[i][j] += g2.num_pages_per_die[i][j];
+			g1.num_blocks_per_die[i][j] += g2.num_blocks_per_die[i][j];
+			g1.num_blocks_ever_given[i][j] += g2.num_blocks_ever_given[i][j];
+			g1.blocks_queue_per_die[i][j].insert(g1.blocks_queue_per_die[i][j].end(), g2.blocks_queue_per_die[i][j].begin(), g2.blocks_queue_per_die[i][j].end());
+		}
+	}
 
+	g1.stats.num_gc_in_group += g2.stats.num_gc_in_group;
+	g1.stats.num_writes_to_group += g2.stats.num_writes_to_group;
+	g1.stats.num_gc_writes_to_group += g2.stats.num_gc_writes_to_group;
+	g1.stats.migrated_in += g2.stats.migrated_in;
+	g1.stats.migrated_out += g2.stats.migrated_out;
 
 	change_id_for_pages(g2.id, g1.id);
 
@@ -756,16 +786,22 @@ void bloom_detector::update_probilities(double current_time) {
 	sort(copy.begin(), copy.end(), [](group_data* a, group_data* b) { return a->get_hits_per_page() < b->get_hits_per_page(); });
 
 	for (int i = 1; i < copy.size() - 1; i++) {
-		if (copy[i]->get_hits_per_page() < copy[i-1]->get_hits_per_page() * 1.5 &&
-				copy[i]->get_hits_per_page() * 1.5 > copy[i+1]->get_hits_per_page() &&
-				copy[i]->age_in_intervals > 1.0 / interval_size_of_the_lba_space) {
+		if (copy[i]->get_hits_per_page() * 100 < copy[i-1]->get_hits_per_page() * 100 * 1.2 &&
+				copy[i]->get_hits_per_page() * 100 * 1.2 > copy[i+1]->get_hits_per_page() * 100 &&
+				copy[i]->age_in_intervals > 1.0 / interval_size_of_the_lba_space &&
+				group::is_stable()) {
 			printf("%f   %f    %f  destroy group %d, others are %d and %d\n",
-					copy[i-1]->get_hits_per_page(),
-					copy[i]->get_hits_per_page(),
-					copy[i+1]->get_hits_per_page(),
+					copy[i-1]->get_hits_per_page() * 100,
+					copy[i]->get_hits_per_page() * 100,
+					copy[i+1]->get_hits_per_page() * 100,
 					copy[i]->id,
 					copy[i-1]->id,
 					copy[i+1]->id);
+			printf("condition1:  %d\n", copy[i]->get_hits_per_page() * 100 < copy[i-1]->get_hits_per_page() * 100 * 1.2);
+			printf("condition2:  %d\n", copy[i]->get_hits_per_page() * 100 * 1.2 > copy[i+1]->get_hits_per_page() * 100);
+			printf("condition3:  %d\n", copy[i]->age_in_intervals > 1.0 / interval_size_of_the_lba_space);
+			printf("condition4:  %d\n", group::is_stable());
+
 			merge_groups(copy[i-1], copy[i], current_time);
 			copy.erase(copy.begin() + i);
 
@@ -794,11 +830,11 @@ void bloom_detector::update_probilities(double current_time) {
 	// check how close some groups are now to each other, and merge or create new groups as needed
 }
 
-bloom_detector::group_data::group_data(group const& group_ref, vector<group> const& groups) :
+bloom_detector::group_data::group_data(group const& group_ref, vector<group>& groups) :
 		current_filter(), filter2(), filter3(),
 		bloom_filter_hits(group_ref.size),
 		update_probability(group_ref.prob), interval_hit_count(0),
-				lower_group_id(0), upper_group_id(0), id(group_ref.id), groups(groups), age_in_intervals(0)
+				lower_group_id(0), upper_group_id(0), id(group_ref.id), groups_none(), groups(groups), age_in_intervals(0)
 {
 	bloom_parameters params;
 	params.false_positive_probability = 0.01;
@@ -807,5 +843,13 @@ bloom_detector::group_data::group_data(group const& group_ref, vector<group> con
 	current_filter = bloom_filter(params);
 	filter2 = bloom_filter(params);
 	filter3 = bloom_filter(params);
+}
+
+bloom_detector::group_data::group_data() :
+		current_filter(), filter2(), filter3(),
+		bloom_filter_hits(0),
+		update_probability(0), interval_hit_count(0),
+				lower_group_id(0), upper_group_id(0), id(0), groups_none(), groups(groups_none), age_in_intervals(0)
+{
 }
 

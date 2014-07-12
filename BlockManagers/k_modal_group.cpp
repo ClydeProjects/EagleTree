@@ -17,6 +17,7 @@ using namespace ssd;
 vector<int> group::mapping_pages_to_groups =  vector<int>();
 int group::num_groups_that_need_more_blocks = 0;
 int group::num_groups_that_need_less_blocks = 0;
+int group::num_writes_since_last_regrouping = 0;
 
 group::group(double prob, double size, Block_manager_parent* bm, Ssd* ssd, int id) : prob(prob), size(size), offset(0), OP(0), OP_greedy(0),
 			OP_prob(0), OP_average(0), free_blocks(bm), next_free_blocks(bm), block_ids(), blocks_being_garbage_collected(), stats(), num_pages(0), actual_prob(prob),
@@ -240,6 +241,10 @@ double group::get_min_pages_per_die() const {
 		}
 	}
 	return min;
+}
+
+bool group::is_stable() {
+	return num_writes_since_last_regrouping > NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * 0.25;
 }
 
 void group::group_stats::print() const {

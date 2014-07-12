@@ -283,4 +283,31 @@ void K_Modal_Thread::handle_event_completion(Event* event) {
 	issue_first_IOs();
 }
 
+void K_Modal_Thread_Messaging::issue_first_IOs() {
+	Groups_Message* gm = new Groups_Message(get_time());
+	gm->groups = k_modes;
+	K_Modal_Thread::issue_first_IOs();
+}
 
+void K_Modal_Thread_Messaging::handle_event_completion(Event* event) {
+	if (++counter % (int)(NUMBER_OF_ADDRESSABLE_PAGES() * fac_num_ios_to_change_workload) == 0) {
+		//printf("%d    %d    %d   \n", counter, NUMBER_OF_ADDRESSABLE_PAGES() * 8, counter % NUMBER_OF_ADDRESSABLE_PAGES() * 8 == 0);
+		int prob_temp = k_modes[0].update_frequency;
+		k_modes[0].update_frequency = k_modes[1].update_frequency;
+		k_modes[1].update_frequency = prob_temp;
+		fac_num_ios_to_change_workload = 100;
+
+		if (fixed_groups) {
+			int tag_temp = k_modes[0].tag;
+			k_modes[0].tag = k_modes[1].tag;
+			k_modes[1].tag = tag_temp;
+		}
+		else {
+			Groups_Message* gm = new Groups_Message(get_time());
+			gm->redistribution_of_update_frequencies = true;
+			gm->groups = k_modes;
+			submit(gm);
+		}
+	}
+	K_Modal_Thread::issue_first_IOs();
+}
