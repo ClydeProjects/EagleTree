@@ -18,15 +18,16 @@ vector<int> group::mapping_pages_to_groups =  vector<int>();
 int group::num_groups_that_need_more_blocks = 0;
 int group::num_groups_that_need_less_blocks = 0;
 int group::num_writes_since_last_regrouping = 0;
+int group::id_generator = 0;
 
-group::group(double prob, double size, Block_manager_parent* bm, Ssd* ssd, int id) : prob(prob), size(size), offset(0), OP(0), OP_greedy(0),
+group::group(double prob, double size, Block_manager_parent* bm, Ssd* ssd, int index) : prob(prob), size(size), offset(0), OP(0), OP_greedy(0),
 			OP_prob(0), OP_average(0), free_blocks(bm), next_free_blocks(bm), block_ids(), blocks_being_garbage_collected(), stats(), num_pages(0), actual_prob(prob),
 			num_pages_per_die(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 			num_blocks_ever_given(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 			num_blocks_per_die(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 			blocks_queue_per_die(SSD_SIZE, vector<vector<Block*> >(PACKAGE_SIZE, vector<Block*>())),
 			stats_gatherer(StatisticsGatherer()),
-			id(id), ssd(ssd){
+			index(index), ssd(ssd), id(id_generator++){
 	double PBA = NUMBER_OF_ADDRESSABLE_PAGES();
 	double LBA = NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
 	get_prob_op(PBA, LBA);
@@ -49,11 +50,11 @@ group::group() : prob(0), size(0), offset(), OP(0), OP_greedy(0),
 		num_blocks_ever_given(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 		num_blocks_per_die(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 		stats_gatherer(StatisticsGatherer()),
-		id(id)
+		index(index)
 {}
 
 void group::print() const {
-	printf("id: %d\t", (int)id);
+	printf("id: %d\t", (int)index);
 	printf("size: %d\t", (int)size);
 	printf("actual num pages: %d\t", (int)num_pages);
 	printf("prob: %f\t", prob);

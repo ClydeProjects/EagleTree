@@ -327,7 +327,7 @@ struct pointers {
 
 class group {
 public:
-	group(double prob, double size, Block_manager_parent* bm, Ssd* ssd, int id);
+	group(double prob, double size, Block_manager_parent* bm, Ssd* ssd, int index);
 	group();
 	void print() const;
 	void print_die_spesific_info() const;
@@ -372,7 +372,9 @@ public:
 	static int num_groups_that_need_more_blocks, num_groups_that_need_less_blocks;
 
 	StatisticsGatherer stats_gatherer;
+	int index;
 	int id;
+	static int id_generator;
 	Ssd* ssd;
 	static int num_writes_since_last_regrouping;
 	static bool is_stable();
@@ -382,7 +384,7 @@ public:
     	ar & prob; ar & size; ar & offset; ar & OP; ar & OP_greedy; ar & OP_prob; ar & OP_average; ar & actual_prob;
     	ar & free_blocks; ar & next_free_blocks; ar & block_ids; ar & blocks_being_garbage_collected;
     	ar & num_pages_per_die; ar & num_blocks_per_die; ar & num_blocks_ever_given; ar & blocks_queue_per_die;
-    	ar & num_pages; ar & mapping_pages_to_groups; ar & id;
+    	ar & num_pages; ar & mapping_pages_to_groups; ar & index;
     	ar & num_writes_since_last_regrouping;
     }
 };
@@ -477,7 +479,7 @@ public:
     	ar & data; ar & bm; ar & current_interval_counter;
     	ar & interval_size_of_the_lba_space; ar & highest_group; ar & lowest_group;
     }
-private:
+protected:
 	int get_interval_length() { return NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * interval_size_of_the_lba_space; }
 	void update_probilities(double current_time);
 	void group_interval_finished(int group_id);
@@ -488,17 +490,17 @@ private:
 		int bloom_filter_hits;
 		int interval_hit_count;
 		double update_probability;
-		inline double get_hits_per_page() const { return groups[id].prob / groups[id].size; }
-		inline group get_group() { return groups[id]; }
-		int id;
+		inline double get_hits_per_page() const { return groups[index].prob / groups[index].size; }
+		inline group get_group() { return groups[index]; }
+		int index;
 		int lower_group_id, upper_group_id;
 		int age_in_intervals;
 		vector<group>& groups;
 	    template<class Archive> void serialize(Archive & ar, const unsigned int version)
 	    {
-	    	ar & current_filter; ar & filter2; ar & filter3;
+	    	//ar & current_filter; ar & filter2; ar & filter3;
 	    	ar & bloom_filter_hits; ar & interval_hit_count; ar & update_probability;
-	    	ar & id; ar & lower_group_id; ar & upper_group_id; ar & age_in_intervals;
+	    	ar & index; ar & lower_group_id; ar & upper_group_id; ar & age_in_intervals;
 	    	ar & groups;
 	    }
 	private:
@@ -506,15 +508,19 @@ private:
 	};
 
 	void merge_groups(group_data* gd1, group_data* gd2, double current_time);
-private:
-	void change_id_for_pages(int old_id, int new_id);
 	vector<group_data*> data;	// sorted by group update probability
 	Block_Manager_Groups* bm;
 	int current_interval_counter;
 	double interval_size_of_the_lba_space;
 	group_data* highest_group, *lowest_group;
+private:
+	void change_id_for_pages(int old_id, int new_id);
 };
 
+/*class adaptive_bloom_detector : bloom_detector {
+public:
+
+};*/
 
 // A simple BM that assigns writes sequentially to dies in a round-robin fashion. No hot-cold separation or anything else intelligent
 class Block_manager_roundrobin : public Block_manager_parent {

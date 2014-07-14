@@ -57,14 +57,13 @@ void Block_Manager_Groups::init(Ssd* ssd, FtlParent* ftl, IOScheduler* sched, Ga
 
 void Block_Manager_Groups::change_update_frequencies(Groups_Message const& msg) {
 	for (int i = 0; i < msg.groups.size(); i++) {
-		groups[i].prob = msg.groups[i].update_frequency / 100.0;
+		groups[i].prob = groups[i].actual_prob = msg.groups[i].update_frequency / 100.0;
 	}
 	vector<group> opt_groups = group::iterate(groups);
 	groups = opt_groups;
 	group::init_stats(groups);
 	printf("\n\n-------------------------------------------------------------------------\n\n");
 	print();
-	//PRINT_LEVEL = 1;
 }
 
 void Block_Manager_Groups::receive_message(Event const& message) {
@@ -215,7 +214,7 @@ void Block_Manager_Groups::register_write_outcome(Event const& event, enum statu
 			groups[i].size = groups[i].num_pages;
 			groups[i].prob = groups[i].actual_prob;
 		}
-		groups = group::iterate(groups);
+		//groups = group::iterate(groups);
 		print();
 
 		double factor_g1, factor_g2;
@@ -225,13 +224,18 @@ void Block_Manager_Groups::register_write_outcome(Event const& event, enum statu
 			factor_g1 = groups[0].stats.num_gc_writes_to_group / groups[0].stats.num_gc_in_group;
 			factor_g2 = groups[1].stats.num_gc_writes_to_group / groups[1].stats.num_gc_in_group;
 		}
+		int sum_gc = 0;
+		for (auto g : groups) {
+			sum_gc += g.stats.num_gc_writes_to_group;
+		}
 
 		StatisticData::register_statistic("groups_gc", {
 				new Integer(count),
 				new Integer(factor_g1),
 				new Integer(groups[0].stats.num_gc_writes_to_group),
 				new Integer(factor_g2),
-				new Integer(groups[1].stats.num_gc_writes_to_group)
+				new Integer(groups[1].stats.num_gc_writes_to_group),
+				new Integer(sum_gc)
 		});
 
 		StatisticData::register_field_names("groups_gc", {
@@ -240,6 +244,7 @@ void Block_Manager_Groups::register_write_outcome(Event const& event, enum statu
 				"group 1 gc",
 				"group 2 factor",
 				"group 2 gc"
+				"Total GC"
 		});
 
 		group::init_stats(groups);
@@ -490,6 +495,7 @@ void Block_Manager_Groups::request_gc(int group_id, int package, int die, double
 
 // handle garbage_collection case. Based on range.
 Address Block_Manager_Groups::choose_best_address(Event& write) {
+
 	if (write.is_garbage_collection_op() && write.get_tag() == UNDEFINED) {
 		int group_id = group::mapping_pages_to_groups.at(write.get_logical_address());
 		write.set_tag(group_id);
@@ -582,7 +588,7 @@ int bloom_detector::which_group_should_this_page_belong_to(Event const& event) {
 
 	// first time this logical addrwss is ever written. Write to the least updated group
 	if (group_id == UNDEFINED) {
-		return lowest_group->id;
+		return lowest_group->index;
 	}
 
 	int num_occurances_in_filters = 0;
@@ -591,14 +597,14 @@ int bloom_detector::which_group_should_this_page_belong_to(Event const& event) {
 	num_occurances_in_filters += data[group_id]->filter3.contains(la);
 
 	// create new groups if needed
-	if (false && num_occurances_in_filters == 0 &&
+	if (num_occurances_in_filters == 0 &&
 			data[group_id]->lower_group_id == UNDEFINED && groups[group_id].num_pages > 10 * BLOCK_SIZE &&
 			!event.is_original_application_io() && data[group_id]->age_in_intervals > 100 &&
 			data[group_id] == lowest_group) {
 		group_data* next_coldest = data[lowest_group->upper_group_id];
 		if (data.size() == 1 || lowest_group->get_hits_per_page() * 2 < next_coldest->get_hits_per_page()) {
 			if (data.size() > 1) {
-				printf("creating new coldest group. coldest is: %d with %f and next is %d with %f\n", lowest_group->id, lowest_group->get_hits_per_page(), next_coldest->id, next_coldest->get_hits_per_page());
+				printf("creating new coldest group. coldest is: %d with %f and next is %d with %f\n", lowest_group->index, lowest_group->get_hits_per_page(), next_coldest->index, next_coldest->get_hits_per_page());
 			}
 			group::print(groups);
 			bm->add_group(0);
@@ -619,7 +625,7 @@ int bloom_detector::which_group_should_this_page_belong_to(Event const& event) {
 		group_data* next_hottest = data[highest_group->lower_group_id];
 		if (data.size() == 1 || highest_group->get_hits_per_page() * 0.5 > next_hottest->get_hits_per_page()) {
 			if (data.size() > 1) {
-				printf("creating new hot group. hottest is: %d with %f and next is %d with %f\n", highest_group->id, highest_group->get_hits_per_page(), next_hottest->id, next_hottest->get_hits_per_page());
+				printf("creating new hot group. hottest is: %d with %f and next is %d with %f\n", highest_group->index, highest_group->get_hits_per_page(), next_hottest->index, next_hottest->get_hits_per_page());
 			}
 			group::print(groups);
 			bm->add_group(0);
@@ -708,8 +714,8 @@ void bloom_detector::change_id_for_pages(int old_id, int new_id) {
 }
 
 void bloom_detector::merge_groups(group_data* gd1, group_data* gd2, double current_time) {
-	group& g1 = groups[gd1->id];
-	group& g2 = groups[gd2->id];
+	group& g1 = groups[gd1->index];
+	group& g2 = groups[gd2->index];
 	group::print(groups);
 	printf("age:  %d\n ", gd1->age_in_intervals);
 	g1.prob += g2.prob;
@@ -742,20 +748,20 @@ void bloom_detector::merge_groups(group_data* gd1, group_data* gd2, double curre
 	g1.stats.migrated_in += g2.stats.migrated_in;
 	g1.stats.migrated_out += g2.stats.migrated_out;
 
-	change_id_for_pages(g2.id, g1.id);
+	change_id_for_pages(g2.index, g1.index);
 
 	// erase the group
-	groups.erase(groups.begin() + gd2->id);
-	delete data[gd2->id];
-	data.erase(data.begin() + gd2->id);
+	groups.erase(groups.begin() + gd2->index);
+	delete data[gd2->index];
+	data.erase(data.begin() + gd2->index);
 
 	// update the ids of the groups to match the indicies
 	for (int i = 0; i < groups.size(); i++) {
-		if (groups[i].id != i) {
-			printf("changing %d to %d\n", groups[i].id, i);
-			change_id_for_pages(groups[i].id, i);
-			groups[i].id = i;
-			data[i]->id = i;
+		if (groups[i].index != i) {
+			printf("changing %d to %d\n", groups[i].index, i);
+			change_id_for_pages(groups[i].index, i);
+			groups[i].index = i;
+			data[i]->index = i;
 		}
 	}
 
@@ -794,9 +800,9 @@ void bloom_detector::update_probilities(double current_time) {
 					copy[i-1]->get_hits_per_page() * 100,
 					copy[i]->get_hits_per_page() * 100,
 					copy[i+1]->get_hits_per_page() * 100,
-					copy[i]->id,
-					copy[i-1]->id,
-					copy[i+1]->id);
+					copy[i]->index,
+					copy[i-1]->index,
+					copy[i+1]->index);
 			printf("condition1:  %d\n", copy[i]->get_hits_per_page() * 100 < copy[i-1]->get_hits_per_page() * 100 * 1.2);
 			printf("condition2:  %d\n", copy[i]->get_hits_per_page() * 100 * 1.2 > copy[i+1]->get_hits_per_page() * 100);
 			printf("condition3:  %d\n", copy[i]->age_in_intervals > 1.0 / interval_size_of_the_lba_space);
@@ -809,22 +815,22 @@ void bloom_detector::update_probilities(double current_time) {
 		}
 	}
 
-	int lowest_group_id = copy[0]->id;
+	int lowest_group_id = copy[0]->index;
 	data[lowest_group_id]->lower_group_id = UNDEFINED;
 	lowest_group = data[lowest_group_id];
 
-	int highest_group_id = copy[copy.size() - 1]->id;
+	int highest_group_id = copy[copy.size() - 1]->index;
 	data[highest_group_id]->upper_group_id = UNDEFINED;
 	highest_group = data[highest_group_id];
 	for (int i = 0; i < copy.size(); i++) {
-		int group_id = copy[i]->id;
+		int group_id = copy[i]->index;
 		if (i + 1 < copy.size()) {
 			//copy[i].upper_group_id = copy[i + i].group_ref.id;
-			data[group_id]->upper_group_id = copy[i + 1]->id;
+			data[group_id]->upper_group_id = copy[i + 1]->index;
 		}
 		if (i - 1 >= 0) {
 			//copy[i]->upper_group_id = copy[i - i]->group_ref.id;
-			data[group_id]->lower_group_id = copy[i - 1]->id;
+			data[group_id]->lower_group_id = copy[i - 1]->index;
 		}
 	}
 	// check how close some groups are now to each other, and merge or create new groups as needed
@@ -834,7 +840,7 @@ bloom_detector::group_data::group_data(group const& group_ref, vector<group>& gr
 		current_filter(), filter2(), filter3(),
 		bloom_filter_hits(group_ref.size),
 		update_probability(group_ref.prob), interval_hit_count(0),
-				lower_group_id(0), upper_group_id(0), id(group_ref.id), groups_none(), groups(groups), age_in_intervals(0)
+				lower_group_id(0), upper_group_id(0), index(group_ref.index), groups_none(), groups(groups), age_in_intervals(0)
 {
 	bloom_parameters params;
 	params.false_positive_probability = 0.01;
@@ -849,7 +855,7 @@ bloom_detector::group_data::group_data() :
 		current_filter(), filter2(), filter3(),
 		bloom_filter_hits(0),
 		update_probability(0), interval_hit_count(0),
-				lower_group_id(0), upper_group_id(0), id(0), groups_none(), groups(groups_none), age_in_intervals(0)
+				lower_group_id(0), upper_group_id(0), index(0), groups_none(), groups(groups_none), age_in_intervals(0)
 {
 }
 

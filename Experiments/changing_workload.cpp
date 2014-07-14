@@ -32,8 +32,8 @@ vector<Thread*> Example_Workload::generate() {
 	K_Modal_Thread_Messaging* t2 = new K_Modal_Thread_Messaging(k_modes);
 
 
-	t2->fixed_groups = true;
-	t2->fac_num_ios_to_change_workload = 100;
+	t2->fixed_groups = false;
+	t2->fac_num_ios_to_change_workload = 7;
 	//t->set_io_size(1);
 
 	if (initialize_with_sequential_write) {
@@ -66,12 +66,10 @@ int main()
 	Experiment::create_base_folder(name.c_str());
 	string calib_name = "calib.txt";
 	Example_Workload* workload = new Example_Workload();
-	Experiment::calibrate_and_save(workload, calib_name, NUMBER_OF_ADDRESSABLE_PAGES(), true);
-
-
+	//Experiment::calibrate_and_save(workload, calib_name, NUMBER_OF_ADDRESSABLE_PAGES(), true);
 	Experiment::create_base_folder(name.c_str());
 	Experiment* e = new Experiment();
-	e->set_calibration_file(calib_name);
+	//e->set_calibration_file(calib_name);
 
 	//vector<pair<int, int> > groups;
 	//groups.push_back(pair<int, int>(80, 0.2 * NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR));
@@ -80,7 +78,7 @@ int main()
 	workload->initialize_with_sequential_write = true;
 
 	e->set_workload(workload);
-	e->set_io_limit(NUMBER_OF_ADDRESSABLE_PAGES() * 8);
+	e->set_io_limit(NUMBER_OF_ADDRESSABLE_PAGES() * 15);
 	e->run("test");
 	e->draw_graphs();
 	delete workload;
