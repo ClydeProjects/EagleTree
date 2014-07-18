@@ -199,7 +199,6 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 	}
 
 	Address ba = event.get_address();
-
 	if (ba.compare(free_block_pointers[ba.package][ba.die]) >= BLOCK) {
 		increment_pointer(free_block_pointers[ba.package][ba.die]);
 		if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
@@ -537,10 +536,10 @@ Address Block_manager_parent::find_free_unused_block(enum age age, double time) 
 	return Address();
 }
 
-void Block_manager_parent::return_unfilled_block(Address pba, double current_time) {
+void Block_manager_parent::return_unfilled_block(Address pba, double current_time, bool give_to_block_pointers) {
 	if (has_free_pages(pba)) {
 		int age_class = sort_into_age_class(pba);
-		if (has_free_pages(free_block_pointers[pba.package][pba.die])) {
+		if (!give_to_block_pointers || has_free_pages(free_block_pointers[pba.package][pba.die])) {
 			free_blocks[pba.package][pba.die][age_class].push_back(pba);
 		} else {
 			free_block_pointers[pba.package][pba.die] = pba;
@@ -629,7 +628,8 @@ void pointers::retire(double current_time) {
 	int num_free_blocks = 0;
 	for (int i = 0; i < blocks.size(); i++) {
 		for (int j = 0; j < blocks[i].size(); j++) {
-			bm->return_unfilled_block(blocks[i][j], current_time);
+			//bm->free_blocks[i][j].push_back(blocks[i][j]);
+			bm->return_unfilled_block(blocks[i][j], current_time, false);
 		}
 	}
 }

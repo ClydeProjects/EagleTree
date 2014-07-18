@@ -15,6 +15,9 @@
 using namespace ssd;
 
 int Block_Manager_Groups::detector_type = 0;
+int Block_Manager_Groups::reclamation_threshold = 0;
+int Block_Manager_Groups::starvation_threshold = 0;
+bool Block_Manager_Groups::balancing_policy_on = true;
 
 Block_Manager_Groups::Block_Manager_Groups()
 : Block_manager_parent(), stats(), groups(), detector(NULL)
@@ -34,8 +37,11 @@ void Block_Manager_Groups::init_detector() {
 	if (detector_type == 0) {
 		detector = new tag_detector(groups);
 	}
+	else if (detector_type == 1) {
+		detector = new adaptive_bloom_detector(groups, this);
+	}
 	else {
-		detector = new bloom_detector(groups, this);
+		detector = new non_adaptive_bloom_detector(groups, this);
 	}
 }
 
@@ -48,11 +54,13 @@ void Block_Manager_Groups::init(Ssd* ssd, FtlParent* ftl, IOScheduler* sched, Ga
 			free_block_pointers[i][j] = Address();
 		}
 	}
+	assert(get_num_free_blocks() == SSD_SIZE * PACKAGE_SIZE * PLANE_SIZE);
 	group::mapping_pages_to_groups =  vector<int>(NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR + 1, UNDEFINED);
 	init_detector();
 	group new_group(1, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR, this, ssd, 0);
 	groups.push_back(new_group);
 	detector->change_in_groups(groups, 0);
+
 }
 
 void Block_Manager_Groups::change_update_frequencies(Groups_Message const& msg) {
@@ -77,8 +85,11 @@ void Block_Manager_Groups::receive_message(Event const& message) {
 	if (new_groups.size() == 0) {
 		return;
 	}
+	for (int i = 0; i < groups.size(); i++) {
+		groups[i].retire_active_blocks(message.get_current_time());
+	}
 	groups.clear();
-	int offset = 0;
+	double offset = 0;
 	for (int i = 0; i < new_groups.size(); i++) {
 		double update_prob = new_groups[i].update_frequency / 100.0;
 		double size = (new_groups[i].size / 100.0) * NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
@@ -110,11 +121,18 @@ int tag_detector::which_group_should_this_page_belong_to(Event const& event) {
 		return event.get_tag();
 	}
 	int la = event.get_logical_address();
+	if (la == 469824) {
+		int i = 0;
+		i++;
+		printf("%d\n", groups[9].offset + groups[9].size + 9);
+	}
 	for (int i = 0; i < groups.size(); i++) {
-		if (la >= groups[i].offset && la < groups[i].offset + groups[i].size) {
+		if (la >= groups[i].offset && la < groups[i].offset + groups[i].size + i) {
 			return i;
 		}
 	}
+	printf("no group for event ");
+	event.print();
 	return UNDEFINED;
 }
 
@@ -185,14 +203,14 @@ void Block_Manager_Groups::register_write_outcome(Event const& event, enum statu
 	detector->register_write_completed(event, prior_group_id, ideal_group_id);
 
 	if (groups[ideal_group_id].num_pages > groups[ideal_group_id].size * 1.05 || groups[ideal_group_id].actual_prob > groups[ideal_group_id].prob * 1.05) {
-		printf("regrouping due to change!!!\n");
+		//printf("regrouping due to change!!!\n");
 		for (int i = 0; i < groups.size(); i++) {
 			groups[i].size = groups[i].num_pages;
 			groups[i].prob = groups[i].actual_prob;
 		}
 		groups = group::iterate(groups);
 		group::num_writes_since_last_regrouping = 0;
-		print();
+		//print();
 		//group::init_stats(groups);
 		//StatisticsGatherer::get_global_instance()->print();
 		//StatisticsGatherer::init();
@@ -247,8 +265,18 @@ void Block_Manager_Groups::register_write_outcome(Event const& event, enum statu
 				"Total GC"
 		});
 
+
+		  static clock_t time_sig = 0;
+		  clock_t time_now = clock();
+		  if (time_sig > 0) {
+			  double elapsed_secs = double(time_now - time_sig) / CLOCKS_PER_SEC;
+			  printf("elapsed_secs:   %f\n", elapsed_secs);
+		  }
+		time_sig = time_now;
+
 		group::init_stats(groups);
 		stats.num_group_misses = 0;
+		stats.num_balancing_gc_operations_requested = 0;
 		//StatisticsGatherer::get_global_instance()->print();
 		//StatisticsGatherer::init();
 	}
@@ -305,7 +333,7 @@ bool Block_Manager_Groups::may_garbage_collect_this_block(Block* block, double c
 		i++;
 	}
 
-	if (!equib && !need_more_blocks && num_active_blocks + num_blocks_being_gc >= SSD_SIZE * PACKAGE_SIZE ) {
+	if (!equib && !need_more_blocks && num_active_blocks + num_blocks_being_gc >= Block_Manager_Groups::reclamation_threshold ) {
 		//print();
 		return false;
 	}
@@ -341,9 +369,15 @@ bool Block_Manager_Groups::may_garbage_collect_this_block(Block* block, double c
 	return true;
 }
 
+void Block_Manager_Groups::give_block_to_group(int package, int die, int group_id, double current_time) {
+	Address block_addr = find_free_unused_block(package, die, current_time);
+	if (has_free_pages(block_addr)) {
+		groups[group_id].accept_block(block_addr);
+	}
+}
+
 bool Block_Manager_Groups::try_to_allocate_block_to_group(int group_id, int package, int die, double time) {
 	bool starved = groups[group_id].is_starved();
-
 	bool needs_more_blocks = groups[group_id].needs_more_blocks();
 	int actual_size = groups[group_id].block_ids.size() * BLOCK_SIZE;
 	int OP = groups[group_id].OP;
@@ -352,46 +386,22 @@ bool Block_Manager_Groups::try_to_allocate_block_to_group(int group_id, int pack
 
 	if (needs_more_blocks || starved || num_free_blocks > 1) {
 		if (!has_free_pages(groups[group_id].free_blocks.blocks[package][die])) {
-			Address block_addr = find_free_unused_block(package, die, time);
-			if (has_free_pages(block_addr)) {
-				groups[group_id].free_blocks.blocks[package][die] = block_addr;
-				Block* block = ssd->get_package(block_addr.package)->get_die(block_addr.die)->get_plane(block_addr.plane)->get_block(block_addr.block);
-				assert(groups[group_id].block_ids.count(block) == 0);
-				groups[group_id].block_ids.insert(block);
-				groups[group_id].num_blocks_per_die[package][die]++;
-			}
+			give_block_to_group(package, die, group_id, time);
 		}
-		if (!has_free_pages(groups[group_id].next_free_blocks.blocks[package][die]) && !starved) {
-			Address block_addr = find_free_unused_block(package, die, time);
-			if (has_free_pages(block_addr)) {
-				groups[group_id].next_free_blocks.blocks[package][die] = block_addr;
-				Block* block = ssd->get_package(block_addr.package)->get_die(block_addr.die)->get_plane(block_addr.plane)->get_block(block_addr.block);
-				assert(groups[group_id].block_ids.count(block) == 0);
-				groups[group_id].block_ids.insert(block);
-				groups[group_id].num_blocks_per_die[package][die]++;
-			}
+		if (!has_free_pages(groups[group_id].next_free_blocks.blocks[package][die])/* && !starved*/) {
+			give_block_to_group(package, die, group_id, time);
 		}
 	}
-	//printf("gc in group since it is starved. group %d \n", group_id);
 
-	/*if (num_free_blocks > 10) {
-		return true;
-	}*/
-
-	if (groups[group_id].num_blocks_per_die[package][die] * 1.15 < groups[group_id].get_avg_blocks_per_die()) {
+	if (balancing_policy_on && groups[group_id].num_blocks_per_die[package][die] * 1.15 < groups[group_id].get_avg_blocks_per_die()) {
 		trigger_gc_in_same_lun_but_different_group(package, die, group_id, time);
 		return true;
 	}
 
-	//if (needs_more_blocks || groups[group_id].in_equilbirium()) {
 	if (needs_more_blocks || group::in_total_equilibrium(groups, group_id)) {
-
-		//printf("group %d needs more blocks  %d\n", group_id, has_free_pages(groups[group_id].next_free_blocks.blocks[package][die]) && has_free_pages(groups[group_id].free_blocks.blocks[package][die]));
 		return has_free_pages(groups[group_id].next_free_blocks.blocks[package][die]) && has_free_pages(groups[group_id].free_blocks.blocks[package][die]);
 	}
 	bool still_starved = groups[group_id].is_starved();
-
-	//printf("group %d starved\n", group_id);
 	return !still_starved;
 }
 
@@ -417,7 +427,7 @@ void Block_Manager_Groups::trigger_gc_in_same_lun_but_different_group(int packag
 	}
 
 	// trigger gc in selected group
-
+	stats.num_balancing_gc_operations_requested++;
 	request_gc(selected_group, package, die, time);
 
 }
@@ -425,7 +435,6 @@ void Block_Manager_Groups::trigger_gc_in_same_lun_but_different_group(int packag
 void Block_Manager_Groups::register_erase_outcome(Event const& event, enum status status) {
 	Address a = event.get_address();
 	Block* block = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
-	//PRINT_LEVEL = 1;
 	int group_id = UNDEFINED;
 	for (int i = 0; i < groups.size(); i++) {
 		if (groups[i].block_ids.count(block) == 1) {
@@ -441,35 +450,34 @@ void Block_Manager_Groups::register_erase_outcome(Event const& event, enum statu
 		assert(false);
 	}
 	Block_manager_parent::register_erase_outcome(event, status);
-	if (rand() % 3 == 0) {
-		group::count_num_groups_that_need_more_blocks(groups);
-	}
+	group::count_num_groups_that_need_more_blocks(groups);
 }
 
 void Block_Manager_Groups::check_if_should_trigger_more_GC(Event const& event) {
 
+	// Find the group with the fewest blocks in the LUN on which the erase was made
 	Address a = event.get_address();
 	int min_num_blocks = NUMBER_OF_ADDRESSABLE_BLOCKS();
 	int selected_group = UNDEFINED;
-	// identify a group with too many pages
 	for (int i = 0; i < groups.size(); i++ ){
 		if (groups[i].num_blocks_per_die[a.package][a.die] < min_num_blocks) {
 			min_num_blocks = groups[i].num_blocks_per_die[a.package][a.die];
 			selected_group = i;
 		}
 	}
-	if (selected_group != UNDEFINED) {
+	// If the group that was found has fewer blocks on this LUN than it has on average on other LUNs, then give the block to this group.
+	if (selected_group != UNDEFINED && balancing_policy_on) {
 		double avg = groups[selected_group].get_avg_blocks_per_die();
 		if (min_num_blocks * 1.05 < avg) {
 			int curr_num_blocks = groups[selected_group].block_ids.size();
 			try_to_allocate_block_to_group(selected_group, a.package, a.die, event.get_current_time());
 			if (groups[selected_group].block_ids.size() > curr_num_blocks) {
-				//printf("successfully donated block! \n");
+				printf("successfully donated block! \n");
 			}
 		}
 	}
 
-
+	// Check if more GC should be triggered
 	vector<int> order_group = Random_Order_Iterator::get_iterator(groups.size());
  	for (auto g : order_group) {
  		vector<int> order_packages = Random_Order_Iterator::get_iterator(SSD_SIZE);
@@ -495,16 +503,14 @@ void Block_Manager_Groups::request_gc(int group_id, int package, int die, double
 
 // handle garbage_collection case. Based on range.
 Address Block_Manager_Groups::choose_best_address(Event& write) {
-
 	if (write.is_garbage_collection_op() && write.get_tag() == UNDEFINED) {
 		int group_id = group::mapping_pages_to_groups.at(write.get_logical_address());
 		write.set_tag(group_id);
 	}
 	int group_id = detector->which_group_should_this_page_belong_to(write);
-	if ( groups.size() <= group_id) {
-		print();
+	if (!(group_id >= 0 && group_id < groups.size())) {
+		write.print();
 	}
-	assert(groups.size() > 0);
 	assert(group_id >= 0 && group_id < groups.size());
 	return groups[group_id].free_blocks.get_best_block(this);
 }
@@ -548,6 +554,7 @@ void Block_Manager_Groups::print() {
 	printf(".........................................\n");
 	group::print(groups);
 	printf("num group misses: %d\n", stats.num_group_misses);
+	printf("num balancing gc operations requested: %d\n", stats.num_balancing_gc_operations_requested);
 	printf("num free blocks in SSD:  %d\n", get_num_free_blocks());
 	printf("num gc scheduled  %d\n", migrator->how_many_gc_operations_are_scheduled());
 	printf("\n");
@@ -561,7 +568,6 @@ bloom_detector::bloom_detector(vector<group>& groups, Block_Manager_Groups* bm) 
 		group_data* gd = new group_data(groups[i], groups);
 		data.push_back(gd);
 	}
-	update_probilities(0);
 }
 
 bloom_detector::bloom_detector() :
@@ -594,10 +600,12 @@ int bloom_detector::which_group_should_this_page_belong_to(Event const& event) {
 	int num_occurances_in_filters = 0;
 	num_occurances_in_filters += data[group_id]->current_filter.contains(la);
 	num_occurances_in_filters += data[group_id]->filter2.contains(la);
-	num_occurances_in_filters += data[group_id]->filter3.contains(la);
+	if (num_occurances_in_filters != 1 || num_occurances_in_filters) {
+		num_occurances_in_filters += data[group_id]->filter3.contains(la);
+	}
 
 	// create new groups if needed
-	if (num_occurances_in_filters == 0 &&
+	if (false && num_occurances_in_filters == 0 &&
 			data[group_id]->lower_group_id == UNDEFINED && groups[group_id].num_pages > 10 * BLOCK_SIZE &&
 			!event.is_original_application_io() && data[group_id]->age_in_intervals > 100 &&
 			data[group_id] == lowest_group) {
@@ -618,7 +626,7 @@ int bloom_detector::which_group_should_this_page_belong_to(Event const& event) {
 			lowest_group = gd;
 		}
 	}
-	else if (/*data.size() < 4 &&*/ num_occurances_in_filters == 3 &&
+	else if (data.size() < 6 && num_occurances_in_filters == 3 &&
 			data[group_id]->upper_group_id == UNDEFINED && groups[group_id].num_pages > 10 * BLOCK_SIZE &&
 			event.is_original_application_io() && data[group_id]->age_in_intervals > 100 &&
 			data[group_id] == highest_group) {
@@ -667,7 +675,7 @@ void bloom_detector::register_write_completed(Event const& event, int prior_grou
 		return;
 	}
 	if (event.get_logical_address() == 599111) {
-		printf("599111 to group %d\n", new_group_id);
+		//printf("599111 to group %d\n", new_group_id);
 	}
 
 	//assert(!data[group_id]->current_filter.contains(event.get_logical_address()));
@@ -682,7 +690,7 @@ void bloom_detector::register_write_completed(Event const& event, int prior_grou
 	}
 
 	if (--current_interval_counter == 0) {
-		bloom_detector::update_probilities(event.get_current_time());
+		update_probilities(event.get_current_time());
 	}
 }
 
@@ -771,7 +779,32 @@ void bloom_detector::merge_groups(group_data* gd1, group_data* gd2, double curre
 }
 
 
-void bloom_detector::update_probilities(double current_time) {
+
+
+bloom_detector::group_data::group_data(group const& group_ref, vector<group>& groups) :
+		current_filter(), filter2(), filter3(),
+		bloom_filter_hits(group_ref.size),
+		interval_hit_count(0),
+				lower_group_id(0), upper_group_id(0), index(group_ref.index), groups_none(), groups(groups), age_in_intervals(0)
+{
+	bloom_parameters params;
+	params.false_positive_probability = 0.01;
+	params.projected_element_count = group_ref.size;
+	params.compute_optimal_parameters();
+	current_filter = bloom_filter(params);
+	filter2 = bloom_filter(params);
+	filter3 = bloom_filter(params);
+}
+
+bloom_detector::group_data::group_data() :
+		current_filter(), filter2(), filter3(),
+		bloom_filter_hits(0),
+		interval_hit_count(0),
+				lower_group_id(0), upper_group_id(0), index(0), groups_none(), groups(groups_none), age_in_intervals(0)
+{
+}
+
+void adaptive_bloom_detector::update_probilities(double current_time) {
 	// Update probabilities of groups
 
 	if (data.size() == 0) {
@@ -782,8 +815,7 @@ void bloom_detector::update_probilities(double current_time) {
 	for (int i = 0; i < data.size(); i++) {
 		double length = get_interval_length();
 		double new_prob = data[i]->interval_hit_count / length;
-		data[i]->update_probability = data[i]->update_probability * (1.0 - interval_size_of_the_lba_space * 3) + new_prob * interval_size_of_the_lba_space * 3;
-		groups[i].actual_prob = data[i]->update_probability;
+		groups[i].actual_prob = groups[i].actual_prob * (1.0 - interval_size_of_the_lba_space * 3) + new_prob * interval_size_of_the_lba_space * 3;
 		data[i]->interval_hit_count = 0;
 		data[i]->age_in_intervals++;
 	}
@@ -836,26 +868,61 @@ void bloom_detector::update_probilities(double current_time) {
 	// check how close some groups are now to each other, and merge or create new groups as needed
 }
 
-bloom_detector::group_data::group_data(group const& group_ref, vector<group>& groups) :
-		current_filter(), filter2(), filter3(),
-		bloom_filter_hits(group_ref.size),
-		update_probability(group_ref.prob), interval_hit_count(0),
-				lower_group_id(0), upper_group_id(0), index(group_ref.index), groups_none(), groups(groups), age_in_intervals(0)
-{
-	bloom_parameters params;
-	params.false_positive_probability = 0.01;
-	params.projected_element_count = group_ref.size;
-	params.compute_optimal_parameters();
-	current_filter = bloom_filter(params);
-	filter2 = bloom_filter(params);
-	filter3 = bloom_filter(params);
+non_adaptive_bloom_detector::non_adaptive_bloom_detector(vector<group>& groups, Block_Manager_Groups* bm) :
+		bloom_detector(groups, bm), hit_rate()
+{}
+
+void non_adaptive_bloom_detector::change_in_groups(vector<group>& groups, double current_time) {
+	for (int i = 0; i < groups.size(); i++) {
+		hit_rate.push_back(pow(2, i));
+	}
+	bloom_detector::change_in_groups(groups, current_time);
+	for (int i = 0; i < groups.size(); i++) {
+		data[i]->upper_group_id = i + 1;
+		data[i]->lower_group_id = i - 1;
+	}
+	highest_group = data.back();
+	lowest_group = data.front();
+	data.back()->upper_group_id = UNDEFINED;
+	data.front()->lower_group_id = UNDEFINED;
 }
 
-bloom_detector::group_data::group_data() :
-		current_filter(), filter2(), filter3(),
-		bloom_filter_hits(0),
-		update_probability(0), interval_hit_count(0),
-				lower_group_id(0), upper_group_id(0), index(0), groups_none(), groups(groups_none), age_in_intervals(0)
-{
-}
+void non_adaptive_bloom_detector::update_probilities(double current_time) {
+	// Update probabilities of groups
+	if (data.size() == 0) {
+		return;
+	}
 
+	current_interval_counter = get_interval_length();
+	// update the hit rates for any new groups
+	double denominator = 0;
+	int num_pages = 0;
+
+	while (hit_rate.size() != groups.size()) {
+		hit_rate.push_back(0);
+	}
+
+	for (int i = 0; i < data.size(); i++) {
+		num_pages += groups[i].num_pages;
+		double length = get_interval_length();
+		if (hit_rate[i] == 0 && data[i]->lower_group_id != UNDEFINED) {
+			hit_rate[i] = hit_rate[data[i]->lower_group_id] * 2;
+		}
+		else if (hit_rate[i] == 0 && data[i]->upper_group_id != UNDEFINED) {
+			hit_rate[i] = hit_rate[data[i]->upper_group_id] / 2;
+		}
+		denominator += hit_rate[i] * groups[i].num_pages;
+	}
+
+	if (num_pages == 0) {
+		return;
+	}
+
+	for (int i = 0; i < data.size(); i++) {
+		double length = get_interval_length();
+		groups[i].actual_prob = (groups[i].num_pages * hit_rate[i]) / denominator;
+		data[i]->interval_hit_count = 0;
+		data[i]->age_in_intervals++;
+	}
+
+}

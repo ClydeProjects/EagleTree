@@ -328,10 +328,10 @@ public:
 
 
 struct group_def {
-	group_def(int update_frequency, int size, int tag = UNDEFINED) : update_frequency(update_frequency), size(size), tag(tag) {}
+	group_def(double update_frequency, double size, int tag = UNDEFINED) : update_frequency(update_frequency), size(size), tag(tag) {}
 	group_def() : update_frequency(), size(), tag() {}
-	int update_frequency;
-	int size;
+	double update_frequency;
+	double size;
 	int tag;
     friend class boost::serialization::access;
     template<class Archive> void serialize(Archive & ar, const unsigned int version) {

@@ -335,7 +335,7 @@ void Sequential_Locality_BM::sequential_event_metadata_removed(long key, double 
 	for (uint i = 0; i < a.pointers.size(); i++) {
 		for (uint j = 0; j < a.pointers[i].size(); j++) {
 			Address& pointer = a.pointers[i][j];
-			Block_manager_parent::return_unfilled_block(pointer, current_time);
+			Block_manager_parent::return_unfilled_block(pointer, current_time, true);
 		}
 	}
 	seq_write_key_to_pointers_mapping.erase(key);

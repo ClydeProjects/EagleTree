@@ -126,7 +126,7 @@ public:
 	Address find_free_unused_block(uint package_id, double time);
 	Address find_free_unused_block(enum age age, double time);
 	pair<bool, pair<int, int> > get_free_block_pointer_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
-	void return_unfilled_block(Address block_address, double current_time);
+	void return_unfilled_block(Address block_address, double current_time, bool give_to_block_pointers);
 protected:
 	virtual Address choose_best_address(Event& write) = 0;
 	virtual Address choose_any_address(Event const& write) = 0;
@@ -341,6 +341,7 @@ public:
 	void register_write_outcome(Event const& event);
 	void register_erase_outcome(Event const& event);
 	bool is_starved() const;
+	void accept_block(Address block_addr);
 	bool needs_more_blocks() const;
 	bool in_equilbirium() const;
 	void retire_active_blocks(double current_time);
@@ -450,15 +451,20 @@ public:
     	//ar & detector;
     }
     static int detector_type;
+    static int reclamation_threshold;
+    static int starvation_threshold;
+    static bool balancing_policy_on;
 protected:
 	Address choose_best_address(Event& write);
 	Address choose_any_address(Event const& write);
 private:
+	void give_block_to_group(int package, int die, int group_id, double current_time);
 	void request_gc(int group_id, int package, int die, double time);
 	vector<group> groups;
 	struct stats {
-		stats() : num_group_misses(0) {}
+		stats() : num_group_misses(0), num_balancing_gc_operations_requested(0) {}
 		int num_group_misses;
+		int num_balancing_gc_operations_requested;
 	};
 	stats stats;
 	temperature_detector* detector;
@@ -471,7 +477,7 @@ public:
 	bloom_detector();
 	virtual ~bloom_detector() {};
 	int which_group_should_this_page_belong_to(Event const& event);
-	void change_in_groups(vector<group>& groups, double current_time);
+	virtual void change_in_groups(vector<group>& groups, double current_time);
 	virtual void register_write_completed(Event const& event, int prior_group, int new_group_id);
     template<class Archive> void serialize(Archive & ar, const unsigned int version)
     {
@@ -481,7 +487,7 @@ public:
     }
 protected:
 	int get_interval_length() { return NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * interval_size_of_the_lba_space; }
-	void update_probilities(double current_time);
+	virtual void update_probilities(double current_time) = 0;
 	void group_interval_finished(int group_id);
 	struct group_data {
 		group_data(group const& group_ref, vector<group>& data);
@@ -489,7 +495,6 @@ protected:
 		bloom_filter current_filter, filter2, filter3;
 		int bloom_filter_hits;
 		int interval_hit_count;
-		double update_probability;
 		inline double get_hits_per_page() const { return groups[index].prob / groups[index].size; }
 		inline group get_group() { return groups[index]; }
 		int index;
@@ -499,7 +504,7 @@ protected:
 	    template<class Archive> void serialize(Archive & ar, const unsigned int version)
 	    {
 	    	//ar & current_filter; ar & filter2; ar & filter3;
-	    	ar & bloom_filter_hits; ar & interval_hit_count; ar & update_probability;
+	    	ar & bloom_filter_hits; ar & interval_hit_count;
 	    	ar & index; ar & lower_group_id; ar & upper_group_id; ar & age_in_intervals;
 	    	ar & groups;
 	    }
@@ -517,10 +522,20 @@ private:
 	void change_id_for_pages(int old_id, int new_id);
 };
 
-/*class adaptive_bloom_detector : bloom_detector {
+class adaptive_bloom_detector : public bloom_detector {
 public:
+	adaptive_bloom_detector(vector<group>& groups, Block_Manager_Groups* bm) : bloom_detector(groups, bm) { update_probilities(0); }
+	void update_probilities(double current_time);
+};
 
-};*/
+class non_adaptive_bloom_detector : public bloom_detector {
+public:
+	non_adaptive_bloom_detector(vector<group>& groups, Block_Manager_Groups* bm);
+	void change_in_groups(vector<group>& groups, double current_time);
+	void update_probilities(double current_time);
+private:
+	vector<int> hit_rate;
+};
 
 // A simple BM that assigns writes sequentially to dies in a round-robin fashion. No hot-cold separation or anything else intelligent
 class Block_manager_roundrobin : public Block_manager_parent {

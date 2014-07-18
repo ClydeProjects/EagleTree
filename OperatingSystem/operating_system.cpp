@@ -18,7 +18,8 @@ OperatingSystem::OperatingSystem()
 	  idle_time(0),
 	  time(0),
 	  scheduler(NULL),
-	  progress_meter_granularity(20)
+	  progress_meter_granularity(20),
+	  counter_for_user(0)
 {
 	ssd->set_operating_system(this);
 	thread_id_generator = 0;

@@ -15,54 +15,58 @@ namespace ssd {
 
 class Priorty_Scheme {
 public:
-	Priorty_Scheme(IOScheduler* scheduler) : scheduler(scheduler) {}
+	Priorty_Scheme(IOScheduler* scheduler) : scheduler(scheduler), queue(NULL) {}
 	virtual ~Priorty_Scheme() {};
 	virtual void schedule(vector<Event*>& events) = 0;
+	void set_queue(event_queue* q) { queue = q; }
 protected:
 	void seperate_internal_external(vector<Event*> const& events, vector<Event*>& internal, vector<Event*>& external);
 	void seperate_by_type(vector<Event*> const& events, vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
+	void prioritize_oldest_event(vector<Event*>& events);
+	void return_to_queue_excessive_events(vector<Event*>& events);
 	IOScheduler* scheduler;
+	event_queue* queue;
 };
 
 class Fifo_Priorty_Scheme : public Priorty_Scheme {
 public:
-	Fifo_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	Fifo_Priorty_Scheme(IOScheduler* scheduler)  : Priorty_Scheme(scheduler) {};
 	void schedule(vector<Event*>& events);
 };
 
 class Noop_Priorty_Scheme : public Priorty_Scheme {
 public:
-	Noop_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	Noop_Priorty_Scheme(IOScheduler* scheduler)  : Priorty_Scheme(scheduler) {};
 	void schedule(vector<Event*>& events);
 };
 
 class Re_Er_Wr_Priorty_Scheme : public Priorty_Scheme {
 public:
-	Re_Er_Wr_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	Re_Er_Wr_Priorty_Scheme(IOScheduler* scheduler)  : Priorty_Scheme(scheduler) {};
 	void schedule(vector<Event*>& events);
 };
 
 class Er_Wr_Re_gcRe_gcWr_Priorty_Scheme : public Priorty_Scheme {
 public:
-	Er_Wr_Re_gcRe_gcWr_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	Er_Wr_Re_gcRe_gcWr_Priorty_Scheme(IOScheduler* scheduler)  : Priorty_Scheme(scheduler) {};
 	void schedule(vector<Event*>& events);
 };
 
 class gcRe_gcWr_Er_Re_Wr_Priorty_Scheme : public Priorty_Scheme {
 public:
-	gcRe_gcWr_Er_Re_Wr_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	gcRe_gcWr_Er_Re_Wr_Priorty_Scheme(IOScheduler* scheduler)  : Priorty_Scheme(scheduler) {};
 	void schedule(vector<Event*>& events);
 };
 
 class We_Re_gcWr_E_gcR_Priorty_Scheme : public Priorty_Scheme {
 public:
-	We_Re_gcWr_E_gcR_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	We_Re_gcWr_E_gcR_Priorty_Scheme(IOScheduler* scheduler)  : Priorty_Scheme(scheduler) {};
 	void schedule(vector<Event*>& events);
 };
 
 class Smart_App_Priorty_Scheme : public Priorty_Scheme {
 public:
-	Smart_App_Priorty_Scheme(IOScheduler* scheduler) : Priorty_Scheme(scheduler) {};
+	Smart_App_Priorty_Scheme(IOScheduler* scheduler)  : Priorty_Scheme(scheduler) {};
 	void schedule(vector<Event*>& events);
 };
 
@@ -85,7 +89,9 @@ private:
 
 class Scheduling_Strategy : public event_queue {
 public:
-	Scheduling_Strategy(IOScheduler* s, Ssd* ssd, Priorty_Scheme* scheme) : event_queue(), scheduler(s), ssd(ssd), priorty_scheme(scheme) {}
+	Scheduling_Strategy(IOScheduler* s, Ssd* ssd, Priorty_Scheme* scheme) : event_queue(), scheduler(s), ssd(ssd), priorty_scheme(scheme) {
+		priorty_scheme->set_queue(this);
+	}
 	virtual ~Scheduling_Strategy() {};
 	virtual void schedule();
 protected:

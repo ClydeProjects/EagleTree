@@ -1262,11 +1262,13 @@ public:
 	static double get_count(string name, int column);
 	static double get_sum(string name, int column);
 	static double get_average(string name, int column);
+	static double get_weighted_avg_of_col2_in_terms_of_col1(string name, int col1, int col2);	// Useful for calculating average values over time. Col1 1 is typically time in this case.
 	static double get_standard_deviation(string name, int column);
+	static void clean(string name);
 	static string to_csv(string name);
 	static map<string, StatisticData> statistics;
 private:
-	vector<string> names;
+	vector<string> names;			// titles of columns
 	vector<vector<Number*> > data;	// a table of data.
 };
 

@@ -1,8 +1,6 @@
 #include "../ssd.h"
 using namespace ssd;
 
-
-
 // All we need to do to declare a workload is extend the Workload_Definition class and override the generate method
 // This method returns a vector of threads, which the operating system will start running.
 class Example_Workload : public Workload_Definition {
@@ -17,6 +15,10 @@ vector<Thread*> Example_Workload::generate() {
 	vector<group_def> k_modes;
 	k_modes.push_back(group_def(10, 50, 0));
 	k_modes.push_back(group_def(90, 50, 1));
+	/*int num_groups = 50;
+	for (int i = 0; i < num_groups; i++) {
+		k_modes.push_back(group_def(100.0 / num_groups, 100.0 / num_groups, i));
+	}*/
 
 	bool include_init_message = Block_Manager_Groups::detector_type == 0;
 	Thread* t1 = NULL;
@@ -33,7 +35,7 @@ vector<Thread*> Example_Workload::generate() {
 
 
 	t2->fixed_groups = false;
-	t2->fac_num_ios_to_change_workload = 7;
+	t2->fac_num_ios_to_change_workload = 100;
 	//t->set_io_size(1);
 
 	if (initialize_with_sequential_write) {
@@ -49,6 +51,7 @@ vector<Thread*> Example_Workload::generate() {
 }
 
 int main()
+
 {
 	printf("Running EagleTree\n");
 	set_small_SSD_config();
@@ -60,7 +63,14 @@ int main()
 	PRINT_LEVEL = 0;
 	OVER_PROVISIONING_FACTOR = 0.7;
 	GARBAGE_COLLECTION_POLICY = 0;
-	Block_Manager_Groups::detector_type = 1;
+	Block_Manager_Groups::detector_type = 0;
+	Block_Manager_Groups::starvation_threshold = SSD_SIZE * PACKAGE_SIZE;
+	Block_Manager_Groups::reclamation_threshold = SSD_SIZE * PACKAGE_SIZE + 1;
+
+	//Block_Manager_Groups::starvation_threshold = 4;
+	//Block_Manager_Groups::reclamation_threshold = 5;
+
+	Block_Manager_Groups::balancing_policy_on = false;
 
 	string name  = "/changing_workload/";
 	Experiment::create_base_folder(name.c_str());
@@ -75,10 +85,17 @@ int main()
 	//groups.push_back(pair<int, int>(80, 0.2 * NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR));
 	//groups.push_back(pair<int, int>(20, 0.8 * NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR));
 
+	int min = SSD_SIZE * PACKAGE_SIZE;
+	int max = SSD_SIZE * PACKAGE_SIZE + 3;
+	int incr = 1;
+	//e->set_variable(&Block_Manager_Groups::reclamation_threshold, min, max, incr, "reclamation threshold");
+
 	workload->initialize_with_sequential_write = true;
 
+	//e->set_variable(&Block_Manager_Groups::starvation_threshold, min, max, incr, "Writes Deadline (µs)");
+
 	e->set_workload(workload);
-	e->set_io_limit(NUMBER_OF_ADDRESSABLE_PAGES() * 15);
+	e->set_io_limit(NUMBER_OF_ADDRESSABLE_PAGES() * 10);
 	e->run("test");
 	e->draw_graphs();
 	delete workload;

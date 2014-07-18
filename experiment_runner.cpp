@@ -173,8 +173,8 @@ void Experiment::simple_experiment_double(string name, T* var, T min, T max, T i
 		StatisticsGatherer::set_record_statistics(true);
 		os->set_num_writes_to_stop_after(io_limit);
 		os->run();
-		//StatisticsGatherer::get_global_instance()->print();
-		StatisticsGatherer::get_global_instance()->print_gc_info();
+		StatisticsGatherer::get_global_instance()->print();
+		//StatisticsGatherer::get_global_instance()->print_gc_info();
 		//Utilization_Meter::print();
 		//Queue_Length_Statistics::print_avg();
 		//Free_Space_Meter::print();
@@ -467,6 +467,11 @@ void Experiment::save_state(OperatingSystem* os, string file_name) {
 	oa.register_type<MTRand53>();
 	oa.register_type<Garbage_Collector_Greedy>();
 	oa.register_type<Garbage_Collector_LRU>();
+	oa.register_type<Block_Manager_Groups>();
+	oa.register_type<Initial_Message>();
+	oa.register_type<K_Modal_Thread_Messaging>();
+	oa.register_type<bloom_detector>();
+	oa.register_type<tag_detector>();
 	oa << os;
 	oa << threads;
 	file.close();
@@ -501,6 +506,10 @@ OperatingSystem* Experiment::load_state(string name) {
 	ia.register_type<MTRand53>();
 	ia.register_type<Garbage_Collector_Greedy>();
 	ia.register_type<Garbage_Collector_LRU>();
+	ia.register_type<Block_Manager_Groups>();
+	ia.register_type<Initial_Message>();
+	ia.register_type<K_Modal_Thread_Messaging>();
+	ia.register_type<tag_detector>();
 	OperatingSystem* os;
 	ia >> os;
 	vector<Thread*> threads;

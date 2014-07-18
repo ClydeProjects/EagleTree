@@ -68,10 +68,24 @@ void group::print() const {
 	printf("\n");
 	stats.print();
 	printf("\tnum ongoing gc in group: %d\n", this->blocks_being_garbage_collected.size());
-	printf("\tin equib: %d\n", this->in_equilbirium());
+	if (this->in_equilbirium()) {
+		printf("\tin equib\n");
+	}
+	else if (this->needs_more_blocks()) {
+		int diff = (OP + size) / BLOCK_SIZE - block_ids.size();
+		printf("\tneeds blocks: %d\n", diff);
+	}
+	else {
+		int diff = block_ids.size() - (OP + size) / BLOCK_SIZE;
+		printf("\texcess blocks: %d\n", diff);
+	}
+
+	string title = "gc_for_diff_groups_" + std::to_string(id);
+	double avg = StatisticData::get_weighted_avg_of_col2_in_terms_of_col1(title, 0, 1);
+	printf("\tavg num live blocks over time: %f\n", avg);
 	//free_blocks.print();
 	//stats_gatherer.print();
-	//print_die_spesific_info();
+	print_die_spesific_info();
 	//print_blocks_valid_pages_per_die();
 }
 
@@ -209,6 +223,8 @@ void group::init_stats(vector<group>& groups) {
 	for (unsigned int i = 0; i < groups.size(); i++) {
 		groups[i].stats = group_stats();
 		groups[i].stats_gatherer = StatisticsGatherer();
+		string title = "gc_for_diff_groups_" + std::to_string(groups[i].id);
+		StatisticData::clean(title);
 	}
 }
 
@@ -325,12 +341,37 @@ Block* group::get_gc_victim(int package, int die) const {
 }
 
 bool group::is_starved() const {
-	int num_live_blocks = 0;
-	return free_blocks.get_num_free_blocks() < SSD_SIZE * PACKAGE_SIZE * 0.5;
+	return free_blocks.get_num_free_blocks()+ next_free_blocks.get_num_free_blocks() < Block_Manager_Groups::starvation_threshold;
 }
 
 bool group::needs_more_blocks() const {
 	return block_ids.size() * BLOCK_SIZE <= OP + size;
+}
+
+void group::accept_block(Address block_addr) {
+	if (free_blocks.blocks[block_addr.package][block_addr.die].page == BLOCK_SIZE || free_blocks.blocks[block_addr.package][block_addr.die].valid != PAGE) {
+		free_blocks.blocks[block_addr.package][block_addr.die] = block_addr;
+	}
+	else {
+		next_free_blocks.blocks[block_addr.package][block_addr.die] = block_addr;
+	}
+	//else assert(false);
+	Block* block = ssd->get_package(block_addr.package)->get_die(block_addr.die)->get_plane(block_addr.plane)->get_block(block_addr.block);
+	assert(block_ids.count(block) == 0);
+	block_ids.insert(block);
+	num_blocks_per_die[block_addr.package][block_addr.die]++;
+
+	string title = "gc_for_diff_groups_" + std::to_string(id);
+	int num_free_pointers = free_blocks.get_num_free_blocks() + next_free_blocks.get_num_free_blocks();
+	StatisticData::register_statistic(title, {
+			new Integer(StatisticsGatherer::get_global_instance()->total_writes()),
+			new Integer(num_free_pointers),
+	});
+
+	StatisticData::register_field_names(title, {
+			"time",
+			"num-live-blocks"
+	});
 }
 
 void group::retire_active_blocks(double current_time) {
