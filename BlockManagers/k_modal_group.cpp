@@ -15,6 +15,7 @@
 using namespace ssd;
 
 vector<int> group::mapping_pages_to_groups =  vector<int>();
+vector<int> group::mapping_pages_to_tags =  vector<int>();
 int group::num_groups_that_need_more_blocks = 0;
 int group::num_groups_that_need_less_blocks = 0;
 int group::num_writes_since_last_regrouping = 0;
@@ -27,7 +28,7 @@ group::group(double prob, double size, Block_manager_parent* bm, Ssd* ssd, int i
 			num_blocks_per_die(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 			blocks_queue_per_die(SSD_SIZE, vector<vector<Block*> >(PACKAGE_SIZE, vector<Block*>())),
 			stats_gatherer(StatisticsGatherer()),
-			index(index), ssd(ssd), id(id_generator++){
+			index(index), ssd(ssd), id(id_generator++) {
 	double PBA = NUMBER_OF_ADDRESSABLE_PAGES();
 	double LBA = NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
 	get_prob_op(PBA, LBA);
@@ -35,11 +36,16 @@ group::group(double prob, double size, Block_manager_parent* bm, Ssd* ssd, int i
 	get_average_op(PBA, LBA);
 	for (int i = 0; i < SSD_SIZE; i++) {
 		for (int j = 0; j < PACKAGE_SIZE; j++) {
-			Block* block1 = ssd->get_package(free_blocks.blocks[i][j].package)->get_die(free_blocks.blocks[i][j].die)->get_plane(free_blocks.blocks[i][j].plane)->get_block(free_blocks.blocks[i][j].block);
-			block_ids.insert(block1);
-			Block* block2 = ssd->get_package(next_free_blocks.blocks[i][j].package)->get_die(next_free_blocks.blocks[i][j].die)->get_plane(next_free_blocks.blocks[i][j].plane)->get_block(next_free_blocks.blocks[i][j].block);
-			block_ids.insert(block2);
-			num_blocks_per_die[i][j] += 2;
+			if (free_blocks.blocks[i][j].valid == PAGE) {
+				Block* block1 = ssd->get_package(free_blocks.blocks[i][j].package)->get_die(free_blocks.blocks[i][j].die)->get_plane(free_blocks.blocks[i][j].plane)->get_block(free_blocks.blocks[i][j].block);
+				block_ids.insert(block1);
+				num_blocks_per_die[i][j] += 1;
+			}
+			if (next_free_blocks.blocks[i][j].valid == PAGE) {
+				Block* block2 = ssd->get_package(next_free_blocks.blocks[i][j].package)->get_die(next_free_blocks.blocks[i][j].die)->get_plane(next_free_blocks.blocks[i][j].plane)->get_block(next_free_blocks.blocks[i][j].block);
+				block_ids.insert(block2);
+				num_blocks_per_die[i][j] += 1;
+			}
 		}
 	}
 }
@@ -50,7 +56,7 @@ group::group() : prob(0), size(0), offset(), OP(0), OP_greedy(0),
 		num_blocks_ever_given(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 		num_blocks_per_die(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 		stats_gatherer(StatisticsGatherer()),
-		index(index)
+		index(index), ssd(NULL), id(id_generator++)
 {}
 
 void group::print() const {
@@ -83,10 +89,26 @@ void group::print() const {
 	string title = "gc_for_diff_groups_" + std::to_string(id);
 	double avg = StatisticData::get_weighted_avg_of_col2_in_terms_of_col1(title, 0, 1);
 	printf("\tavg num live blocks over time: %f\n", avg);
+	print_tags_per_group();
 	//free_blocks.print();
 	//stats_gatherer.print();
-	print_die_spesific_info();
+	//print_die_spesific_info();
 	//print_blocks_valid_pages_per_die();
+}
+
+void group::print_tags_per_group() const {
+	map<int, int> tag_map;
+	for (int i = 0; i < mapping_pages_to_groups.size(); i++) {
+		if (mapping_pages_to_groups[i] == index) {
+			int tag = mapping_pages_to_tags[i];
+			tag_map[tag]++;
+		}
+	}
+	printf("\ttags");
+	for (auto t : tag_map) {
+		printf("\t%d: %d", t.first, t.second);
+	}
+	printf("\n");
 }
 
 void group::print_die_spesific_info() const {
@@ -102,6 +124,13 @@ void group::print_die_spesific_info() const {
 					stats_gatherer.num_gc_writes_per_LUN_destination[i][j]);
 		}
 	}
+}
+
+void group::print_blocks_valid_pages() const {
+	for (auto b : block_ids) {
+		printf("%d ", b->get_pages_valid());
+	}
+	printf("\n");
 }
 
 void group::print_blocks_valid_pages_per_die() const {
@@ -228,6 +257,23 @@ void group::init_stats(vector<group>& groups) {
 	}
 }
 
+double group::get_avg_pages_per_block_per_die() const {
+	double avg = 0;
+	double count = 0;
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			if (num_blocks_per_die[i][j] > 0) {
+				/*if (index == 1) {
+					printf("%d  /  %d\n", num_pages_per_die[i][j], num_blocks_per_die[i][j]);
+				}*/
+				avg += (double)num_pages_per_die[i][j] / (double)num_blocks_per_die[i][j];
+				count++;
+			}
+		}
+	}
+	return avg / count;
+}
+
 double group::get_avg_pages_per_die() const {
 	double avg = 0;
 	for (int i = 0; i < SSD_SIZE; i++) {
@@ -275,20 +321,9 @@ void group::group_stats::print() const {
 	printf("\tmigrated out: %d\n", migrated_out);
 }
 
-Block* group::get_gc_victim() const {
-	int min = BLOCK_SIZE;
-	Block* victim = NULL;
-	for (auto b : block_ids) {
-		if (b->get_pages_valid() < min && b->get_state() == ACTIVE) {
-			min = b->get_pages_valid();
-			victim = b;
-		}
-	}
-	return victim;
-}
-
 void group::register_write_outcome(Event const& event) {
-
+	assert(event.get_tag() != 2);
+	mapping_pages_to_tags[event.get_logical_address()] = event.get_tag();
 	stats_gatherer.register_completed_event(event);
 
 	if (event.get_address().page == 0) {
@@ -340,9 +375,14 @@ Block* group::get_gc_victim(int package, int die) const {
 	return victim;
 }
 
-bool group::is_starved() const {
+/*bool group::is_starved() const {
 	return free_blocks.get_num_free_blocks()+ next_free_blocks.get_num_free_blocks() < Block_Manager_Groups::starvation_threshold;
+}*/
+
+bool group::is_starved() const {
+	return free_blocks.get_num_free_blocks() < SSD_SIZE * PACKAGE_SIZE * 0.75;
 }
+
 
 bool group::needs_more_blocks() const {
 	return block_ids.size() * BLOCK_SIZE <= OP + size;
@@ -357,7 +397,6 @@ void group::accept_block(Address block_addr) {
 	}
 	//else assert(false);
 	Block* block = ssd->get_package(block_addr.package)->get_die(block_addr.die)->get_plane(block_addr.plane)->get_block(block_addr.block);
-	assert(block_ids.count(block) == 0);
 	block_ids.insert(block);
 	num_blocks_per_die[block_addr.package][block_addr.die]++;
 
@@ -391,7 +430,7 @@ void group::retire_active_blocks(double current_time) {
 
 bool group::in_equilbirium() const {
 	int diff = abs(block_ids.size() * BLOCK_SIZE - (OP + size));
-	if (diff > BLOCK_SIZE * 10) {
+	if (diff > BLOCK_SIZE * 20) {
 		return false;
 	}
 	return true;

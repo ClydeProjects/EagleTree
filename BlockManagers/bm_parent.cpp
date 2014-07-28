@@ -596,7 +596,7 @@ pointers::pointers() : bm(NULL), blocks(SSD_SIZE, vector<Address>(PACKAGE_SIZE, 
 void pointers::register_completion(Event const& e) {
 	blocks[e.get_address().package][e.get_address().die].page++;
 }
-Address pointers::get_best_block(Block_manager_parent* bm) {
+Address pointers::get_best_block(Block_manager_parent* bm) const {
 	pair<bool, pair<int, int> > result = bm->get_free_block_pointer_with_shortest_IO_queue(blocks);
 	if (result.first) {
 		return blocks[result.second.first][result.second.second];
@@ -604,7 +604,7 @@ Address pointers::get_best_block(Block_manager_parent* bm) {
 	return Address();
 }
 
-void pointers::print() {
+void pointers::print() const {
 	for (int i = 0; i < blocks.size(); i++) {
 		for (int j = 0; j < blocks[i].size(); j++) {
 			printf("%d %d %d\n", i, j, blocks[i][j].page);

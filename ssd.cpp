@@ -48,7 +48,7 @@ Ssd::Ssd():
 			exit(MEM_ERR);
 		}
 	}*/
-
+	StatisticsGatherer::init();
 	Block_manager_parent* bm = Block_manager_parent::get_new_instance();
 	Migrator* migrator = new Migrator();
 
@@ -82,7 +82,7 @@ Ssd::Ssd():
 	migrator->init(scheduler, bm, gc, wl, ftl, this);
 
 	StateVisualiser::init(this);
-	StatisticsGatherer::init();
+
 	SsdStatisticsExtractor::init(this);
 	Utilization_Meter::init();
 	Event::reset_id_generators();

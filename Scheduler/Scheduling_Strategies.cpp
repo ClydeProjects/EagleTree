@@ -102,6 +102,7 @@ void Re_Er_Wr_Priorty_Scheme::schedule(vector<Event*>& events) {
 	vector<Event*> reads, copybacks, writes, erases;
 	seperate_by_type(events, reads, copybacks, writes, erases);
 	scheduler->handle(reads);
+	sort(reads.begin(), reads.end(), current_wait_time_comparator);
 	scheduler->handle(copybacks);
 	scheduler->handle(erases);
 	sort(writes.begin(), writes.end(), current_wait_time_comparator);

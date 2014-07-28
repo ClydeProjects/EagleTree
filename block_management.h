@@ -133,11 +133,6 @@ protected:
 	void increment_pointer(Address& pointer);
 	bool can_schedule_write_immediately(Address const& prospective_dest, double current_time);
 	bool can_write(Event const& write) const;
-
-
-
-
-
 	Address get_free_block_pointer_with_shortest_IO_queue();
 
 	inline bool has_free_pages(Address const& address) const { return address.valid == PAGE && address.page < BLOCK_SIZE; }
@@ -151,6 +146,7 @@ protected:
 	int get_num_free_blocks() const;
 	int get_num_free_blocks(int package, int die) const;
 	int get_num_pointers_with_free_space() const;
+	int get_num_available_pages_for_new_writes() const { return num_available_pages_for_new_writes; }
 private:
 	Address find_free_unused_block(uint package_id, uint die_id, uint age_class, double time);
 	void issue_erase(Address a, double time);
@@ -312,8 +308,8 @@ struct pointers {
 	pointers();
 	pointers(Block_manager_parent* bm);
 	void register_completion(Event const& e);
-	Address get_best_block(Block_manager_parent* bm);
-	void print();
+	Address get_best_block(Block_manager_parent* bm) const;
+	void print() const;
 	int get_num_free_blocks() const;
 	void retire(double current_time);
 	Block_manager_parent* bm;
@@ -331,15 +327,16 @@ public:
 	group();
 	void print() const;
 	void print_die_spesific_info() const;
+	void print_tags_per_group() const;
 	void print_blocks_valid_pages_per_die() const;
+	void print_blocks_valid_pages() const;
 	double get_prob_op(double PBA, double LBA);
 	double get_greedy_op(double PBA, double LBA);
 	double get_average_op(double PBA, double LBA);
 	double get_write_amp(write_amp_choice choice) const;
-	Block* get_gc_victim() const;
-	Block* get_gc_victim(int package, int die) const;
 	void register_write_outcome(Event const& event);
 	void register_erase_outcome(Event const& event);
+	Block* get_gc_victim(int package, int die) const;
 	bool is_starved() const;
 	void accept_block(Address block_addr);
 	bool needs_more_blocks() const;
@@ -351,6 +348,7 @@ public:
 	static void print(vector<group>& groups);
 	static void init_stats(vector<group>& groups);
 	static void count_num_groups_that_need_more_blocks(vector<group> const& groups);
+	double get_avg_pages_per_block_per_die() const;
 	double get_avg_pages_per_die() const;
 	double get_avg_blocks_per_die() const;
 	double get_min_pages_per_die() const;
@@ -370,6 +368,7 @@ public:
 	int num_pages;
 	group_stats stats;
 	static vector<int> mapping_pages_to_groups;
+	static vector<int> mapping_pages_to_tags;
 	static int num_groups_that_need_more_blocks, num_groups_that_need_less_blocks;
 
 	StatisticsGatherer stats_gatherer;
@@ -437,12 +436,11 @@ public:
 	void receive_message(Event const& message);
 	void change_update_frequencies(Groups_Message const& message);
 	void check_if_should_trigger_more_GC(Event const&);
-	bool try_to_allocate_block_to_group(int group_id, int package, int die, double time);
+	void try_to_allocate_block_to_group(int group_id, int package, int die, double time);
 	bool may_garbage_collect_this_block(Block* block, double current_time);
 	void register_logical_address(Event const& event, int group_id);
     friend class boost::serialization::access;
     void print();
-    bool is_in_equilibrium() const;
     void add_group(double starting_prob_val = 0);
     template<class Archive> void serialize(Archive & ar, const unsigned int version)
     {
@@ -453,7 +451,8 @@ public:
     static int detector_type;
     static int reclamation_threshold;
     static int starvation_threshold;
-    static bool balancing_policy_on;
+    static bool balancing_policy_on;	// the balancing policy is now obsolete, so this should be set to false.
+    static bool reserve_blocks_on;
 protected:
 	Address choose_best_address(Event& write);
 	Address choose_any_address(Event const& write);
@@ -461,12 +460,14 @@ private:
 	void give_block_to_group(int package, int die, int group_id, double current_time);
 	void request_gc(int group_id, int package, int die, double time);
 	vector<group> groups;
-	struct stats {
-		stats() : num_group_misses(0), num_balancing_gc_operations_requested(0) {}
+	struct statistics {
+		statistics() : num_group_misses(0),
+				num_starved_gc_operations_requested(0), num_normal_gc_operations_requested(0) {}
 		int num_group_misses;
-		int num_balancing_gc_operations_requested;
+		int num_starved_gc_operations_requested;
+		int num_normal_gc_operations_requested;
 	};
-	stats stats;
+	statistics stats;
 	temperature_detector* detector;
 };
 
@@ -499,7 +500,7 @@ protected:
 		inline group get_group() { return groups[index]; }
 		int index;
 		int lower_group_id, upper_group_id;
-		int age_in_intervals;
+		int age_in_intervals, age_in_group_periods;
 		vector<group>& groups;
 	    template<class Archive> void serialize(Archive & ar, const unsigned int version)
 	    {
@@ -511,7 +512,7 @@ protected:
 	private:
 	    vector<group> groups_none;
 	};
-
+	bool create_higher_group(int index) const;
 	void merge_groups(group_data* gd1, group_data* gd2, double current_time);
 	vector<group_data*> data;	// sorted by group update probability
 	Block_Manager_Groups* bm;
