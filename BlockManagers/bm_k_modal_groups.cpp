@@ -229,7 +229,7 @@ void Block_Manager_Groups::register_write_outcome(Event const& event, enum statu
 			groups[i].size = groups[i].num_pages;
 			groups[i].prob = groups[i].actual_prob;
 		}
-		//groups = group::iterate(groups);
+		groups = group::iterate(groups);
 		print();
 		printf("num writes:  %d   %d\n", StatisticsGatherer::get_global_instance()->total_writes(), count);
 
@@ -282,7 +282,7 @@ void Block_Manager_Groups::register_write_outcome(Event const& event, enum statu
 		time_sig = time_now;
 
 		group::init_stats(groups);
-		//stats.num_group_misses = 0;
+		stats.num_group_misses = 0;
 		//stats = statistics();
 		//StatisticsGatherer::get_global_instance()->print();
 		//StatisticsGatherer::init();
@@ -551,6 +551,10 @@ void Block_Manager_Groups::request_gc(int group_id, int package, int die, double
 
 // handle garbage_collection case. Based on range.
 Address Block_Manager_Groups::choose_best_address(Event& write) {
+	if (write.get_id() == 4668242) {
+		int i = 0;
+		i++;
+	}
 	if (write.is_garbage_collection_op() && write.get_tag() == UNDEFINED) {
 		int tag = group::mapping_pages_to_tags.at(write.get_logical_address());
 		write.set_tag(tag);
@@ -632,6 +636,10 @@ int bloom_detector::which_group_should_this_page_belong_to(Event const& event) {
 	ulong la = event.get_logical_address();
 	int group_id = group::mapping_pages_to_groups[la];
 
+	/*if (groups.size() == 2 && event.get_tag() != UNDEFINED) {
+		return event.get_tag();
+	}*/
+
 	// first time this logical addrwss is ever written. Write to the least updated group
 	if (group_id == UNDEFINED) {
 		return lowest_group->index;
@@ -682,7 +690,7 @@ int bloom_detector::which_group_should_this_page_belong_to(Event const& event) {
 		}
 	}
 	else if (/*StatisticsGatherer::get_global_instance()->total_writes() > 5000000 &&*/
-			data.size() < 2 &&
+			data.size() < 1 &&
 			num_occurances_in_filters == 2 && event.is_original_application_io() && create_higher_group(group_id)) {
 		group_data* next_hottest = data[highest_group->lower_group_id];
 		if (data.size() > 1) {
@@ -701,7 +709,8 @@ int bloom_detector::which_group_should_this_page_belong_to(Event const& event) {
 		gd->upper_group_id = UNDEFINED;
 		highest_group = gd;
 	}
-	if (num_occurances_in_filters == 0 && data[group_id]->lower_group_id != UNDEFINED && !event.is_original_application_io() && rand() % 2 == 0) {
+
+	if (num_occurances_in_filters == 0 && data[group_id]->lower_group_id != UNDEFINED && !event.is_original_application_io() && rand() % 12 == 0) {
 		//printf("Demoting page with tag %d from %d to %d\n", event.get_tag(), group_id, data[group_id]->lower_group_id );
 		return data[group_id]->lower_group_id;
 	}
@@ -834,8 +843,8 @@ void bloom_detector::merge_groups(group_data* gd1, group_data* gd2, double curre
 bloom_detector::group_data::group_data(group const& group_ref, vector<group>& groups) :
 		current_filter(), filter2(), filter3(),
 		bloom_filter_hits(group_ref.size),
-		interval_hit_count(0),
-				lower_group_id(0), upper_group_id(0), index(group_ref.index), groups_none(), groups(groups), age_in_intervals(0), age_in_group_periods(0)
+		interval_hit_count(0), lower_group_id(0), upper_group_id(0), index(group_ref.index),
+		groups_none(), groups(groups), age_in_intervals(0), age_in_group_periods(0), filters(num_filters, NULL)
 {
 	bloom_parameters params;
 	params.false_positive_probability = 0.01;
@@ -844,13 +853,15 @@ bloom_detector::group_data::group_data(group const& group_ref, vector<group>& gr
 	current_filter = bloom_filter(params);
 	filter2 = bloom_filter(params);
 	filter3 = bloom_filter(params);
+	filters[0] = new bloom_filter(params);
 }
 
 bloom_detector::group_data::group_data() :
 		current_filter(), filter2(), filter3(),
 		bloom_filter_hits(0),
 		interval_hit_count(0),
-				lower_group_id(0), upper_group_id(0), index(0), groups_none(), groups(groups_none), age_in_intervals(0)
+		lower_group_id(0), upper_group_id(0), index(0), groups_none(), groups(groups_none), age_in_intervals(0),
+		filters(num_filters, NULL), age_in_group_periods(0)
 {
 }
 
@@ -865,7 +876,8 @@ void adaptive_bloom_detector::update_probilities(double current_time) {
 	for (int i = 0; i < data.size(); i++) {
 		double length = get_interval_length();
 		double new_prob = data[i]->interval_hit_count / length;
-		groups[i].actual_prob = groups[i].actual_prob * (1.0 - interval_size_of_the_lba_space * 3) + new_prob * interval_size_of_the_lba_space * 3;
+		double weight = interval_size_of_the_lba_space * 5;
+		groups[i].actual_prob = groups[i].actual_prob * (1.0 - weight) + new_prob * weight;
 		data[i]->interval_hit_count = 0;
 		data[i]->age_in_intervals++;
 	}

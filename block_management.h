@@ -494,6 +494,8 @@ protected:
 		group_data(group const& group_ref, vector<group>& data);
 		group_data();
 		bloom_filter current_filter, filter2, filter3;
+		vector<bloom_filter*> filters;
+		int num_filters;
 		int bloom_filter_hits;
 		int interval_hit_count;
 		inline double get_hits_per_page() const { return groups[index].prob / groups[index].size; }
