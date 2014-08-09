@@ -341,7 +341,7 @@ void Sequential_Locality_BM::sequential_event_metadata_removed(long key, double 
 	seq_write_key_to_pointers_mapping.erase(key);
 }
 
-void Sequential_Locality_BM::register_erase_outcome(Event const& event, enum status status) {
+void Sequential_Locality_BM::register_erase_outcome(Event& event, enum status status) {
 	Block_manager_parallel::register_erase_outcome(event, status);
 	int i, j;
 	if (parallel_degree == ONE) {

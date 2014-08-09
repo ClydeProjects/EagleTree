@@ -33,7 +33,7 @@ void Shortest_Queue_Hot_Cold_BM::handle_cold_pointer_out_of_space(double start_t
 	}
 }
 
-void Shortest_Queue_Hot_Cold_BM::register_erase_outcome(Event const& event, enum status status) {
+void Shortest_Queue_Hot_Cold_BM::register_erase_outcome(Event& event, enum status status) {
 	Block_manager_parent::register_erase_outcome(event, status);
 	Address addr = event.get_address();
 

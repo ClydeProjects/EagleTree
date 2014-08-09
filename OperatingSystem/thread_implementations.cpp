@@ -231,8 +231,12 @@ void Collision_Free_Asynchronous_Random_Thread::handle_event_completion(Event* e
 }*/
 
 void K_Modal_Thread::create_io() {
+	double total_prob = 0;
+	for (int i = 0; i < k_modes.size(); i++) {
+		total_prob += k_modes[i].update_frequency;
+	}
 
-	int group_decider = random_number_generator() * 101;
+	double group_decider = random_number_generator() * total_prob;
 	double cumulative_prob = 0;
 	int selected_group_start_lba = 0;
 	int selected_group_size = 0;
@@ -240,7 +244,7 @@ void K_Modal_Thread::create_io() {
 	int group_index = UNDEFINED;
 	for (int i = 0; i < k_modes.size(); i++) {
 		cumulative_prob += k_modes[i].update_frequency;
-		if (group_decider <= ceil(cumulative_prob)) {
+		if (group_decider < cumulative_prob) {
 			selected_group_size = (k_modes[i].size / 100.0) * NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
 			group_hist[i]++;
 			group_index = i;
@@ -251,21 +255,7 @@ void K_Modal_Thread::create_io() {
 	assert(group_index != UNDEFINED);
 	//printf("%d  %d\n", group_hist[0], group_hist[1]);
 	long lba = selected_group_start_lba + random_number_generator() * selected_group_size;
-	/*printf("%d\n", lba);
-	if (lba == 314572) {
-		int i = 0;
-		i++;
-	}*/
-	if (lba == 755280) {
-		int i = 0;
-		i++;
-	}
 
-	/*long max_addr = NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
-	if (lba > max_addr) {
-		int i = 0;
-		i++;
-	}*/
 	Event* e = new Event(WRITE, lba, 1, get_time());
 	if (k_modes[group_index].tag == UNDEFINED) {
 		e->set_tag(selected_group_start_lba);
@@ -273,12 +263,6 @@ void K_Modal_Thread::create_io() {
 	else {
 		e->set_tag(k_modes[group_index].tag);
 	}
-	if (e->get_id() == 734005) {
-		int i = 0;
-		i++;
-		e->print();
-	}
-
 	//e->set_size(selected_group_size);
 	submit(e);
 }
@@ -305,8 +289,7 @@ void K_Modal_Thread_Messaging::handle_event_completion(Event* event) {
 		int prob_temp = k_modes[0].update_frequency;
 		k_modes[0].update_frequency = k_modes[1].update_frequency;
 		k_modes[1].update_frequency = prob_temp;
-		fac_num_ios_to_change_workload = 100;
-
+		//fac_num_ios_to_change_workload = 100;
 		if (fixed_groups) {
 			int tag_temp = k_modes[0].tag;
 			k_modes[0].tag = k_modes[1].tag;

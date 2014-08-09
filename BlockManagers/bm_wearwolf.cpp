@@ -66,7 +66,7 @@ void Wearwolf::handle_cold_pointer_out_of_space(enum read_hotness rh, double sta
 	}
 }
 
-void Wearwolf::register_erase_outcome(Event const& event, enum status status) {
+void Wearwolf::register_erase_outcome(Event& event, enum status status) {
 	Block_manager_parent::register_erase_outcome(event, status);
 	reset_any_filled_pointers(event);
 	check_if_should_trigger_more_GC(event);

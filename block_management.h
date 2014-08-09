@@ -70,7 +70,7 @@ public:
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_command_outcome(Event const& event, enum status status);
 	virtual void register_read_transfer_outcome(Event const& event, enum status status);
-	virtual void register_erase_outcome(Event const& event, enum status status);
+	virtual void register_erase_outcome(Event& event, enum status status);
 	virtual void register_register_cleared();
 	virtual Address choose_write_address(Event& write);
 	Address choose_flexible_read_address(Flexible_Read_Event* fr);
@@ -241,7 +241,7 @@ public:
 	Block_manager_parallel();
 	~Block_manager_parallel() {}
 	void register_write_outcome(Event const& event, enum status status);
-	void register_erase_outcome(Event const& event, enum status status);
+	void register_erase_outcome(Event& event, enum status status);
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
@@ -260,7 +260,7 @@ public:
 	~bm_gc_locality() {}
 	void register_write_outcome(Event const& event, enum status status);
 	void check_if_should_trigger_more_GC(Event const& event);
-	void register_erase_outcome(Event const& event, enum status status);
+	void register_erase_outcome(Event& event, enum status status);
 	bool may_garbage_collect_this_block(Block* block, double current_time);
     friend class boost::serialization::access;
     template<class Archive>
@@ -285,7 +285,7 @@ public:
 	~Block_Manager_Tag_Groups() {}
 	void register_write_arrival(Event const& e);
 	void register_write_outcome(Event const& event, enum status status);
-	void register_erase_outcome(Event const& event, enum status status);
+	void register_erase_outcome(Event& event, enum status status);
 	//void increment_pointer_and_find_free(Address& block, double time);
     friend class boost::serialization::access;
     void print();
@@ -335,11 +335,15 @@ public:
 	double get_average_op(double PBA, double LBA);
 	double get_write_amp(write_amp_choice choice) const;
 	void register_write_outcome(Event const& event);
-	void register_erase_outcome(Event const& event);
-	Block* get_gc_victim(int package, int die) const;
+	void register_erase_outcome(Event& event);
+	Block* get_gc_victim_LRU(int package, int die) const;
+	Block* get_gc_victim_window_greedy(int package, int die) const;
+
+	Block* get_gc_victim_greedy(int package, int die) const;
 	bool is_starved() const;
 	void accept_block(Address block_addr);
 	bool needs_more_blocks() const;
+	int needs_how_many_blocks() const;
 	bool in_equilbirium() const;
 	void retire_active_blocks(double current_time);
 	static bool in_total_equilibrium(vector<group> const& groups, int group_id);
@@ -430,7 +434,7 @@ public:
 	void init_detector();
 	void register_write_arrival(Event const& e);
 	void register_write_outcome(Event const& event, enum status status);
-	void register_erase_outcome(Event const& event, enum status status);
+	void register_erase_outcome(Event& event, enum status status);
 	void trigger_gc_in_same_lun_but_different_group(int package, int die, int group_id, double time);
 	void handle_block_out_of_space(Event const& event, int group_id);
 	void receive_message(Event const& message);
@@ -451,8 +455,8 @@ public:
     static int detector_type;
     static int reclamation_threshold;
     static int starvation_threshold;
-    static bool balancing_policy_on;	// the balancing policy is now obsolete, so this should be set to false.
-    static bool reserve_blocks_on;
+    static bool prioritize_groups_that_need_blocks;
+    static int garbage_collection_policy_within_groups; // 0 for LRU, 1 for greedy
 protected:
 	Address choose_best_address(Event& write);
 	Address choose_any_address(Event const& write);
@@ -486,16 +490,18 @@ public:
     	ar & data; ar & bm; ar & current_interval_counter;
     	ar & interval_size_of_the_lba_space; ar & highest_group; ar & lowest_group;
     }
+    static int num_filters;
 protected:
 	int get_interval_length() { return NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * interval_size_of_the_lba_space; }
 	virtual void update_probilities(double current_time) = 0;
 	void group_interval_finished(int group_id);
 	struct group_data {
+	public:
 		group_data(group const& group_ref, vector<group>& data);
 		group_data();
-		bloom_filter current_filter, filter2, filter3;
 		vector<bloom_filter*> filters;
-		int num_filters;
+		int in_filters(Event const& );
+
 		int bloom_filter_hits;
 		int interval_hit_count;
 		inline double get_hits_per_page() const { return groups[index].prob / groups[index].size; }
@@ -546,7 +552,7 @@ public:
 	Block_manager_roundrobin(bool channel_alternation = true);
 	~Block_manager_roundrobin();
 	void register_write_outcome(Event const& event, enum status status);
-	void register_erase_outcome(Event const& event, enum status status);
+	void register_erase_outcome(Event& event, enum status status);
 protected:
 	Address choose_best_address(Event& write);
 	Address choose_any_address(Event const& write);
@@ -563,7 +569,7 @@ public:
 	~Shortest_Queue_Hot_Cold_BM();
 	void register_write_outcome(Event const& event, enum status status);
 	void register_read_command_outcome(Event const& event, enum status status);
-	void register_erase_outcome(Event const& event, enum status status);
+	void register_erase_outcome(Event& event, enum status status);
 protected:
 	Address choose_best_address(Event& write);
 	virtual Address choose_any_address(Event const& write);
@@ -581,7 +587,7 @@ public:
 	~Wearwolf();
 	virtual void register_write_outcome(Event const& event, enum status status);
 	virtual void register_read_command_outcome(Event const& event, enum status status);
-	virtual void register_erase_outcome(Event const& event, enum status status);
+	virtual void register_erase_outcome(Event& event, enum status status);
 protected:
 	virtual void check_if_should_trigger_more_GC(Event const&);
 	virtual Address choose_best_address(Event& write);
@@ -635,7 +641,7 @@ public:
 	~Sequential_Locality_BM();
 	void register_write_arrival(Event const& write);
 	void register_write_outcome(Event const& event, enum status status);
-	void register_erase_outcome(Event const& event, enum status status);
+	void register_erase_outcome(Event& event, enum status status);
 	void sequential_event_metadata_removed(long key, double current_time);
     friend class boost::serialization::access;
     template<class Archive>

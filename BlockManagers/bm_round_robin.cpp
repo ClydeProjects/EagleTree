@@ -31,7 +31,7 @@ void Block_manager_roundrobin::register_write_outcome(Event const& event, enum s
 	move_address_cursor();
 }
 
-void Block_manager_roundrobin::register_erase_outcome(Event const& event, enum status status) {
+void Block_manager_roundrobin::register_erase_outcome(Event& event, enum status status) {
 	assert(event.get_event_type() == ERASE);
 	if (status == FAILURE) {
 		return;

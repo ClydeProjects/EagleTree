@@ -5,16 +5,17 @@ using namespace ssd;
 // This method returns a vector of threads, which the operating system will start running.
 class Example_Workload : public Workload_Definition {
 public:
-	Example_Workload() : initialize_with_sequential_write(false) {}
+	Example_Workload() : initialize_with_sequential_write(false), fac_num_ios_to_change_workload(1) {}
 	vector<Thread*> generate();
 	bool initialize_with_sequential_write;
+	double fac_num_ios_to_change_workload;
 };
 
 vector<Thread*> Example_Workload::generate() {
 	vector<Thread*> starting_threads;
 	vector<group_def> k_modes;
-	k_modes.push_back(group_def(10, 50, 0));
-	k_modes.push_back(group_def(90, 50, 1));
+	k_modes.push_back(group_def(0, 50, 0));
+	k_modes.push_back(group_def(100, 50, 1));
 	/*int num_groups = 10;
 	for (int i = 0; i < num_groups; i++) {
 		k_modes.push_back(group_def(100.0 / num_groups, 100.0 / num_groups, i));
@@ -34,8 +35,8 @@ vector<Thread*> Example_Workload::generate() {
 	K_Modal_Thread_Messaging* t2 = new K_Modal_Thread_Messaging(k_modes);
 
 
-	t2->fixed_groups = true;
-	t2->fac_num_ios_to_change_workload = 100;
+	t2->fixed_groups = false;
+	t2->fac_num_ios_to_change_workload = 2;
 	//t->set_io_size(1);
 
 	if (initialize_with_sequential_write) {
@@ -51,7 +52,6 @@ vector<Thread*> Example_Workload::generate() {
 }
 
 int main() {
-
 	printf("Running EagleTree\n");
 	set_small_SSD_config();
 	SSD_SIZE = 4;
@@ -62,9 +62,12 @@ int main() {
 	PRINT_LEVEL = 0;
 	OVER_PROVISIONING_FACTOR = 0.7;
 	GARBAGE_COLLECTION_POLICY = 0;
-	Block_Manager_Groups::detector_type = 1;
+	Block_Manager_Groups::detector_type = 0;
 	Block_Manager_Groups::starvation_threshold = SSD_SIZE * PACKAGE_SIZE;
 	Block_Manager_Groups::reclamation_threshold = SSD_SIZE * PACKAGE_SIZE * 2;
+	Block_Manager_Groups::prioritize_groups_that_need_blocks = true;
+	Block_Manager_Groups::garbage_collection_policy_within_groups = 3;
+	bloom_detector::num_filters = 2;
 
 	string name  = "/changing_workload/";
 	Experiment::create_base_folder(name.c_str());
@@ -79,16 +82,17 @@ int main() {
 	//groups.push_back(pair<int, int>(80, 0.2 * NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR));
 	//groups.push_back(pair<int, int>(20, 0.8 * NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR));
 
-	int min = SSD_SIZE * PACKAGE_SIZE;
-	int max = SSD_SIZE * PACKAGE_SIZE + 3;
-	int incr = 1;
-	//e->set_variable(&Block_Manager_Groups::reclamation_threshold, min, max, incr, "reclamation threshold");
+	double min = 0.5;
+	double max = 2;
+	double incr = 2;
+	//e->set_variable(&workload->fac_num_ios_to_change_workload, min, max, incr, "Periodicity");
+	//e->set_exponential_increase(true);
 
 	workload->initialize_with_sequential_write = true;
 
 	//e->set_variable(&Block_Manager_Groups::starvation_threshold, min, max, incr, "Writes Deadline (µs)");
 	e->set_workload(workload);
-	e->set_io_limit(NUMBER_OF_ADDRESSABLE_PAGES() * 8);
+	e->set_io_limit(NUMBER_OF_ADDRESSABLE_PAGES() * 10);
 	e->run("test");
 	e->draw_graphs();
 	delete workload;

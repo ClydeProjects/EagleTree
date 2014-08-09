@@ -75,7 +75,7 @@ void Block_Manager_Tag_Groups::register_write_outcome(Event const& event, enum s
 	}
 }
 
-void Block_Manager_Tag_Groups::register_erase_outcome(Event const& event, enum status status) {
+void Block_Manager_Tag_Groups::register_erase_outcome(Event& event, enum status status) {
 	Block_manager_parent::register_erase_outcome(event, status);
 	int p = event.get_address().package;
 	int d = event.get_address().die;

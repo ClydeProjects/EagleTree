@@ -116,7 +116,7 @@ Address Block_manager_parent::choose_write_address(Event& write) {
 	return Address();
 }
 
-void Block_manager_parent::register_erase_outcome(Event const& event, enum status status) {
+void Block_manager_parent::register_erase_outcome(Event& event, enum status status) {
 	IO_has_completed_since_last_shortest_queue_search = true;
 
 	Address a = event.get_address();

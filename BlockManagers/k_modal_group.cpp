@@ -337,7 +337,7 @@ void group::register_write_outcome(Event const& event) {
 
 
 
-void group::register_erase_outcome(Event const& event) {
+void group::register_erase_outcome(Event& event) {
 	Address a = event.get_address();
 	Block* block = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
 	assert(block_ids.count(block) == 1);
@@ -356,7 +356,36 @@ void group::register_erase_outcome(Event const& event) {
 	//blocks_queue_per_die[a.package][a.die].erase()
 }
 
-Block* group::get_gc_victim(int package, int die) const {
+Block* group::get_gc_victim_LRU(int package, int die) const {
+	Block* b = blocks_queue_per_die[package][die].front();
+	Address a = Address(b->get_physical_address(), BLOCK);
+	for (int i = 0; i < blocks_queue_per_die[package][die].size(); i++) {
+		if (b->get_state() == ACTIVE && a.package == package && a.die == die) {
+			return b;
+		}
+	}
+	return NULL;
+}
+
+Block* group::get_gc_victim_window_greedy(int package, int die) const {
+	double window_factor = PLANE_SIZE;
+	int win1 = 0.1 * PLANE_SIZE, win2 = blocks_queue_per_die[package][die].size();
+	int window_size = min(win1, win2);
+	int selected_index = 0;
+	int min_num_live_blocks = BLOCK_SIZE;
+	for (int i = 0; i < window_size; i++) {
+		Block* b = blocks_queue_per_die[package][die][i];
+		if (b->get_state() == ACTIVE && min_num_live_blocks >= b->get_pages_valid()) {
+			Address a = Address(b->get_physical_address(), BLOCK);
+			assert(a.package == package && a.die == die);
+			selected_index = i;
+			min_num_live_blocks = b->get_pages_valid();
+		}
+	}
+	return blocks_queue_per_die[package][die][selected_index];
+}
+
+Block* group::get_gc_victim_greedy(int package, int die) const {
 	int min = BLOCK_SIZE;
 	Block* victim = NULL;
 	for (auto b : block_ids) {
@@ -386,6 +415,10 @@ bool group::is_starved() const {
 
 bool group::needs_more_blocks() const {
 	return block_ids.size() * BLOCK_SIZE <= OP + size;
+}
+
+int group::needs_how_many_blocks() const {
+	return (OP + size - block_ids.size() * BLOCK_SIZE) / BLOCK_SIZE;
 }
 
 void group::accept_block(Address block_addr) {

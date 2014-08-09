@@ -526,7 +526,7 @@ enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd->issue(event);
 	assert(result == SUCCESS);
 
-	if (PRINT_LEVEL > 0  /* && event->is_garbage_collection_op() && (event->get_event_type() == WRITE || event->get_event_type() == ERASE)*/ ) {
+	if (PRINT_LEVEL > 0 && event->get_event_type() == WRITE  /* && event->is_garbage_collection_op() && (event->get_event_type() == WRITE || event->get_event_type() == ERASE)*/ ) {
 		event->print();
 		if (event->is_flexible_read()) {
 			//printf("FLEX\n");
@@ -558,7 +558,9 @@ enum status IOScheduler::execute_next(Event* event) {
 		StatisticsGatherer::get_global_instance()->print_gc_info();
 		exit(1);
 	}*/
-
+	if (event->get_event_type() == ERASE) {
+		//event->print();
+	}
 
 	if (event->get_address().package == 3 && event->get_address().die == 0 && event->get_address().block == 881 && event->get_event_type() == READ_TRANSFER) {
 		//event->print();
