@@ -120,6 +120,7 @@ public:
     	ar & gc;
     	ar & migrator;
     }
+    virtual void print() const {}
     Address find_free_unused_block(double time);
 	Address find_free_unused_block(uint package_id, uint die_id, enum age age, double time);
 	Address find_free_unused_block(uint package_id, uint die_id, double time);
@@ -338,7 +339,7 @@ public:
 	void register_erase_outcome(Event& event);
 	Block* get_gc_victim_LRU(int package, int die) const;
 	Block* get_gc_victim_window_greedy(int package, int die) const;
-
+	inline double get_normalized_hits_per_page() const { return (prob / num_pages) * OVER_PROVISIONING_FACTOR * NUMBER_OF_ADDRESSABLE_PAGES(); }
 	Block* get_gc_victim_greedy(int package, int die) const;
 	bool is_starved() const;
 	void accept_block(Address block_addr);
@@ -348,14 +349,20 @@ public:
 	void retire_active_blocks(double current_time);
 	static bool in_total_equilibrium(vector<group> const& groups, int group_id);
 	static double get_average_write_amp(vector<group>& groups, write_amp_choice choice = opt);
+	static vector<group> allocate_op(vector<group> const& groups);
+	static vector<group> closed_form_method(vector<group> const& groups);
+	static vector<group> closed_form_method(vector<group> const& groups, int LBA, int PBA);
 	static vector<group> iterate(vector<group> const& groups);
-	static void print(vector<group>& groups);
+	static vector<group> iterate_except_first(vector<group> const& groups);
+	static void print(vector<group> const& groups);
+	static void print_tags_distribution(vector<group> const& groups);
 	static void init_stats(vector<group>& groups);
 	static void count_num_groups_that_need_more_blocks(vector<group> const& groups);
 	double get_avg_pages_per_block_per_die() const;
 	double get_avg_pages_per_die() const;
 	double get_avg_blocks_per_die() const;
 	double get_min_pages_per_die() const;
+
 	double prob, size, offset, OP, OP_greedy, OP_prob, OP_average, actual_prob;
 	pointers free_blocks, next_free_blocks;
 	set<Block*> block_ids, blocks_being_garbage_collected;
@@ -363,12 +370,14 @@ public:
 	vector<vector<vector<Block*> > > blocks_queue_per_die;
 	struct group_stats {
 		group_stats() : num_gc_in_group(0), num_writes_to_group(0), num_gc_writes_to_group(0),
+				num_requested_gc(0), num_requested_gc_to_balance(0), num_requested_gc_starved(0),
 				migrated_in(0), migrated_out(0) {}
 		int num_gc_in_group, num_writes_to_group, num_gc_writes_to_group;
+		int num_requested_gc, num_requested_gc_to_balance, num_requested_gc_starved;
 		int migrated_in, migrated_out;
 		void print() const;
 	};
-
+	long num_app_writes;
 	int num_pages;
 	group_stats stats;
 	static vector<int> mapping_pages_to_groups;
@@ -379,6 +388,7 @@ public:
 	int index;
 	int id;
 	static int id_generator;
+	static int overprov_allocation_strategy;
 	Ssd* ssd;
 	static int num_writes_since_last_regrouping;
 	static bool is_stable();
@@ -388,8 +398,8 @@ public:
     	ar & prob; ar & size; ar & offset; ar & OP; ar & OP_greedy; ar & OP_prob; ar & OP_average; ar & actual_prob;
     	ar & free_blocks; ar & next_free_blocks; ar & block_ids; ar & blocks_being_garbage_collected;
     	ar & num_pages_per_die; ar & num_blocks_per_die; ar & num_blocks_ever_given; ar & blocks_queue_per_die;
-    	ar & num_pages; ar & mapping_pages_to_groups; ar & index;
-    	ar & num_writes_since_last_regrouping;
+    	ar & num_pages; ar & mapping_pages_to_groups; ar & mapping_pages_to_tags; ar & index; ar & id;
+    	ar & num_writes_since_last_regrouping; ar & ssd;
     }
 };
 
@@ -435,7 +445,7 @@ public:
 	void register_write_arrival(Event const& e);
 	void register_write_outcome(Event const& event, enum status status);
 	void register_erase_outcome(Event& event, enum status status);
-	void trigger_gc_in_same_lun_but_different_group(int package, int die, int group_id, double time);
+	bool trigger_gc_in_same_lun_but_different_group(int package, int die, int group_id, double time);
 	void handle_block_out_of_space(Event const& event, int group_id);
 	void receive_message(Event const& message);
 	void change_update_frequencies(Groups_Message const& message);
@@ -443,18 +453,17 @@ public:
 	void try_to_allocate_block_to_group(int group_id, int package, int die, double time);
 	bool may_garbage_collect_this_block(Block* block, double current_time);
 	void register_logical_address(Event const& event, int group_id);
-    friend class boost::serialization::access;
-    void print();
+    void print() const;
     void add_group(double starting_prob_val = 0);
+    friend class boost::serialization::access;
     template<class Archive> void serialize(Archive & ar, const unsigned int version)
     {
     	ar & boost::serialization::base_object<Block_manager_parent>(*this);
-    	//ar & groups;
-    	//ar & detector;
+    	ar & groups;
+    	ar & detector;
     }
     static int detector_type;
     static int reclamation_threshold;
-    static int starvation_threshold;
     static bool prioritize_groups_that_need_blocks;
     static int garbage_collection_policy_within_groups; // 0 for LRU, 1 for greedy
 protected:
@@ -481,7 +490,7 @@ public:
 	bloom_detector(vector<group>& groups, Block_Manager_Groups* bm);
 	bloom_detector();
 	virtual ~bloom_detector() {};
-	int which_group_should_this_page_belong_to(Event const& event);
+	virtual int which_group_should_this_page_belong_to(Event const& event);
 	virtual void change_in_groups(vector<group>& groups, double current_time);
 	virtual void register_write_completed(Event const& event, int prior_group, int new_group_id);
     template<class Archive> void serialize(Archive & ar, const unsigned int version)
@@ -491,6 +500,9 @@ public:
     	ar & interval_size_of_the_lba_space; ar & highest_group; ar & lowest_group;
     }
     static int num_filters;
+    static int max_num_groups;
+    static int min_num_groups;
+    static double bloom_false_positive_probability;
 protected:
 	int get_interval_length() { return NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * interval_size_of_the_lba_space; }
 	virtual void update_probilities(double current_time) = 0;
@@ -504,7 +516,8 @@ protected:
 
 		int bloom_filter_hits;
 		int interval_hit_count;
-		inline double get_hits_per_page() const { return groups[index].prob / groups[index].size; }
+		inline double get_hits_per_page() const { return groups[index].prob / groups[index].num_pages; }
+
 		inline group get_group() { return groups[index]; }
 		int index;
 		int lower_group_id, upper_group_id;
@@ -521,12 +534,14 @@ protected:
 	    vector<group> groups_none;
 	};
 	bool create_higher_group(int index) const;
+	void try_to_merge_groups(double current_time);
 	void merge_groups(group_data* gd1, group_data* gd2, double current_time);
 	vector<group_data*> data;	// sorted by group update probability
 	Block_Manager_Groups* bm;
 	int current_interval_counter;
 	double interval_size_of_the_lba_space;
 	group_data* highest_group, *lowest_group;
+	vector<int> tag_map;
 private:
 	void change_id_for_pages(int old_id, int new_id);
 };
@@ -535,6 +550,7 @@ class adaptive_bloom_detector : public bloom_detector {
 public:
 	adaptive_bloom_detector(vector<group>& groups, Block_Manager_Groups* bm) : bloom_detector(groups, bm) { update_probilities(0); }
 	void update_probilities(double current_time);
+	virtual void adjust_groups(double current_time);
 };
 
 class non_adaptive_bloom_detector : public bloom_detector {
@@ -544,6 +560,13 @@ public:
 	void update_probilities(double current_time);
 private:
 	vector<int> hit_rate;
+};
+
+class tag_based_with_prob_recomp : public adaptive_bloom_detector {
+public:
+	tag_based_with_prob_recomp(vector<group>& groups, Block_Manager_Groups* bm) : adaptive_bloom_detector(groups, bm) { update_probilities(0); }
+	virtual int which_group_should_this_page_belong_to(Event const& event);
+	void adjust_groups(double current_time) {}
 };
 
 // A simple BM that assigns writes sequentially to dies in a round-robin fashion. No hot-cold separation or anything else intelligent

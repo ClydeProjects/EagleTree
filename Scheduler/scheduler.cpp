@@ -90,6 +90,7 @@ void IOScheduler::schedule_events_queue(deque<Event*> events) {
 	//printf("dependency_code_to_type size: %d\n", dependency_code_to_type.size());
 
 	Event* first = dependencies[operation_code].front();
+	assert(dependencies.size() > 0);
 	dependencies[operation_code].pop_front();
 
 	if (events.back()->is_original_application_io() && first->is_mapping_op() && first->get_event_type() == READ) {
@@ -526,11 +527,19 @@ enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd->issue(event);
 	assert(result == SUCCESS);
 
-	if (PRINT_LEVEL > 0 && event->get_event_type() == WRITE  /* && event->is_garbage_collection_op() && (event->get_event_type() == WRITE || event->get_event_type() == ERASE)*/ ) {
+	if (PRINT_LEVEL > 0  && (event->get_event_type() == WRITE || event->get_event_type() == ERASE)   /* && event->is_garbage_collection_op() && (event->get_event_type() == WRITE || event->get_event_type() == ERASE)*/ ) {
 		event->print();
 		if (event->is_flexible_read()) {
 			//printf("FLEX\n");
 		}
+	}
+
+	if (event->get_event_type() == WRITE && event->is_garbage_collection_op()) {
+		//event->print();
+	}
+
+	if (event->get_event_type() == ERASE) {
+		//event->print();
 	}
 
 	/*if (StatisticsGatherer::get_global_instance()->total_writes() > 1000000) {
@@ -672,10 +681,6 @@ void IOScheduler::init_event(Event* event) {
 	uint dep_code = event->get_application_io_id();
 	event_type type = event->get_event_type();
 
-	if (dep_code == 3714556) {
-		event->print();
-	}
-
 	if (event->get_noop() && event->get_event_type() != GARBAGE_COLLECTION) {
 		push(event);
 		return;
@@ -762,6 +767,12 @@ void IOScheduler::trigger_next_migration(Event* event) {
 		else if (!first->get_noop()) {
 			bm->register_trim_making_gc_redundant(first);
 		}
+		/*else {
+			bm->register_trim_making_gc_redundant(first);
+			printf("------------> \t\t\n");
+			first->print();
+		}*/
+
 		first->set_noop(true);
 		first->set_address(event->get_address());
 	}
@@ -780,6 +791,8 @@ void IOScheduler::try_to_put_in_safe_cache(Event* write) {
 
 
 void IOScheduler::remove_redundant_events(Event* new_event) {
+
+
 	uint la = new_event->get_logical_address();
 	if (LBA_currently_executing.count(la) == 0) {
 		LBA_currently_executing[new_event->get_logical_address()] = new_event->get_application_io_id();
@@ -803,6 +816,8 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	event_type new_op_code = dependency_code_to_type[dependency_code_of_new_event];
 	event_type scheduled_op_code = dependency_code_to_type[dependency_code_of_other_event];
 
+	assert(new_op_code != TRIM);
+	assert(scheduled_op_code != TRIM);
 	//if (existing_event == NULL) {
 		//new_event->print();
 	//}
@@ -822,19 +837,14 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 	else */
 
-	if (new_event->get_application_io_id() == 3714556 || (existing_event != NULL && existing_event->get_application_io_id() == 3714556)) {
-		int i = 0;
-		i++;
-		new_event->print();
-		existing_event->print();
-
-	}
-
 	if (IS_FTL_PAGE_MAPPING && new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
 		promote_to_gc(existing_event);
 		remove_current_operation(new_event);
 		push(new_event); // Make sure the old GC READ is run, even though it is now a NOOP command
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
+		if (existing_event->is_garbage_collection_op() && !existing_event->is_original_application_io()) {
+			bm->register_trim_making_gc_redundant(new_event);
+		}
 	}
 	else if (!IS_FTL_PAGE_MAPPING && new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
 		make_dependent(new_event, dependency_code_of_other_event);
@@ -861,37 +871,37 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 	}
 
 	// if two writes are scheduled, the one before is irrelevant and may as well be cancelled
-	else if (new_op_code == WRITE && scheduled_op_code == WRITE) {
+	else if (new_op_code == WRITE && scheduled_op_code == WRITE) {	// 1
 		remove_current_operation(existing_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 		//make_dependent(new_event, dependency_code_of_other_event);
 	}
-	else if (new_op_code == WRITE && scheduled_op_code == READ && existing_event->is_mapping_op()) {
+	else if (new_op_code == WRITE && scheduled_op_code == READ && existing_event->is_mapping_op()) { // 2
 		remove_current_operation(existing_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 		//make_dependent(new_event, dependency_code_of_new_event, dependency_code_of_other_event);
 	}
-	else if (new_op_code == COPY_BACK && scheduled_op_code == READ && existing_event != NULL) {
+	else if (new_op_code == COPY_BACK && scheduled_op_code == READ && existing_event != NULL) { // 3
 		remove_current_operation(existing_event);
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 	}
 	// if there is a write, but before a read was scheduled, we should read first before making the write
-	else if (new_op_code == WRITE && (scheduled_op_code == READ || scheduled_op_code == READ_COMMAND || scheduled_op_code == READ_TRANSFER)) {
+	else if (new_op_code == WRITE && (scheduled_op_code == READ || scheduled_op_code == READ_COMMAND || scheduled_op_code == READ_TRANSFER)) { // 4
 		//assert(false);
 		make_dependent(new_event, dependency_code_of_other_event);
 	}
 	// if there is a read, and a write is scheduled, then the contents of the write must be buffered, so the read can wait
-	else if (new_op_code == READ && existing_event != NULL && existing_event->is_garbage_collection_op()) {
+	else if (new_op_code == READ && existing_event != NULL && existing_event->is_garbage_collection_op()) {  // 5
 		new_event->set_noop(true);
 		make_dependent(new_event, dependency_code_of_other_event);
 	}
-	else if (new_op_code == READ && (scheduled_op_code == WRITE || scheduled_op_code == COPY_BACK )) {
+	else if (new_op_code == READ && (scheduled_op_code == WRITE || scheduled_op_code == COPY_BACK )) { // 6
 		//remove_current_operation(new_event);
 		//current_events->push_back(new_event);
 		make_dependent(new_event, dependency_code_of_other_event);
 	}
 	// if there are two reads to the same address, there is no point reading the same page twice.
-	else if ((new_op_code == READ || new_op_code == READ_COMMAND || new_op_code == READ_TRANSFER) && (scheduled_op_code == READ || scheduled_op_code == READ_COMMAND || scheduled_op_code == READ_TRANSFER)) {
+	else if ((new_op_code == READ || new_op_code == READ_COMMAND || new_op_code == READ_TRANSFER) && (scheduled_op_code == READ || scheduled_op_code == READ_COMMAND || scheduled_op_code == READ_TRANSFER)) { // 7
 		//assert(false);
 		make_dependent(new_event, dependency_code_of_other_event);
 		if (!new_event->is_garbage_collection_op()) {
@@ -900,7 +910,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		}
 	}
 	// if a write is scheduled when a trim is received, we may as well cancel the write
-	else if (new_op_code == TRIM && scheduled_op_code == WRITE) {
+	else if (new_op_code == TRIM && scheduled_op_code == WRITE) {  // 8
 		remove_current_operation(existing_event);
 		if (existing_event->is_garbage_collection_op()) {
 			bm->register_trim_making_gc_redundant(new_event);
@@ -908,16 +918,16 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		LBA_currently_executing[common_logical_address] = dependency_code_of_new_event;
 	}
 	// if a trim is scheduled, and a write arrives, may as well let the trim execute first
-	else if (new_op_code == WRITE && scheduled_op_code == TRIM) {
+	else if (new_op_code == WRITE && scheduled_op_code == TRIM) {  // 9
 		make_dependent(new_event, dependency_code_of_other_event);
 	}
 	// if a read is scheduled when a trim is received, we must still execute the read. Then we can trim
-	else if (new_op_code == TRIM && (scheduled_op_code == READ || scheduled_op_code == READ_TRANSFER || scheduled_op_code == READ_COMMAND)) {
+	else if (new_op_code == TRIM && (scheduled_op_code == READ || scheduled_op_code == READ_TRANSFER || scheduled_op_code == READ_COMMAND)) {  // 10
 		make_dependent(new_event, dependency_code_of_other_event);
 		//make_dependent(new_event, dependency_code_of_new_event, dependency_code_of_other_event);
 	}
 	// if something is to be trimmed, and a read is sent, invalidate the read
-	else if ((new_op_code == READ || new_op_code == READ_TRANSFER || new_op_code == READ_COMMAND) && scheduled_op_code == TRIM) {
+	else if ((new_op_code == READ || new_op_code == READ_TRANSFER || new_op_code == READ_COMMAND) && scheduled_op_code == TRIM) { // 1
 		if (new_event->is_garbage_collection_op()) {
 			bm->register_trim_making_gc_redundant(new_event);
 			remove_current_operation(new_event);

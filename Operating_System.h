@@ -27,9 +27,9 @@ public:
 	Event* pop();
 
 	bool is_finished() const;
-	int get_num_ongoing_IOs() { return num_IOs_executing; }
+	int get_num_ongoing_IOs() const { return num_IOs_executing; }
 	void stop();
-	bool is_stopped();
+	bool is_stopped() const;
 
 	inline void set_time(double current_time) { time = current_time; }
 	inline double get_time() { return time; }
@@ -187,6 +187,32 @@ private:
 	long counter;
 };
 
+class File_Reading_Thread : public Thread {
+public:
+	File_Reading_Thread();
+	~File_Reading_Thread();
+	void issue_first_IOs();
+	void read_and_submit();
+	int get_next();
+	void get_back_to_start_after_init();
+	void handle_event_completion(Event* event);
+	void print_trace_stats();
+	void calc_update_distances();
+	void sequentiality_analyze();
+	void process_trace();
+private:
+	string file_name;
+	ifstream file;
+	set<long> unique_addresses, initial_addresses;
+	vector<int> logical_address_space_size_over_time;  // index is size. value is io num
+	long io_num;
+	bool collect_stats;
+	vector<int> address_map;
+	vector<int> update_frequency_count;
+	vector<int> trace;
+	int highest_address;
+};
+
 /*
  * Class Heirarchy for creating synthetic IO patterns with many configurable properties.
  */
@@ -219,6 +245,8 @@ private:
 	IO_Mode_Generator* io_type_gen;
 	int io_size; // in pages
 };
+
+
 
 // This thread performs synchronous random writes across the target address space
 class Synchronous_Random_Writer : public Simple_Thread
@@ -720,6 +748,7 @@ private:
 };
 
 }
+
 
 
 #endif /* OPERATING_SYSTEM_H_ */

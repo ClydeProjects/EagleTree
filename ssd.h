@@ -463,7 +463,7 @@ public:
 	inline int get_ssd_id() { return ssd_id; }
 	inline void set_ssd_id(int new_ssd_id) { ssd_id = new_ssd_id; }
 protected:
-	double start_time;
+	long double start_time;
 	double execution_time;
 	double bus_wait_time;
 	double os_wait_time;
@@ -1247,6 +1247,7 @@ public:
 };
 class Double : public Number {
 public:
+	Double(double num) : value(num) {};
 	double value;
 	string toString() { return to_string(value); };
 	double toDouble() { return value; }

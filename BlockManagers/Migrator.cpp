@@ -138,6 +138,8 @@ void Migrator::issue_erase(Address ra, double time) {
 	ra.valid = BLOCK;
 	ra.page = 0;
 
+
+
 	Event* erase = new Event(ERASE, 0, 1, time);
 	erase->set_address(ra);
 	erase->set_garbage_collection_op(true);
@@ -238,6 +240,12 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	if (scheduled_erase_successfully) {
 		return migrations;
 	}*/
+
+	if (gc_event->get_id() > 1185561) {
+		int i = 0;
+		i++;
+	}
+
 
 	int die_id = a.valid >= DIE ? a.die : UNDEFINED;
 	int package_id = a.valid >= PACKAGE ? a.package : UNDEFINED;
@@ -353,6 +361,7 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 		cout << endl;
 	}*/
 
+	//printf("block: %d\n", victim->get_pages_valid());
 	//printf("gc eff: %f\n", StatisticData::get_average("Garbage Collection Efficiency") );
 	//printf("num_available_pages_for_new_writes:  %d\n", num_available_pages_for_new_writes);
 	//deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
@@ -450,7 +459,7 @@ bool Migrator::more_migrations(Event * gc_read) {
 	if (dependent_gc.count(block_id) == 1 && dependent_gc.at(block_id).size() > 0) {
 		return true;
 	}
-	else if (dependent_gc.count(block_id) == 1) {
+	else if (dependent_gc.count(block_id) == 1 && dependent_gc.at(block_id).size() == 0) {
 		dependent_gc.erase(block_id);
 	}
 	return false;

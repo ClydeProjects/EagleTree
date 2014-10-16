@@ -89,6 +89,12 @@ Address Block_manager_parent::choose_flexible_read_address(Flexible_Read_Event* 
 Address Block_manager_parent::choose_write_address(Event& write) {
 	//printf("num_available_pages_for_new_writes   %d\n", num_available_pages_for_new_writes);
 	bool can_write = num_available_pages_for_new_writes > 0 || write.is_garbage_collection_op();
+
+	if (write.get_id() == 1185934 && write.get_bus_wait_time() > 71000000) {
+		this->print();
+		//StateVisualiser::print_page_status();
+	}
+
 	if (!can_write) {
 		return Address();
 	}

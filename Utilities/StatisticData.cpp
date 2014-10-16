@@ -82,6 +82,9 @@ double StatisticData::get_weighted_avg_of_col2_in_terms_of_col1(string name, int
 }
 
 double StatisticData::get_standard_deviation(string name, int column) {
+	if (statistics.count(name) == 0) {
+		return 0;
+	}
 	StatisticData& stat = statistics.at(name);
 	double avg = get_average(name, column);
 	double squared_sum = 0;

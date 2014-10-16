@@ -14,7 +14,7 @@ OBJ = bm_gc_locality.o StatisticData.o bm_k_modal_groups.o k_modal_group.o bm_ta
 PERMS = 660
 EPERMS = 770
 
-all: gc_locality changing_workload 
+all: changing_workload random
 
 demo: $(HDR) $(OBJ)
 	$(CXX) $(CXXFLAGS) -o Experiments/demo Experiments/demo.cpp $(OBJ) -lboost_serialization

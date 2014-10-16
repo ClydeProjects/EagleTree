@@ -11,7 +11,7 @@ int main()
 	Workload_Definition* init = new Init_Workload();
 	string calib_name = "calib.txt";
 	SCHEDULING_SCHEME = 1;
-	Experiment::calibrate_and_save(init, calib_name);
+	Experiment::calibrate_and_save(init, calib_name, NUMBER_OF_ADDRESSABLE_PAGES());
 	delete init;
 	Experiment* e = new Experiment();
 	e->set_calibration_file(calib_name);

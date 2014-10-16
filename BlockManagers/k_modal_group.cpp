@@ -20,6 +20,8 @@ int group::num_groups_that_need_more_blocks = 0;
 int group::num_groups_that_need_less_blocks = 0;
 int group::num_writes_since_last_regrouping = 0;
 int group::id_generator = 0;
+int group::overprov_allocation_strategy = 1;  // 0 is iterative, 1 is closed form
+
 
 group::group(double prob, double size, Block_manager_parent* bm, Ssd* ssd, int index) : prob(prob), size(size), offset(0), OP(0), OP_greedy(0),
 			OP_prob(0), OP_average(0), free_blocks(bm), next_free_blocks(bm), block_ids(), blocks_being_garbage_collected(), stats(), num_pages(0), actual_prob(prob),
@@ -28,7 +30,7 @@ group::group(double prob, double size, Block_manager_parent* bm, Ssd* ssd, int i
 			num_blocks_per_die(SSD_SIZE, vector<int>(PACKAGE_SIZE, 0)),
 			blocks_queue_per_die(SSD_SIZE, vector<vector<Block*> >(PACKAGE_SIZE, vector<Block*>())),
 			stats_gatherer(StatisticsGatherer()),
-			index(index), ssd(ssd), id(id_generator++) {
+			index(index), ssd(ssd), id(id_generator++), num_app_writes(0) {
 	double PBA = NUMBER_OF_ADDRESSABLE_PAGES();
 	double LBA = NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
 	get_prob_op(PBA, LBA);
@@ -64,13 +66,14 @@ void group::print() const {
 	printf("size: %d\t", (int)size);
 	printf("actual num pages: %d\t", (int)num_pages);
 	printf("prob: %f\t", prob);
-	printf("OP_greedy: %d\t", (int)OP_greedy);
-	printf("OP_prob: %d\t", (int)OP_prob);
-	printf("OP_avg: %d\t", (int)OP_average);
-	printf("OP: %d\t", (int)OP);
+	printf("hit_rate: %f\t", get_normalized_hits_per_page());
 	printf("amp: %f\t", get_write_amp(opt));
 	printf("blocks: %d\t", (int)block_ids.size());
 	printf("pages: %d\t", (int)block_ids.size() * BLOCK_SIZE);
+	printf("OP: %d\t", (int)OP);
+	printf("OP_greedy: %d\t", (int)OP_greedy);
+	printf("OP_prob: %d\t", (int)OP_prob);
+	printf("OP_avg: %d\t", (int)OP_average);
 	printf("\n");
 	stats.print();
 	printf("\tnum ongoing gc in group: %d\n", this->blocks_being_garbage_collected.size());
@@ -90,7 +93,7 @@ void group::print() const {
 	double avg = StatisticData::get_weighted_avg_of_col2_in_terms_of_col1(title, 0, 1);
 	printf("\tavg num live blocks over time: %f\n", avg);
 	print_tags_per_group();
-	//free_blocks.print();
+	free_blocks.print();
 	//stats_gatherer.print();
 	//print_die_spesific_info();
 	//print_blocks_valid_pages_per_die();
@@ -104,9 +107,9 @@ void group::print_tags_per_group() const {
 			tag_map[tag]++;
 		}
 	}
-	printf("\ttags");
+	printf("\ttags ");
 	for (auto t : tag_map) {
-		printf("\t%d: %d", t.first, t.second);
+		printf("\t%d\t%d", t.first, t.second);
 	}
 	printf("\n");
 }
@@ -157,7 +160,9 @@ double group::get_greedy_op(double PBA, double LBA) {
 
 double group::get_average_op(double PBA, double LBA) {
 	double weight = 0.5;
-	return OP_average = OP = (get_greedy_op(PBA, LBA) * weight + get_prob_op(PBA, LBA) * (1 - weight));
+	double greedy = get_greedy_op(PBA, LBA);
+	double prob = get_prob_op(PBA, LBA);
+	return OP_average = OP = greedy * weight + prob * (1 - weight);
 }
 
 double group::get_write_amp(write_amp_choice choice) const {
@@ -184,15 +189,43 @@ double group::get_average_write_amp(vector<group>& groups, write_amp_choice choi
 	return weighted_avg;
 }
 
+vector<group> group::allocate_op(vector<group> const& groups) {
+	if (overprov_allocation_strategy == 0) {
+		return iterate(groups);
+	}
+	else if (overprov_allocation_strategy == 1) {
+		return closed_form_method(groups);
+	}
+	else {
+		return iterate_except_first(groups);
+	}
+}
+
+vector<group> group::closed_form_method(vector<group> const& groups) {
+	double PBA = NUMBER_OF_ADDRESSABLE_PAGES(), LBA = 0;
+	for (auto g : groups) {
+		LBA += g.num_pages;
+	}
+	return closed_form_method(groups, LBA, PBA);
+}
+
+vector<group> group::closed_form_method(vector<group> const& groups, int LBA, int PBA) {
+	vector<group> groups_opt = groups;
+	for (unsigned int i = 0; i < groups.size(); i++) {
+		groups_opt[i].get_average_op(PBA, LBA);
+	}
+	return groups_opt;
+}
+
 vector<group> group::iterate(vector<group> const& groups) {
 
 	double PBA = NUMBER_OF_ADDRESSABLE_PAGES();
-	double LBA = NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR;
-	/*
-	 * 	for (auto g : groups) {
-		LBA += g.size;
+	double LBA = 0;
+
+	for (auto g : groups) {
+		LBA += g.num_pages;
 	}
-	 */
+
 	vector<double> incrementals(groups.size());
 	vector<group> groups_opt = groups;
 
@@ -237,16 +270,123 @@ vector<group> group::iterate(vector<group> const& groups) {
 			incrementals[i] /= 2;
 		}
 	}
+
+	/*for (int i = 1; i < groups_opt.size(); i++) {
+		int transfer = groups_opt[i].OP * 0.02;
+		printf("transfer from %d: %d\n", i, transfer);
+		groups_opt[0].OP += transfer;
+		groups_opt[i].OP -= transfer;
+	}*/
+
 	return groups_opt;
 }
 
-void group::print(vector<group>& groups) {
+vector<group> group::iterate_except_first(vector<group> const& groups) {
+
+	if (groups.size() == 1) {
+		return closed_form_method(groups);
+	}
+
+	vector<group> sorted = groups;
+	sort(sorted.begin(), sorted.end(), [](group const& a, group const& b) { return a.get_normalized_hits_per_page() < b.get_normalized_hits_per_page(); });
+
+	double hit_rate1 = sorted[0].get_normalized_hits_per_page();
+	double hit_rate2 = sorted[1].get_normalized_hits_per_page();
+
+	//printf("%f  %f\n", hit_rate1, hit_rate2);
+
+	if (hit_rate1 / hit_rate2 > 0.05 || sorted[0].num_app_writes < BLOCK_SIZE * 100) {
+		return closed_form_method(groups);
+	}
+
+	for (int i = 0; i < sorted.size(); i++) {
+		printf("%d: %d\t%d\n", sorted[i].index, (int)sorted[i].OP, (int)groups[sorted[i].index].OP);
+	}
+	printf("\n");
+
+	printf("%f\n", groups[0].prob);
+	vector<group> copy;
+
+	double total_prob = 1 - sorted[0].prob;
+	for (int i = 1; i < sorted.size(); i++) {
+		copy.push_back(sorted[i]);
+		copy[i-1].prob /= total_prob;
+	}
+	assert(groups.size() == copy.size() + 1);
+
+	double PBA = NUMBER_OF_ADDRESSABLE_PAGES();
+	double LBA = 0;
+
+	for (auto g : groups) {
+		LBA += g.num_pages;
+	}
+
+	//printf("LBA: %f   PBA %f\n", LBA, PBA);
+	int OP = PBA - LBA;
+	sorted[0].OP = max(sorted[0].OP * 0.95, sorted[0].size * 0.05);
+	int closed_form_LBA = LBA - sorted[0].size;
+	int closed_form_PBA = PBA - sorted[0].size - sorted[0].OP;
+	printf("total OP: %d   OP given to lowest: %d\n", OP, (int)sorted[0].OP);
+	printf("feeding into closed form:  LBA: %d   PBA: %d  OP: %d\n", closed_form_LBA, closed_form_PBA, closed_form_PBA - closed_form_LBA);
+	copy = closed_form_method(copy, closed_form_LBA, closed_form_PBA);
+
+	vector<group> copy2(groups.size());
+	copy2[sorted[0].index] = sorted[0];
+	for (int i = 0; i < copy.size(); i++) {
+		copy2[copy[i].index] = copy[i];
+		copy2[copy[i].index].prob *= total_prob;
+	}
+
+	int total = 0;
+	for (int i = 0; i < copy2.size(); i++) {
+		printf("%d: %d\n", copy2[i].index, (int)copy2[i].OP);
+		total += copy2[i].OP;
+	}
+	printf("total: %d\n", total);
+
+	return copy2;
+}
+
+void group::print(vector<group> const& groups) {
 	vector<group> copy = groups;
 	sort(copy.begin(), copy.end(), [](group const& a, group const& b) { return a.prob / a.size < b.prob / b.size; });
 	for (unsigned int i = 0; i < copy.size(); i++) {
 		copy[i].print();
 	}
 }
+
+void group::print_tags_distribution(vector<group> const& groups) {
+	map<int, int> tag_to_total;
+	vector<map<int, int> > per_group(groups.size(), map<int, int>());
+	for (int i = 0; i < mapping_pages_to_groups.size(); i++) {
+		int tag = mapping_pages_to_tags[i];
+		tag_to_total[tag]++;
+		int group_id = mapping_pages_to_groups[i];
+		if (group_id != UNDEFINED) {
+			assert(group_id == groups[group_id].index);
+			per_group[group_id][tag]++;
+		}
+
+		/*if (mapping_pages_to_groups[i] == index) {
+			int tag = mapping_pages_to_tags[i];
+			tag_map[tag]++;
+		}*/
+	}
+
+	for (auto g : tag_to_total) {
+		printf("\t%d:\t%d\n", g.first, g.second);
+	}
+	for (int i = 0; i < per_group.size(); i++) {
+		printf("%d\n", i);
+		for (auto tags : per_group[i]) {
+			double fraction = tags.second / (double) tag_to_total[tags.first];
+			printf("\t%d:\t%d\t%d\n", tags.first, tags.second, (int)(fraction * 100));
+		}
+	}
+
+}
+
+
 
 void group::init_stats(vector<group>& groups) {
 	for (unsigned int i = 0; i < groups.size(); i++) {
@@ -314,6 +454,11 @@ void group::group_stats::print() const {
 	printf("\tnum_gc_in_group:\t%d", num_gc_in_group);
 	printf("\tnum_writes_to_group:\t%d", num_writes_to_group);
 	printf("\tnum_gc_writes_to_group:\t%d\n", num_gc_writes_to_group);
+
+	printf("\tnum_requested_gc:\t%d", num_requested_gc);
+	printf("\tnum_requested_gc_starved:\t%d", num_requested_gc_starved);
+	printf("\tnum_requested_gc_to_balance:\t%d\n", num_requested_gc_to_balance);
+
 	double write_amp = (num_writes_to_group + num_gc_writes_to_group) / (double)num_writes_to_group;
 	printf("\tactual write amp:\t%f", write_amp);
 	printf("\tfactor:\t%f\n", (double) num_gc_writes_to_group  / (double)num_gc_in_group );
@@ -322,10 +467,9 @@ void group::group_stats::print() const {
 }
 
 void group::register_write_outcome(Event const& event) {
-	assert(event.get_tag() != 2);
 	mapping_pages_to_tags[event.get_logical_address()] = event.get_tag();
 	stats_gatherer.register_completed_event(event);
-
+	num_app_writes++;
 	if (event.get_address().page == 0) {
 		Address a = event.get_address();
 		num_blocks_ever_given[a.package][a.die]++;
@@ -409,7 +553,7 @@ Block* group::get_gc_victim_greedy(int package, int die) const {
 }*/
 
 bool group::is_starved() const {
-	return free_blocks.get_num_free_blocks() < SSD_SIZE * PACKAGE_SIZE * 0.75;
+	return free_blocks.get_num_free_blocks() < SSD_SIZE * PACKAGE_SIZE * 0.5;
 }
 
 

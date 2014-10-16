@@ -97,6 +97,8 @@ void Experiment::run_single_point(string name) {
 	write_config_file(data_folder);
 	Queue_Length_Statistics::init();
 
+	printf("calibration_file : %s\n", calibration_file.c_str());
+
 	OperatingSystem* os = calibration_file.empty() ? new OperatingSystem() : load_state(calibration_file);
 	//os->set_progress_meter_granularity(10);
 	if (workload != NULL) {
