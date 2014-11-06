@@ -87,10 +87,10 @@ int main() {
 	BLOCK_SIZE = 128;
 	PRINT_LEVEL = 0;
 	//PLANE_SIZE = 1024;
-	PLANE_SIZE = 1120;
+	PLANE_SIZE = 1028;
 	OVER_PROVISIONING_FACTOR = 0.7;
 	GARBAGE_COLLECTION_POLICY = 1;
-	Block_Manager_Groups::detector_type = 2;
+	Block_Manager_Groups::detector_type = 0;
 	//Block_Manager_Groups::reclamation_threshold = SSD_SIZE * PACKAGE_SIZE * 2;
 	Block_Manager_Groups::prioritize_groups_that_need_blocks = true;
 	Block_Manager_Groups::garbage_collection_policy_within_groups = 1;
@@ -107,7 +107,7 @@ int main() {
 	string calib_name = "calib.txt";
 
 	Workload_Definition* workload = NULL;
-	bool synthetic = false;
+	bool synthetic = true;
 	if (synthetic) {
 		Example_Workload* eg_workload = new Example_Workload();
 		eg_workload->initialize_with_sequential_write = true;
@@ -133,7 +133,7 @@ int main() {
 	//e->set_exponential_increase(true);
 	//e->set_variable(&Block_Manager_Groups::starvation_threshold, min, max, incr, "Writes Deadline (µs)");
 	e->set_workload(workload);
-	e->set_io_limit(NUMBER_OF_ADDRESSABLE_PAGES() * 100);
+	e->set_io_limit(NUMBER_OF_ADDRESSABLE_PAGES() * 6);
 	e->run("test");
 	e->draw_graphs();
 	delete workload;

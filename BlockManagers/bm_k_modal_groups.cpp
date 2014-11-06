@@ -871,9 +871,9 @@ Address Block_Manager_Groups::choose_any_address(Event const& write) {
 	}*/
 	static int counter = 0;
 	if (++counter % 1000000 == 0) {
-		int free1 = groups[0].free_blocks.get_num_free_blocks();
-		int free2 = groups[1].free_blocks.get_num_free_blocks();
-		printf("stuck in choose any addr. num writes  %d    free0: %d   free1: %d\n", StatisticsGatherer::get_global_instance()->total_writes(), free1, free2);
+		//int free1 = groups[0].free_blocks.get_num_free_blocks();
+		//int free2 = groups[1].free_blocks.get_num_free_blocks();
+		//printf("stuck in choose any addr. num writes  %d    free0: %d   free1: %d\n", StatisticsGatherer::get_global_instance()->total_writes(), free1, free2);
 		//print();
 	}
 	vector<int> order_group = Random_Order_Iterator::get_iterator(groups.size());
