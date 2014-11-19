@@ -33,7 +33,7 @@ void Shortest_Queue_Hot_Cold_BM::handle_cold_pointer_out_of_space(double start_t
 	}
 }
 
-void Shortest_Queue_Hot_Cold_BM::register_erase_outcome(Event const& event, enum status status) {
+void Shortest_Queue_Hot_Cold_BM::register_erase_outcome(Event& event, enum status status) {
 	Block_manager_parent::register_erase_outcome(event, status);
 	Address addr = event.get_address();
 
@@ -46,11 +46,11 @@ void Shortest_Queue_Hot_Cold_BM::register_erase_outcome(Event const& event, enum
 		cold_pointer = find_free_unused_block(OLD, event.get_current_time());
 	}
 
-	check_if_should_trigger_more_GC(event.get_current_time());
+	check_if_should_trigger_more_GC(event);
 }
 
 
-Address Shortest_Queue_Hot_Cold_BM::choose_best_address(Event const& write) {
+Address Shortest_Queue_Hot_Cold_BM::choose_best_address(Event& write) {
 	enum write_hotness w_hotness = page_hotness_measurer.get_write_hotness(write.get_logical_address());
 	//w_hotness = WRITE_HOT;
 	return w_hotness == WRITE_HOT ? get_free_block_pointer_with_shortest_IO_queue() : cold_pointer;
@@ -67,8 +67,8 @@ void Shortest_Queue_Hot_Cold_BM::register_read_command_outcome(Event const& even
 	}
 }
 
-void Shortest_Queue_Hot_Cold_BM::check_if_should_trigger_more_GC(double start_time) {
+void Shortest_Queue_Hot_Cold_BM::check_if_should_trigger_more_GC(Event const& event) {
 	if (!has_free_pages(cold_pointer)) {
-		handle_cold_pointer_out_of_space(start_time);
+		handle_cold_pointer_out_of_space(event.get_current_time());
 	}
 }

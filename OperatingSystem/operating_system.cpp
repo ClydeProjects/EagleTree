@@ -15,11 +15,11 @@ OperatingSystem::OperatingSystem()
 	  threads(),
 	  NUM_WRITES_TO_STOP_AFTER(UNDEFINED),
 	  num_writes_completed(0),
-	  counter_for_user(1),
 	  idle_time(0),
 	  time(0),
 	  scheduler(NULL),
-	  progress_meter_granularity(20)
+	  progress_meter_granularity(20),
+	  counter_for_user(0)
 {
 	ssd->set_operating_system(this);
 	thread_id_generator = 0;
@@ -68,6 +68,7 @@ void OperatingSystem::check_if_stuck(bool no_pending_event, bool queue_is_full) 
 	const int idle_limit = 3000000;
 	if (idle_time > 100000 && idle_time % 100000 == 0) {
 		printf("Idle for %f seconds. No_pending_event=%d  Queue_is_full=%d\n", (double) idle_time / 1000000, no_pending_event, queue_is_full);
+		//PRINT_LEVEL = 2;
 	}
 	if (idle_time >= idle_limit) {
 		printf("\n");
@@ -113,6 +114,7 @@ void OperatingSystem::run() {
 		int thread_id = scheduler->pick(threads);
 		bool no_pending_event = thread_id == UNDEFINED;
 		bool queue_is_full = currently_executing_ios.size() >= MAX_SSD_QUEUE_SIZE;
+		int queue_size = currently_executing_ios.size();
 		if (no_pending_event || queue_is_full) {
 			check_if_stuck(no_pending_event, queue_is_full);
 			ssd->progress_since_os_is_waiting();
@@ -152,6 +154,7 @@ void OperatingSystem::dispatch_event(int thread_id) {
 void OperatingSystem::setup_follow_up_threads(int thread_id, double current_time) {
 	vector<Thread*>& follow_up_threads = threads[thread_id]->get_follow_up_threads();
 	if (PRINT_LEVEL >= 1) printf("Switching to new follow up thread\n");
+	printf("Switching to new follow up thread\n");
 	for (auto t : follow_up_threads) {
 		t->init(this, current_time);
 		int new_id = ++thread_id_generator;

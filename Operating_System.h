@@ -27,9 +27,9 @@ public:
 	Event* pop();
 
 	bool is_finished() const;
-	int get_num_ongoing_IOs() { return num_IOs_executing; }
+	int get_num_ongoing_IOs() const { return num_IOs_executing; }
 	void stop();
-	bool is_stopped();
+	bool is_stopped() const;
 
 	inline void set_time(double current_time) { time = current_time; }
 	inline double get_time() { return time; }
@@ -187,6 +187,32 @@ private:
 	long counter;
 };
 
+class File_Reading_Thread : public Thread {
+public:
+	File_Reading_Thread();
+	~File_Reading_Thread();
+	void issue_first_IOs();
+	void read_and_submit();
+	int get_next();
+	void get_back_to_start_after_init();
+	void handle_event_completion(Event* event);
+	void print_trace_stats();
+	void calc_update_distances();
+	void sequentiality_analyze();
+	void process_trace();
+private:
+	string file_name;
+	ifstream file;
+	set<long> unique_addresses, initial_addresses;
+	vector<int> logical_address_space_size_over_time;  // index is size. value is io num
+	long io_num;
+	bool collect_stats;
+	vector<int> address_map;
+	vector<int> update_frequency_count;
+	vector<int> trace;
+	int highest_address;
+};
+
 /*
  * Class Heirarchy for creating synthetic IO patterns with many configurable properties.
  */
@@ -220,12 +246,19 @@ private:
 	int io_size; // in pages
 };
 
+
+
 // This thread performs synchronous random writes across the target address space
 class Synchronous_Random_Writer : public Simple_Thread
 {
 public:
+	Synchronous_Random_Writer() : Simple_Thread() {}
 	Synchronous_Random_Writer(long min_LBA, long max_LBA, ulong randseed)
 		: Simple_Thread(new Random_IO_Pattern(min_LBA, max_LBA, randseed), new WRITES(), 1, INFINITE) {}
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<Simple_Thread>(*this);
+    }
 };
 
 // This thread performs synchronous random reads across the target address space
@@ -274,6 +307,7 @@ public:
 class Asynchronous_Sequential_Writer : public Simple_Thread
 {
 public:
+	Asynchronous_Sequential_Writer() : Simple_Thread() {}
 	Asynchronous_Sequential_Writer(long min_LBA, long max_LBA)
 		: Simple_Thread(new Sequential_IO_Pattern(min_LBA, max_LBA), MAX_SSD_QUEUE_SIZE * 2, new WRITES()) {
 	}
@@ -318,6 +352,55 @@ public:
     template<class Archive> void serialize(Archive & ar, const unsigned int version) {
     	ar & boost::serialization::base_object<Simple_Thread>(*this);
     }
+};
+
+
+struct group_def {
+	group_def(double update_frequency, double size, int tag = UNDEFINED) : update_frequency(update_frequency), size(size), tag(tag) {}
+	group_def() : update_frequency(), size(), tag() {}
+	double update_frequency;
+	double size;
+	int tag;
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & update_frequency;
+    	ar & size;
+    	ar & tag;
+    }
+};
+
+class Groups_Message : public Message {
+public:
+	Groups_Message(double time) : Message(time), redistribution_of_update_frequencies(false) {}
+	bool redistribution_of_update_frequencies;
+	vector<group_def> groups; // one pair for each group. The first double is the update frequency, between 0 and 1, and the second is the group size as a fraction of the whole
+};
+
+// Divides the workload across the logical address space into K groups
+class K_Modal_Thread : public Thread
+{
+public:
+
+	K_Modal_Thread(vector<group_def> k_modes) : k_modes(k_modes), random_number_generator(2) {
+		random_number_generator.seed(10);
+		for (auto k : k_modes) {
+			printf("%d   %d\n", k.update_frequency, k.size);
+		}
+	}
+	K_Modal_Thread() : k_modes(), random_number_generator(35) {}
+	virtual void issue_first_IOs();
+	virtual void handle_event_completion(Event* event);
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<Thread>(*this);
+    	ar & k_modes;
+    	ar & random_number_generator;
+    }
+protected:
+	void create_io();
+
+	vector<group_def> k_modes;
+	MTRand_open random_number_generator;
 };
 
 // This thread simulates the IO pattern of an external sort algorithm
@@ -453,11 +536,11 @@ private:
 		int id;
 		uint num_pages_written;
 		deque<Address_Range > ranges_comprising_file;
-
+		set<pair<int, int>> on_how_many_luns_is_this_file;
 		File(uint size, double death_probability, double time_created, int id);
 
 		bool is_finished() const;
-		void register_write_completion();
+		void register_write_completion(Event* event);
 		void finish(double time_finished);
 	    friend class boost::serialization::access;
 	    template<class Archive> void
@@ -627,7 +710,45 @@ private:
 	int progress_meter_granularity;
 };
 
+class Initial_Message : public Thread
+{
+public:
+	Initial_Message(vector<group_def> k_modes) : k_modes(k_modes) {}
+	Initial_Message() : k_modes() {}
+	void issue_first_IOs() {
+		Groups_Message* gm = new Groups_Message(get_time());
+		gm->groups = k_modes;
+		submit(gm);
+	}
+	void handle_event_completion(Event* event) {}
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<Thread>(*this);
+    	ar & k_modes;
+    }
+    vector<group_def> k_modes;
+};
+
+class K_Modal_Thread_Messaging : public K_Modal_Thread
+{
+public:
+	K_Modal_Thread_Messaging(vector<group_def> k_modes) : K_Modal_Thread(k_modes), counter(0), fac_num_ios_to_change_workload(2), fixed_groups(false) {}
+	K_Modal_Thread_Messaging() : K_Modal_Thread(), counter(0), fac_num_ios_to_change_workload(2), fixed_groups(false) {}
+	void issue_first_IOs();
+	void handle_event_completion(Event* event);
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<K_Modal_Thread>(*this);
+    	ar & fac_num_ios_to_change_workload; ar & fixed_groups; ar & counter;
+    }
+    double fac_num_ios_to_change_workload;
+    double fixed_groups;
+private:
+	long counter;
+};
+
 }
+
 
 
 #endif /* OPERATING_SYSTEM_H_ */

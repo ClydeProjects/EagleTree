@@ -67,10 +67,11 @@ void File_Manager::handle_no_IOs_left() {
 }
 
 void File_Manager::handle_event_completion(Event* event) {
-	if (event->get_event_type() == TRIM) {
+ 	if (event->get_event_type() == TRIM) {
 		num_pending_trims--;
 	} else if (event->get_event_type() == WRITE) {
-		current_file->register_write_completion();
+		//event->print();
+		current_file->register_write_completion(event);
 	}
 }
 
@@ -317,13 +318,16 @@ void File_Manager::File::finish(double time) {
 	if (PRINT_FILE_MANAGER_INFO) {
 		printf("finished with file  %d\n", id);
 	}
+	printf("file has %d pages, and was written on %d luns\n", size, on_how_many_luns_is_this_file.size());
 }
 
 bool File_Manager::File::is_finished() const {
 	return size == num_pages_written;
 }
 
-void File_Manager::File::register_write_completion() {
+void File_Manager::File::register_write_completion(Event* event) {
 	//printf("num_pages_written:  %d\n", num_pages_written);
+	pair<int,int> p = pair<int,int>(event->get_address().package,event->get_address().die);
+	on_how_many_luns_is_this_file.insert(p);
 	num_pages_written++;
 }

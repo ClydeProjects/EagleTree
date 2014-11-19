@@ -113,7 +113,7 @@ void Experiment::graph(int sizeX, int sizeY, string title, string filename, int 
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete temporary script file again
 }
 
-void Experiment::latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, Experiment_Result experiment, int y_max) {
+/*void Experiment::latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, Experiment_Result experiment, int y_max) {
 	chdir(experiment.data_folder.c_str());
 
 	// Write temporary file containing GLE script
@@ -152,7 +152,7 @@ void Experiment::latency_plot(int sizeX, int sizeY, string title, string filenam
     system(gleCommand.c_str());
 
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete temporary script file again
-}
+}*/
 
 
 void Experiment::waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Experiment_Result experiment) {
@@ -226,13 +226,13 @@ void Experiment::draw_graph(int sizeX, int sizeY, string outputFile, string data
     if (REMOVE_GLE_SCRIPTS_AGAIN) remove(scriptFilename.c_str()); // Delete temporary script file again
 }
 
-void Experiment::waittime_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points, int black_column, int red_column) {
+void Experiment::waittime_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, int black_column, int red_column) {
 	vector<string> commands;
-	for (uint i = 0; i < points.size(); i++) {
+	for (uint i = 0; i < experiment.points.size(); i++) {
 		stringstream command;
-		command << "hist 0 " << i << " \"" << Experiment_Result::waittime_filename_prefix << points[i] << Experiment_Result::datafile_postfix << "\" \"Wait time histogram";
+		command << "hist 0 " << i << " \"" << Experiment_Result::waittime_filename_prefix << experiment.points[i] << Experiment_Result::datafile_postfix << "\" \"Wait time histogram";
 		if (!experiment.variable_parameter_name.empty()) {
-			command << "(" << experiment.variable_parameter_name << " = " << points[i] << ")";
+			command << "(" << experiment.variable_parameter_name << " = " << experiment.points[i] << ")";
 		}
 		command << "\" \"log min 1\" \"Event wait time (µs)\" " << max(experiment.max_waittimes[black_column], (red_column == -1 ? 0 : experiment.max_waittimes[red_column])) << " " << StatisticsGatherer::get_global_instance()->get_wait_time_histogram_bin_size() << " " << black_column << " " << red_column;
 		commands.push_back(command.str());
@@ -241,12 +241,12 @@ void Experiment::waittime_histogram(int sizeX, int sizeY, string outputFile, Exp
 	multigraph(sizeX, sizeY, outputFile, commands);
 }
 
-void Experiment::cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<Experiment_Result> experiments, double point, int black_column, int red_column) {
+void Experiment::cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<Experiment_Result> experiments, string point, int black_column, int red_column) {
 	vector<string> commands;
 	double cross_experiment_max_waittime = 0;
 	for (uint i = 0; i < experiments.size(); i++) {
 		if (experiments[i].vp_max_waittimes.find(point) == experiments[i].vp_max_waittimes.end()) {
-			printf("cross_experiment_waittime_histogram: experiment with variable parameter value %f not found. Skipping graph drawing.\n", point);
+			printf("cross_experiment_waittime_histogram: experiment with variable parameter value %s not found. Skipping graph drawing.\n", point.c_str());
 			return;
 		}
 		cross_experiment_max_waittime = max(cross_experiment_max_waittime, experiments[i].vp_max_waittimes[point][black_column]);
@@ -264,18 +264,18 @@ void Experiment::cross_experiment_waittime_histogram(int sizeX, int sizeY, strin
 }
 
 
-void Experiment::age_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points) {
+void Experiment::age_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment) {
 	vector<string> settings;
 	stringstream age_max;
 	age_max << "age_max = " << experiment.max_age;
 	settings.push_back(age_max.str());
 
 	vector<string> commands;
-	for (uint i = 0; i < points.size(); i++) {
+	for (uint i = 0; i < experiment.points.size(); i++) {
 		stringstream command;
-		command << "hist 0 " << i << " \"" << Experiment_Result::age_filename_prefix << points[i] << Experiment_Result::datafile_postfix << "\" \"Block age histogram ";
+		command << "hist 0 " << i << " \"" << Experiment_Result::age_filename_prefix << experiment.points[i] << Experiment_Result::datafile_postfix << "\" \"Block age histogram ";
 		if (!experiment.variable_parameter_name.empty()) {
-			command	<< "(" << experiment.variable_parameter_name << " = " << points[i] << ")";
+			command	<< "(" << experiment.variable_parameter_name << " = " << experiment.points[i] << ")";
 		}
 		command << "\" \"on min 0 max " << experiment.max_age_freq << "\" \"Block age\" age_max " << SsdStatisticsExtractor::get_age_histogram_bin_size();
 		commands.push_back(command.str());
@@ -284,44 +284,74 @@ void Experiment::age_histogram(int sizeX, int sizeY, string outputFile, Experime
 	multigraph(sizeX, sizeY, experiment.graph_filename_prefix + outputFile, commands, settings);
 }
 
-void Experiment::queue_length_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points) {
+void Experiment::queue_length_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment) {
 	vector<string> commands;
-	for (uint i = 0; i < points.size(); i++) {
+	for (uint i = 0; i < experiment.points.size(); i++) {
 		stringstream command;
-		command << "plot 0 " << i << " \"" << Experiment_Result::queue_filename_prefix << points[i] << Experiment_Result::datafile_postfix << "\" \"Queue length history ";
+		command << "plot 0 " << i << " \"" << Experiment_Result::queue_filename_prefix << experiment.points[i] << Experiment_Result::datafile_postfix << "\" \"Queue length history ";
 		if (!experiment.variable_parameter_name.empty()) {
-			command << "(" << experiment.variable_parameter_name << " = " << points[i] << ")";
+			command << "(" << experiment.variable_parameter_name << " = " << experiment.points[i] << ")";
 		}
 		command  << "\" \"on\" \"Timeline (µs progressed)\" \"Items in event queue\"";
+		cout << command.str() << endl;
 		commands.push_back(command.str());
 	}
 
 	multigraph(sizeX, sizeY, experiment.graph_filename_prefix + outputFile, commands);
 }
 
-void Experiment::throughput_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points) {
+void Experiment::plot(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, string csv_name, string title, string x_axis_lavel, string y_axis_label, int num_lines, int x_min, int x_max, int y_min, int y_max) {
 	vector<string> commands;
-	for (uint i = 0; i < points.size(); i++) {
+	for (uint i = 0; i < experiment.points.size(); i++) {
 		stringstream command;
-		command << "plot 0 " << i << " \"" << Experiment_Result::throughput_filename_prefix << points[i] << Experiment_Result::datafile_postfix << "\" \"Throughput history ";
+		command << "plot 0 " << i << " \"" << csv_name << experiment.points[i] << Experiment_Result::datafile_postfix << "\" \"" << title;
 		if (!experiment.variable_parameter_name.empty()) {
-			command << "(" << experiment.variable_parameter_name << " = " << points[i] << ")";
+			command << "(" << experiment.variable_parameter_name << " = " << experiment.points[i] << ")";
 		}
-		command << "\" \"on\" \"Timeline (µs progressed)\" \"Throughput (IOs/s)\" " << 2;
-
-		//printf("%s\n", command.str().c_str());
+		command << "\" \"on\" \" " << x_axis_lavel << " \" \"" << y_axis_label << "\" " << num_lines;
 		commands.push_back(command.str());
 	}
 
-	multigraph(sizeX, sizeY, experiment.graph_filename_prefix + outputFile, commands);
+	multigraph(sizeX, sizeY, experiment.graph_filename_prefix + outputFile, commands, vector<string>(), x_min, x_max, y_min, y_max);
 }
 
 // Draw multiple smaller graphs in one image
-void Experiment::multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings) {
+void Experiment::multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings, int x_min, int x_max, int y_min, int y_max) {
 	// Write temporary file containing GLE script
     string scriptFilename = outputFile + ".gle"; // Name of temporary script file
+
+    stringstream x_boundary;
+	if (x_max != UNDEFINED || x_min != UNDEFINED) {
+		x_boundary << "xaxis";
+	}
+	if (x_min != UNDEFINED) {
+		x_boundary << " min " << x_min;
+	}
+	if (x_max != UNDEFINED) {
+		x_boundary << " max " << x_max;
+	}
+	if (x_max != UNDEFINED || x_min != UNDEFINED) {
+		x_boundary << "\n";
+	}
+	stringstream y_boundary;
+	if (y_max != UNDEFINED || y_min != UNDEFINED) {
+		y_boundary << "yaxis ";
+	}
+	if (y_min != UNDEFINED) {
+		y_boundary << " min " << y_min;
+	}
+	if (y_max != UNDEFINED) {
+		y_boundary << " max " << y_max;
+	}
+	if (y_max != UNDEFINED || y_min != UNDEFINED) {
+		y_boundary << "\n";
+	}
+
+
     std::ofstream gleScript;
     gleScript.open(scriptFilename.c_str());
+
+
 
 	gleScript <<
 	"std_sx = " << sizeX << endl <<
@@ -384,6 +414,10 @@ void Experiment::multigraph(int sizeX, int sizeY, string outputFile, vector<stri
 	"      if num_plots >= 2 then" << endl <<
 	"         d2 line color red" << endl <<
 	"      end if" << endl <<
+	"      " << x_boundary.str() << endl <<
+	"      " << y_boundary.str() << endl <<
+	"      " << "axis grid" << endl <<
+	"      " << "ticks color grey10" << endl <<
 	"   end graph" << endl <<
 	"end sub" << endl;
 
@@ -454,7 +488,7 @@ void Experiment::draw_aggregate_graphs() {
 		int num = e.vp_max_waittimes.size();
 
 		for (auto& kv : e.vp_max_waittimes) {
-		    string name = "waittime_histogram " + to_string(kv.first);
+		    string name = "waittime_histogram " + kv.first;
 		    Experiment::cross_experiment_waittime_histogram(sx, sy/2, name, exp, kv.first, 1, 4);
 		}
 		/*if (i > 0)*/ { chdir(".."); }
@@ -465,17 +499,6 @@ void Experiment::draw_experiment_spesific_graphs() {
 		int sx = 32;
 		int sy = 16;
 
-		vector<int> x_vals;
-		for (double i = d_min; i < d_max && d_variable != NULL; i += d_incr) {
-			x_vals.push_back(i * 100);
-		}
-		for (int i = i_min; i < i_max && i_variable != NULL; i += i_incr) {
-			x_vals.push_back(i);
-		}
-		if (x_vals.size() == 0) {
-			x_vals.push_back(0);
-		}
-
 		uint mean_pos_in_datafile = std::find(results[0][0].column_names.begin(), results[0][0].column_names.end(), "Write latency, mean (us)") - results[0][0].column_names.begin();
 		assert(mean_pos_in_datafile != results[0][0].column_names.size());
 
@@ -485,11 +508,13 @@ void Experiment::draw_experiment_spesific_graphs() {
 				printf("%s\n", exp[i].data_folder.c_str());
 				if (chdir(exp[i].data_folder.c_str()) != 0) printf("Error changing dir to %s\n", exp[i].data_folder.c_str());
 				Experiment::waittime_boxplot  		(sx, sy,   "Write latency boxplot", "boxplot", mean_pos_in_datafile, exp[i]);
-				Experiment::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], x_vals, 1, 4);
+				Experiment::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], 1, 4);
 				//Experiment::waittime_histogram		(sx, sy/2, "waittime-histograms-allIOs", exp[i], x_vals, true);
-				Experiment::age_histogram			(sx, sy/2, "age-histograms", exp[i], x_vals);
-				Experiment::queue_length_history	(sx, sy/2, "queue_length", exp[i], x_vals);
-				Experiment::throughput_history		(sx, sy/2, "throughput_history", exp[i], x_vals);
+				Experiment::age_histogram			(sx, sy/2, "age-histograms", exp[i]);
+				//Experiment::queue_length_history	(sx, sy/2, "queue_length", exp[i]);
+				//Experiment::throughput_history		(sx, sy/2, "throughput_history", exp[i]);
+				Experiment::plot					(sx, sy/2, "throughput_history", exp[i], Experiment_Result::throughput_filename_prefix, "Throughput history", "Timeline (µs progressed)", "Throughput (IOs/s)", 2);
+				Experiment::plot					(sx, sy/2, "gc_efficiency", exp[i], "GC_eff_with_writes-", "", "page writes #", "Num pages to migrate", 1, 0, UNDEFINED, 0, BLOCK_SIZE);
 			}
 		}
 }

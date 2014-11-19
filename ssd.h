@@ -24,7 +24,7 @@
 #include <boost/serialization/utility.hpp>
 #include <boost/serialization/base_object.hpp>
 #include <sstream>
-
+#include <initializer_list>
 #include <boost/archive/xml_iarchive.hpp>
 #include <boost/archive/xml_oarchive.hpp>
 
@@ -173,6 +173,7 @@ extern void *global_buffer;
  * Controls the block manager to be used
  */
 extern int BLOCK_MANAGER_ID;
+extern int GARBAGE_COLLECTION_POLICY;
 extern int GREED_SCALE;
 extern int SEQUENTIAL_LOCALITY_THRESHOLD;
 extern bool ENABLE_TAGGING;
@@ -243,7 +244,7 @@ enum block_state{FREE, PARTIALLY_FREE, ACTIVE, INACTIVE};
  * 	                                page states set to empty)
  * 	merge - move valid pages from block at address (page state set to invalid)
  * 	           to free pages in block at merge_address */
-enum event_type{NOT_VALID, READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, MERGE, TRIM, GARBAGE_COLLECTION, COPY_BACK};
+enum event_type{NOT_VALID, READ, READ_COMMAND, READ_TRANSFER, WRITE, ERASE, MERGE, TRIM, GARBAGE_COLLECTION, COPY_BACK, MESSAGE};
 
 /* General return status
  * return status for simulator operations that only need to provide general
@@ -462,7 +463,7 @@ public:
 	inline int get_ssd_id() { return ssd_id; }
 	inline void set_ssd_id(int new_ssd_id) { ssd_id = new_ssd_id; }
 protected:
-	double start_time;
+	long double start_time;
 	double execution_time;
 	double bus_wait_time;
 	double os_wait_time;
@@ -500,6 +501,13 @@ protected:
 	double pure_ssd_wait_time;
 	int num_iterations_in_scheduler;
 };
+
+class Message : public Event {
+public:
+	Message(double time) : Event(MESSAGE, 0, 1, time) {}
+};
+
+
 
 /* The page is the lowest level data storage unit that is the size unit of
  * requests (events).  Pages maintain their state as events modify them. */
@@ -938,6 +946,80 @@ private:
 	int ENTRIES_PER_TRANSLATION_PAGE;
 };
 
+class LSM_FTL : public FtlParent {
+public:
+	LSM_FTL(Ssd *ssd, Block_manager_parent* bm);
+	LSM_FTL();
+	~LSM_FTL();
+	void read(Event *event);
+	void write(Event *event);
+	void trim(Event *event);
+	void register_write_completion(Event const& event, enum status result);
+	void register_read_completion(Event const& event, enum status result);
+	void register_trim_completion(Event & event);
+	long get_logical_address(uint physical_address) const;
+	Address get_physical_address(uint logical_address) const;
+	void set_replace_address(Event& event) const;
+	void set_read_address(Event& event) const;
+	void print() const;
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & boost::serialization::base_object<FtlParent>(*this);
+    	ar & cached_mapping_table;
+    	ar & global_translation_directory;
+    	ar & ongoing_mapping_operations;
+    	ar & NUM_PAGES_IN_SSD;
+    	ar & page_mapping;
+    	ar & CACHED_ENTRIES_THRESHOLD;
+    	ar & num_dirty_cached_entries;
+    	ar & dial;
+    	ar & ENTRIES_PER_TRANSLATION_PAGE;
+    }
+private:
+	struct entry {
+		entry() : dirty(false), fixed(false), hotness(0), timestamp(numeric_limits<double>::infinity()) {}
+		bool dirty;
+		int fixed;
+		short hotness;
+		double timestamp; // when was the entry added to the cache
+	    friend class boost::serialization::access;
+	    template<class Archive> void
+	    serialize(Archive & ar, const unsigned int version) {
+	    	ar & dirty;
+	    	ar & fixed;
+	    	ar & hotness;
+	    	ar & timestamp;
+	    }
+	};
+
+	struct level {
+		level() : num_entries(0), bf() {};
+		int num_entries;
+		bloom_filter bf;
+	};
+	map<int, level> levels;
+
+
+	void flush_mapping(double time);
+	void iterate(long& victim_key, entry& victim_entry, map<long, entry>::iterator start, map<long, entry>::iterator finish);
+	void create_mapping_read(long translation_page_id, double time, Event* dependant);
+	void lock_all_entries_in_a_translation_page(long translation_page_id, int lock, double time);
+	int evict_cold_entries();
+	map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
+	vector<Address> global_translation_directory; // tracks where translation pages are
+
+	set<long> ongoing_mapping_operations; // contains the logical addresses of ongoing mapping IOs
+	map<long, vector<Event*> > application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
+	int NUM_PAGES_IN_SSD;
+	FtlImpl_Page page_mapping;
+	int CACHED_ENTRIES_THRESHOLD;
+	int num_dirty_cached_entries;
+	int dial;
+	int ENTRIES_PER_TRANSLATION_PAGE;
+};
+
 class FAST : public FtlParent {
 public:
 	FAST(Ssd *ssd, Block_manager_parent* bm, Migrator* migrator);
@@ -1103,13 +1185,14 @@ public:
 	static string get_as_string(ulong cursor, ulong max, int chars_per_line);
 	static void print_vertically();
 	static void write_file();
+	static bool write_to_file;
 private:
 	static void trim_from_start(int num_characters_from_start);
 	static void write(int package, int die, char symbol, int length);
 	static void write_with_id(int package, int die, char symbol, int length, vector<vector<char> > symbols);
 	static vector<vector<vector<char> > > trace;
 	static string file_name;
-	static bool write_to_file;
+
 	static long amount_written_to_file;
 };
 
@@ -1148,6 +1231,48 @@ private:
 	static const double age_histogram_bin_size;
 };
 
+class Number {
+public:
+	virtual string toString() = 0;
+	virtual double toDouble() = 0;
+	virtual int toInt() = 0;
+};
+class Integer : public Number {
+public:
+	Integer(int num) : value(num) {};
+	int value;
+	string toString() { return to_string(value); };
+	double toDouble() { return value; }
+	int toInt() { return value; }
+};
+class Double : public Number {
+public:
+	Double(double num) : value(num) {};
+	double value;
+	string toString() { return to_string(value); };
+	double toDouble() { return value; }
+	int toInt() { return value; }
+};
+
+class StatisticData {
+public:
+	~StatisticData();
+	static void init();
+	static void register_statistic(string name, std::initializer_list<Number*> list);
+	static void register_field_names(string name, std::initializer_list<string> list);
+	static double get_count(string name, int column);
+	static double get_sum(string name, int column);
+	static double get_average(string name, int column);
+	static double get_weighted_avg_of_col2_in_terms_of_col1(string name, int col1, int col2);	// Useful for calculating average values over time. Col1 1 is typically time in this case.
+	static double get_standard_deviation(string name, int column);
+	static void clean(string name);
+	static string to_csv(string name);
+	static map<string, StatisticData> statistics;
+private:
+	vector<string> names;			// titles of columns
+	vector<vector<Number*> > data;	// a table of data.
+};
+
 class StatisticsGatherer
 {
 public:
@@ -1161,7 +1286,7 @@ public:
 	void register_scheduled_gc(Event const& gc);
 	void register_executed_gc(Block const& victim);
 	void register_events_queue_length(uint queue_size, double time);
-	void print();
+	void print() const;
 	void print_simple(FILE* file = stdout);
 	void print_gc_info();
 	void print_mapping_info();
@@ -1180,11 +1305,11 @@ public:
 	uint max_age();
 	uint max_age_freq();
 	vector<double> max_waittimes();
-	uint total_reads();
-	uint total_writes();
-	double get_reads_throughput();
-	double get_writes_throughput();
-	double get_total_throughput();
+	uint total_reads() const;
+	uint total_writes() const;
+	double get_reads_throughput() const;
+	double get_writes_throughput() const;
+	double get_total_throughput() const;
 
 	long num_gc_cancelled_no_candidate;
 	long num_gc_cancelled_not_enough_free_space;
@@ -1192,6 +1317,10 @@ public:
 
 	long get_num_erases_executed() { return num_erases; }
 	static void set_record_statistics(bool val) { record_statistics = val; }
+	vector<vector<uint> > num_erases_per_LUN;
+	vector<vector<uint> > num_writes_per_LUN;
+	vector<vector<uint> > num_gc_writes_per_LUN_origin;
+	vector<vector<uint> > num_gc_writes_per_LUN_destination;
 private:
 	static StatisticsGatherer *inst;
 //	Ssd & ssd;
@@ -1206,18 +1335,16 @@ private:
 	vector<vector<uint> > num_mapping_writes_per_LUN;
 
 	vector<vector<vector<double> > > bus_wait_time_for_writes_per_LUN;
-	vector<vector<uint> > num_writes_per_LUN;
+
 
 	vector<vector<uint> > num_gc_reads_per_LUN;
-	vector<vector<uint> > num_gc_writes_per_LUN_origin;
-	vector<vector<uint> > num_gc_writes_per_LUN_destination;
 	vector<vector<double> > sum_gc_wait_time_per_LUN;
 	vector<vector<vector<double> > > gc_wait_time_per_LUN;
 	vector<vector<uint> > num_copy_backs_per_LUN;
 
 	long num_erases;
 	long num_gc_writes;
-	vector<vector<uint> > num_erases_per_LUN;
+
 
 	vector<vector<uint> > num_gc_scheduled_per_LUN;
 
@@ -1335,8 +1462,8 @@ public:
 	Experiment_Result(string experiment_name, string data_folder, string sub_folder, string variable_parameter_name);
 	~Experiment_Result();
 	void start_experiment();
-	void collect_stats(double variable_parameter_value);
-	void collect_stats(double variable_parameter_value, StatisticsGatherer* statistics_gatherer);
+	void collect_stats(string variable_parameter_value);
+	void collect_stats(string variable_parameter_value, StatisticsGatherer* statistics_gatherer);
 	void end_experiment();
 	double time_elapsed() { return end_time - start_time; }
 
@@ -1351,14 +1478,15 @@ public:
 	uint max_age_freq;
 	string graph_filename_prefix;
 	vector<double> max_waittimes;
-	map<double, vector<double> > vp_max_waittimes; // Varable parameter --> max waittimes for each waittime measurement type
-	map<double, vector<uint> > vp_num_IOs; // Varable parameter --> num_ios[write, read, write+read]
+	map<string, vector<double> > vp_max_waittimes; // Varable parameter --> max waittimes for each waittime measurement type
+	//map<double, vector<uint> > vp_num_IOs; // Varable parameter --> num_ios[write, read, write+read]
     static const string throughput_column_name; // e.g. "Average throughput (IOs/s)". Becomes y-axis on aggregated (for all experiments with different values for the variable parameter) throughput graph
     static const string write_throughput_column_name;
     static const string read_throughput_column_name;
     std::ofstream* stats_file;
     double start_time;
     double end_time;
+    vector<string> points;
 
 	static const string datafile_postfix;
 	static const string stats_filename;
@@ -1400,6 +1528,21 @@ private:
 // On the first half, one thread is doing random reads, and another is doing random writes.
 // On the other half, there is a file system emulating thread that performs large sequential writes.
 class File_System_With_Noise : public Workload_Definition {
+public:
+	vector<Thread*> generate();
+};
+
+class K2_Modal_Workload : public Workload_Definition {
+public:
+	K2_Modal_Workload(double relative_prob, double relative_size) :
+		relative_prob(relative_prob), relative_size(relative_size) {}
+	double relative_prob, relative_size;
+	vector<Thread*> generate();
+
+};
+
+
+class Synch_Random_Workload : public Workload_Definition {
 public:
 	vector<Thread*> generate();
 };
@@ -1449,13 +1592,13 @@ public:
 	static void draw_graph(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command);
 	static void draw_graph_with_histograms(int sizeX, int sizeY, string outputFile, string dataFilename, string title, string xAxisTitle, string yAxisTitle, string xAxisConf, string command, vector<string> histogram_commands);
 	static void graph(int sizeX, int sizeY, string title, string filename, int column, vector<Experiment_Result> experiments, int y_max = UNDEFINED, string subfolder = "");
-	static void latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, Experiment_Result experiment, int y_max = UNDEFINED);
+	//static void latency_plot(int sizeX, int sizeY, string title, string filename, int column, int variable_parameter_value, Experiment_Result experiment, int y_max = UNDEFINED);
 	static void waittime_boxplot(int sizeX, int sizeY, string title, string filename, int mean_column, Experiment_Result experiment);
-	static void waittime_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points, int black_column, int red_column = -1);
-    static void cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<Experiment_Result> experiments, double point, int black_column, int red_column = -1);
-	static void age_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points);
-	static void queue_length_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points);
-	static void throughput_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, vector<int> points);
+	static void waittime_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, int black_column, int red_column = -1);
+    static void cross_experiment_waittime_histogram(int sizeX, int sizeY, string outputFile, vector<Experiment_Result> experiments, string point, int black_column, int red_column = -1);
+	static void age_histogram(int sizeX, int sizeY, string outputFile, Experiment_Result experiment);
+	static void queue_length_history(int sizeX, int sizeY, string outputFile, Experiment_Result experiment);
+	static void plot(int sizeX, int sizeY, string outputFile, Experiment_Result experiment, string csv_name, string title, string x_axis_label, string y_axis_label, int num_lines, int x_min = UNDEFINED, int x_max = UNDEFINED, int y_min = UNDEFINED, int y_max = UNDEFINED);
 	static string get_working_dir();
 	static void unify_under_one_statistics_gatherer(vector<Thread*> threads, StatisticsGatherer* statistics_gatherer);
 	template <class T> void simple_experiment_double(string name, T* variable, T min, T max, T inc);
@@ -1467,7 +1610,7 @@ public:
 	static vector<Experiment_Result> random_writes_on_the_side_experiment(Workload_Definition* workload, int write_threads_min, int write_threads_max, int write_threads_inc, string name, int IO_limit, double used_space, int random_writes_min_lba, int random_writes_max_lba);
 	static Experiment_Result copyback_experiment(vector<Thread*> (*experiment)(int highest_lba), int used_space, int max_copybacks, string data_folder, string name, int IO_limit);
 	static Experiment_Result copyback_map_experiment(vector<Thread*> (*experiment)(int highest_lba), int cb_map_min, int cb_map_max, int cb_map_inc, int used_space, string data_folder, string name, int IO_limit);
-
+	void set_exponential_increase(bool e) { exponential_increase = e; }
 	void draw_graphs();
 	void draw_aggregate_graphs();
 	void draw_experiment_spesific_graphs();
@@ -1504,7 +1647,7 @@ private:
 
 	string alternate_location_for_results_file;
 
-	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>());
+	static void multigraph(int sizeX, int sizeY, string outputFile, vector<string> commands, vector<string> settings = vector<string>(), int x_min = UNDEFINED, int x_max = UNDEFINED, int y_min = UNDEFINED, int y_max = UNDEFINED);
 
 	static uint max_age;
 	static const bool REMOVE_GLE_SCRIPTS_AGAIN;
@@ -1515,6 +1658,7 @@ private:
 	static double calibration_precision;      // microseconds
 	static double calibration_starting_point; // microseconds
 	static string base_folder;
+	bool exponential_increase;
 };
 
 class MTRand_int32 { // Mersenne Twister random number generator

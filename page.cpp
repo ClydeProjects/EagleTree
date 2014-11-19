@@ -33,6 +33,10 @@ enum status Page::_write(Event &event)
 		void *data = (char*)page_data + event.get_address().get_linear_address() * PAGE_SIZE;
 		memcpy (data, event.get_payload(), PAGE_SIZE);
 	}*/
+	if (state != EMPTY) {
+		printf("You are trying to overwrite a page that is not free. This is illegal. The operations is: \n");
+		event.print();
+	}
 	assert(state == EMPTY);
 	state = VALID;
 	return SUCCESS;

@@ -86,12 +86,20 @@ Address Block_manager_parent::choose_flexible_read_address(Flexible_Read_Event* 
 	return candidates[coor.first][coor.second];
 }
 
-Address Block_manager_parent::choose_write_address(Event const& write) {
+Address Block_manager_parent::choose_write_address(Event& write) {
 	//printf("num_available_pages_for_new_writes   %d\n", num_available_pages_for_new_writes);
 	bool can_write = num_available_pages_for_new_writes > 0 || write.is_garbage_collection_op();
+
+	if (write.get_id() == 1185934 && write.get_bus_wait_time() > 71000000) {
+		this->print();
+		//StateVisualiser::print_page_status();
+	}
+
 	if (!can_write) {
 		return Address();
 	}
+	int num_free_blocks = get_num_free_blocks();
+	int num_gc = migrator->how_many_gc_operations_are_scheduled();
 
 	if (write.get_event_type() == COPY_BACK) {
 		return choose_copbyback_address(write);
@@ -102,7 +110,7 @@ Address Block_manager_parent::choose_write_address(Event const& write) {
 		return a;
 	}
 
-	if (!write.is_garbage_collection_op() && migrator->how_many_gc_operations_are_scheduled() == 0) {
+	if (GREED_SCALE > 0 && !write.is_garbage_collection_op() && migrator->how_many_gc_operations_are_scheduled() == 0) {
 		migrator->schedule_gc(write.get_current_time(), -1, -1, -1 ,-1);
 	}
 	if (write.is_garbage_collection_op() || migrator->how_many_gc_operations_are_scheduled() == 0) {
@@ -114,7 +122,7 @@ Address Block_manager_parent::choose_write_address(Event const& write) {
 	return Address();
 }
 
-void Block_manager_parent::register_erase_outcome(Event const& event, enum status status) {
+void Block_manager_parent::register_erase_outcome(Event& event, enum status status) {
 	IO_has_completed_since_last_shortest_queue_search = true;
 
 	Address a = event.get_address();
@@ -148,10 +156,11 @@ void Block_manager_parent::register_erase_outcome(Event const& event, enum statu
 	Free_Space_Meter::register_num_free_pages_for_app_writes(num_available_pages_for_new_writes, event.get_current_time());
 
 	if (migrator->how_many_gc_operations_are_scheduled() == 0) {
-		//assert(num_free_pages == num_available_pages_for_new_writes);
+		assert(num_free_pages == num_available_pages_for_new_writes);
 	}
 
-	Block_manager_parent::check_if_should_trigger_more_GC(event.get_current_time());
+	check_if_should_trigger_more_GC(event);
+
 }
 
 void Block_manager_parent::register_write_arrival(Event const& write) {
@@ -206,14 +215,18 @@ void Block_manager_parent::register_write_outcome(Event const& event, enum statu
 			if (has_free_pages(free_pointer)) {
 				free_block_pointers[ba.package][ba.die] = free_pointer;
 			}
-			else {
-				Free_Space_Per_LUN_Meter::mark_out_of_space(ba, event.get_current_time() );
-			}
 			if (PRINT_LEVEL > 1) {
 				if (free_pointer.valid == NONE) printf(", and a new unused block could not be found.\n");
 				else printf(".\n");
 			}
 		}
+	}
+
+	if (!has_free_pages(free_block_pointers[ba.package][ba.die])) {
+		Free_Space_Per_LUN_Meter::mark_out_of_space(ba, event.get_current_time());
+	}
+	else {
+		Free_Space_Per_LUN_Meter::mark_new_space(ba, event.get_current_time());
 	}
 }
 
@@ -221,7 +234,29 @@ void Block_manager_parent::trim(Event const& event) {
 	IO_has_completed_since_last_shortest_queue_search = true;
 }
 
-int Block_manager_parent::get_num_free_blocks(int package, int die) {
+int Block_manager_parent::get_num_pointers_with_free_space() const {
+	int sum = 0;
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			if (has_free_pages(free_block_pointers[i][j])) {
+				sum++;
+			}
+		}
+	}
+	return sum;
+}
+
+int Block_manager_parent::get_num_free_blocks() const {
+	int sum = 0;
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			sum += get_num_free_blocks(i, j);
+		}
+	}
+	return sum;
+}
+
+int Block_manager_parent::get_num_free_blocks(int package, int die) const {
 	int num_free_blocks = 0;
 	for (int i = 0; i < num_age_classes; i++) {
 		num_free_blocks += free_blocks[package][die][i].size();
@@ -244,16 +279,16 @@ bool Block_manager_parent::can_write(Event const& write) const {
 	return num_available_pages_for_new_writes > 0 || write.is_garbage_collection_op();
 }
 
-void Block_manager_parent::check_if_should_trigger_more_GC(double start_time) {
+void Block_manager_parent::check_if_should_trigger_more_GC(Event const& event) {
 	if (num_free_pages <= BLOCK_SIZE) {
-		migrator->schedule_gc(start_time, -1, -1, -1, -1);
+		migrator->schedule_gc(event.get_current_time(), -1, -1, -1, -1);
 	}
 
 	int num_luns_with_space = SSD_SIZE * PACKAGE_SIZE;
 	for (uint i = 0; i < SSD_SIZE; i++) {
 		for (uint j = 0; j < PACKAGE_SIZE; j++) {
 			if (!has_free_pages(free_block_pointers[i][j]) || get_num_free_blocks(i, j) < GREED_SCALE) {
-				migrator->schedule_gc(start_time, i, j, -1, -1);
+				migrator->schedule_gc(event.get_current_time(), i, j, -1, -1);
 			}
 			if (!has_free_pages(free_block_pointers[i][j])) {
 				num_luns_with_space--;
@@ -324,24 +359,6 @@ Address Block_manager_parent::get_free_block_pointer_with_shortest_IO_queue() {
 }
 
 bool Block_manager_parent::Copy_backs_in_progress(Address const& addr) {
-	/*if (addr.page > 0) {
-		BlockAnastasia
-3 days ago
-Hi, Niv Ok, thank you for answer ) Anastasia
-Thorsgade, Copenhagen, Capital Region of Denmark (May 7 - 12, 2013)
-Inquiry
-2246 kr DKK
-Julie
-4 days ago
-Hi Julie, I'm just on my way home, I'll try to be as fast as p...
-Thorsgade, Copenhagen, Capital Region of Denmark
-Delete
-Hanna
-4 days ago
-Hey Niv, Thanks that sounds fairy easy! A& block = ssd.get_package()[addr.package]->get_die()[addr.die].getPlanes()[addr.plane].getBlocks()[addr.block];
-		Page const& page_before = block.getPages()[addr.page - 1];
-		return page_before.get_state() == EMPTY;
-	}*/
 	return false;
 }
 
@@ -458,6 +475,12 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 		order.pop_back();
 		Address address = find_free_unused_block(package_id, die_id, index, time);
 		if (address.valid != NONE) {
+
+			if (address.package == 1 && address.die == 1 && address.block == 1021) {
+				//address.print();
+				//printf("\n");
+			}
+
 			return address;
 		}
 	}
@@ -473,6 +496,10 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 		free_blocks[package_id][die_id][klass].pop_back();
 		num_free_blocks_left--;
 		assert(has_free_pages(to_return));
+	}
+	if (to_return.valid != NONE &&  num_free_blocks_left == 0) {
+		//printf("here yo\n");
+		//StateVisualiser::print_page_status();
 	}
 	if (num_free_blocks_left < GREED_SCALE) {
 		migrator->schedule_gc(time, package_id, die_id, -1, -1);
@@ -515,10 +542,10 @@ Address Block_manager_parent::find_free_unused_block(enum age age, double time) 
 	return Address();
 }
 
-void Block_manager_parent::return_unfilled_block(Address pba, double current_time) {
+void Block_manager_parent::return_unfilled_block(Address pba, double current_time, bool give_to_block_pointers) {
 	if (has_free_pages(pba)) {
 		int age_class = sort_into_age_class(pba);
-		if (has_free_pages(free_block_pointers[pba.package][pba.die])) {
+		if (!give_to_block_pointers || has_free_pages(free_block_pointers[pba.package][pba.die])) {
 			free_blocks[pba.package][pba.die][age_class].push_back(pba);
 		} else {
 			free_block_pointers[pba.package][pba.die] = pba;
@@ -552,7 +579,64 @@ Block_manager_parent* Block_manager_parent::get_new_instance() {
 		case 2: bm = new Sequential_Locality_BM(); break;
 		case 3: bm = new Block_manager_roundrobin(); break;
 		case 4: bm = new Wearwolf(); break;
+		case 5: bm = new Block_Manager_Tag_Groups(); break;
+		case 6: bm = new Block_Manager_Groups(); break;
+		case 7: bm = new bm_gc_locality(); break;
 		default: bm = new Block_manager_parallel(); break;
 	}
 	return bm;
 }
+
+pointers::pointers(Block_manager_parent* bm) : bm(bm), blocks(SSD_SIZE, vector<Address>(PACKAGE_SIZE, Address())) {
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			blocks[i][j] = bm->find_free_unused_block(i, j, 0);
+		}
+	}
+}
+
+pointers::pointers() : bm(NULL), blocks(SSD_SIZE, vector<Address>(PACKAGE_SIZE, Address())) {
+}
+
+
+void pointers::register_completion(Event const& e) {
+	blocks[e.get_address().package][e.get_address().die].page++;
+}
+Address pointers::get_best_block(Block_manager_parent* bm) const {
+	pair<bool, pair<int, int> > result = bm->get_free_block_pointer_with_shortest_IO_queue(blocks);
+	if (result.first) {
+		return blocks[result.second.first][result.second.second];
+	}
+	return Address();
+}
+
+void pointers::print() const {
+	for (int i = 0; i < blocks.size(); i++) {
+		for (int j = 0; j < blocks[i].size(); j++) {
+			printf("%d %d %d\n", i, j, blocks[i][j].page);
+		}
+	}
+}
+
+int pointers::get_num_free_blocks() const {
+	int num_free_blocks = 0;
+	for (int i = 0; i < blocks.size(); i++) {
+		for (int j = 0; j < blocks[i].size(); j++) {
+			if (blocks[i][j].page < BLOCK_SIZE && blocks[i][j].valid == PAGE) {
+				num_free_blocks++;
+			}
+		}
+	}
+	return num_free_blocks;
+}
+
+void pointers::retire(double current_time) {
+	int num_free_blocks = 0;
+	for (int i = 0; i < blocks.size(); i++) {
+		for (int j = 0; j < blocks[i].size(); j++) {
+			//bm->free_blocks[i][j].push_back(blocks[i][j]);
+			bm->return_unfilled_block(blocks[i][j], current_time, false);
+		}
+	}
+}
+

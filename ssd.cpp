@@ -48,7 +48,7 @@ Ssd::Ssd():
 			exit(MEM_ERR);
 		}
 	}*/
-
+	StatisticsGatherer::init();
 	Block_manager_parent* bm = Block_manager_parent::get_new_instance();
 	Migrator* migrator = new Migrator();
 
@@ -67,7 +67,14 @@ Ssd::Ssd():
 
 	ftl->set_scheduler(scheduler);
 
-	Garbage_Collector* gc = new Garbage_Collector(this, bm);
+	Garbage_Collector* gc = NULL;
+	if (GARBAGE_COLLECTION_POLICY == 0){
+		gc = new Garbage_Collector_Greedy(this, bm);
+	}
+	else {
+		gc = new Garbage_Collector_LRU(this, bm);
+	}
+
 	Wear_Leveling_Strategy* wl = new Wear_Leveling_Strategy(this, migrator);
 
 	bm->init(this, ftl, scheduler, gc, wl, migrator);
@@ -75,7 +82,7 @@ Ssd::Ssd():
 	migrator->init(scheduler, bm, gc, wl, ftl, this);
 
 	StateVisualiser::init(this);
-	StatisticsGatherer::init();
+
 	SsdStatisticsExtractor::init(this);
 	Utilization_Meter::init();
 	Event::reset_id_generators();
@@ -118,7 +125,7 @@ void Ssd::submit(Event* event) {
 	// If the IO spans several flash pages, we break it into multiple flash page IOs
 	// When these page IOs are all finished, we return to the OS
 	static int ssd_id_generator = 0;
-	if (event->get_size() > 1) {
+	if (event->get_size() > 1 && event->get_tag() == UNDEFINED) {
 		int ssd_id = ssd_id_generator++;
 		event->set_ssd_id(ssd_id);
 		large_events_map.resiger_large_event(event);
@@ -137,9 +144,10 @@ void Ssd::submit(Event* event) {
 }
 
 void Ssd::submit_to_ftl(Event* event) {
-	if(event->get_event_type() 		== READ) 	ftl->read(event);
-	else if(event->get_event_type() == WRITE) 	ftl->write(event);
-	else if(event->get_event_type() == TRIM) 	ftl->trim(event);
+	if(event->get_event_type() 		== READ) 		ftl->read(event);
+	else if(event->get_event_type() == WRITE) 		ftl->write(event);
+	else if(event->get_event_type() == TRIM) 		ftl->trim(event);
+	else if(event->get_event_type() == MESSAGE) 	scheduler->schedule_event(event);
 }
 
 void Ssd::io_map::resiger_large_event(Event* e) {

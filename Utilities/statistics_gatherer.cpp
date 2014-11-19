@@ -88,6 +88,15 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 		if (event.is_original_application_io()) {
 			num_writes_per_LUN[a.package][a.die]++;
 			bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_latency());
+
+			StatisticData::register_statistic("all_writes", {
+					new Integer(event.get_latency())
+			});
+
+			StatisticData::register_field_names("all_writes", {
+					"write_latency"
+			});
+
 		}
 		else if (event.is_wear_leveling_op()) {
 			Address replace_add = event.get_replace_address();
@@ -109,6 +118,16 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 		if (event.is_original_application_io()) {
 			bus_wait_time_for_reads_per_LUN[a.package][a.die].push_back(event.get_latency());
 			num_reads_per_LUN[a.package][a.die]++;
+
+
+			StatisticData::register_statistic("all_reads", {
+					new Integer(event.get_latency())
+			});
+
+			StatisticData::register_field_names("all_reads", {
+					"read_latency"
+			});
+
 		} else if (event.is_garbage_collection_op()) {
 			num_gc_reads_per_LUN[a.package][a.die]++;
 		} else if (event.is_mapping_op()) {
@@ -298,7 +317,7 @@ void flatten(vector<vector<vector<T> > > const& vec, vector<T>& outcome)
 }
 
 
-void StatisticsGatherer::print() {
+void StatisticsGatherer::print() const {
 	printf("\n\t");
 	printf("num writes\t");
 	printf("num reads\t");
@@ -514,6 +533,7 @@ void StatisticsGatherer::print_gc_info() {
 	printf("num scheduled gc: %ld \n", num_gc_scheduled);
 	printf("num executed gc: %ld \n", num_gc_executed);
 	printf("num migrations per gc: %f \n", (double)num_migrations / num_gc_executed);
+	printf("standard dev num migrations per gc: %f \n", StatisticData::get_standard_deviation("GC_eff_with_writes", 1));
 	printf("\n");
 	printf("gc targeting package die class: %ld \n", num_gc_targeting_package_die_class);
 	printf("gc targeting package die: %ld \n", num_gc_targeting_package_die);
@@ -581,23 +601,23 @@ vector<string> StatisticsGatherer::totals_vector_header() {
 	return result;
 }
 
-uint StatisticsGatherer::total_reads() {
+uint StatisticsGatherer::total_reads() const {
 	return get_sum(num_reads_per_LUN);
 }
 
-uint StatisticsGatherer::total_writes() {
+uint StatisticsGatherer::total_writes() const {
 	return get_sum(num_writes_per_LUN);
 }
 
-double StatisticsGatherer::get_reads_throughput() {
+double StatisticsGatherer::get_reads_throughput() const {
 	return (total_reads() / end_time) * 1000 * 1000;
 }
 
-double StatisticsGatherer::get_writes_throughput() {
+double StatisticsGatherer::get_writes_throughput() const {
 	return (total_writes() / end_time) * 1000 * 1000;
 }
 
-double StatisticsGatherer::get_total_throughput() {
+double StatisticsGatherer::get_total_throughput() const {
 	return get_reads_throughput() + get_writes_throughput();
 }
 

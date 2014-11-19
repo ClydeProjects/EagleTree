@@ -31,7 +31,7 @@ void Block_manager_roundrobin::register_write_outcome(Event const& event, enum s
 	move_address_cursor();
 }
 
-void Block_manager_roundrobin::register_erase_outcome(Event const& event, enum status status) {
+void Block_manager_roundrobin::register_erase_outcome(Event& event, enum status status) {
 	assert(event.get_event_type() == ERASE);
 	if (status == FAILURE) {
 		return;
@@ -44,10 +44,10 @@ void Block_manager_roundrobin::register_erase_outcome(Event const& event, enum s
 		free_block_pointers[a.package][a.die] = find_free_unused_block(a.package, a.die);
 	}
 
-	check_if_should_trigger_more_GC(event.get_current_time());
+	check_if_should_trigger_more_GC(event);
 }
 
-Address Block_manager_roundrobin::choose_best_address(Event const& write) { // const
+Address Block_manager_roundrobin::choose_best_address(Event& write) { // const
 	return free_block_pointers[address_cursor.package][address_cursor.die];
 }
 

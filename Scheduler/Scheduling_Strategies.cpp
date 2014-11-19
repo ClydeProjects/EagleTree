@@ -22,6 +22,35 @@ void Priorty_Scheme::seperate_by_type(vector<Event*> const& events, vector<Event
 	}
 }
 
+void Priorty_Scheme::prioritize_oldest_event(vector<Event*>& events) {
+	if (events.size() == 0) {
+		return;
+	}
+	double max_wait_time = events[0]->get_bus_wait_time();
+	int index = 0;
+	for (int i = 1; i < events.size(); i++) {
+		if (events[i]->get_bus_wait_time() >= max_wait_time) {
+			index = i;
+			max_wait_time = events[i]->get_bus_wait_time();
+		}
+	}
+	Event* temp = events[0];
+	events[0] = events[index];
+	events[index] = temp;
+}
+
+void Priorty_Scheme::return_to_queue_excessive_events(vector<Event*>& events) {
+	if (events.size() <= SSD_SIZE * PACKAGE_SIZE) {
+		return;
+	}
+	for (int i = SSD_SIZE * PACKAGE_SIZE; i < events.size(); i++) {
+		queue->push(events[i]);
+	}
+	//printf("removed %d \n", events.size() - PACKAGE_SIZE * SSD_SIZE);
+	events.resize(SSD_SIZE * PACKAGE_SIZE);
+	assert(events.size() <= SSD_SIZE * PACKAGE_SIZE);
+}
+
 int get_num_mimatches(vector<Event*>& events) {
 	int mismatches = 0;
 	set<double> values;
@@ -51,10 +80,16 @@ int get_num_mimatches(vector<Event*>& events) {
 void Fifo_Priorty_Scheme::schedule(vector<Event*>& events) {
 	event_queue q;
 	for (auto e : events) {
-		q.push(e, e->get_bus_wait_time());
+		q.push(e, INFINITE - e->get_bus_wait_time());
 	}
+	int time = INFINITE;
 	while (q.size() > 0) {
 		vector<Event*> ordered_events = q.get_soonest_events();
+		/*if (ordered_events[0]->get_bus_wait_time() >= time) {
+			printf("%f  %f \n", ordered_events[0]->get_bus_wait_time(), time);
+			assert(false);
+		}*/
+		time = ordered_events[0]->get_bus_wait_time();
 		scheduler->handle(ordered_events);
 	}
 }
@@ -63,12 +98,18 @@ void Noop_Priorty_Scheme::schedule(vector<Event*>& events) {
 	scheduler->handle(events);
 }
 
-/*void Re_Er_Wr_Priorty_Scheme::schedule(vector<Event*>& reads, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases) {
+void Re_Er_Wr_Priorty_Scheme::schedule(vector<Event*>& events) {
+	vector<Event*> reads, copybacks, writes, erases;
+	seperate_by_type(events, reads, copybacks, writes, erases);
 	scheduler->handle(reads);
-	scheduler->handle(copyback_commands);
+	sort(reads.begin(), reads.end(), current_wait_time_comparator);
+	scheduler->handle(copybacks);
 	scheduler->handle(erases);
+	sort(writes.begin(), writes.end(), current_wait_time_comparator);
+	//return_to_queue_excessive_events(writes);
+	//prioritize_oldest_event(writes);
 	scheduler->handle(writes);
-}*/
+}
 
 void Smart_App_Priorty_Scheme::schedule(vector<Event*>& events) {
 	vector<Event*> reads, copybacks, writes, erases;

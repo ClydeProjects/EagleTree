@@ -6,8 +6,10 @@ Migrator::Migrator() :
 		num_blocks_being_garbaged_collected_per_LUN(SSD_SIZE, vector<uint>(PACKAGE_SIZE, 0)),
 		blocks_being_garbage_collected(),
 		num_erases_scheduled_per_package(SSD_SIZE),
-		dependent_gc()
-{}
+		dependent_gc(),
+		gc_time_stat()
+{
+}
 
 Migrator::~Migrator() {
 	/*for (int i = 0; i < num_blocks_being_garbaged_collected_per_LUN.size(); i++) {
@@ -21,6 +23,7 @@ Migrator::~Migrator() {
 		printf("blocks_being_garbage_collected    %d:  %d\n", (*it).first, (*it).second);
 		it++;
 	}*/
+	printf("average time for a whole GC operation:\t%f\n", StatisticData::get_average("gc_op_length", 0));
 	delete gc;
 	delete wl;
 }
@@ -61,6 +64,16 @@ void Migrator::handle_erase_completion(Event* event) {
 		}
 	}
 
+	Block* block = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
+	double time_to_completion = 0;
+	if (gc_time_stat.count(block) == 1) {
+		double time_to_completion = event->get_current_time() - gc_time_stat.at(block);
+	}
+	gc_time_stat.erase(block);
+	StatisticData::register_statistic("gc_op_length", {
+			new Integer(time_to_completion)
+	});
+
 	num_blocks_being_garbaged_collected_per_LUN[a.package][a.die]--;
 	blocks_being_garbage_collected.erase(a.get_linear_address());
 
@@ -84,6 +97,10 @@ void Migrator::handle_trim_completion(Event* event) {
 	assert(page.get_state() == VALID);
 	block.invalidate_page(ra.page);
 	assert(block.get_state() != FREE);
+
+	/*if (event->get_replace_address().package == 3 && event->get_replace_address().die == 0 && event->get_replace_address().block == 881) {
+		printf("num pages live: %d\n", block.get_pages_valid());
+	}*/
 
 	ra.valid = BLOCK;
 	ra.page = 0;
@@ -120,6 +137,8 @@ uint Migrator::how_many_gc_operations_are_scheduled() const {
 void Migrator::issue_erase(Address ra, double time) {
 	ra.valid = BLOCK;
 	ra.page = 0;
+
+
 
 	Event* erase = new Event(ERASE, 0, 1, time);
 	erase->set_address(ra);
@@ -165,7 +184,7 @@ void Migrator::schedule_gc(double time, int package, int die, int block, int kla
 	} else if (package >= 0 && die >= 0 && block >= 0) {
 		address.valid = BLOCK;
 		// TODO add the wear leveling as a parameter to this method
-		gc_event->set_wear_leveling_op(true);
+		//gc_event->set_wear_leveling_op(true);
 	} else {
 		assert(false);
 	}
@@ -205,7 +224,7 @@ void Migrator::register_ECC_check_on(uint logical_address) {
 
 void Migrator::update_structures(Address const& a) {
 	Block* victim = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
-	gc->remove_as_gc_candidate(a);
+	gc->commit_choice_of_victim(a);
 	blocks_being_garbage_collected[victim->get_physical_address()] = victim->get_pages_valid();
 	num_blocks_being_garbaged_collected_per_LUN[a.package][a.die]++;
 	StatisticsGatherer::get_global_instance()->register_executed_gc(*victim);
@@ -214,15 +233,19 @@ void Migrator::update_structures(Address const& a) {
 vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	Address a = gc_event->get_address();
 	vector<deque<Event*> > migrations;
-
 	if (how_many_gc_operations_are_scheduled() >= MAX_CONCURRENT_GC_OPS) {
 		return migrations;
 	}
-
 	/*bool scheduled_erase_successfully = schedule_queued_erase(a);
 	if (scheduled_erase_successfully) {
 		return migrations;
 	}*/
+
+	if (gc_event->get_id() > 1185561) {
+		int i = 0;
+		i++;
+	}
+
 
 	int die_id = a.valid >= DIE ? a.die : UNDEFINED;
 	int package_id = a.valid >= PACKAGE ? a.package : UNDEFINED;
@@ -230,13 +253,13 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	bool is_wear_leveling_op = gc_event->is_wear_leveling_op();
 
 	Block * victim;
-	if (is_wear_leveling_op) {
+	if (a.valid == BLOCK) {
 		victim = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
 	}
 	else {
 		victim = gc->choose_gc_victim(package_id, die_id, gc_event->get_age_class());
 	}
-
+	//printf("num valid:  %d\n", victim->get_pages_valid());
 	StatisticsGatherer::get_global_instance()->register_scheduled_gc(*gc_event);
 
 	if (victim == NULL) {
@@ -269,7 +292,27 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 		i++;
 	}
 
+	if (victim->get_state() == FREE) {
+		//printf("warning: trying to garbage collect a block that is completely free. This will be ignored.\n");
+		return migrations;
+	}
+
+	if (victim->get_state() == PARTIALLY_FREE) {
+		//printf("warning: trying to garbage collect a block that is partially free. This will be ignored.\n");
+		return migrations;
+	}
+
+	if (a.package == 3 && a.die == 1 && a.block == 1018) {
+		int i = 0;
+		i++;
+	}
+
+	if (!bm->may_garbage_collect_this_block(victim, gc_event->get_current_time())) {
+		return migrations;
+	}
+
 	update_structures(addr);
+	//printf("blocks being gced %d\n", blocks_being_garbage_collected.size());
 	bm->subtract_from_available_for_new_writes(victim->get_pages_valid());
 
 	if (PRINT_LEVEL > 1) {
@@ -282,13 +325,49 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 		printf("\n");
 	}
 
+	if (victim->get_physical_address() == 185856) {
+		int i = 0;
+		i++;
+	}
+
 	assert(victim->get_state() != FREE);
 	assert(victim->get_state() != PARTIALLY_FREE);
 
+	StatisticData::register_statistic("Garbage Collection Efficiency", {
+			new Integer(victim->get_pages_valid())
+	});
 
+	StatisticData::register_statistic("GC_eff_with_writes", {
+			new Integer(StatisticsGatherer::get_global_instance()->total_writes()),
+			new Integer(victim->get_pages_valid())
+	});
+
+	StatisticData::register_field_names("GC_eff_with_writes", {
+			"num_writes",
+			"num_pages_to_migrate"
+	});
+
+	gc_time_stat[victim] = gc_event->get_current_time();
+
+	/*printf("schedule gc in ");
+	addr.print();
+	printf("\n");*/
+
+	/*static int min_valid_pages = BLOCK_SIZE;
+	if (victim->get_pages_valid() < min_valid_pages) {
+		min_valid_pages = victim->get_pages_valid();
+		cout << "min: " << min_valid_pages << "\t" << StatisticsGatherer::get_global_instance()->total_writes() << "\t" << StatisticData::get_sum("GC_eff_with_writes", 1) << "\t" << StatisticData::get_count("GC_eff_with_writes", 1) << "\t";
+		addr.print();
+		cout << endl;
+	}*/
+
+	//printf("block: %d\n", victim->get_pages_valid());
+	//printf("gc eff: %f\n", StatisticData::get_average("Garbage Collection Efficiency") );
 	//printf("num_available_pages_for_new_writes:  %d\n", num_available_pages_for_new_writes);
-
 	//deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
+
+	int below = 0;
+	int above = 0;
 
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	//PRINT_LEVEL = 1;
@@ -298,6 +377,12 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 			Address addr = Address(victim->get_physical_address(), PAGE);
 			addr.page = i;
 			long logical_address = ftl->get_logical_address(addr.get_linear_address());
+
+			if (logical_address > 587202) {
+				above++;
+			} else {
+				below++;
+			}
 
 			deque<Event*> migration;
 
@@ -353,6 +438,7 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 			}
 		}
 	}
+	//printf("above\t%d\tbelow:\t%d\ttotal:%d\tpack:%d\tdie:%d\n", above, below, above + below, package_id, die_id);
 	//if (cb_migrations.size() > 0) migrations.push_back(cb_migrations);
 	//StateVisualiser::pr
 	return migrations;
@@ -373,7 +459,7 @@ bool Migrator::more_migrations(Event * gc_read) {
 	if (dependent_gc.count(block_id) == 1 && dependent_gc.at(block_id).size() > 0) {
 		return true;
 	}
-	else if (dependent_gc.count(block_id) == 1) {
+	else if (dependent_gc.count(block_id) == 1 && dependent_gc.at(block_id).size() == 0) {
 		dependent_gc.erase(block_id);
 	}
 	return false;
@@ -383,6 +469,8 @@ deque<Event*> Migrator::trigger_next_migration(Event * gc_read) {
 	int block_id = gc_read->get_address().get_block_id();
 	assert(dependent_gc.count(block_id) == 1 && dependent_gc.at(block_id).size() > 0);
 	deque<Event*> next_migration = dependent_gc.at(block_id).back();
+	//next_migration[0]->set_start_time(gc_read->get_current_time());
+	//next_migration[1]->set_start_time(gc_read->get_current_time());
 	dependent_gc.at(block_id).pop_back();
 
 	if ( dependent_gc.at(block_id).empty()) {

@@ -66,10 +66,10 @@ void Wearwolf::handle_cold_pointer_out_of_space(enum read_hotness rh, double sta
 	}
 }
 
-void Wearwolf::register_erase_outcome(Event const& event, enum status status) {
+void Wearwolf::register_erase_outcome(Event& event, enum status status) {
 	Block_manager_parent::register_erase_outcome(event, status);
 	reset_any_filled_pointers(event);
-	check_if_should_trigger_more_GC(event.get_current_time());
+	check_if_should_trigger_more_GC(event);
 }
 
 // must really improve logic in this class. Currently, mistakes are too easy if much GC happens at same time
@@ -90,7 +90,7 @@ void Wearwolf::reset_any_filled_pointers(Event const& event) {
 }
 
 
-Address Wearwolf::choose_best_address(Event const& write) {
+Address Wearwolf::choose_best_address(Event& write) {
 	enum write_hotness w_hotness = page_hotness_measurer->get_write_hotness(write.get_logical_address());
 	enum read_hotness r_hotness = page_hotness_measurer->get_read_hotness(write.get_logical_address());
 
@@ -122,11 +122,11 @@ void Wearwolf::register_read_command_outcome(Event const& event, enum status sta
 	}
 }
 
-void Wearwolf::check_if_should_trigger_more_GC(double start_time) {
+void Wearwolf::check_if_should_trigger_more_GC(Event const& event) {
 	if (!has_free_pages(wcrh_pointer)) {
-		handle_cold_pointer_out_of_space(READ_HOT, start_time);
+		handle_cold_pointer_out_of_space(READ_HOT, event.get_current_time());
 	}
 	if (!has_free_pages(wcrc_pointer)) {
-		handle_cold_pointer_out_of_space(READ_COLD, start_time);
+		handle_cold_pointer_out_of_space(READ_COLD, event.get_current_time());
 	}
 }
