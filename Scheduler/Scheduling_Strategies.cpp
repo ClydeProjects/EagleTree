@@ -22,74 +22,13 @@ void Priorty_Scheme::seperate_by_type(vector<Event*> const& events, vector<Event
 	}
 }
 
-void Priorty_Scheme::prioritize_oldest_event(vector<Event*>& events) {
-	if (events.size() == 0) {
-		return;
-	}
-	double max_wait_time = events[0]->get_bus_wait_time();
-	int index = 0;
-	for (int i = 1; i < events.size(); i++) {
-		if (events[i]->get_bus_wait_time() >= max_wait_time) {
-			index = i;
-			max_wait_time = events[i]->get_bus_wait_time();
-		}
-	}
-	Event* temp = events[0];
-	events[0] = events[index];
-	events[index] = temp;
-}
-
-void Priorty_Scheme::return_to_queue_excessive_events(vector<Event*>& events) {
-	if (events.size() <= SSD_SIZE * PACKAGE_SIZE) {
-		return;
-	}
-	for (int i = SSD_SIZE * PACKAGE_SIZE; i < events.size(); i++) {
-		queue->push(events[i]);
-	}
-	//printf("removed %d \n", events.size() - PACKAGE_SIZE * SSD_SIZE);
-	events.resize(SSD_SIZE * PACKAGE_SIZE);
-	assert(events.size() <= SSD_SIZE * PACKAGE_SIZE);
-}
-
-int get_num_mimatches(vector<Event*>& events) {
-	int mismatches = 0;
-	set<double> values;
-	if (events.size() == 0) {
-		return 0;
-	}
-	values.insert(events[0]->get_bus_wait_time());
-	for (int i = 1; i < events.size(); i++) {
-		if (events[i-1]->get_bus_wait_time() > events[i]->get_bus_wait_time()) {
-			mismatches++;
-		}
-		values.insert(events[i]->get_bus_wait_time());
-	}
-	printf("size:  %d    values:  %d    mismatches: %d\n", events.size(), values.size(), mismatches);
-	if (mismatches > 10) {
-		for (int i = 0; i < events.size(); i++) {
-			printf("\t%f\t", events[i]->get_bus_wait_time());
-
-			events[i]->print();
-		}
-	}
-
-
-	return mismatches;
-}
-
 void Fifo_Priorty_Scheme::schedule(vector<Event*>& events) {
 	event_queue q;
 	for (auto e : events) {
 		q.push(e, INFINITE - e->get_bus_wait_time());
 	}
-	int time = INFINITE;
 	while (q.size() > 0) {
 		vector<Event*> ordered_events = q.get_soonest_events();
-		/*if (ordered_events[0]->get_bus_wait_time() >= time) {
-			printf("%f  %f \n", ordered_events[0]->get_bus_wait_time(), time);
-			assert(false);
-		}*/
-		time = ordered_events[0]->get_bus_wait_time();
 		scheduler->handle(ordered_events);
 	}
 }

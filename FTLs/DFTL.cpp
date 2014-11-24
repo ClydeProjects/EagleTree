@@ -125,7 +125,7 @@ void DFTL::register_read_completion(Event const& event, enum status result) {
 	// Made sure we don't overuse RAM
 	int num_evicted = 1;
 	while (cached_mapping_table.size() >= CACHED_ENTRIES_THRESHOLD && num_evicted > 0) {
-		num_evicted = evict_cold_entries();
+		num_evicted = evict_cold_entries(event.get_current_time());
 	}
 
 	if (cached_mapping_table.size() >= CACHED_ENTRIES_THRESHOLD) {
@@ -138,7 +138,7 @@ void DFTL::write(Event *event)
 {
 	long la = event->get_logical_address();
 
-	if (event->get_id() == 101850) {
+	if (event->get_id() == 202700) {
 		int i =0 ;
 		i++;
 	}
@@ -177,6 +177,17 @@ void DFTL::write(Event *event)
 
 void DFTL::register_write_completion(Event const& event, enum status result) {
 	page_mapping.register_write_completion(event, result);
+
+	if (event.get_id() == 202700) {
+		event.print();
+		int i =0 ;
+		i++;
+	}
+	if (event.get_id() == 203028) {
+		event.print();
+		int i =0 ;
+		i++;
+	}
 
 	if (event.get_noop()) {
 		return;
@@ -229,7 +240,7 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 	// really, we should not be exceeding the threshold here, but just in case we are, evict entries
 	if (CACHED_ENTRIES_THRESHOLD <= cached_mapping_table.size()) {
 		//printf("Warning: more entries in DFTL cache than capacity allows\n");
-		int num_flushed = evict_cold_entries();
+		int num_flushed = evict_cold_entries(event.get_current_time());
 		//printf("num flushed %d\n", num_flushed);
 	}
 
@@ -300,6 +311,10 @@ void DFTL::set_read_address(Event& event) const {
 }
 
 void DFTL::lock_all_entries_in_a_translation_page(long translation_page_id, int lock, double time) {
+	if (translation_page_id == 2 && time > 11768785.0) {
+		int i = 0;
+		i++;
+	}
 	long first_key_in_translation_page = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE;
 	for (auto it = cached_mapping_table.lower_bound(first_key_in_translation_page);
 			it != cached_mapping_table.upper_bound(first_key_in_translation_page + ENTRIES_PER_TRANSLATION_PAGE); ++it) {
@@ -307,14 +322,19 @@ void DFTL::lock_all_entries_in_a_translation_page(long translation_page_id, int 
 		entry& e = (*it).second;
 
 		if (lock == 1 && e.timestamp <= time && e.fixed == 0 && e.dirty) {
-			e.fixed++;
+			//e.fixed++;
 		}
 
 		assert(e.fixed >= 0);
 
+		if (curr_key == 1216 && time > 11768785.0) {
+			int i =0;
+			i++;
+		}
+
 		if (lock == -1 && e.fixed > 0 && e.timestamp <= time && e.dirty) {
 			e.dirty = false;
-			e.fixed--;
+			//e.fixed--;
 			num_dirty_cached_entries--;
 		}
 	}
@@ -322,7 +342,7 @@ void DFTL::lock_all_entries_in_a_translation_page(long translation_page_id, int 
 
 // Iterates through all entries in the cache, identifying and evicting X entries that are not dirty with the minimum temperature
 // returns the number of entries evicted. 0 is returned if all entries are dirty and nothing could be evicted.
-int DFTL::evict_cold_entries() {
+int DFTL::evict_cold_entries(double time) {
 	vector<long> keys_to_remove;
 	vector<entry> entries;
 	int min_temperature = INT_MAX;
@@ -338,7 +358,8 @@ int DFTL::evict_cold_entries() {
 	for (int i = 0; i < entries.size(); i++) {
 		if (entries[i].hotness == min_temperature) {
 			assert(entries[i].fixed == 0);
-			if (keys_to_remove[i] == 44584) {
+			if (keys_to_remove[i] == 1216 && time > 11768785.0) {
+				printf("%f  \n", cached_mapping_table.at(1216).timestamp);
 				int i = 0;
 				i++;
 			}
@@ -421,6 +442,12 @@ void DFTL::flush_mapping(double time) {
 	Event* mapping_event = new Event(WRITE, NUM_PAGES_IN_SSD - translation_page_id, 1, time);
 	mapping_event->set_mapping_op(true);
 	lock_all_entries_in_a_translation_page(translation_page_id, 1, time);
+
+	if (mapping_event->get_id() == 203028 || translation_page_id == 2) {
+		mapping_event->print();
+		int i = 0;
+		i++;
+	}
 
 	// If a translation page on flash does not exist yet, we can flush without a read first
 	if( global_translation_directory[translation_page_id].valid == NONE ) {

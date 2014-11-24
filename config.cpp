@@ -116,8 +116,6 @@ int MAX_CONCURRENT_GC_OPS = 1;
  * 		across the logical address space. After a certain threshold of such writes, defined by the variable SEQUENTIAL_LOCALITY_THRESHOLD,
  * 		it clusters pages from the same sequential write in the same flash blocks.
  * 4 -> Round Robin
- * 5 -> Group tags
- * 6 -> Groups explicit communication
  */
 int BLOCK_MANAGER_ID = 3;
 
@@ -256,11 +254,11 @@ void load_entry(char *name, double value, uint line_number) {
 }
 
 void set_small_SSD_config() {
-	SSD_SIZE = 8;
+	SSD_SIZE = 4;
 	PACKAGE_SIZE = 8;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 128 * 8;
-	BLOCK_SIZE = 128;
+	PLANE_SIZE = 64;
+	BLOCK_SIZE = 16;
 
 	PAGE_READ_DELAY = 115;
 	PAGE_WRITE_DELAY = 1600;
@@ -270,7 +268,7 @@ void set_small_SSD_config() {
 
 	MAX_SSD_QUEUE_SIZE = 32;
 	MAX_REPEATED_COPY_BACKS_ALLOWED = 0;
-	SCHEDULING_SCHEME = 6;
+	SCHEDULING_SCHEME = 0;
 
 	USE_ERASE_QUEUE = false;
 	ENABLE_WEAR_LEVELING = false;

@@ -66,12 +66,6 @@ void VisualTracer::register_completed_event(Event& event) {
 	Address add = event.get_address();
 
 	int i = event.get_current_time() - event.get_execution_time() - trace[add.package][add.die].size() - amount_written_to_file;
-
-	/*if (event.get_id() == 2147221) {
-		printf("%d   %d    %d\n", i, trace[add.package][add.die].size(), amount_written_to_file);
-		event.print();
-	}*/
-
 	write(add.package, add.die, ' ', i);
 
 	event_type type = event.get_event_type();

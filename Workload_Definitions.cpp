@@ -169,26 +169,3 @@ vector<Thread*> Synch_Random_Workload::generate() {
 	Simple_Thread* t = new Synchronous_Random_Writer(min_lba, max_lba, 2345);
 	return vector<Thread*>(1, t);
 }
-
-vector<Thread*> K2_Modal_Workload::generate() {
-	double prob_1 = relative_prob / (relative_prob + 1.0);
-	double prob_2 = 1 / (relative_prob + 1.0);
-
-	double size_1 = relative_size / (relative_size + 1.0);
-	double size_2 = 1 / (relative_size + 1.0);
-
-	group_def m1(prob_1 * 100, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * size_1);
-	group_def m2(prob_2 * 100, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR * size_2);
-
-	printf("division point %d\n", m1.size);
-
-	vector<group_def > groups;
-	groups.push_back(m1);
-	groups.push_back(m2);
-
-	Thread* modes_t = new K_Modal_Thread(groups);
-	return vector<Thread*>(1, modes_t);
-}
-
-
-

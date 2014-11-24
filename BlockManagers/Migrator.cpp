@@ -241,12 +241,6 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 		return migrations;
 	}*/
 
-	if (gc_event->get_id() > 1185561) {
-		int i = 0;
-		i++;
-	}
-
-
 	int die_id = a.valid >= DIE ? a.die : UNDEFINED;
 	int package_id = a.valid >= PACKAGE ? a.package : UNDEFINED;
 
@@ -259,7 +253,6 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	else {
 		victim = gc->choose_gc_victim(package_id, die_id, gc_event->get_age_class());
 	}
-	//printf("num valid:  %d\n", victim->get_pages_valid());
 	StatisticsGatherer::get_global_instance()->register_scheduled_gc(*gc_event);
 
 	if (victim == NULL) {
@@ -302,11 +295,6 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 		return migrations;
 	}
 
-	if (a.package == 3 && a.die == 1 && a.block == 1018) {
-		int i = 0;
-		i++;
-	}
-
 	if (!bm->may_garbage_collect_this_block(victim, gc_event->get_current_time())) {
 		return migrations;
 	}
@@ -323,11 +311,6 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 			printf("%d  ", (*iter).first);
 		}
 		printf("\n");
-	}
-
-	if (victim->get_physical_address() == 185856) {
-		int i = 0;
-		i++;
 	}
 
 	assert(victim->get_state() != FREE);
@@ -349,41 +332,13 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 
 	gc_time_stat[victim] = gc_event->get_current_time();
 
-	/*printf("schedule gc in ");
-	addr.print();
-	printf("\n");*/
-
-	/*static int min_valid_pages = BLOCK_SIZE;
-	if (victim->get_pages_valid() < min_valid_pages) {
-		min_valid_pages = victim->get_pages_valid();
-		cout << "min: " << min_valid_pages << "\t" << StatisticsGatherer::get_global_instance()->total_writes() << "\t" << StatisticData::get_sum("GC_eff_with_writes", 1) << "\t" << StatisticData::get_count("GC_eff_with_writes", 1) << "\t";
-		addr.print();
-		cout << endl;
-	}*/
-
-	//printf("block: %d\n", victim->get_pages_valid());
-	//printf("gc eff: %f\n", StatisticData::get_average("Garbage Collection Efficiency") );
-	//printf("num_available_pages_for_new_writes:  %d\n", num_available_pages_for_new_writes);
-	//deque<Event*> cb_migrations; // We put all copy back GC operations on one deque and push it on migrations vector. This makes the CB migrations happen in order as they should.
-
-	int below = 0;
-	int above = 0;
-
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	//PRINT_LEVEL = 1;
 	for (uint i = 0; i < BLOCK_SIZE; i++) {
 		if (victim->get_page(i).get_state() == VALID) {
-
 			Address addr = Address(victim->get_physical_address(), PAGE);
 			addr.page = i;
 			long logical_address = ftl->get_logical_address(addr.get_linear_address());
-
-			if (logical_address > 587202) {
-				above++;
-			} else {
-				below++;
-			}
-
 			deque<Event*> migration;
 
 			// If a copy back is allowed, and a target page could be reserved, do it. Otherwise, just do a traditional and more expensive READ - WRITE garbage collection
@@ -408,11 +363,6 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 				read->set_address(addr);
 				read->set_garbage_collection_op(true);
 
-				if (victim->get_physical_address() == 976) {
-					int i = 0;
-					i++;
-				}
-
 				Event* write = new Event(WRITE, logical_address, 1, gc_event->get_current_time());
 				write->set_garbage_collection_op(true);
 				write->set_replace_address(addr);
@@ -424,7 +374,6 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 
 				migration.push_back(read);
 				migration.push_back(write);
-
 				//register_ECC_check_on(logical_address); // An ECC check happens in a normal read-write GC operation
 			}
 
@@ -438,9 +387,6 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 			}
 		}
 	}
-	//printf("above\t%d\tbelow:\t%d\ttotal:%d\tpack:%d\tdie:%d\n", above, below, above + below, package_id, die_id);
-	//if (cb_migrations.size() > 0) migrations.push_back(cb_migrations);
-	//StateVisualiser::pr
 	return migrations;
 }
 
@@ -469,8 +415,6 @@ deque<Event*> Migrator::trigger_next_migration(Event * gc_read) {
 	int block_id = gc_read->get_address().get_block_id();
 	assert(dependent_gc.count(block_id) == 1 && dependent_gc.at(block_id).size() > 0);
 	deque<Event*> next_migration = dependent_gc.at(block_id).back();
-	//next_migration[0]->set_start_time(gc_read->get_current_time());
-	//next_migration[1]->set_start_time(gc_read->get_current_time());
 	dependent_gc.at(block_id).pop_back();
 
 	if ( dependent_gc.at(block_id).empty()) {

@@ -22,8 +22,6 @@ public:
 protected:
 	void seperate_internal_external(vector<Event*> const& events, vector<Event*>& internal, vector<Event*>& external);
 	void seperate_by_type(vector<Event*> const& events, vector<Event*>& read_commands, vector<Event*>& copyback_commands, vector<Event*>& writes, vector<Event*>& erases);
-	void prioritize_oldest_event(vector<Event*>& events);
-	void return_to_queue_excessive_events(vector<Event*>& events);
 	IOScheduler* scheduler;
 	event_queue* queue;
 };

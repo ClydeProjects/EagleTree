@@ -260,23 +260,14 @@ void IOScheduler::handle_event(Event* event) {
 }
 
 void IOScheduler::handle_read(Event* event) {
-
-	if (event->get_application_io_id() == 2353679) {
-		/*printf("\t");
-		event->print();
-		PRINT_LEVEL = 1;
-	*/}
-
 	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
 	bool can_schedule = bm->can_schedule_on_die(event->get_address(), event->get_event_type(), event->get_application_io_id());
 
 	if (!can_schedule) {
-		//if (event->get_application_io_id() == 2353679) printf("cannot schedule\n");
 		event->incr_bus_wait_time(BUS_DATA_DELAY + BUS_CTRL_DELAY + time);
 		push(event);
 	}
 	else if (time > 0) {
-		//if (event->get_application_io_id() == 2353679) printf("time %f\n", time);
 		event->incr_bus_wait_time(time);
 		push(event);
 	}
@@ -288,7 +279,6 @@ void IOScheduler::handle_read(Event* event) {
 		dependencies[event->get_application_io_id()].pop_front();
 		setup_dependent_event(event, transfer);*/
 		long app_code = event->get_application_io_id();
-		//event->print();
 		execute_next(event);
 
 		Event* transfer = current_events->find(app_code);
@@ -297,11 +287,7 @@ void IOScheduler::handle_read(Event* event) {
 			transfer = overdue_events->find(app_code);
 			overdue_events->remove(transfer);
 		}
-		//transfer->print();
 		execute_next(transfer);
-
-		//transfer->print();
-		//execute_next(transfer);
 	}
 }
 
@@ -365,24 +351,12 @@ void IOScheduler::handle_flexible_read(Event* event) {
 
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_write(Event* event) {
-
-	if (event->get_application_io_id() == 1050083) {
-		//PRINT_LEVEL = 1;
-		int i = 0;
-		i++;
-	}
-
 	Address addr = event->get_address();
 	if (event->get_address().valid == NONE) {
 		addr = bm->choose_write_address(*event);
 	}
 	try_to_put_in_safe_cache(event);
 	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time(), WRITE);
-	/*if (wait_time > 0) {
-		wait_time = max(1.0, bm->in_how_long_can_this_write_be_scheduled( event->get_current_time() ));
-	}*/
-
-	//assert(wait_time1 == wait_time);
 
 	if (addr.valid == NONE && event->get_event_type() == COPY_BACK) {
 		transform_copyback(event);
@@ -534,56 +508,6 @@ enum status IOScheduler::execute_next(Event* event) {
 		}
 	}
 
-	if (event->get_event_type() == WRITE && event->is_garbage_collection_op()) {
-		//event->print();
-	}
-
-	if (event->get_event_type() == ERASE) {
-		//event->print();
-	}
-
-	/*if (StatisticsGatherer::get_global_instance()->total_writes() > 1000000) {
-		VisualTracer::write_to_file = true;
-	}
-
-	if (StatisticsGatherer::get_global_instance()->total_writes() > 1100000) {
-		VisualTracer::print_horizontally(40000);
-		Utilization_Meter::print();
-		exit(1);
-	}*/
-
-
-	/*if (StatisticsGatherer::get_global_instance()->total_writes() > 1240000) {
-		StateVisualiser::print_page_status();
-		VisualTracer::write_to_file = true;
-		int i = 0;
-		i++;
-	}
-
-	if (StatisticsGatherer::get_global_instance()->total_writes() > 1300000) {
-		VisualTracer::print_horizontally(50000);
-		Utilization_Meter::print();
-		StatisticsGatherer::get_global_instance()->print();
-		StatisticsGatherer::get_global_instance()->print_gc_info();
-		exit(1);
-	}*/
-	if (event->get_event_type() == ERASE) {
-		//event->print();
-	}
-
-	if (event->get_address().package == 3 && event->get_address().die == 0 && event->get_address().block == 881 && event->get_event_type() == READ_TRANSFER) {
-		//event->print();
-	}
-
-	if (event->get_replace_address().package == 0 && event->get_replace_address().die == 0 && event->get_replace_address().block == 554 && event->get_current_time() > 2409819035 - 10) {
-		//event->print();
-	}
-
-	/*if ((event->get_address().package == 1 && event->get_address().die == 1 && event->get_address().block == 98) ||
-			(event->get_replace_address().package == 1 && event->get_replace_address().die == 1 && event->get_replace_address().block == 98)) {
-		event->print();
-	}*/
-
 	handle_finished_event(event);
 
 	if (event->get_event_type() == READ_TRANSFER && event->is_garbage_collection_op()) {
@@ -614,7 +538,6 @@ enum status IOScheduler::execute_next(Event* event) {
 
 	if (safe_cache.exists(event->get_logical_address())) {
 		safe_cache.remove(event->get_logical_address());
-		//printf("removing from cache:  %d\n", event->get_logical_address());
 		delete event;
 	} else {
 		complete(event);
@@ -709,10 +632,8 @@ void IOScheduler::init_event(Event* event) {
 		ftl->set_read_address(*event);
 	}
 	else if (type == WRITE) {
-		//printf("new event  %d    %f\n", event->get_logical_address(), event->get_bus_wait_time());
 		bm->register_write_arrival(*event);
 		try_to_put_in_safe_cache(event);
-//		ftl->set_replace_address(*event);
 	}
 	else if (type == TRIM && event->get_replace_address().valid == NONE) {
 		ftl->set_replace_address(*event);

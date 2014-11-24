@@ -933,7 +933,7 @@ private:
 	void iterate(long& victim_key, entry& victim_entry, map<long, entry>::iterator start, map<long, entry>::iterator finish);
 	void create_mapping_read(long translation_page_id, double time, Event* dependant);
 	void lock_all_entries_in_a_translation_page(long translation_page_id, int lock, double time);
-	int evict_cold_entries();
+	int evict_cold_entries(double time);
 	map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
 	vector<Address> global_translation_directory; // tracks where translation pages are
 	set<long> ongoing_mapping_operations; // contains the logical addresses of ongoing mapping IOs
@@ -1531,16 +1531,6 @@ class File_System_With_Noise : public Workload_Definition {
 public:
 	vector<Thread*> generate();
 };
-
-class K2_Modal_Workload : public Workload_Definition {
-public:
-	K2_Modal_Workload(double relative_prob, double relative_size) :
-		relative_prob(relative_prob), relative_size(relative_size) {}
-	double relative_prob, relative_size;
-	vector<Thread*> generate();
-
-};
-
 
 class Synch_Random_Workload : public Workload_Definition {
 public:

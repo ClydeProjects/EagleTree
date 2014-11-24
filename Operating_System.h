@@ -355,54 +355,6 @@ public:
 };
 
 
-struct group_def {
-	group_def(double update_frequency, double size, int tag = UNDEFINED) : update_frequency(update_frequency), size(size), tag(tag) {}
-	group_def() : update_frequency(), size(), tag() {}
-	double update_frequency;
-	double size;
-	int tag;
-    friend class boost::serialization::access;
-    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
-    	ar & update_frequency;
-    	ar & size;
-    	ar & tag;
-    }
-};
-
-class Groups_Message : public Message {
-public:
-	Groups_Message(double time) : Message(time), redistribution_of_update_frequencies(false) {}
-	bool redistribution_of_update_frequencies;
-	vector<group_def> groups; // one pair for each group. The first double is the update frequency, between 0 and 1, and the second is the group size as a fraction of the whole
-};
-
-// Divides the workload across the logical address space into K groups
-class K_Modal_Thread : public Thread
-{
-public:
-
-	K_Modal_Thread(vector<group_def> k_modes) : k_modes(k_modes), random_number_generator(2) {
-		random_number_generator.seed(10);
-		for (auto k : k_modes) {
-			printf("%d   %d\n", k.update_frequency, k.size);
-		}
-	}
-	K_Modal_Thread() : k_modes(), random_number_generator(35) {}
-	virtual void issue_first_IOs();
-	virtual void handle_event_completion(Event* event);
-    friend class boost::serialization::access;
-    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
-    	ar & boost::serialization::base_object<Thread>(*this);
-    	ar & k_modes;
-    	ar & random_number_generator;
-    }
-protected:
-	void create_io();
-
-	vector<group_def> k_modes;
-	MTRand_open random_number_generator;
-};
-
 // This thread simulates the IO pattern of an external sort algorithm
 class External_Sort : public Thread
 {
@@ -710,45 +662,6 @@ private:
 	int progress_meter_granularity;
 };
 
-class Initial_Message : public Thread
-{
-public:
-	Initial_Message(vector<group_def> k_modes) : k_modes(k_modes) {}
-	Initial_Message() : k_modes() {}
-	void issue_first_IOs() {
-		Groups_Message* gm = new Groups_Message(get_time());
-		gm->groups = k_modes;
-		submit(gm);
-	}
-	void handle_event_completion(Event* event) {}
-    friend class boost::serialization::access;
-    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
-    	ar & boost::serialization::base_object<Thread>(*this);
-    	ar & k_modes;
-    }
-    vector<group_def> k_modes;
-};
-
-class K_Modal_Thread_Messaging : public K_Modal_Thread
-{
-public:
-	K_Modal_Thread_Messaging(vector<group_def> k_modes) : K_Modal_Thread(k_modes), counter(0), fac_num_ios_to_change_workload(2), fixed_groups(false) {}
-	K_Modal_Thread_Messaging() : K_Modal_Thread(), counter(0), fac_num_ios_to_change_workload(2), fixed_groups(false) {}
-	void issue_first_IOs();
-	void handle_event_completion(Event* event);
-    friend class boost::serialization::access;
-    template<class Archive> void serialize(Archive & ar, const unsigned int version) {
-    	ar & boost::serialization::base_object<K_Modal_Thread>(*this);
-    	ar & fac_num_ios_to_change_workload; ar & fixed_groups; ar & counter;
-    }
-    double fac_num_ios_to_change_workload;
-    double fixed_groups;
-private:
-	long counter;
-};
-
 }
-
-
 
 #endif /* OPERATING_SYSTEM_H_ */

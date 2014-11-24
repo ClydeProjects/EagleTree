@@ -1,30 +1,6 @@
 #include "../ssd.h"
 using namespace ssd;
 
-
-class K_Modal_Workload : public Workload_Definition {
-public:
-	K_Modal_Workload(vector<group_def> groups) : groups(groups), initialize_with_sequential_write(false) {}
-	vector<Thread*> generate();
-	vector<group_def> groups;
-	bool initialize_with_sequential_write;
-};
-
-
-vector<Thread*> K_Modal_Workload::generate() {
-	Thread* modes_t = new K_Modal_Thread(groups);
-	vector<Thread*> init;
-	if (initialize_with_sequential_write) {
-		Simple_Thread* seq = new Asynchronous_Sequential_Writer(0, NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR);
-		seq->add_follow_up_thread(modes_t);
-		init.push_back(seq);
-	}
-	else {
-		init.push_back(modes_t);
-	}
-	return init;
-}
-
 // All we need to do to declare a workload is extend the Workload_Definition class and override the generate method
 // This method returns a vector of threads, which the operating system will start running.
 class Example_Workload : public Workload_Definition {
@@ -35,7 +11,7 @@ public:
 vector<Thread*> Example_Workload::generate() {
 
 	// This workload begins with a large sequential write of the entire logical address space.
-	Simple_Thread* init_write = new Synchronous_Sequential_Writer(min_lba, max_lba);
+	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
 	init_write->set_io_size(1);
 	vector<Thread*> starting_threads;
 	starting_threads.push_back(init_write);
@@ -55,9 +31,9 @@ vector<Thread*> Example_Workload::generate() {
 	// and prints statistics.
 	int seed1 = 13515;
 	int seed2 = 264;
-	Simple_Thread* writer = new Asynchronous_Random_Reader_Writer(min_lba, max_lba, seed1, 0.8);
+	Simple_Thread* writer = new Asynchronous_Random_Writer(min_lba, max_lba, seed1);
 	Simple_Thread* reader = new Asynchronous_Random_Reader(min_lba, max_lba, seed2);
-	//init_write->add_follow_up_thread(reader);
+	init_write->add_follow_up_thread(reader);
 	init_write->add_follow_up_thread(writer);
 	writer->set_num_ios(INFINITE);
 	reader->set_num_ios(INFINITE);
@@ -69,26 +45,12 @@ int main()
 {
 	printf("Running EagleTree\n");
 	set_small_SSD_config();
-	SSD_SIZE = 4;
-	PACKAGE_SIZE = 2;
-	GREED_SCALE = 2;
-	BLOCK_MANAGER_ID = 5;
-	BLOCK_SIZE = 128;
-	PRINT_LEVEL = 0;
-	OVER_PROVISIONING_FACTOR = 0.7;
-	GARBAGE_COLLECTION_POLICY = 0;
 	string name  = "/demo_output/";
 	Experiment::create_base_folder(name.c_str());
 	Experiment* e = new Experiment();
-
-	vector<group_def > groups;
-	groups.push_back(group_def(80, 20));
-	groups.push_back(group_def(20, 80));
-	K_Modal_Workload* workload = new K_Modal_Workload(groups);
-	workload->initialize_with_sequential_write = true;
-
+	Workload_Definition* workload = new Example_Workload();
 	e->set_workload(workload);
-	e->set_io_limit(NUMBER_OF_ADDRESSABLE_PAGES() * 6);
+	e->set_io_limit(1000000);
 	e->run("test");
 	e->draw_graphs();
 	delete workload;

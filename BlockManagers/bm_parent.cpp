@@ -90,16 +90,9 @@ Address Block_manager_parent::choose_write_address(Event& write) {
 	//printf("num_available_pages_for_new_writes   %d\n", num_available_pages_for_new_writes);
 	bool can_write = num_available_pages_for_new_writes > 0 || write.is_garbage_collection_op();
 
-	if (write.get_id() == 1185934 && write.get_bus_wait_time() > 71000000) {
-		this->print();
-		//StateVisualiser::print_page_status();
-	}
-
 	if (!can_write) {
 		return Address();
 	}
-	int num_free_blocks = get_num_free_blocks();
-	int num_gc = migrator->how_many_gc_operations_are_scheduled();
 
 	if (write.get_event_type() == COPY_BACK) {
 		return choose_copbyback_address(write);
@@ -475,12 +468,6 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 		order.pop_back();
 		Address address = find_free_unused_block(package_id, die_id, index, time);
 		if (address.valid != NONE) {
-
-			if (address.package == 1 && address.die == 1 && address.block == 1021) {
-				//address.print();
-				//printf("\n");
-			}
-
 			return address;
 		}
 	}
@@ -498,7 +485,6 @@ Address Block_manager_parent::find_free_unused_block(uint package_id, uint die_i
 		assert(has_free_pages(to_return));
 	}
 	if (to_return.valid != NONE &&  num_free_blocks_left == 0) {
-		//printf("here yo\n");
 		//StateVisualiser::print_page_status();
 	}
 	if (num_free_blocks_left < GREED_SCALE) {
@@ -578,9 +564,7 @@ Block_manager_parent* Block_manager_parent::get_new_instance() {
 		case 1: bm = new Shortest_Queue_Hot_Cold_BM(); break;
 		case 2: bm = new Sequential_Locality_BM(); break;
 		case 3: bm = new Block_manager_roundrobin(); break;
-		case 4: bm = new Wearwolf(); break;
 		case 5: bm = new Block_Manager_Tag_Groups(); break;
-		case 6: bm = new Block_Manager_Groups(); break;
 		case 7: bm = new bm_gc_locality(); break;
 		default: bm = new Block_manager_parallel(); break;
 	}
