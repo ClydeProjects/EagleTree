@@ -13,6 +13,7 @@
 #include <queue>
 #include <deque>
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <algorithm>
 #include <boost/archive/text_oarchive.hpp>
@@ -897,6 +898,7 @@ public:
 	void set_replace_address(Event& event) const;
 	void set_read_address(Event& event) const;
 	void print() const;
+	void print_short() const;
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
@@ -928,13 +930,23 @@ private:
 	    	ar & timestamp;
 	    }
 	};
-
-	void flush_mapping(double time);
-	void iterate(long& victim_key, entry& victim_entry, map<long, entry>::iterator start, map<long, entry>::iterator finish);
+	struct stats {
+		stats() : num_mapping_reads(0), num_mapping_writes(0) {}
+		long num_mapping_reads;
+		long num_mapping_writes;
+		void print() const;
+	};
+	stats stats;
+	int get_num_dirty_entries() const;
+	bool flush_mapping(double time, bool allow_flushing_dirty, int& dial);
+	void iterate(long& victim_key, entry& victim_entry, map<long, entry>::iterator& start, map<long, entry>::iterator& finish, bool allow_choosing_dirty);
+	void iterate2(long& victim_key, entry& victim_entry, bool allow_choosing_dirty);
 	void create_mapping_read(long translation_page_id, double time, Event* dependant);
 	void lock_all_entries_in_a_translation_page(long translation_page_id, int lock, double time);
-	int evict_cold_entries(double time);
+	void try_clear_space_in_mapping_cache(double time);
 	map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
+	queue<long> eviction_queue_dirty;
+	queue<long> eviction_queue_clean;
 	vector<Address> global_translation_directory; // tracks where translation pages are
 	set<long> ongoing_mapping_operations; // contains the logical addresses of ongoing mapping IOs
 	map<long, vector<Event*> > application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
@@ -942,8 +954,24 @@ private:
 	FtlImpl_Page page_mapping;
 	int CACHED_ENTRIES_THRESHOLD;
 	int num_dirty_cached_entries;
-	int dial;
+	int dial, dial2;
 	int ENTRIES_PER_TRANSLATION_PAGE;
+
+	// allow randomly picking a victim by access to a random element in the vector, log(n)
+	// allow making element cold in log(n) by removing from map, finding index in vector, and removing element from vector, nullifying element
+	// need to occasionally compress the vector
+	struct temp_detector {
+		temp_detector() : logical_addr_to_index_in_vector(), addresses(), num_removed_from_addresses(0) {}
+		void make_cold(int logical_addr);
+		int get_random_victim();
+		map<int, int> logical_addr_to_index_in_vector;
+		vector<int> addresses;
+		int num_removed_from_addresses;
+	private:
+		void compress_table();
+	};
+	temp_detector temp_detector;
+
 };
 
 class LSM_FTL : public FtlParent {
