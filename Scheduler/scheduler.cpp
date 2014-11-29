@@ -501,7 +501,7 @@ enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd->issue(event);
 	assert(result == SUCCESS);
 
-	if (PRINT_LEVEL > 0  && (event->get_event_type() == WRITE || event->get_event_type() == ERASE)   /* && event->is_garbage_collection_op() && (event->get_event_type() == WRITE || event->get_event_type() == ERASE)*/ ) {
+	if (PRINT_LEVEL > 0  && (event->get_event_type() == WRITE || event->get_event_type() == ERASE || event->get_event_type() == READ_TRANSFER)   /* && event->is_garbage_collection_op() && (event->get_event_type() == WRITE || event->get_event_type() == ERASE)*/ ) {
 		event->print();
 		if (event->is_flexible_read()) {
 			//printf("FLEX\n");
@@ -763,7 +763,7 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		remove_current_operation(new_event);
 		push(new_event); // Make sure the old GC READ is run, even though it is now a NOOP command
 		LBA_currently_executing[common_logical_address] = dependency_code_of_other_event;
-		if (existing_event->is_garbage_collection_op() && !existing_event->is_original_application_io()) {
+		if (existing_event->is_garbage_collection_op() && !existing_event->is_original_application_io() && !existing_event->is_mapping_op()) {
 			bm->register_trim_making_gc_redundant(new_event);
 		}
 	}
