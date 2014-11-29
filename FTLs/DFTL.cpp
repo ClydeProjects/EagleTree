@@ -100,12 +100,12 @@ void DFTL::register_read_completion(Event const& event, enum status result) {
 	long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
 
 	// Insert all entries into cached mapping table with hotness 0
-	for (int i = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE; i < (translation_page_id + 1) * ENTRIES_PER_TRANSLATION_PAGE; i++) {
+	/*for (int i = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE; i < (translation_page_id + 1) * ENTRIES_PER_TRANSLATION_PAGE; i++) {
 		if (cached_mapping_table.count(i) == 0) {
 			cached_mapping_table[i] = entry();
 			eviction_queue_clean.push(i);
 		}
-	}
+	}*/
 
 	// schedule all operations
 	vector<Event*> waiting_events = application_ios_waiting_for_translation[translation_page_id];
@@ -118,29 +118,31 @@ void DFTL::register_read_completion(Event const& event, enum status result) {
 				continue;
 			}
 			//printf("now submitting mapping write  %d\n", translation_page_id);
-			//lock_all_entries_in_a_translation_page(translation_page_id, -1, event.get_current_time());
 			ongoing_mapping_operations.insert(e->get_logical_address());
 		}
-		else if (e->get_event_type() == WRITE) {
-			assert(cached_mapping_table.count(e->get_logical_address()) == 1);
-			entry& en = cached_mapping_table.at(e->get_logical_address());
-			en.hotness++;
-			en.timestamp = numeric_limits<double>::infinity();
-			if (en.fixed == 0) {
-				en.fixed++;
+		else  {
+			long fixed = 0;
+			if (cached_mapping_table.count(e->get_logical_address()) == 0) {
+				entry entry;
+				entry.hotness++;
+				fixed = 0;
+				cached_mapping_table[e->get_logical_address()] = entry;
 			}
-		}
-		else {
-			assert(cached_mapping_table.count(e->get_logical_address()) == 1);
-			entry& en = cached_mapping_table.at(e->get_logical_address());
-			en.hotness++;
+			else {
+				entry& entry = cached_mapping_table[e->get_logical_address()];
+				entry.hotness++;
+				fixed = entry.fixed;
+			}
+			if (e->get_event_type() == WRITE && fixed == 0) {
+				entry& entry = cached_mapping_table[e->get_logical_address()];
+				entry.fixed++;
+			}
 		}
 		scheduler->schedule_event(e);
 	}
 
 	// Made sure we don't overuse RAM
 	try_clear_space_in_mapping_cache(event.get_current_time());
-
 }
 
 void DFTL::write(Event *event)
@@ -158,6 +160,7 @@ void DFTL::write(Event *event)
 	if (cached_mapping_table.count(la) == 1) {
 		entry& e = cached_mapping_table.at(la);
 		e.hotness++;
+
 		e.fixed++;
 		scheduler->schedule_event(event);
 		return;
@@ -250,7 +253,7 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 	global_translation_directory[translation_page_id] = event.get_address();
 
 	// mark all pages included as clean
-	lock_all_entries_in_a_translation_page(translation_page_id, -1, event.get_start_time());
+	lock_all_entries_in_a_translation_page(translation_page_id, event.get_start_time());
 
 	// really, we should not be exceeding the threshold here, but just in case we are, evict entries
 	try_clear_space_in_mapping_cache(event.get_current_time());
@@ -321,36 +324,23 @@ void DFTL::set_read_address(Event& event) const {
 	}
 }
 
-void DFTL::lock_all_entries_in_a_translation_page(long translation_page_id, int lock, double time) {
-	if (translation_page_id == 2 && time > 11768785.0) {
-		int i = 0;
-		i++;
-	}
+void DFTL::lock_all_entries_in_a_translation_page(long translation_page_id, double time) {
 	int num_dirty_entries = 0;
 	long first_key_in_translation_page = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE;
-	for (auto it = cached_mapping_table.lower_bound(first_key_in_translation_page);
-			it != cached_mapping_table.upper_bound(first_key_in_translation_page + ENTRIES_PER_TRANSLATION_PAGE); ++it) {
-		long curr_key = (*it).first;
-		entry& e = (*it).second;
-
-		if (lock == 1 && e.timestamp <= time && e.fixed == 0 && e.dirty) {
-			//e.fixed++;
+	for (int i = first_key_in_translation_page;
+			i < first_key_in_translation_page + ENTRIES_PER_TRANSLATION_PAGE; ++i) {
+		if (cached_mapping_table.count(i) == 0) {
+			continue;
 		}
-
+		long curr_key = i;
+		entry& e = cached_mapping_table[i];
 		assert(e.fixed >= 0);
-
-		if (curr_key == 1216 && time > 11768785.0) {
-			int i =0;
-			i++;
-		}
-
-		if (lock == -1 && /*e.fixed > 0 &&*/ e.timestamp <= time && e.dirty) {
+		if (e.timestamp <= time && e.dirty) {
 			e.dirty = false;
-			//e.fixed--;
 			num_dirty_entries++;
-			//num_dirty_cached_entries--;
 		}
 	}
+
 	//printf("mapping write %d cleans: %d   num dirty: %d   cache size: %d\n", translation_page_id, num_dirty_entries, get_num_dirty_entries(), cached_mapping_table.size());
 }
 
@@ -570,7 +560,6 @@ bool DFTL::flush_mapping(double time, bool allow_flushing_dirty, int& dial) {
 	// create mapping write
 	Event* mapping_event = new Event(WRITE, NUM_PAGES_IN_SSD - translation_page_id, 1, time);
 	mapping_event->set_mapping_op(true);
-	//lock_all_entries_in_a_translation_page(translation_page_id, 1, time);
 
 	if (mapping_event->get_logical_address() == 1048259) {
 		int i = 0;
@@ -588,19 +577,15 @@ bool DFTL::flush_mapping(double time, bool allow_flushing_dirty, int& dial) {
 
 	// If the translation page already exists, check if all entries belonging to it are in the cache.
 	long first_key_in_translation_page = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE;
-	bool are_all_mapping_entries_cached = cached_mapping_table.count(first_key_in_translation_page) == 1 &&
-			cached_mapping_table.count(first_key_in_translation_page + ENTRIES_PER_TRANSLATION_PAGE) == 1;
+	bool are_all_mapping_entries_cached = false;
 
 	long last_addr = first_key_in_translation_page;
-	for (auto it = cached_mapping_table.find(first_key_in_translation_page);
-			are_all_mapping_entries_cached && it != cached_mapping_table.find(first_key_in_translation_page + ENTRIES_PER_TRANSLATION_PAGE); ++it) {
-		long curr_key = (*it).first;
-		if (last_addr == curr_key || last_addr + 1 == curr_key) {
-			last_addr = curr_key;
-		} else {
+	/*for (int i = first_key_in_translation_page; i < first_key_in_translation_page + ENTRIES_PER_TRANSLATION_PAGE; ++i) {
+		if (cached_mapping_table.count(i) == 0) {
 			are_all_mapping_entries_cached = false;
+			break;
 		}
-	}
+	}*/
 
 	if (are_all_mapping_entries_cached) {
 		application_ios_waiting_for_translation[translation_page_id] = vector<Event*>();

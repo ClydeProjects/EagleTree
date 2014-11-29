@@ -904,7 +904,7 @@ public:
     void serialize(Archive & ar, const unsigned int version)
     {
     	ar & boost::serialization::base_object<FtlParent>(*this);
-    	ar & cached_mapping_table;
+    	//ar & cached_mapping_table;
     	ar & global_translation_directory;
     	ar & ongoing_mapping_operations;
     	ar & NUM_PAGES_IN_SSD;
@@ -942,9 +942,9 @@ private:
 	void iterate(long& victim_key, entry& victim_entry, map<long, entry>::iterator& start, map<long, entry>::iterator& finish, bool allow_choosing_dirty);
 	void iterate2(long& victim_key, entry& victim_entry, bool allow_choosing_dirty);
 	void create_mapping_read(long translation_page_id, double time, Event* dependant);
-	void lock_all_entries_in_a_translation_page(long translation_page_id, int lock, double time);
+	void lock_all_entries_in_a_translation_page(long translation_page_id, double time);
 	void try_clear_space_in_mapping_cache(double time);
-	map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
+	unordered_map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
 	queue<long> eviction_queue_dirty;
 	queue<long> eviction_queue_clean;
 	vector<Address> global_translation_directory; // tracks where translation pages are
