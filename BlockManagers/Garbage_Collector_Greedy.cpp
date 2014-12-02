@@ -4,18 +4,16 @@ using namespace ssd;
 
 Garbage_Collector_Greedy::Garbage_Collector_Greedy()
 	:  Garbage_Collector(),
-	   gc_candidates(SSD_SIZE, vector<vector<set<long> > >(PACKAGE_SIZE, vector<set<long> >(1, set<long>())))
+	   gc_candidates(SSD_SIZE, vector<set<long> >(PACKAGE_SIZE, set<long>()))
 {}
 
 Garbage_Collector_Greedy::Garbage_Collector_Greedy(Ssd* ssd, Block_manager_parent* bm)
 	:  Garbage_Collector(ssd, bm),
-	   gc_candidates(SSD_SIZE, vector<vector<set<long> > >(PACKAGE_SIZE, vector<set<long> >(bm->get_num_age_classes(), set<long>())))
+	   gc_candidates(SSD_SIZE, vector<set<long> >(PACKAGE_SIZE, set<long>()))
 {}
 
-void Garbage_Collector_Greedy::remove_as_gc_candidate(Address const& phys_address) {
-	for (int i = 0; i < num_age_classes; i++) {
-		gc_candidates[phys_address.package][phys_address.die][i].erase(phys_address.get_linear_address());
-	}
+void Garbage_Collector_Greedy::commit_choice_of_victim(Address const& phys_address) {
+	gc_candidates[phys_address.package][phys_address.die].erase(phys_address.get_linear_address());
 }
 
 vector<long> Garbage_Collector_Greedy::get_relevant_gc_candidates(int package_id, int die_id, int klass) const {
@@ -26,17 +24,10 @@ vector<long> Garbage_Collector_Greedy::get_relevant_gc_candidates(int package_id
 		int die = die_id == -1 ? 0 : die_id;
 		int num_dies = die_id == -1 ? PACKAGE_SIZE : die_id + 1;
 		for (; die < num_dies; die++) {
-			int age_class = klass == -1 ? 0 : klass;
-			int num_classes = klass == -1 ? num_age_classes : klass + 1;
-			for (; age_class < num_classes; age_class++) {
-				for (auto i :  gc_candidates[package][die][age_class]) {
-					candidates.push_back(i);
-				}
+			for (auto i : gc_candidates[package][die]) {
+				candidates.push_back(i);
 			}
 		}
-	}
-	if (candidates.size() == 0 && klass != -1) {
-		candidates = get_relevant_gc_candidates(package_id, die_id, -1);
 	}
 	return candidates;
 }
@@ -58,17 +49,18 @@ Block* Garbage_Collector_Greedy::choose_gc_victim(int package_id, int die_id, in
 	return best_block;
 }
 
-void Garbage_Collector_Greedy::register_trim(Event const& event, uint age_class, int num_live_pages) {
+void Garbage_Collector_Greedy::register_event_completion(Event const& event) {
 	Address ra = event.get_replace_address();
-	assert(ra.valid != NONE);
+	if (ra.valid == NONE) {
+		return;
+	}
 	ra.valid = BLOCK;
 	ra.page = 0;
-	remove_as_gc_candidate(ra);
 	if (PRINT_LEVEL > 1) {
 		//printf("Inserting as GC candidate: %ld ", ra.get_linear_address()); ra.print(); printf(" with age_class %d and valid blocks: %d\n", num_live_pages);
 	}
-	gc_candidates[ra.package][ra.die][age_class].insert(ra.get_linear_address());
-	if (gc_candidates[ra.package][ra.die][age_class].size() == 1) {
+	gc_candidates[ra.package][ra.die].insert(ra.get_linear_address());
+	if (gc_candidates[ra.package][ra.die].size() == 1) {
 		bm->check_if_should_trigger_more_GC(event);
 	}
 }

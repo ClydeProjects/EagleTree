@@ -143,14 +143,10 @@ int GREED_SCALE = 2;
  * 0 -> Page FTL
  * 1 -> DFTL
  * 2 -> FAST
+ * 3 -> LSM FTL
  */
 int FTL_DESIGN = 0;
 bool IS_FTL_PAGE_MAPPING = 0;
-
-// The number of entries that fit into the in-RAM cache of DFTL
-int DFTL_CACHE_SIZE = 10000;
-// The number of entries that fit into one flash translation page in DFTL
-int DFTL_ENTRIES_PER_TRANSLATION_PAGE = 512;
 
 /* Output level of detail:
  * 0 -> Nothing
@@ -255,10 +251,10 @@ void load_entry(char *name, double value, uint line_number) {
 
 void set_small_SSD_config() {
 	SSD_SIZE = 4;
-	PACKAGE_SIZE = 8;
+	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 64;
-	BLOCK_SIZE = 16;
+	PLANE_SIZE = 1024;
+	BLOCK_SIZE = 128;
 
 	PAGE_READ_DELAY = 115;
 	PAGE_WRITE_DELAY = 1600;

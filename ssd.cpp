@@ -56,8 +56,10 @@ Ssd::Ssd():
 		ftl = new FtlImpl_Page(this, bm);
 	} else if (FTL_DESIGN == 1) {
 		ftl = new DFTL(this, bm);
-	} else {
+	} else if (FTL_DESIGN == 2) {
 		ftl = new FAST(this, bm, migrator);
+	} else {
+		ftl = new LSM_FTL(this, bm);
 	}
 
 	scheduler = new IOScheduler();
@@ -68,11 +70,12 @@ Ssd::Ssd():
 	ftl->set_scheduler(scheduler);
 
 	Garbage_Collector* gc = NULL;
-	if (GARBAGE_COLLECTION_POLICY == 0){
+	if (GARBAGE_COLLECTION_POLICY == 0) {
 		gc = new Garbage_Collector_Greedy(this, bm);
-	}
-	else {
+	} else if (GARBAGE_COLLECTION_POLICY == 0) {
 		gc = new Garbage_Collector_LRU(this, bm);
+	} else {
+		gc = new Garbage_Collector_LRU2(this, bm);
 	}
 
 	Wear_Leveling_Strategy* wl = new Wear_Leveling_Strategy(this, migrator);

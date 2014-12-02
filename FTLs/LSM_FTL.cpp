@@ -14,10 +14,8 @@ LSM_FTL::LSM_FTL(Ssd *ssd, Block_manager_parent* bm) :
 		application_ios_waiting_for_translation(),
 		NUM_PAGES_IN_SSD(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE),
 		page_mapping(FtlImpl_Page(ssd, bm)),
-		CACHED_ENTRIES_THRESHOLD(DFTL_CACHE_SIZE),
 		num_dirty_cached_entries(0),
-		dial(0),
-		ENTRIES_PER_TRANSLATION_PAGE(DFTL_ENTRIES_PER_TRANSLATION_PAGE)
+		dial(0)
 {
 	IS_FTL_PAGE_MAPPING = true;
 }
@@ -73,7 +71,7 @@ void LSM_FTL::read(Event *event)
 	}
 }
 
-void DFTL::register_read_completion(Event const& event, enum status result) {
+void LSM_FTL::register_read_completion(Event const& event, enum status result) {
 	// if normal application read, do nothing
 	if (ongoing_mapping_operations.count(event.get_logical_address()) == 0) {
 		return;

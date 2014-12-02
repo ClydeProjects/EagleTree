@@ -476,9 +476,8 @@ public:
 	Garbage_Collector() : ssd(NULL), bm(NULL), num_age_classes(1) {}
 	Garbage_Collector(Ssd* ssd, Block_manager_parent* bm) : ssd(ssd), bm(bm), num_age_classes(bm->get_num_age_classes()) {}
 	virtual ~Garbage_Collector() {}
-	virtual void register_trim(Event const& event, uint age_class, int num_live_pages) = 0;
+	virtual void register_event_completion(Event const& event) {};
 	virtual Block* choose_gc_victim(int package_id, int die_id, int klass) const = 0;
-	virtual void remove_as_gc_candidate(Address const& phys_address) = 0;
 	virtual void commit_choice_of_victim(Address const& phys_address) = 0;
 	void set_block_manager(Block_manager_parent* b) { bm = b; }
     friend class boost::serialization::access;
@@ -508,12 +507,12 @@ public:
 	Garbage_Collector_Greedy(Ssd* ssd, Block_manager_parent* bm);
 	// Called by the block manager after any page in the SSD is invalidated, as a result of a trim or a write.
 	// This is used to keep the gc_candidates structure updated.
-	void register_trim(Event const& event, uint age_class, int num_live_pages);
+	virtual void register_event_completion(Event const& event);
+
 	// Called by the block manager to ask the garbage-collector for a good block to garbage-collect in a given package, die, and with a certain age.
 	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
 	// Called by the block manager when a GC operation for a certain block has been issued. This block is removed from the gc_candidates structure.
-	void remove_as_gc_candidate(Address const& phys_address);
-	void commit_choice_of_victim(Address const& phys_address) {remove_as_gc_candidate(phys_address);}
+	void commit_choice_of_victim(Address const& phys_address);
 	friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
@@ -523,7 +522,7 @@ public:
     }
 private:
 	vector<long> get_relevant_gc_candidates(int package_id, int die_id, int klass) const;
-	vector<vector<vector<set<long> > > > gc_candidates;  // each age class has a vector of candidates for GC
+	vector<vector<set<long> > > gc_candidates;
 };
 
 class Garbage_Collector_LRU : public Garbage_Collector {
@@ -532,11 +531,9 @@ public:
 	Garbage_Collector_LRU(Ssd* ssd, Block_manager_parent* bm);
 	// Called by the block manager after any page in the SSD is invalidated, as a result of a trim or a write.
 	// This is used to keep the gc_candidates structure updated.
-	void register_trim(Event const& event, uint age_class, int num_live_pages) {}
 	// Called by the block manager to ask the garbage-collector for a good block to garbage-collect in a given package, die, and with a certain age.
 	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
 	// Called by the block manager when a GC operation for a certain block has been issued. This block is removed from the gc_candidates structure.
-	void remove_as_gc_candidate(Address const& phys_address) {}
 	void commit_choice_of_victim(Address const& phys_address);
 	friend class boost::serialization::access;
     template<class Archive>
@@ -549,6 +546,27 @@ private:
 	vector<vector<int> > gc_candidates;  // each age class has a vector of candidates for GC
 };
 
+class Garbage_Collector_LRU2 : public Garbage_Collector {
+public:
+	Garbage_Collector_LRU2();
+	Garbage_Collector_LRU2(Ssd* ssd, Block_manager_parent* bm);
+	// Called by the block manager after any page in the SSD is invalidated, as a result of a trim or a write.
+	// This is used to keep the gc_candidates structure updated.
+	virtual void register_event_completion(Event const& event);
+	// Called by the block manager to ask the garbage-collector for a good block to garbage-collect in a given package, die, and with a certain age.
+	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
+	// Called by the block manager when a GC operation for a certain block has been issued. This block is removed from the gc_candidates structure.
+	void commit_choice_of_victim(Address const& phys_address);
+	friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+    	ar & boost::serialization::base_object<Garbage_Collector>(*this);
+    	ar & gc_candidates;
+    }
+private:
+	vector<vector<queue<int> > > gc_candidates;  // for each die, a queue of blocks to be erased
+};
 
 }
 #endif /* BLOCK_MANAGEMENT_H_ */

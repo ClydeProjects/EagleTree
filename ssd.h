@@ -144,11 +144,6 @@ extern bool ALLOW_DEFERRING_TRANSFERS;
  */
 extern const uint FTL_IMPLEMENTATION;
 
-/*
- * Number of blocks allowed to be in DFTL Cached Mapping Table.
- */
-extern const uint CACHE_DFTL_LIMIT;
-
 /* Virtual block size (as a multiple of the physical block size) */
 //extern const uint VIRTUAL_BLOCK_SIZE;
 
@@ -184,11 +179,6 @@ extern int READ_TRANSFER_DEADLINE;
 
 extern int FTL_DESIGN;
 extern bool IS_FTL_PAGE_MAPPING;
-
-// The number of entries that fit into the in-RAM cache of DFTL
-extern int DFTL_CACHE_SIZE;
-// The number of entries that fit into one flash translation page in DFTL
-extern int DFTL_ENTRIES_PER_TRANSLATION_PAGE;
 
 /*
  * Controls the level of detail of output
@@ -910,10 +900,10 @@ public:
     	ar & NUM_PAGES_IN_SSD;
     	ar & page_mapping;
     	ar & CACHED_ENTRIES_THRESHOLD;
-    	ar & num_dirty_cached_entries;
-    	ar & dial;
     	ar & ENTRIES_PER_TRANSLATION_PAGE;
     }
+	static int CACHED_ENTRIES_THRESHOLD;
+	static int ENTRIES_PER_TRANSLATION_PAGE;
 private:
 	struct entry {
 		entry() : dirty(false), fixed(false), hotness(0), timestamp(numeric_limits<double>::infinity()) {}
@@ -938,9 +928,8 @@ private:
 	};
 	stats stats;
 	int get_num_dirty_entries() const;
-	bool flush_mapping(double time, bool allow_flushing_dirty, int& dial);
-	void iterate(long& victim_key, entry& victim_entry, map<long, entry>::iterator& start, map<long, entry>::iterator& finish, bool allow_choosing_dirty);
-	void iterate2(long& victim_key, entry& victim_entry, bool allow_choosing_dirty);
+	bool flush_mapping(double time, bool allow_flushing_dirty);
+	void iterate(long& victim_key, entry& victim_entry, bool allow_choosing_dirty);
 	void create_mapping_read(long translation_page_id, double time, Event* dependant);
 	void lock_all_entries_in_a_translation_page(long translation_page_id, double time);
 	void try_clear_space_in_mapping_cache(double time);
@@ -952,25 +941,6 @@ private:
 	map<long, vector<Event*> > application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
 	int NUM_PAGES_IN_SSD;
 	FtlImpl_Page page_mapping;
-	int CACHED_ENTRIES_THRESHOLD;
-	int num_dirty_cached_entries;
-	int dial, dial2;
-	int ENTRIES_PER_TRANSLATION_PAGE;
-
-	// allow randomly picking a victim by access to a random element in the vector, log(n)
-	// allow making element cold in log(n) by removing from map, finding index in vector, and removing element from vector, nullifying element
-	// need to occasionally compress the vector
-	struct temp_detector {
-		temp_detector() : logical_addr_to_index_in_vector(), addresses(), num_removed_from_addresses(0) {}
-		void make_cold(int logical_addr);
-		int get_random_victim();
-		map<int, int> logical_addr_to_index_in_vector;
-		vector<int> addresses;
-		int num_removed_from_addresses;
-	private:
-		void compress_table();
-	};
-	temp_detector temp_detector;
 
 };
 

@@ -44,6 +44,9 @@ void Migrator::register_event_completion(Event* event) {
 	else if (event->get_event_type() == TRIM || (event->get_event_type() == WRITE && event->get_replace_address().valid != NONE)) {
 		handle_trim_completion(event);
 	}
+	if (event->get_event_type() == WRITE) {
+		gc->register_event_completion(*event);
+	}
 }
 
 void Migrator::handle_erase_completion(Event* event) {
@@ -111,14 +114,8 @@ void Migrator::handle_trim_completion(Event* event) {
 		blocks_being_garbage_collected.at(block.get_physical_address())--;
 	}
 
-	// TODO: fix thresholds for inserting blocks into GC lists. ALSO Revise the condition.
-	if (blocks_being_garbage_collected.count(block.get_physical_address()) == 0 &&
-			(block.get_state() == ACTIVE || block.get_state() == PARTIALLY_FREE) && block.get_pages_valid() < BLOCK_SIZE) {
-		gc->register_trim(*event, age_class, block.get_pages_valid());
-	}
-
 	if (blocks_being_garbage_collected.count(phys_addr) == 0 && block.get_state() == INACTIVE) {
-		gc->remove_as_gc_candidate(ra);
+		gc->commit_choice_of_victim(ra);
 		blocks_being_garbage_collected[phys_addr] = 0;
 		num_blocks_being_garbaged_collected_per_LUN[ra.package][ra.die]++;
 		issue_erase(ra, event->get_current_time());
