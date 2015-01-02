@@ -60,7 +60,7 @@ void FtlImpl_Page::trim(Event *event)
 }
 
 void FtlImpl_Page::register_write_completion(Event const& event, enum status result) {
-
+	collect_stats(event);
 	if (event.get_noop()) {
 		return;
 	}
@@ -77,7 +77,7 @@ void FtlImpl_Page::register_write_completion(Event const& event, enum status res
 }
 
 void FtlImpl_Page::register_read_completion(Event const& event, enum status result) {
-
+	collect_stats(event);
 }
 
 void FtlImpl_Page::register_trim_completion(Event & event) {

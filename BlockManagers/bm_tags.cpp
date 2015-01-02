@@ -80,11 +80,6 @@ void Block_Manager_Tag_Groups::register_erase_outcome(Event& event, enum status 
 	int p = event.get_address().package;
 	int d = event.get_address().die;
 
-	if (p == 1 && event.get_address().block == 11) {
-		int i = 0;
-		i++;
-	}
-
 	for (auto t : free_block_pointers_tags) {
 		Address& a = free_block_pointers_tags.at(t.first)[p][d];
 		if (!has_free_pages(a)) {
@@ -106,18 +101,14 @@ Address Block_Manager_Tag_Groups::choose_best_address(Event& write) {
 	}
 
 	int tag = write.get_tag();
-
 	if (tag == UNDEFINED && write.is_garbage_collection_op()) {
 		long lba = write.get_logical_address();
-		map<int, vector<vector<Address> > >::iterator it = free_block_pointers_tags.lower_bound(lba);
-		tag = (*it).first;
-		if (lba != tag) {
-			it--;
+		for (auto& i : free_block_pointers_tags) {
+			if (i.first > tag && i.first <= lba) {
+				tag = i.first;
+			}
 		}
-		if (it != free_block_pointers_tags.end()) {
-			tag = (*it).first;
-			write.set_tag(tag);
-		}
+		write.set_tag(tag);
 	}
 
 	pair<bool, pair<int, int> > result = get_free_block_pointer_with_shortest_IO_queue(free_block_pointers_tags.at(tag));
@@ -144,11 +135,18 @@ Address Block_Manager_Tag_Groups::choose_any_address(Event const& write) {
 	return Address();
 }
 
-void Block_Manager_Tag_Groups::print() {
+void Block_Manager_Tag_Groups::print() const{
 	int mixed = 0;
 
 	for (auto i : free_block_pointers_tags) {
 		cout << i.first << endl;
+		for (auto p : i.second) {
+			for (auto d : p) {
+				printf("\t");
+				d.print();
+				printf("\n");
+			}
+		}
 	}
 
 	map<int, int> histogram;
@@ -164,7 +162,7 @@ void Block_Manager_Tag_Groups::print() {
 						if (la == UNDEFINED) {
 							continue;
 						}
-						map<int, vector<vector<Address> > >::iterator i = free_block_pointers_tags.lower_bound(la);
+						map<int, vector<vector<Address> > >::const_iterator i = free_block_pointers_tags.lower_bound(la);
 						if ( (*i).first != la ) {
 							i--;
 						}

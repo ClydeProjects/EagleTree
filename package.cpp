@@ -45,6 +45,12 @@ enum status Package::lock(double start_time, double duration, Event& event) {
 
 	Utilization_Meter::register_event(currently_executing_operation_finish_time, duration, event, PACKAGE);
 
+	if (currently_executing_operation_finish_time > event.get_current_time()) {
+		VisualTracer::print_horizontally(300);
+		event.print();
+		printf("currently_executing_io_finish_time: %f     %f\n", currently_executing_operation_finish_time, event.get_current_time());
+	}
+
 	if (currently_executing_operation_finish_time > event.get_current_time() + 0.000001) {
 		assert(false);
 	}

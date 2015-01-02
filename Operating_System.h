@@ -170,6 +170,27 @@ private:
 };
 
 // Creates a uniformly randomly distributed IO pattern acress the target logical address space
+class Random_IO_Pattern_Collision_Free : public IO_Pattern
+{
+public:
+	Random_IO_Pattern_Collision_Free() : IO_Pattern(), random_number_generator(23623620), counter(0) {}
+	Random_IO_Pattern_Collision_Free(long min_LBA, long max_LBA, ulong seed);
+	~Random_IO_Pattern_Collision_Free() {};
+	void reinit();
+	int next();
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int version) {
+    	ar & boost::serialization::base_object<IO_Pattern>(*this);
+    	ar & random_number_generator;
+    }
+private:
+	MTRand_int32 random_number_generator;
+	vector<int> candidates;
+	int counter;
+};
+
+// Creates a uniformly randomly distributed IO pattern acress the target logical address space
 class Sequential_IO_Pattern : public IO_Pattern
 {
 public:
@@ -259,6 +280,16 @@ public:
     template<class Archive> void serialize(Archive & ar, const unsigned int version) {
     	ar & boost::serialization::base_object<Simple_Thread>(*this);
     }
+};
+
+
+// This thread performs synchronous random writes across the target address space
+class Synchronous_No_Collision_Random_Writer : public Simple_Thread
+{
+public:
+	Synchronous_No_Collision_Random_Writer() : Simple_Thread() {}
+	Synchronous_No_Collision_Random_Writer(long min_LBA, long max_LBA, ulong randseed)
+		: Simple_Thread(new Random_IO_Pattern_Collision_Free(min_LBA, max_LBA, randseed), new WRITES(), 1, INFINITE) {}
 };
 
 // This thread performs synchronous random reads across the target address space
@@ -602,20 +633,20 @@ private:
 class OS_Scheduler {
 public:
 	virtual ~OS_Scheduler() {}
-	virtual int pick(map<int, Thread*> const& threads) = 0;
+	virtual int pick(unordered_map<int, Thread*> const& threads) = 0;
 };
 
 // This is a FIFO scheduler that implements a simple IO queue.
 class FIFO_OS_Scheduler : public OS_Scheduler {
 public:
-	int pick(map<int, Thread*> const& threads);
+	int pick(unordered_map<int, Thread*> const& threads);
 };
 
 // This is a fair IO scheduler that tries to schedule IOs from different threads in round robin
 class FAIR_OS_Scheduler : public OS_Scheduler {
 public:
 	FAIR_OS_Scheduler() : last_id(0) {}
-	int pick(map<int, Thread*> const& threads);
+	int pick(unordered_map<int, Thread*> const& threads);
 private:
 	int last_id;
 };
@@ -648,9 +679,9 @@ private:
 	double get_event_minimal_completion_time(Event const*const event) const;
 	void setup_follow_up_threads(int thread_id, double time);
 	Ssd * ssd;
-	map<int, Thread*> threads;
+	unordered_map<int, Thread*> threads;
 	vector<Thread*> historical_threads;
-	map<long, long> app_id_to_thread_id_mapping;
+	unordered_map<long, long> app_id_to_thread_id_mapping;
 	set<uint> currently_executing_ios;
 	long NUM_WRITES_TO_STOP_AFTER;
 	long num_writes_completed;

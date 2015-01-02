@@ -83,8 +83,8 @@ void Migrator::handle_erase_completion(Event* event) {
 	if (PRINT_LEVEL > 1) {
 		printf("Finishing GC in %d \n", a.get_linear_address());
 		printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
-		for (map<int, int>::const_iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
-			printf("%d  ", (*iter).first);
+		for (auto i : blocks_being_garbage_collected) {
+			printf("%d  ", i.first);
 		}
 		printf("\n");
 	}
@@ -114,13 +114,13 @@ void Migrator::handle_trim_completion(Event* event) {
 		blocks_being_garbage_collected.at(block.get_physical_address())--;
 	}
 
-	if (blocks_being_garbage_collected.count(phys_addr) == 0 && block.get_state() == INACTIVE) {
+	/*if (blocks_being_garbage_collected.count(phys_addr) == 0 && block.get_state() == INACTIVE) {
 		gc->commit_choice_of_victim(ra);
 		blocks_being_garbage_collected[phys_addr] = 0;
 		num_blocks_being_garbaged_collected_per_LUN[ra.package][ra.die]++;
 		issue_erase(ra, event->get_current_time());
 	}
-	else if (blocks_being_garbage_collected.count(phys_addr) == 1 && blocks_being_garbage_collected.at(phys_addr) == 0) {
+	else*/ if (blocks_being_garbage_collected.count(phys_addr) == 1 && blocks_being_garbage_collected.at(phys_addr) == 0) {
 		assert(block.get_state() == INACTIVE);
 		blocks_being_garbage_collected[phys_addr]--;
 		issue_erase(ra, event->get_current_time());
@@ -144,8 +144,8 @@ void Migrator::issue_erase(Address ra, double time) {
 	if (PRINT_LEVEL > 1) {
 		printf("block %lu", ra.get_linear_address()); printf(" is now invalid. An erase is issued: "); erase->print();
 		printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
-		for (map<int, int>::const_iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
-			printf("%d  ", (*iter).first);
+		for (auto i : blocks_being_garbage_collected) {
+			printf("%d  ", i.first);
 		}
 		printf("\n");
 	}
@@ -250,6 +250,7 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	else {
 		victim = gc->choose_gc_victim(package_id, die_id, gc_event->get_age_class());
 	}
+
 	StatisticsGatherer::get_global_instance()->register_scheduled_gc(*gc_event);
 
 	if (victim == NULL) {
@@ -304,18 +305,14 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 		printf("num gc operations in (%d %d) : %d  ", addr.package, addr.die, num_blocks_being_garbaged_collected_per_LUN[addr.package][addr.die]);
 		printf("Triggering GC in %ld    time: %f  ", victim->get_physical_address(), gc_event->get_current_time()); addr.print(); printf(". Migrating %d \n", victim->get_pages_valid());
 		printf("%lu GC operations taking place now. On:   ", blocks_being_garbage_collected.size());
-		for (map<int, int>::const_iterator iter = blocks_being_garbage_collected.begin(); iter != blocks_being_garbage_collected.end(); iter++) {
-			printf("%d  ", (*iter).first);
+		for (auto i : blocks_being_garbage_collected) {
+			printf("%d  ", i.first);
 		}
 		printf("\n");
 	}
 
 	assert(victim->get_state() != FREE);
 	assert(victim->get_state() != PARTIALLY_FREE);
-
-	StatisticData::register_statistic("Garbage Collection Efficiency", {
-			new Integer(victim->get_pages_valid())
-	});
 
 	StatisticData::register_statistic("GC_eff_with_writes", {
 			new Integer(StatisticsGatherer::get_global_instance()->total_writes()),
@@ -328,6 +325,11 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 	});
 
 	gc_time_stat[victim] = gc_event->get_current_time();
+
+	if (victim->get_pages_invalid() == BLOCK_SIZE) {
+		issue_erase(addr, gc_event->get_current_time());
+		return migrations;
+	}
 
 	// TODO: for DFTL, we in fact do not know the LBA when we dispatch the write. We get this from the OOB. Need to fix this.
 	//PRINT_LEVEL = 1;

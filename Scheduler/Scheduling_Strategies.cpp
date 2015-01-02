@@ -33,6 +33,25 @@ void Fifo_Priorty_Scheme::schedule(vector<Event*>& events) {
 	}
 }
 
+void Semi_Fifo_Priorty_Scheme::schedule(vector<Event*>& events) {
+	long max = -1;
+	int chosen_index = 0;
+	for (int i = 0; i < events.size(); i++) {
+		if (events[i] != NULL && events[i]->get_bus_wait_time() > max) {
+			max = events[i]->get_bus_wait_time();
+			chosen_index = i;
+		}
+	}
+	if (events.size() > 0) {
+		Event* chosen = events[chosen_index];
+		events[chosen_index] = NULL;
+		scheduler->handle(chosen);
+		//vector<Event*> chosen_vec(1, chosen);
+		//scheduler->handle(chosen_vec);
+	}
+	scheduler->handle(events);
+}
+
 void Noop_Priorty_Scheme::schedule(vector<Event*>& events) {
 	scheduler->handle(events);
 }
@@ -135,7 +154,7 @@ void We_Re_gcWr_E_gcR_Priorty_Scheme::schedule(vector<Event*>& events) {
 }
 
 void Scheduling_Strategy::schedule() {
-
+	//print();
 	vector<Event*> current_events = get_soonest_events();
 
 	/*cout << current_events.size() << endl;

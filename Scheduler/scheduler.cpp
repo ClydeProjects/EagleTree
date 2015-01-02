@@ -51,7 +51,8 @@ void IOScheduler::init() {
 		case 4: ps = new Er_Wr_Re_gcRe_gcWr_Priorty_Scheme(this); break;
 		case 5: ps = new We_Re_gcWr_E_gcR_Priorty_Scheme(this); break;
 		case 6: ps = new Re_Er_Wr_Priorty_Scheme(this); break;
-		default: ps = new Fifo_Priorty_Scheme(this); break;
+		case 7: ps = new Semi_Fifo_Priorty_Scheme(this); break;
+		default: ps = new Semi_Fifo_Priorty_Scheme(this); break;
 	}
 	current_events = new Scheduling_Strategy(this, ssd, ps);
 	overdue_events = new Scheduling_Strategy(this, ssd, new Fifo_Priorty_Scheme(this));
@@ -126,6 +127,11 @@ void IOScheduler::complete(Event* event) {
 }
 
 void IOScheduler::execute_soonest_events() {
+	/*if (StatisticsGatherer::get_global_instance()->total_writes() > 1000001) {
+		if (!current_events->empty()) current_events->print();
+		if (!overdue_events->empty()) overdue_events->print();
+		PRINT_LEVEL = 2;
+	}*/
 	if (current_events->empty() && overdue_events->empty() && !completed_events->empty()) {
 		send_earliest_completed_events_back();
 	}
@@ -140,6 +146,8 @@ void IOScheduler::execute_soonest_events() {
 			current_time = get_current_time();
 			continue;
 		}
+		bool emp  = overdue_events->empty();
+		double ear = overdue_events->get_earliest_time();
 		if (!overdue_events->empty() && overdue_events->get_earliest_time() < next_events_time) {
 			overdue_events->schedule();
 		}
@@ -170,13 +178,13 @@ double IOScheduler::get_soonest_event_time(vector<Event*> const& events) const {
 void IOScheduler::push(Event* event) {
 	event_type t = event->get_event_type();
 	double wait = event->get_bus_wait_time();
-	if (		(t == READ_COMMAND && wait >= READ_DEADLINE)
+	/*if (		(t == READ_COMMAND && wait >= READ_DEADLINE)
 			|| 	(t == READ_TRANSFER && wait >= READ_TRANSFER_DEADLINE)
 			|| 	(t == WRITE && wait >= WRITE_DEADLINE)) {
 		overdue_events->push(event);
 		//event->print();
 	}
-	else
+	else*/
 		current_events->push(event);
 }
 
@@ -221,24 +229,31 @@ void IOScheduler::update_current_events(double current_time) {
 void IOScheduler::handle(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
-		event->increment_iteration_count();
 		events.pop_back();
-		event_type type = event->get_event_type();
-		if (type == WRITE || type == COPY_BACK) {
-			handle_write(event);
+		if (event == NULL) {
+			continue;
 		}
-		else if (type == READ_COMMAND && event->is_flexible_read()) {
-			handle_flexible_read(event);
-		}
-		else if (type == READ_COMMAND || type == COPY_BACK) {
-			handle_read(event);
-		}
-		else if (type == TRIM) {
-			execute_next(event);
-		}
-		else {
-			handle_event(event);
-		}
+		handle(event);
+	}
+}
+
+void IOScheduler::handle(Event* event) {
+	event->increment_iteration_count();
+	event_type type = event->get_event_type();
+	if (type == WRITE || type == COPY_BACK) {
+		handle_write(event);
+	}
+	else if (type == READ_COMMAND && event->is_flexible_read()) {
+		handle_flexible_read(event);
+	}
+	else if (type == READ_COMMAND || type == COPY_BACK) {
+		handle_read(event);
+	}
+	else if (type == TRIM) {
+		execute_next(event);
+	}
+	else {
+		handle_event(event);
 	}
 }
 
@@ -352,11 +367,13 @@ void IOScheduler::handle_flexible_read(Event* event) {
 // Looks for an idle LUN and schedules writes in it. Works in O(events * LUNs), but also handles overdue events. Using this for now for simplicity.
 void IOScheduler::handle_write(Event* event) {
 	Address addr = event->get_address();
+
 	if (event->get_address().valid == NONE) {
 		addr = bm->choose_write_address(*event);
 	}
 	try_to_put_in_safe_cache(event);
 	double wait_time = bm->in_how_long_can_this_event_be_scheduled(addr, event->get_current_time(), WRITE);
+	//double wait_time = bm->in_how_long_can_this_write_be_scheduled2(event->get_current_time());
 
 	if (addr.valid == NONE && event->get_event_type() == COPY_BACK) {
 		transform_copyback(event);
@@ -368,6 +385,7 @@ void IOScheduler::handle_write(Event* event) {
 	else if (!bm->can_schedule_on_die(addr, event->get_event_type(), event->get_application_io_id())) {
 		event->incr_bus_wait_time(wait_time + BUS_DATA_DELAY + BUS_CTRL_DELAY);
 		push(event);
+		assert(false);
 	}
 	else if (wait_time > 0) {
 		event->incr_bus_wait_time(wait_time);
@@ -415,9 +433,6 @@ void IOScheduler::remove_current_operation(Event* event) {
 void IOScheduler::handle_noop_events(vector<Event*>& events) {
 	while (events.size() > 0) {
 		Event* event = events.back();
-		if (event->get_application_io_id() == 10111) {
-			event->print();
-		}
 		events.pop_back();
 
 		uint dependency_code = event->get_application_io_id();
@@ -438,6 +453,8 @@ void IOScheduler::handle_noop_events(vector<Event*>& events) {
 		dependencies.erase(dependency_code);
 		dependency_code_to_LBA.erase(dependency_code);
 		dependency_code_to_type.erase(dependency_code);
+		current_events->register_event_compeltion(event);
+		overdue_events->register_event_compeltion(event);
 		manage_operation_completion(event);
 		inform_FTL_of_noop_completion(event);
 		//ssd->register_event_completion(event);
@@ -446,6 +463,8 @@ void IOScheduler::handle_noop_events(vector<Event*>& events) {
 }
 
 void IOScheduler::inform_FTL_of_noop_completion(Event* event) {
+	//static int c = 0;
+	//printf("%d\n", c++);
 	if (event->get_event_type() == READ_TRANSFER) {
 		ftl->register_read_completion(*event, SUCCESS);
 		if (event->is_garbage_collection_op()) {
@@ -501,15 +520,58 @@ enum status IOScheduler::execute_next(Event* event) {
 	enum status result = ssd->issue(event);
 	assert(result == SUCCESS);
 
-	if (PRINT_LEVEL > 0  && (event->get_event_type() == WRITE || event->get_event_type() == ERASE || event->get_event_type() == READ_TRANSFER)   /* && event->is_garbage_collection_op() && (event->get_event_type() == WRITE || event->get_event_type() == ERASE)*/ ) {
+	if (PRINT_LEVEL > 0  /*&& event->is_original_application_io() */ /*&& (event->get_event_type() == WRITE || event->get_event_type() == ERASE *//*|| event->get_event_type() == READ_TRANSFER)*/   /* && event->is_garbage_collection_op() && (event->get_event_type() == WRITE || event->get_event_type() == ERASE)*/ ) {
 		event->print();
 		if (event->is_flexible_read()) {
 			//printf("FLEX\n");
 		}
 	}
 
+	/*if (event->get_event_type() == WRITE && event->get_address().package == 0 && event->get_address().die == 0 && event->get_address().block == 186) {
+		event->print();
+	}
+
+	if (event->get_event_type() == WRITE && event->get_replace_address().package == 0 && event->get_replace_address().die == 0 && event->get_replace_address().block == 186) {
+		event->print();
+	}
+
+	if (event->get_application_io_id() == 1063947) {
+		int i = 0;
+		i++;
+	}*/
+
+	/*if (StatisticsGatherer::get_global_instance()->total_writes() == 500000) {
+		VisualTracer::print_horizontally(1000);
+	}
+
+	if (StatisticsGatherer::get_global_instance()->total_writes() == 1000000) {
+		VisualTracer::print_horizontally(1000);
+	}
+
+	if (StatisticsGatherer::get_global_instance()->total_writes() == 1500000) {
+		VisualTracer::print_horizontally(1000);
+	}*/
+
+	/*if (event->get_address().package == 0 && event->get_address().die == 1 && event->get_address().block == 255 && event->get_event_type() == WRITE) {
+		event->print();
+	}
+	if (event->get_replace_address().package == 0 && event->get_replace_address().die == 1 && event->get_replace_address().block == 255 && event->get_event_type() == WRITE) {
+		event->print();
+	}*/
+
+
 	handle_finished_event(event);
 
+	/*if (event->get_id() == 2794555) {
+		VisualTracer::print_horizontally(200);
+		event->print();
+		PRINT_LEVEL = 1;
+		int i = 0;
+		i++;
+	}
+
+	bm->update_next_possible_write_time();
+*/
 	if (event->get_event_type() == READ_TRANSFER && event->is_garbage_collection_op()) {
 		trigger_next_migration(event);
 	}
@@ -528,10 +590,10 @@ enum status IOScheduler::execute_next(Event* event) {
 				printf("Assertion failure LBA_currently_executing.count(lba = %d) = %d, concerning ", lba, LBA_currently_executing.count(lba));
 				event->print();
 			}
-			assert(LBA_currently_executing.count(lba) == 1);
+			//assert(LBA_currently_executing.count(lba) == 1);
 			LBA_currently_executing.erase(lba);
-			assert(LBA_currently_executing.count(lba) == 0);
-			assert(dependency_code_to_LBA.count(dependency_code) == 1);
+			//assert(LBA_currently_executing.count(lba) == 0);
+			//assert(dependency_code_to_LBA.count(dependency_code) == 1);
 		}
 		manage_operation_completion(event);
 	}
@@ -551,6 +613,7 @@ enum status IOScheduler::execute_next(Event* event) {
 
 //
 void IOScheduler::manage_operation_completion(Event* event) {
+
 	int dependency_code = event->get_application_io_id();
 	dependency_code_to_LBA.erase(dependency_code);
 	dependency_code_to_type.erase(dependency_code);
@@ -575,10 +638,16 @@ void IOScheduler::manage_operation_completion(Event* event) {
 }
 
 void IOScheduler::handle_finished_event(Event *event) {
+	if (event->get_event_type() == WRITE && event->get_application_io_id() == 1125450) {
+		int i = 0;
+		i++;
+	}
 	stats.register_IO_completion(event);
 	VisualTracer::register_completed_event(*event);
 	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
 	migrator->register_event_completion(event);
+	current_events->register_event_compeltion(event);
+	overdue_events->register_event_compeltion(event);
 	if (event->get_event_type() == WRITE || event->get_event_type() == COPY_BACK) {
 		ftl->register_write_completion(*event, SUCCESS);
 		bm->register_write_outcome(*event, SUCCESS);

@@ -100,3 +100,29 @@ void StateVisualiser::print_block_ages() {
 	printf("\n");
 }
 
+void StateVisualiser::print_page_valid_histogram() {
+	printf("\n");
+	Ssd & ssd_ref = *ssd;
+	vector<int> histogram = vector<int>(BLOCK_SIZE, 0);
+	for (uint i = 0; i < SSD_SIZE; i++) {
+		for (uint j = 0; j < PACKAGE_SIZE; j++) {
+			for (uint k = 0; k < DIE_SIZE; k++) {
+				for (uint t = 0; t < PLANE_SIZE; t++) {
+					Block* b = ssd_ref.get_package(i)->get_die(j)->get_plane(k)->get_block(t);
+					histogram[b->get_pages_valid()]++;
+					if (b->get_pages_valid() == 0) {
+						Address a = Address();
+						a.set_linear_address(b->get_physical_address());
+						a.print();
+						printf("   block:  %d  valid: %d   invalid: %d\n", b->get_physical_address(), b->get_pages_valid(), b->get_pages_invalid());
+					}
+ 				}
+			}
+		}
+	}
+	printf("histogram:\n");
+	for (int i = 0; i < BLOCK_SIZE; i++) {
+		printf("\t%d\t%d\n", i, histogram[i]);
+	}
+	printf("\n");
+}

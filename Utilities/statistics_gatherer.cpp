@@ -55,7 +55,9 @@ StatisticsGatherer::StatisticsGatherer()
 vector<vector<double> > num_valid_pages_per_gc_op;
 vector<vector<int> > num_executed_gc_ops;
 
-StatisticsGatherer::~StatisticsGatherer() {}
+StatisticsGatherer::~StatisticsGatherer() {
+
+}
 
 void StatisticsGatherer::init()
 {
@@ -89,13 +91,13 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 			num_writes_per_LUN[a.package][a.die]++;
 			bus_wait_time_for_writes_per_LUN[a.package][a.die].push_back(event.get_latency());
 
-			StatisticData::register_statistic("all_writes", {
+			/*StatisticData::register_statistic("all_writes", {
 					new Integer(event.get_latency())
 			});
 
 			StatisticData::register_field_names("all_writes", {
 					"write_latency"
-			});
+			});*/
 
 		}
 		else if (event.is_wear_leveling_op()) {
@@ -110,6 +112,7 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 
 			sum_gc_wait_time_per_LUN[a.package][a.die] += event.get_latency();
 			gc_wait_time_per_LUN[a.package][a.die].push_back(event.get_latency());
+
 		}
 		else if (event.is_mapping_op()) {
 			num_mapping_writes_per_LUN[a.package][a.die]++;
@@ -120,13 +123,13 @@ void StatisticsGatherer::register_completed_event(Event const& event) {
 			num_reads_per_LUN[a.package][a.die]++;
 
 
-			StatisticData::register_statistic("all_reads", {
+			/*StatisticData::register_statistic("all_reads", {
 					new Integer(event.get_latency())
 			});
 
 			StatisticData::register_field_names("all_reads", {
 					"read_latency"
-			});
+			});*/
 
 		} else if (event.is_garbage_collection_op()) {
 			num_gc_reads_per_LUN[a.package][a.die]++;

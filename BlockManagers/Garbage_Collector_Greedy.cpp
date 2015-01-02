@@ -39,7 +39,7 @@ Block* Garbage_Collector_Greedy::choose_gc_victim(int package_id, int die_id, in
 	for (auto physical_address : candidates) {
 		Address a = Address(physical_address, BLOCK);
 		Block* block = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
-		if (block->get_pages_valid() < min_valid_pages && block->get_state() == ACTIVE) {
+		if (block->get_pages_valid() < min_valid_pages && (block->get_state() == ACTIVE || block->get_state() == INACTIVE)) {
 			min_valid_pages = block->get_pages_valid();
 			best_block = block;
 			assert(min_valid_pages < BLOCK_SIZE);

@@ -8,7 +8,7 @@
 #include "../ssd.h"
 using namespace ssd;
 
-int FIFO_OS_Scheduler::pick(map<int, Thread*> const& threads) {
+int FIFO_OS_Scheduler::pick(unordered_map<int, Thread*> const& threads) {
 	long double soonest_event_time = std::numeric_limits<long double>::max();
 	int thread_id_with_soonest_event = UNDEFINED;
 	for (auto i : threads) {
@@ -23,7 +23,7 @@ int FIFO_OS_Scheduler::pick(map<int, Thread*> const& threads) {
 	return thread_id_with_soonest_event;
 }
 
-int FAIR_OS_Scheduler::pick(map<int, Thread*> const& threads) {
+int FAIR_OS_Scheduler::pick(unordered_map<int, Thread*> const& threads) {
 
 	for (auto entry : threads)
 	{
@@ -34,7 +34,7 @@ int FAIR_OS_Scheduler::pick(map<int, Thread*> const& threads) {
 		}
 	}
 
-	map<int, Thread*>::const_iterator i = threads.find(last_id);
+	unordered_map<int, Thread*>::const_iterator i = threads.find(last_id);
 	bool found = false;
 	uint num_tried = 0;
 	while (!found && num_tried < threads.size()) {

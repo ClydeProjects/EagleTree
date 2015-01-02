@@ -24,6 +24,11 @@ Die::Die() :
 
 enum status Die::read(Event &event)
 {
+	if (currently_executing_io_finish_time > event.get_current_time()) {
+		VisualTracer::print_horizontally(500);
+		event.print();
+		printf("currently_executing_io_finish_time: %f     %f\n", currently_executing_io_finish_time, event.get_current_time());
+	}
 	assert(currently_executing_io_finish_time <= event.get_current_time());
 	if (event.get_event_type() == READ_COMMAND) {
 		last_read_io = event.get_application_io_id();

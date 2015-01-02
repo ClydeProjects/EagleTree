@@ -15,6 +15,8 @@
 using namespace ssd;
 using namespace std;
 
+double Block_manager_parent::soonest_write_time = 0;
+
 Block_manager_parent::Block_manager_parent(int num_age_classes)
  : ssd(NULL),
    ftl(NULL),
@@ -366,10 +368,15 @@ double Block_manager_parent::in_how_long_can_this_event_be_scheduled(Address con
 	double channel_finish_time = ssd->get_currently_executing_operation_finish_time(package_id);
 	double die_finish_time = ssd->get_package(package_id)->get_die(die_id)->get_currently_executing_io_finish_time();
 	double max_time = max(channel_finish_time, die_finish_time);
-	double time = max(0.0, max_time - event_time);
+	double time = fmax(0.0, max_time - event_time);
 	if (type == WRITE) {
-		time = min(time, BUS_DATA_DELAY + BUS_CTRL_DELAY);
+		time = fmin(time, BUS_DATA_DELAY + BUS_CTRL_DELAY);
+		return time; // in_how_long_can_this_write_be_scheduled(event_time);
 	}
+	/*if (alternative_time > time) {
+		int i = 0;
+		i++;
+	}*/
 	return time;
 }
 
@@ -380,12 +387,31 @@ double Block_manager_parent::in_how_long_can_this_write_be_scheduled(double curr
 		for (int j = 0; j < PACKAGE_SIZE; j++) {
 			bool busy = ssd->get_package(i)->get_die(j)->register_is_busy();
 			double die_finish_time = ssd->get_package(i)->get_die(j)->get_currently_executing_io_finish_time();
-			die_finish_time += busy ? BUS_DATA_DELAY + BUS_CTRL_DELAY : 0;
-			double max_time = max(channel_finish_time, die_finish_time);
-			min_execution_time = min(min_execution_time, max_time);
+			double max_time = fmax(channel_finish_time, die_finish_time);
+			max_time += busy ? BUS_DATA_DELAY + BUS_CTRL_DELAY : 0;
+			min_execution_time = fmin(min_execution_time, max_time);
 		}
 	}
-	return max(min_execution_time - current_time, 0.0);
+	return fmax(min_execution_time - current_time, 0.0);
+}
+
+double Block_manager_parent::in_how_long_can_this_write_be_scheduled2(double current_time) const {
+	return fmax(0.0, soonest_write_time - current_time);
+}
+
+void Block_manager_parent::update_next_possible_write_time() const {
+	double min_execution_time = INFINITE;
+	for (int i = 0; i < SSD_SIZE; i++) {
+		double channel_finish_time = ssd->get_currently_executing_operation_finish_time(i);
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			bool busy = ssd->get_package(i)->get_die(j)->register_is_busy();
+			double die_finish_time = ssd->get_package(i)->get_die(j)->get_currently_executing_io_finish_time();
+			double max_time = fmax(channel_finish_time, die_finish_time);
+			max_time += busy ? BUS_DATA_DELAY + BUS_CTRL_DELAY : 0;
+			min_execution_time = fmin(min_execution_time, max_time);
+		}
+	}
+	soonest_write_time = min_execution_time;
 }
 
 bool Block_manager_parent::can_schedule_on_die(Address const& address, event_type type, uint app_io_id) const {

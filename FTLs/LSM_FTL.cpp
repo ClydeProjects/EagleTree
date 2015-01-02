@@ -2,243 +2,183 @@
 #include <assert.h>
 #include <stdio.h>
 #include <math.h>
+#include <ctgmath>
 #include "../ssd.h"
 
 using namespace ssd;
 
+int LSM_FTL::buffer_threshold = 128;
+int LSM_FTL::SIZE_RATIO = 2;
+int LSM_FTL::mapping_run::id_generator = 0;
+
 LSM_FTL::LSM_FTL(Ssd *ssd, Block_manager_parent* bm) :
 		FtlParent(ssd, bm),
-		cached_mapping_table(),
-		global_translation_directory(NUMBER_OF_ADDRESSABLE_BLOCKS(), Address()),
-		ongoing_mapping_operations(),
-		application_ios_waiting_for_translation(),
-		NUM_PAGES_IN_SSD(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE),
 		page_mapping(FtlImpl_Page(ssd, bm)),
-		num_dirty_cached_entries(0),
-		dial(0)
+		buffer(),
+		flush_in_progress(false)
+
 {
 	IS_FTL_PAGE_MAPPING = true;
 }
 
 LSM_FTL::LSM_FTL() :
 		FtlParent(),
-		cached_mapping_table(),
-		global_translation_directory(),
-		ongoing_mapping_operations(),
-		application_ios_waiting_for_translation(),
-		NUM_PAGES_IN_SSD(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE),
-		page_mapping(),
-		CACHED_ENTRIES_THRESHOLD(),
-		num_dirty_cached_entries(),
-		dial(),
-		ENTRIES_PER_TRANSLATION_PAGE(512)
+		flush_in_progress(false)
 {
 	IS_FTL_PAGE_MAPPING = true;
 }
 
 LSM_FTL::~LSM_FTL(void)
 {
-	assert(application_ios_waiting_for_translation.size() == 0);
 }
 
 void LSM_FTL::read(Event *event)
 {
-	long la = event->get_logical_address();
-	// If the logical address is in the cached mapping table, submit the IO
-	if (cached_mapping_table.count(la) == 1) {
-		entry& e = cached_mapping_table.at(la);
-		e.hotness++;
-		scheduler->schedule_event(event);
-		return;
+	if (event->is_original_application_io()) {
+		if (buffer.addresses.count(event->get_logical_address()) == 1) {
+			scheduler->schedule_event(event);
+		}
+		else {
+			//print_detailed();
+			ongoing_read* r = new ongoing_read();
+			r->original_read = event;
+			ongoing_reads.insert(r);
+			attend_ongoing_read(r, event->get_current_time());
+		}
 	}
 
-	// find which translation page is the logical address is on
-	long translation_page_id = la / ENTRIES_PER_TRANSLATION_PAGE;
+}
 
-	// If the mapping entry does not exist in cache and there is no translation page in flash, cancel the read
-	if (global_translation_directory[translation_page_id].valid == NONE) {
-		event->set_noop(true);
-		return;
-	}
-
-	// If there is no mapping IO currently targeting the translation page, create on. Otherwise, invoke current event when ongoing mapping IO finishes.
-	if (ongoing_mapping_operations.count(NUM_PAGES_IN_SSD - translation_page_id) == 1) {
-		application_ios_waiting_for_translation[translation_page_id].push_back(event);
-	}
-	else {
-		//printf("creating mapping read %d for app write %d\n", translation_page_id, event->get_logical_address());
-		create_mapping_read(translation_page_id, event->get_current_time(), event);
+void LSM_FTL::attend_ongoing_read(ongoing_read* r, double time) {
+	for (int i = mapping_tree.runs.size() - 1; i >= 0; i--) {
+		mapping_run* run = mapping_tree.runs[i];
+		int la = r->original_read->get_logical_address();
+		if (!run->being_created && !run->obsolete && r->run_ids_attempted.count(run->id) == 0 && (/*run->contains(la) ||*/ mapping_tree.runs[i]->filter.contains(la))) {
+			// in which page is it?
+			r->run_ids_attempted.insert(run->id);
+			int mapping_address_to_read = UNDEFINED;
+			for (int i = 0; i < run->mapping_pages.size(); i++) {
+				mapping_page* page = run->mapping_pages[i];
+				int first = page->first_key;
+				int last = page->last_key;
+				if (first <= la && last >= la) {
+					mapping_address_to_read = i;
+					break;
+				}
+			}
+			if (mapping_address_to_read != UNDEFINED) {
+				Event* read = new Event(READ, run->starting_logical_address + mapping_address_to_read, 1, time);
+				read->set_mapping_op(true);
+				r->read_ios_submitted.insert(read->get_application_io_id());
+				run->executing_ios.insert(read->get_application_io_id());
+				scheduler->schedule_event(read);
+				return;
+			}
+		}
 	}
 }
 
 void LSM_FTL::register_read_completion(Event const& event, enum status result) {
-	// if normal application read, do nothing
-	if (ongoing_mapping_operations.count(event.get_logical_address()) == 0) {
-		return;
-	}
-	// If mapping read
-	ongoing_mapping_operations.erase(event.get_logical_address());
-
-	// identify translation page we finished reading
-	long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
-
-	// Insert all entries into cached mapping table with hotness 0
-	for (int i = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE; i < (translation_page_id + 1) * ENTRIES_PER_TRANSLATION_PAGE; i++) {
-		if (cached_mapping_table.count(i) == 0) {
-			cached_mapping_table[i] = entry();
+	collect_stats(event);
+	if (event.is_mapping_op()) {
+		for (auto& m : merges) {
+			m->check_read(event, scheduler);
 		}
-	}
-
-	// schedule all operations
-	vector<Event*> waiting_events = application_ios_waiting_for_translation[translation_page_id];
-	application_ios_waiting_for_translation.erase(translation_page_id);
-	for (auto e : waiting_events) {
-		if (e->is_mapping_op()) {
-			if (ongoing_mapping_operations.count(e->get_logical_address()) == 1) {
-				assert(false);
-				delete e;
-				continue;
+		ongoing_read* ongoing = NULL;
+		for (auto& r : ongoing_reads) {
+			if (r->read_ios_submitted.count(event.get_application_io_id())) {
+				ongoing = r;
+				break;
 			}
-			//printf("now submitting mapping write  %d\n", translation_page_id);
-			//lock_all_entries_in_a_translation_page(translation_page_id, -1, event.get_current_time());
-			ongoing_mapping_operations.insert(e->get_logical_address());
 		}
-		else if (e->get_event_type() == WRITE) {
-			assert(cached_mapping_table.count(e->get_logical_address()) == 1);
-			entry& en = cached_mapping_table.at(e->get_logical_address());
-			en.hotness++;
-			en.timestamp = numeric_limits<double>::infinity();
-			if (en.fixed == 0) {
-				en.fixed++;
+		if (ongoing == NULL) {
+			return;
+		}
+
+		int mapping_la = event.get_logical_address();
+		mapping_run* run = NULL;
+		for (auto& r : mapping_tree.runs) {
+			if (r->starting_logical_address <= mapping_la && r->ending_logical_address >= mapping_la) {
+				run = r;
 			}
+		}
+		if (run->executing_ios.count(event.get_application_io_id()) == 0) {
+			event.print();
+			ongoing->original_read->print();
+		}
+		assert(run->executing_ios.count(event.get_application_io_id()) == 1);
+		run->executing_ios.erase(event.get_application_io_id());
+		ongoing->read_ios_submitted.erase(event.get_application_io_id());
+		assert(run->executing_ios.count(event.get_application_io_id()) == 0);
+
+		assert(run != NULL);
+		bool found_address = false;
+		int orig_la = ongoing->original_read->get_logical_address();
+		for (auto& page : run->mapping_pages) {
+			if (page->first_key <= orig_la && page->last_key >= orig_la && page->addresses.count(orig_la) == 1) {
+				found_address = true;
+				break;
+			}
+		}
+
+		erase_run(run);
+		if (!found_address) {
+			attend_ongoing_read(ongoing, event.get_current_time());
 		}
 		else {
-			assert(cached_mapping_table.count(e->get_logical_address()) == 1);
-			entry& en = cached_mapping_table.at(e->get_logical_address());
-			en.hotness++;
+			Event* original_read = ongoing->original_read;
+			Address addr = page_mapping.get_physical_address(original_read->get_logical_address());
+			original_read->set_address(addr);
+			ongoing_reads.erase(ongoing);
+			delete ongoing;
+			scheduler->schedule_event(original_read);
 		}
-		scheduler->schedule_event(e);
 	}
-
-	// Made sure we don't overuse RAM
-	int num_evicted = 1;
-	while (cached_mapping_table.size() >= CACHED_ENTRIES_THRESHOLD && num_evicted > 0) {
-		num_evicted = evict_cold_entries();
-	}
-
-	if (cached_mapping_table.size() >= CACHED_ENTRIES_THRESHOLD) {
-		flush_mapping(event.get_current_time());
-	}
-
 }
+
+
 
 void LSM_FTL::write(Event *event)
 {
-	long la = event->get_logical_address();
-
-	if (event->get_id() == 101850) {
-		int i =0 ;
-		i++;
+	if (event->is_original_application_io()) {
+		buffer.addresses.insert(event->get_logical_address());
+		if (buffer.addresses.size() >= buffer_threshold) {
+			flush(event->get_current_time());
+		}
 	}
-
-	// If the logical address is in the cached mapping table, submit the IO
-	if (cached_mapping_table.count(la) == 1) {
-		entry& e = cached_mapping_table.at(la);
-		e.hotness++;
-		e.fixed++;
-		scheduler->schedule_event(event);
-		return;
-	}
-
-	// find which translation page is the logical address is on
-	long translation_page_id = la / ENTRIES_PER_TRANSLATION_PAGE;
-
-	// does this translation page exist? If not (because the SSD is new) just create an entry in the cached mapping table
-	if (global_translation_directory[translation_page_id].valid == NONE) {
-		entry e;
-		e.fixed = 1;
-		e.hotness = 1;
-		cached_mapping_table[la] = e;
-		scheduler->schedule_event(event);
-		return;
-	}
-
-	// If there is no mapping IO currently targeting the translation page, create on. Otherwise, invoke current event when ongoing mapping IO finishes.
-	if (ongoing_mapping_operations.count(NUM_PAGES_IN_SSD - translation_page_id) == 1) {
-		application_ios_waiting_for_translation[translation_page_id].push_back(event);
-	}
-	else {
-		//printf("creating mapping read %d for app write %d\n", translation_page_id, event->get_logical_address());
-		create_mapping_read(translation_page_id, event->get_current_time(), event);
-	}
+	scheduler->schedule_event(event);
 }
 
 void LSM_FTL::register_write_completion(Event const& event, enum status result) {
+	collect_stats(event);
 	page_mapping.register_write_completion(event, result);
-
-	if (event.get_noop()) {
+	if (event.is_original_application_io()) {
 		return;
 	}
 
-	// assume that the logical address of a GCed page is in the out of bound area of the page, so we can use it to update the mapping
-	if (event.is_garbage_collection_op() && !event.is_original_application_io() && !event.is_mapping_op()) {
-		if (cached_mapping_table.count(event.get_logical_address()) == 0) {
-			entry e;
-			e.timestamp = event.get_current_time();
-			e.dirty = true;
-			cached_mapping_table[event.get_logical_address()] = e;
+	if (event.is_mapping_op()) {
+		for (auto& m : merges) {
+			if (m->check_write(event) && m->is_finished()) {
+				finish_merge(m);
+				//print();
+				//printf("mapping writes: %d\n", stats.num_mapping_writes);
+				//stats.num_mapping_writes = 0;
+				//printf("finished merge\n");
+			}
 		}
-		else {
-			entry& e = cached_mapping_table[event.get_logical_address()];
-			e.dirty = true;
-			e.timestamp = event.get_current_time();
-			e.fixed = 0;
-		}
-	}
 
-	// If the write that just finished is a normal IO, update the mapping
-	if (ongoing_mapping_operations.count(event.get_logical_address()) == 0 && !event.is_mapping_op()) {
-		if (cached_mapping_table.count(event.get_logical_address()) == 0) {
-			printf("The entry was not in the cache \n");
-			event.print();
-			assert(false);
-		}
-		entry& e = cached_mapping_table.at(event.get_logical_address());
-		e.fixed = 0;
-		e.dirty = true;
-		e.timestamp = event.get_current_time();
-		if (++num_dirty_cached_entries == CACHED_ENTRIES_THRESHOLD) {
-			//printf("num_dirty_cached_entries  %d\n", num_dirty_cached_entries);
-			flush_mapping(event.get_current_time());
-		}
-		return;
-	}
+		for (auto& run : mapping_tree.runs) {
+			// end of flush
+			if (run->being_created && run->level == 1 && run->executing_ios.count(event.get_application_io_id())) {
+				run->executing_ios.erase(event.get_application_io_id());
+				run->being_created = false;
+				print();
+				//printf("mapping writes: %d\n", stats.num_mapping_writes);
+				//stats.num_mapping_writes = 0;
+				check_if_should_merge(event.get_current_time());
+				flush_in_progress = false;
 
-	// if write is a mapping IO that just finished
-	ongoing_mapping_operations.erase(event.get_logical_address());
-	long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
-
-	//printf("finished mapping write %d\n", translation_page_id);
-	global_translation_directory[translation_page_id] = event.get_address();
-
-	// mark all pages included as clean
-	lock_all_entries_in_a_translation_page(translation_page_id, -1, event.get_start_time());
-
-	// really, we should not be exceeding the threshold here, but just in case we are, evict entries
-	if (CACHED_ENTRIES_THRESHOLD <= cached_mapping_table.size()) {
-		//printf("Warning: more entries in DFTL cache than capacity allows\n");
-		int num_flushed = evict_cold_entries();
-		//printf("num flushed %d\n", num_flushed);
-	}
-
-	// schedule all operations
-	vector<Event*> waiting_events = application_ios_waiting_for_translation[translation_page_id];
-	application_ios_waiting_for_translation.erase(translation_page_id);
-	for (auto e : waiting_events) {
-		if (e->get_event_type() == READ) {
-			read(e);
-		} else {
-			write(e);
+			}
 		}
 	}
 }
@@ -263,211 +203,263 @@ Address LSM_FTL::get_physical_address(uint logical_address) const {
 }
 
 void LSM_FTL::set_replace_address(Event& event) const {
-	if (event.is_mapping_op()) {
-		long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
-		Address ra = global_translation_directory[translation_page_id];
-		event.set_replace_address(ra);
-	}
-	// We are garbage collecting a mapping IO, we can infer it by the page's logical address
-	else if (event.is_garbage_collection_op() && event.get_logical_address() >= NUM_PAGES_IN_SSD - global_translation_directory.size()) {
-		long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
-		Address ra = global_translation_directory[translation_page_id];
-		event.set_replace_address(ra);
-		event.set_mapping_op(true);
-	}
-	else {
-		page_mapping.set_replace_address(event);
-	}
+	page_mapping.set_replace_address(event);
 }
 
 void LSM_FTL::set_read_address(Event& event) const {
-	if (event.is_mapping_op()) {
-		long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
-		Address ra = global_translation_directory[translation_page_id];
-		event.set_address(ra);
-	}
-	// We are garbage collecting a mapping IO, we can infer it by the page's logical address
-	else if (event.is_garbage_collection_op() && event.get_logical_address() >= NUM_PAGES_IN_SSD - global_translation_directory.size()) {
-		long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
-		Address ra = global_translation_directory[translation_page_id];
-		event.set_address(ra);
-	}
-	else {
-		page_mapping.set_read_address(event);
-	}
-}
-
-void LSM_FTL::lock_all_entries_in_a_translation_page(long translation_page_id, int lock, double time) {
-	long first_key_in_translation_page = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE;
-	for (auto it = cached_mapping_table.lower_bound(first_key_in_translation_page);
-			it != cached_mapping_table.upper_bound(first_key_in_translation_page + ENTRIES_PER_TRANSLATION_PAGE); ++it) {
-		long curr_key = (*it).first;
-		entry& e = (*it).second;
-
-		if (lock == 1 && e.timestamp <= time && e.fixed == 0 && e.dirty) {
-			e.fixed++;
-		}
-
-		assert(e.fixed >= 0);
-
-		if (lock == -1 && e.fixed > 0 && e.timestamp <= time && e.dirty) {
-			e.dirty = false;
-			e.fixed--;
-			num_dirty_cached_entries--;
-		}
-	}
-}
-
-// Iterates through all entries in the cache, identifying and evicting X entries that are not dirty with the minimum temperature
-// returns the number of entries evicted. 0 is returned if all entries are dirty and nothing could be evicted.
-int LSM_FTL::evict_cold_entries() {
-	vector<long> keys_to_remove;
-	vector<entry> entries;
-	int min_temperature = INT_MAX;
-	for (auto e : cached_mapping_table) {
-		if (!e.second.dirty && e.second.fixed == 0 && e.second.hotness <= min_temperature) {
-			min_temperature = e.second.hotness;
-			keys_to_remove.push_back(e.first);
-			entries.push_back(e.second);
-		}
-	}
-	int num_removed = 0;
-	int how_many_to_remove = cached_mapping_table.size() - CACHED_ENTRIES_THRESHOLD;
-	for (int i = 0; i < entries.size(); i++) {
-		if (entries[i].hotness == min_temperature) {
-			assert(entries[i].fixed == 0);
-			if (keys_to_remove[i] == 44584) {
-				int i = 0;
-				i++;
-			}
-			cached_mapping_table.erase(keys_to_remove[i]);
-			if (++num_removed == how_many_to_remove) {
-				return num_removed;
-			}
-		}
-	}
-	return num_removed;
-}
-
-void LSM_FTL::create_mapping_read(long translation_page_id, double time, Event* dependant) {
-	Event* mapping_event = new Event(READ, NUM_PAGES_IN_SSD - translation_page_id, 1, time);
-	mapping_event->set_mapping_op(true);
-	Address physical_addr_of_translation_page = global_translation_directory[translation_page_id];
-	mapping_event->set_address(physical_addr_of_translation_page);
-	application_ios_waiting_for_translation[translation_page_id] = vector<Event*>();
-	application_ios_waiting_for_translation[translation_page_id].push_back(dependant);
-	assert(ongoing_mapping_operations.count(mapping_event->get_logical_address()) == 0);
-	ongoing_mapping_operations.insert(mapping_event->get_logical_address());
-	scheduler->schedule_event(mapping_event);
-}
-
-void LSM_FTL::iterate(long& victim_key, entry& victim_entry, map<long, entry>::iterator start, map<long, entry>::iterator finish) {
-	for (auto it = start; it != finish; ++it) {
-		entry e = (*it).second;
-		long key = (*it).first;
-		if (e.dirty && e.hotness == 0 && e.fixed == 0) {
-			victim_key = key;
-			victim_entry = e;
-			break;
-		}
-		else if (e.dirty && e.hotness < victim_entry.hotness && e.fixed == 0) {
-			victim_key = key;
-			victim_entry = e;
-		}
-		e.hotness--;
-	}
-}
-
-// Uses a clock entry replacement policy
-void LSM_FTL::flush_mapping(double time) {
-
-	// start at a given location
-	// find first entry with hotness 0 and make that the target, or make full traversal and identify least hot entry
-	long victim = UNDEFINED;
-	entry victim_entry;
-	victim_entry.hotness = SHRT_MAX;
-
-	map<long, entry>::iterator start = cached_mapping_table.upper_bound(dial);
-	map<long, entry>::iterator finish = cached_mapping_table.end();
-	iterate(victim, victim_entry, start, finish);
-	if (victim_entry.hotness > 0) {
-		map<long, entry>::iterator start = cached_mapping_table.begin();
-		map<long, entry>::iterator finish = cached_mapping_table.lower_bound(dial);
-		iterate(victim, victim_entry, start, finish);
-	}
-
-	if (victim == UNDEFINED) {
-		//printf("Warning, could not find a victim to flush from cache\n");
-		return;
-	}
-
-	if (dial > victim + ENTRIES_PER_TRANSLATION_PAGE || dial > NUM_PAGES_IN_SSD * OVER_PROVISIONING_FACTOR) {
-		dial = 0;
-	} else {
-		dial += ENTRIES_PER_TRANSLATION_PAGE;
-	}
-
-	// find translation page. If all entries are cached, no need to read it. Otherwise, read it.
-	long translation_page_id = victim / ENTRIES_PER_TRANSLATION_PAGE;
-	//printf("flush  %d\n", translation_page_id);
-	if (ongoing_mapping_operations.count(NUM_PAGES_IN_SSD - translation_page_id) == 1) {
-		//printf("Ongoing flush already targeting this address\n");
-		return;
-	}
-
-	// create mapping write
-	Event* mapping_event = new Event(WRITE, NUM_PAGES_IN_SSD - translation_page_id, 1, time);
-	mapping_event->set_mapping_op(true);
-	lock_all_entries_in_a_translation_page(translation_page_id, 1, time);
-
-	// If a translation page on flash does not exist yet, we can flush without a read first
-	if( global_translation_directory[translation_page_id].valid == NONE ) {
-		application_ios_waiting_for_translation[translation_page_id] = vector<Event*>();
-		ongoing_mapping_operations.insert(mapping_event->get_logical_address());
-		scheduler->schedule_event(mapping_event);
-		//printf("submitting mapping write %d\n", translation_page_id);
-		return;
-	}
-
-	// If the translation page already exists, check if all entries belonging to it are in the cache.
-	long first_key_in_translation_page = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE;
-	bool are_all_mapping_entries_cached = cached_mapping_table.count(first_key_in_translation_page) == 1 &&
-			cached_mapping_table.count(first_key_in_translation_page + ENTRIES_PER_TRANSLATION_PAGE) == 1;
-
-	long last_addr = first_key_in_translation_page;
-	for (auto it = cached_mapping_table.find(first_key_in_translation_page);
-			are_all_mapping_entries_cached && it != cached_mapping_table.find(first_key_in_translation_page + ENTRIES_PER_TRANSLATION_PAGE); ++it) {
-		long curr_key = (*it).first;
-		if (last_addr == curr_key || last_addr + 1 == curr_key) {
-			last_addr = curr_key;
-		} else {
-			are_all_mapping_entries_cached = false;
-		}
-	}
-
-	if (are_all_mapping_entries_cached) {
-		application_ios_waiting_for_translation[translation_page_id] = vector<Event*>();
-		ongoing_mapping_operations.insert(mapping_event->get_logical_address());
-		//printf("submitting mapping write, all in RAM %d\n", translation_page_id);
-		scheduler->schedule_event(mapping_event);
-	}
-	else {
-		//printf("submitting mapping read, since not all entries are in RAM %d\n", translation_page_id);
-		create_mapping_read(translation_page_id, time, mapping_event);
-	}
+	page_mapping.set_read_address(event);
 }
 
 // used for debugging
 void LSM_FTL::print() const {
-	int j = 0;
-	for (auto i : cached_mapping_table) {
-		printf("%d\t%d\t%d\t%d\t%d\t\n", j++, i.first, i.second.dirty, i.second.fixed, i.second.hotness);
+	int total_pages = 0;
+	for (auto& run : mapping_tree.runs) {
+		printf("level: %d   num pages: %d    id: %d    starting: %d   ending %d\t", run->level, run->mapping_pages.size(), run->id, run->starting_logical_address, run->ending_logical_address);
+		if (run->being_created) {
+			printf("being created\t");
+		}
+		if (run->being_merged) {
+			printf("being merged\t");
+		}
+		if (run->obsolete) {
+			printf("obsolete \t");
+			for (auto i : run->executing_ios) {
+				printf("%d ", i);
+			}
+		}
+		printf("\n");
+		total_pages += run->mapping_pages.size();
 	}
+	printf("total pages: %d\n", total_pages);
+	printf("\n");
+}
 
-	for (auto i : application_ios_waiting_for_translation) {
-		for (auto e : i.second) {
-			printf("waiting for %i", i.first);
-			e->print();
+void LSM_FTL::print_detailed() const {
+	for (auto& run : mapping_tree.runs) {
+		printf("level: %d   num pages: %d    id: %d    starting: %d   ending %d\n", run->level, run->mapping_pages.size(), run->id, run->starting_logical_address, run->ending_logical_address);
+		//printf("\t");
+		for (auto& page : run->mapping_pages) {
+			printf("\t%d-%d\n", *page->addresses.begin(), *page->addresses.rbegin());
+		}
+		//printf("\n");
+	}
+	printf("\n");
+}
+
+long LSM_FTL::find_prospective_address_for_new_run(int size) const {
+	int prospective_addr = NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR + 1;
+	bool found = true;
+	do {
+		found = true;
+		for (auto& mapping_run : mapping_tree.runs) {
+			// if prospective adress is
+			bool try1 = prospective_addr >= mapping_run->starting_logical_address;
+			if ((prospective_addr >= mapping_run->starting_logical_address && mapping_run->ending_logical_address >= prospective_addr)
+			 || (prospective_addr + size - 1 >= mapping_run->starting_logical_address && mapping_run->ending_logical_address >= prospective_addr + size - 1 ) ) {
+				prospective_addr = mapping_run->ending_logical_address + 1;
+				found = false;
+				break;
+			}
+		}
+
+	} while (!found);
+
+	return prospective_addr;
+}
+
+bool LSM_FTL::mapping_run::contains(int addr) {
+	for (auto& m : mapping_pages) {
+		if (addr >= m->first_key && addr <= m->last_key) {
+			return m->addresses.count(addr);
+		}
+	}
+	return false;
+}
+
+void LSM_FTL::mapping_run::create_bloom_filter() {
+	bloom_parameters params;
+	params.projected_element_count = buffer_threshold;
+	params.false_positive_probability = 0.01;
+	params.compute_optimal_parameters();
+	filter = bloom_filter(params);
+	for (auto& page : mapping_pages) {
+		for (int b : page->addresses) {
+			filter.insert(b);
 		}
 	}
 }
+
+void LSM_FTL::flush(double time) {
+	if (flush_in_progress) {
+		return;
+	}
+	flush_in_progress = true;
+	// divide how many IOs to issue
+	long prospective_addr = find_prospective_address_for_new_run(1);
+
+	Event* event = new Event(WRITE, prospective_addr, 1, time);
+	event->set_mapping_op(true);
+	scheduler->schedule_event(event);
+
+	mapping_run* run = new mapping_run();
+	run->starting_logical_address = prospective_addr;
+	run->ending_logical_address = prospective_addr;
+	run->level = 1;
+	run->being_merged = false;
+	run->being_created = true;
+	run->obsolete = false;
+	run->executing_ios.insert(event->get_application_io_id());
+	mapping_page* p = new mapping_page();
+	p->addresses = buffer.addresses;
+	p->first_key = *p->addresses.begin();
+	p->last_key = *p->addresses.rbegin();
+	buffer.addresses.clear();
+	run->mapping_pages.push_back(p);
+	mapping_tree.runs.push_back(run);
+	run->create_bloom_filter();
+}
+
+bool LSM_FTL::merge::check_read(Event const& event, IOScheduler *scheduler) {
+	for (auto& pages : pages_to_read) {
+		if (pages.second.front() == event.get_logical_address()) {
+			pages.second.pop();
+			if (pages.second.size() > 0) {
+				Event* read = new Event(READ, pages.second.front(), 1, event.get_current_time());
+				read->set_mapping_op(true);
+				scheduler->schedule_event(read);
+			}
+			Event* write = new Event(WRITE, being_created->starting_logical_address + num_writes_issued, 1, event.get_current_time());
+			write->set_mapping_op(true);
+			scheduler->schedule_event(write);
+			num_writes_issued++;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool LSM_FTL::merge::check_write(Event const& write) {
+	long la = write.get_logical_address();
+	if (la >= being_created->starting_logical_address && la <= being_created->ending_logical_address) {
+		num_writes_finished++;
+		return true;
+	}
+	return false;
+}
+
+void LSM_FTL::erase_run(mapping_run* run) {
+	if (run->executing_ios.size() == 0 && run->obsolete) {
+		for (auto& page : run->mapping_pages) {
+			delete page;
+		}
+		mapping_tree.runs.erase(std::find(mapping_tree.runs.begin(), mapping_tree.runs.end(), run));
+	}
+}
+
+void LSM_FTL::finish_merge(merge* m) {
+	merges.erase(std::find(merges.begin(), merges.end(), m));
+	m->being_created->being_created = false;
+	for (auto& run : m->runs) {
+		run->obsolete = true;
+		run->being_merged = false;
+		erase_run(run);
+	}
+}
+
+void LSM_FTL::check_if_should_merge(double time) {
+	map<int, int> levels;
+	map<int, int> levels_sizes;
+	for (auto& mapping_run : mapping_tree.runs) {
+		if (!mapping_run->being_created && !mapping_run->being_merged && !mapping_run->obsolete) {
+			levels[mapping_run->level]++;
+			levels_sizes[mapping_run->level] += mapping_run->mapping_pages.size();
+		}
+	}
+
+	if (levels.at(1) < 2) {
+		return;
+	}
+	int highest_level_to_merge = 1;
+	int total_pages = 0;
+	for (auto& level : levels_sizes) {
+		total_pages += level.second;
+		if (level.first == highest_level_to_merge && total_pages >= pow(SIZE_RATIO, level.first)) {
+			highest_level_to_merge++;
+		}
+		else {
+			break;
+		}
+	}
+
+	merge* m = new merge();
+	merges.push_back(m);
+	for (auto& mapping_run : mapping_tree.runs) {
+		if (!mapping_run->being_created && !mapping_run->being_merged && !mapping_run->obsolete && (highest_level_to_merge >= mapping_run->level || mapping_run->level == 1)) {
+			m->runs.push_back(mapping_run);
+		}
+	}
+
+	mapping_run* run = new mapping_run();
+	m->being_created = run;
+	run->being_merged = false;
+	run->being_created = true;
+	run->obsolete = false;
+	//run->executing_ios.insert(event->get_application_io_id());
+
+
+	set<long> addresses_set;
+	for (auto& run : m->runs) {
+		run->being_merged = true;
+		for (auto& page : run->mapping_pages) {
+			addresses_set.insert(page->addresses.begin(), page->addresses.end());
+		}
+	}
+
+	vector<long> addresses;
+	addresses.insert(addresses.begin(), addresses_set.begin(), addresses_set.end());
+	vector<mapping_page*> mapping_pages_of_new_run;
+	int steps = 0;
+	do	{
+		mapping_page* mp = new mapping_page();
+		run->mapping_pages.push_back(mp);
+		if ((steps + 1) * buffer_threshold < addresses.size()) {
+			mp->addresses.insert(addresses.begin() + steps * buffer_threshold, addresses.begin() + (steps + 1) * buffer_threshold);
+			//addresses.erase(addresses.begin(), addresses.begin() + buffer_threshold);
+		}
+		else {
+			mp->addresses.insert(addresses.begin(), addresses.end());
+			//addresses.erase(addresses.begin(), addresses.end());
+		}
+		mp->first_key = *mp->addresses.begin();
+		mp->last_key = *mp->addresses.rbegin();
+		steps++;
+	} while (steps * buffer_threshold < addresses.size());
+	run->create_bloom_filter();
+
+	run->level = floor(log10(run->mapping_pages.size()) / log10(SIZE_RATIO)) + 1;
+	/*if (run->id == 9695) {
+		print();
+		PRINT_LEVEL = 1;
+		int starting_address = find_prospective_address_for_new_run(run->mapping_pages.size());
+	}*/
+
+	int starting_address = find_prospective_address_for_new_run(run->mapping_pages.size());
+	run->starting_logical_address = starting_address;
+	run->ending_logical_address = starting_address + run->mapping_pages.size() - 1;
+	assert(run->starting_logical_address < NUMBER_OF_ADDRESSABLE_PAGES() + 1);
+	assert(run->ending_logical_address < NUMBER_OF_ADDRESSABLE_PAGES() + 1);
+	mapping_tree.runs.push_back(run);
+
+	for (auto& run : m->runs) {
+		for (int i = run->starting_logical_address; i <= run->ending_logical_address; i++) {
+			m->pages_to_read[run].push(i);
+		}
+		Event* read = new Event(READ, run->starting_logical_address, 1, time);
+		read->set_mapping_op(true);
+		Address physical_addr_of_translation_page = page_mapping.get_physical_address(run->starting_logical_address);
+		read->set_address(physical_addr_of_translation_page);
+		scheduler->schedule_event(read);
+	}
+}
+
+

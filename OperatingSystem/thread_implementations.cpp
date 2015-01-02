@@ -160,6 +160,50 @@ void Simple_Thread::handle_event_completion(Event* event) {
 	}
 }
 
+Random_IO_Pattern_Collision_Free::Random_IO_Pattern_Collision_Free(long min_LBA, long max_LBA, ulong seed) : IO_Pattern(min_LBA, max_LBA), random_number_generator(seed), counter(0) {
+	reinit();
+};
+
+void Random_IO_Pattern_Collision_Free::reinit() {
+	candidates.clear();
+	candidates.reserve(max_LBA - min_LBA);
+	for (int i = min_LBA; i < max_LBA; i++ ) {
+		candidates.push_back(i);
+	}
+}
+
+int Random_IO_Pattern_Collision_Free::next() {
+	bool found = false;
+	int index = UNDEFINED;
+
+	do {
+		index = random_number_generator() % candidates.size();
+		if (candidates[index] != UNDEFINED) {
+			found = true;
+		}
+	} while (!found);
+	int lba = candidates[index];
+	candidates[index] = UNDEFINED;
+	if (candidates.size() == 1 && candidates.front() == UNDEFINED) {
+		reinit();
+		counter = candidates.size();
+	}
+	if (++counter >= candidates.size() / 2) {
+		vector<int> new_candidates;
+		new_candidates.reserve(candidates.size() / 2);
+		for (auto i : candidates) {
+			if (i != UNDEFINED) {
+				new_candidates.push_back(i);
+			}
+		}
+		candidates = new_candidates;
+		//printf("size %d\n", candidates.size());
+		counter = 0;
+	}
+
+	return lba;
+}
+
 // =================  Flexible_Reader_Thread  =============================
 
 Flexible_Reader_Thread::Flexible_Reader_Thread(long min_LBA, long max_LBA, int repetitions_num)

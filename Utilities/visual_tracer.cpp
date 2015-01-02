@@ -60,6 +60,7 @@ void mark_as_gc_or_app(bool gc, bool app, vector<vector<char> >& symbols) {
 }
 
 void VisualTracer::register_completed_event(Event& event) {
+	//write_to_file = true;
 	if (event.get_event_type() == TRIM || !write_to_file) {
 		return;
 	}

@@ -32,6 +32,13 @@ public:
 	void schedule(vector<Event*>& events);
 };
 
+//
+class Semi_Fifo_Priorty_Scheme : public Priorty_Scheme {
+public:
+	Semi_Fifo_Priorty_Scheme(IOScheduler* scheduler)  : Priorty_Scheme(scheduler) {};
+	void schedule(vector<Event*>& events);
+};
+
 class Noop_Priorty_Scheme : public Priorty_Scheme {
 public:
 	Noop_Priorty_Scheme(IOScheduler* scheduler)  : Priorty_Scheme(scheduler) {};
@@ -76,13 +83,37 @@ public:
 	virtual void push(Event*);
 	vector<Event*> get_soonest_events();
 	virtual bool remove(Event*);
+	virtual void register_event_compeltion(Event*) {}
 	virtual Event* find(long dep_code) const;
 	inline bool empty() const { return events.empty(); }
 	double get_earliest_time() const { return events.empty() ? 0 : floor((*events.begin()).first); };
 	int size() const { return num_events; }
+	virtual void print();
 private:
 	map<long, vector<Event*> > events;
 	int num_events;
+};
+
+class special_event_queue : public event_queue {
+public:
+	special_event_queue() : event_queue(), writes(), next_time(INFINITE), earliest(NULL) {};
+	virtual ~special_event_queue();
+	virtual void push(Event*, double value);
+	virtual void push(Event*);
+	virtual void register_event_compeltion(Event*);
+	vector<Event*> get_soonest_events();
+	virtual bool remove(Event*);
+	virtual Event* find(long dep_code) const;
+	void compute_new_min_time();
+	inline bool empty() const { return event_queue::empty() && event_queue::size() == 0 && writes.empty(); }
+	double get_earliest_time() const;
+	int size() const { return event_queue::size() + writes.size(); }
+	void print();
+private:
+	bool remove_write(Event*);
+	double next_time;
+	Event* earliest;
+	vector<Event*> writes;
 };
 
 class Scheduling_Strategy : public event_queue {
@@ -117,6 +148,7 @@ public:
 	bool is_empty();
 	void execute_soonest_events();
 	void handle(vector<Event*>& events);
+	void handle(Event* event);
 	void handle_noop_events(vector<Event*>& events);
 	void inform_FTL_of_noop_completion(Event* event);
     friend class boost::serialization::access;
@@ -157,17 +189,17 @@ private:
 	Scheduling_Strategy* current_events;
 	event_queue* completed_events;
 
-	map<uint, deque<Event*> > dependencies;
+	unordered_map<uint, deque<Event*> > dependencies;
 
 	Ssd* ssd;
 	FtlParent* ftl;
 	Block_manager_parent* bm;
 	Migrator* migrator;
 
-	map<uint, uint> dependency_code_to_LBA;
-	map<uint, event_type> dependency_code_to_type;
-	map<uint, uint> LBA_currently_executing;
-	map<uint, queue<uint> > op_code_to_dependent_op_codes;
+	unordered_map<uint, uint> dependency_code_to_LBA;
+	unordered_map<uint, event_type> dependency_code_to_type;
+	unordered_map<uint, uint> LBA_currently_executing;
+	unordered_map<uint, queue<uint> > op_code_to_dependent_op_codes;
 
 	struct Safe_Cache {
 		const uint size;

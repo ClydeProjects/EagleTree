@@ -14,6 +14,7 @@
 #include <deque>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <set>
 #include <algorithm>
 #include <boost/archive/text_oarchive.hpp>
@@ -807,10 +808,10 @@ private:
 class FtlParent
 {
 public:
-	FtlParent(Ssd *ssd, Block_manager_parent* bm) : ssd(ssd), scheduler(NULL), bm(bm) {};
-	FtlParent() : ssd(NULL), scheduler(NULL), bm(NULL) {};
+	FtlParent(Ssd *ssd, Block_manager_parent* bm);
+	FtlParent() : ssd(NULL), scheduler(NULL), bm(NULL), normal_stats("normal_stats", 50000) {};
 	inline void set_scheduler(IOScheduler* sched) { scheduler = sched; }
-	virtual ~FtlParent () {};
+	virtual ~FtlParent ();
 	virtual void read(Event *event) = 0;
 	virtual void write(Event *event) = 0;
 	virtual void trim(Event *event) = 0;
@@ -823,6 +824,7 @@ public:
 	virtual void set_replace_address(Event& event) const = 0;
 	virtual void set_read_address(Event& event) const = 0;
 	virtual void print() const {};
+
 	void set_block_manager(Block_manager_parent* b) { bm = b; }
 	Block_manager_parent* get_block_manager() { return bm; }
     friend class boost::serialization::access;
@@ -837,6 +839,32 @@ protected:
 	Ssd *ssd;
 	IOScheduler *scheduler;
 	Block_manager_parent* bm;
+	void collect_stats(Event const& event);
+	struct stats {
+		stats(string name, long counter_limit);
+		string file_name;
+		long num_noop_reads_per_interval;
+		long num_noop_writes_per_interval;
+		long num_mapping_writes;
+		long num_mapping_reads;
+		long mapping_reads_per_interval;
+		long mapping_writes_per_interval;
+		long gc_reads_per_interval;
+		long gc_writes_per_interval;
+		long gc_mapping_writes_per_interval;
+		long gc_mapping_reads_per_interval;
+		long app_reads_per_interval;
+		long app_writes_per_interval;
+		long num_noop_reads;
+		long num_noop_writes;
+
+		long counter;
+		const long COUNTER_LIMIT;
+		void print() const;
+		void collect_stats(Event const& event);
+	};
+	stats normal_stats;
+
 };
 
 class FtlImpl_Page : public FtlParent
@@ -904,6 +932,7 @@ public:
     }
 	static int CACHED_ENTRIES_THRESHOLD;
 	static int ENTRIES_PER_TRANSLATION_PAGE;
+	static bool SEPERATE_MAPPING_PAGES;
 private:
 	struct entry {
 		entry() : dirty(false), fixed(false), hotness(0), timestamp(numeric_limits<double>::infinity()) {}
@@ -920,28 +949,26 @@ private:
 	    	ar & timestamp;
 	    }
 	};
-	struct stats {
-		stats() : num_mapping_reads(0), num_mapping_writes(0) {}
-		long num_mapping_reads;
-		long num_mapping_writes;
-		void print() const;
-	};
-	stats stats;
+
 	int get_num_dirty_entries() const;
 	bool flush_mapping(double time, bool allow_flushing_dirty);
 	void iterate(long& victim_key, entry& victim_entry, bool allow_choosing_dirty);
 	void create_mapping_read(long translation_page_id, double time, Event* dependant);
-	void lock_all_entries_in_a_translation_page(long translation_page_id, double time);
+	void mark_clean(long translation_page_id, Event const& event);
 	void try_clear_space_in_mapping_cache(double time);
 	unordered_map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
 	queue<long> eviction_queue_dirty;
 	queue<long> eviction_queue_clean;
 	vector<Address> global_translation_directory; // tracks where translation pages are
 	set<long> ongoing_mapping_operations; // contains the logical addresses of ongoing mapping IOs
-	map<long, vector<Event*> > application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
+	unordered_map<long, vector<Event*> > application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
 	int NUM_PAGES_IN_SSD;
 	FtlImpl_Page page_mapping;
-
+	struct dftl_statistics {
+		map<int, int> cleans_histogram;
+		map<int, int> address_hits;
+	};
+	dftl_statistics dftl_stats;
 };
 
 class LSM_FTL : public FtlParent {
@@ -960,62 +987,66 @@ public:
 	void set_replace_address(Event& event) const;
 	void set_read_address(Event& event) const;
 	void print() const;
-    friend class boost::serialization::access;
-    template<class Archive>
-    void serialize(Archive & ar, const unsigned int version)
-    {
-    	ar & boost::serialization::base_object<FtlParent>(*this);
-    	ar & cached_mapping_table;
-    	ar & global_translation_directory;
-    	ar & ongoing_mapping_operations;
-    	ar & NUM_PAGES_IN_SSD;
-    	ar & page_mapping;
-    	ar & CACHED_ENTRIES_THRESHOLD;
-    	ar & num_dirty_cached_entries;
-    	ar & dial;
-    	ar & ENTRIES_PER_TRANSLATION_PAGE;
-    }
+	void print_detailed() const;
+	static int buffer_threshold;
+	static int SIZE_RATIO;
 private:
-	struct entry {
-		entry() : dirty(false), fixed(false), hotness(0), timestamp(numeric_limits<double>::infinity()) {}
-		bool dirty;
-		int fixed;
-		short hotness;
-		double timestamp; // when was the entry added to the cache
-	    friend class boost::serialization::access;
-	    template<class Archive> void
-	    serialize(Archive & ar, const unsigned int version) {
-	    	ar & dirty;
-	    	ar & fixed;
-	    	ar & hotness;
-	    	ar & timestamp;
-	    }
-	};
 
-	struct level {
-		level() : num_entries(0), bf() {};
-		int num_entries;
-		bloom_filter bf;
-	};
-	map<int, level> levels;
-
-
-	void flush_mapping(double time);
-	void iterate(long& victim_key, entry& victim_entry, map<long, entry>::iterator start, map<long, entry>::iterator finish);
-	void create_mapping_read(long translation_page_id, double time, Event* dependant);
-	void lock_all_entries_in_a_translation_page(long translation_page_id, int lock, double time);
-	int evict_cold_entries();
-	map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
-	vector<Address> global_translation_directory; // tracks where translation pages are
-
-	set<long> ongoing_mapping_operations; // contains the logical addresses of ongoing mapping IOs
-	map<long, vector<Event*> > application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
-	int NUM_PAGES_IN_SSD;
+	void flush(double time);
+	long find_prospective_address_for_new_run(int size) const;
+	void check_if_should_merge(double time);
 	FtlImpl_Page page_mapping;
-	int CACHED_ENTRIES_THRESHOLD;
-	int num_dirty_cached_entries;
-	int dial;
-	int ENTRIES_PER_TRANSLATION_PAGE;
+
+	struct mapping_page {
+		int first_key;
+		int last_key;
+		set<int> addresses;
+	};
+	struct mapping_run {
+		mapping_run() : id(id_generator++) {}
+		void create_bloom_filter();
+		bool contains(int addr);
+		vector<mapping_page*> mapping_pages;
+		int starting_logical_address;	// not of the entries, but of where they're stored
+		int ending_logical_address;		// not of the entries, but of where they're stored
+		bloom_filter filter;
+		int level;
+		bool being_created;
+		bool being_merged;
+		bool obsolete;
+		set<long> executing_ios;
+		int id;
+		static int id_generator;
+	};
+	struct mapping_tree {
+		vector<mapping_run*> runs;
+	};
+	mapping_tree mapping_tree;
+	struct merge {
+		bool check_read(Event const& read, IOScheduler *scheduler);
+		bool check_write(Event const& read);
+		bool is_finished() const {return num_writes_finished == being_created->mapping_pages.size(); }
+		vector<mapping_run*> runs;
+		mapping_run* being_created;
+		int num_writes_issued;
+		int num_writes_finished;
+		map<mapping_run*, queue<int> > pages_to_read;
+	};
+	vector<merge*> merges;
+	struct buffer {
+		set<int> addresses;
+	};
+	void finish_merge(merge* m);
+	buffer buffer;
+	struct ongoing_read {
+		unordered_set<int> run_ids_attempted;
+		unordered_set<int> read_ios_submitted;
+		Event* original_read;
+	};
+	set<ongoing_read*> ongoing_reads;
+	void attend_ongoing_read(ongoing_read* r, double time);
+	void erase_run(mapping_run* run);
+	bool flush_in_progress;
 };
 
 class FAST : public FtlParent {
@@ -1199,6 +1230,7 @@ class StateVisualiser
 public:
 	static void print_page_status();
 	static void print_block_ages();
+	static void print_page_valid_histogram();
 	static Ssd * ssd;
 	static void init(Ssd * ssd);
 };

@@ -55,11 +55,11 @@ private:
 	Wear_Leveling_Strategy* wl;
 	map<long, uint> page_copy_back_count; // Pages that have experienced a copy-back, mapped to a count of the number of copy-backs
 	vector<vector<uint> > num_blocks_being_garbaged_collected_per_LUN;
-	map<int, int> blocks_being_garbage_collected;
+	unordered_map<int, int> blocks_being_garbage_collected;
 	vector<queue<Event*> > erase_queue;
 	vector<int> num_erases_scheduled_per_package;
-	map<long, vector<deque<Event*> > > dependent_gc;
-	map<Block*, double> gc_time_stat;
+	unordered_map<long, vector<deque<Event*> > > dependent_gc;
+	unordered_map<Block*, double> gc_time_stat;
 };
 
 class Block_manager_parent {
@@ -78,7 +78,11 @@ public:
 	virtual void trim(Event const& write);
 	virtual void receive_message(Event const& message) {}
 	double in_how_long_can_this_event_be_scheduled(Address const& die_address, double current_time, event_type type = NOT_VALID) const;
+	double soonest_possible_write() const;
+	static double soonest_write_time;
 	double in_how_long_can_this_write_be_scheduled(double current_time) const;
+	double in_how_long_can_this_write_be_scheduled2(double current_time) const;
+	void update_next_possible_write_time() const;
 	vector<deque<Event*> > migrate(Event * gc_event);
 	bool Copy_backs_in_progress(Address const& address);
 	bool can_schedule_on_die(Address const& address, event_type type, uint app_io_id) const;
@@ -289,7 +293,7 @@ public:
 	void register_erase_outcome(Event& event, enum status status);
 	//void increment_pointer_and_find_free(Address& block, double time);
     friend class boost::serialization::access;
-    void print();
+    void print() const;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
     {
@@ -302,8 +306,6 @@ protected:
 private:
 	map<int, vector<vector<Address> > > free_block_pointers_tags;  // tags, packages, dies
 };
-
-enum write_amp_choice {greedy, prob, opt};
 
 struct pointers {
 	pointers();

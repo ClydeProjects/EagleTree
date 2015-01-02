@@ -68,7 +68,7 @@ void OperatingSystem::check_if_stuck(bool no_pending_event, bool queue_is_full) 
 	const int idle_limit = 3000000;
 	if (idle_time > 100000 && idle_time % 100000 == 0) {
 		printf("Idle for %f seconds. No_pending_event=%d  Queue_is_full=%d\n", (double) idle_time / 1000000, no_pending_event, queue_is_full);
-		//PRINT_LEVEL = 2;
+		PRINT_LEVEL = 2;
 	}
 	if (idle_time >= idle_limit) {
 		printf("\n");
@@ -77,14 +77,14 @@ void OperatingSystem::check_if_stuck(bool no_pending_event, bool queue_is_full) 
 			fprintf(stderr, "Normally the SSD invokes the OS's register_event_completion method whenever an application IO completes.\n");
 			fprintf(stderr, "This isn't happening, though. Since these IOs are still in the IO queue, we are stuck. We cannot submit any more IOs.\n");
 			fprintf(stderr, "The IOs that were submitted but never completed have the following application IDs:\n");
-			for (auto it : currently_executing_ios) {
-				printf("%d ", it);
-			}
 		}
 		else if (no_pending_event) {
 			fprintf(stderr, "For some reason, the application threads are not submitting IOs.\n");
 			fprintf(stderr, "This means we are not making any progress. We are stuck an infinite loop.\n");
 			fprintf(stderr, "Hint: try to debug the OS_Scheduler method \"pick\", and try to see why the threads are not submitting IOs.\n");
+		}
+		for (auto it : currently_executing_ios) {
+			printf("%d ", it);
 		}
 
 		printf("\n");
@@ -155,6 +155,7 @@ void OperatingSystem::setup_follow_up_threads(int thread_id, double current_time
 	vector<Thread*>& follow_up_threads = threads[thread_id]->get_follow_up_threads();
 	if (PRINT_LEVEL >= 1) printf("Switching to new follow up thread\n");
 	printf("Switching to new follow up thread\n");
+	//PRINT_LEVEL = 2;
 	for (auto t : follow_up_threads) {
 		t->init(this, current_time);
 		int new_id = ++thread_id_generator;
@@ -172,7 +173,7 @@ void OperatingSystem::register_event_completion(Event* event) {
 	//printf("finished:\t"); event->print();
 	//printf("queue size:\t%d\n", currently_executing_ios_counter);
 
-	long thread_id = app_id_to_thread_id_mapping[event->get_application_io_id()];
+	long thread_id = app_id_to_thread_id_mapping.at(event->get_application_io_id());
 	app_id_to_thread_id_mapping.erase(event->get_application_io_id());
 	Thread* thread = threads[thread_id];
 	thread->register_event_completion(event);
