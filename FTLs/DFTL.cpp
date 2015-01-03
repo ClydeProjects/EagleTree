@@ -321,7 +321,8 @@ void DFTL::set_replace_address(Event& event) const {
 		event.set_replace_address(ra);
 		event.set_mapping_op(true);
 		if (SEPERATE_MAPPING_PAGES) {
-			event.set_tag(NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR + 1);
+			int tag = BLOCK_MANAGER_ID == 5 ? NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR + 1 : 1;
+			event.set_tag(tag);
 		}
 	}
 	else {
@@ -398,7 +399,7 @@ void DFTL::mark_clean(long translation_page_id, Event const& event) {
 
 
 	static int c = 0;
-	if (c++ % 10000 == 0 && StatisticsGatherer::get_global_instance()->total_writes() > 2000000) {
+	if (c++ % 20000 == 0 && StatisticsGatherer::get_global_instance()->total_writes() > 2000000) {
 		print();
 	}
 
@@ -501,7 +502,8 @@ bool DFTL::flush_mapping(double time, bool allow_flushing_dirty) {
 	Event* mapping_event = new Event(WRITE, NUM_PAGES_IN_SSD - translation_page_id, 1, time);
 	mapping_event->set_mapping_op(true);
 	if (SEPERATE_MAPPING_PAGES) {
-		mapping_event->set_tag(NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR + 1);
+		int tag = BLOCK_MANAGER_ID == 5 ? NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR + 1 : 1;
+		mapping_event->set_tag(tag);
 	}
 
 	// If a translation page on flash does not exist yet, we can flush without a read first
@@ -603,7 +605,7 @@ void DFTL::print() const {
 		printf("%d  %d\n", i.first, i.second);
 		total += i.second;
 	}
-	printf("total pages %d\n", total);
+	//printf("total pages %d\n", total);
 
 
 	/*printf("address histogram:");

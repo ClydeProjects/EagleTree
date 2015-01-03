@@ -591,6 +591,7 @@ Block_manager_parent* Block_manager_parent::get_new_instance() {
 		case 2: bm = new Sequential_Locality_BM(); break;
 		case 3: bm = new Block_manager_roundrobin(); break;
 		case 5: bm = new Block_Manager_Tag_Groups(); break;
+		case 6: bm = new Block_Manager_Groups(); break;
 		case 7: bm = new bm_gc_locality(); break;
 		default: bm = new Block_manager_parallel(); break;
 	}

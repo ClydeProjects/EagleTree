@@ -11,10 +11,13 @@ public:
 vector<Thread*> Example_Workload::generate() {
 
 	// This workload begins with a large sequential write of the entire logical address space.
-	Simple_Thread* init_write = new Asynchronous_Sequential_Writer(min_lba, max_lba);
+	Simple_Thread* init_write = new Synchronous_No_Collision_Random_Writer(min_lba, max_lba, 135);
+	//Simple_Thread* init_write = new Synchronous_Sequential_Writer(min_lba, max_lba);
 	init_write->set_io_size(1);
+	init_write->set_num_ios(NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR);
 	vector<Thread*> starting_threads;
 	starting_threads.push_back(init_write);
+
 	//init_write->set_num_ios(10000);
 
 	// Once the sequential write above is finished, two threads start.
@@ -31,9 +34,9 @@ vector<Thread*> Example_Workload::generate() {
 	// and prints statistics.
 	int seed1 = 13515;
 	int seed2 = 264;
-	Simple_Thread* writer = new Asynchronous_Random_Writer(min_lba, max_lba, seed1);
-	Simple_Thread* reader = new Asynchronous_Random_Reader(min_lba, max_lba, seed2);
-	init_write->add_follow_up_thread(reader);
+	Simple_Thread* writer = new Synchronous_Random_Writer(min_lba, max_lba, seed1);
+	Simple_Thread* reader = new Synchronous_Random_Reader(min_lba, max_lba, seed2);
+	//init_write->add_follow_up_thread(reader);
 	init_write->add_follow_up_thread(writer);
 	writer->set_num_ios(INFINITE);
 	reader->set_num_ios(INFINITE);
@@ -45,12 +48,29 @@ int main()
 {
 	printf("Running EagleTree\n");
 	set_small_SSD_config();
+	FTL_DESIGN = 1;
+	GARBAGE_COLLECTION_POLICY = 0;
+	SCHEDULING_SCHEME = 7;
+	PRINT_LEVEL = 0;
+	MAX_SSD_QUEUE_SIZE = 16;
+	BLOCK_MANAGER_ID = 5;
+	DFTL::SEPERATE_MAPPING_PAGES = true;
+	DFTL::CACHED_ENTRIES_THRESHOLD = pow(2,4);		// SRAM fitting 256 kb, or 2^25 entries,
+	DFTL::ENTRIES_PER_TRANSLATION_PAGE = 128;
+	LSM_FTL::buffer_threshold = 128;
+	LSM_FTL::SIZE_RATIO = 9;
+	Block_Manager_Groups::detector_type = 3;
+	Block_Manager_Groups::prioritize_groups_that_need_blocks = true;
+	Block_Manager_Groups::garbage_collection_policy_within_groups = 1;
+	bloom_detector::min_num_groups = 2;
+	group::overprov_allocation_strategy = 1;
 	string name  = "/demo_output/";
 	Experiment::create_base_folder(name.c_str());
 	Experiment* e = new Experiment();
 	Workload_Definition* workload = new Example_Workload();
 	e->set_workload(workload);
-	e->set_io_limit(1000000);
+	printf("NUMBER_OF_ADDRESSABLE_PAGES: %d  %d\n", NUMBER_OF_ADDRESSABLE_PAGES(), (int)(NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR));
+	e->set_io_limit(3000000);
 	e->run("test");
 	e->draw_graphs();
 	delete workload;
