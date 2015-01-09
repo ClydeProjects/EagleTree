@@ -971,10 +971,8 @@ private:
 	dftl_statistics dftl_stats;
 };
 
-/*class LSM_Tree_Manager {
+class LSM_Tree_Manager {
 public:
-	FtlImpl_Page* page_mapping;
-
 		struct mapping_page {
 			int first_key;
 			int last_key;
@@ -1032,10 +1030,14 @@ public:
 			void check_if_should_merge(double time);
 			void finish_merge(merge* m);
 			void erase_run(mapping_run* run);
+			void create_ongoing_read(Event* e);
 			void attend_ongoing_read(ongoing_read* r, double time);
+			void print() const;
 		};
-		static map<string, mapping_tree> trees;
-};*/
+		//static map<string, mapping_tree> trees;
+		static int buffer_threshold;
+		static int SIZE_RATIO;
+};
 
 class LSM_FTL : public FtlParent {
 public:
@@ -1055,73 +1057,10 @@ public:
 	void set_read_address(Event& event) const;
 	void print() const;
 	void print_detailed() const;
-	static int buffer_threshold;
-	static int SIZE_RATIO;
+
 private:
-
 	FtlImpl_Page* page_mapping;
-
-	struct mapping_page {
-		int first_key;
-		int last_key;
-		set<int> addresses;
-	};
-	struct mapping_run {
-		mapping_run() : id(id_generator++) {}
-		void create_bloom_filter();
-		bool contains(int addr);
-		vector<mapping_page*> mapping_pages;
-		int starting_logical_address;	// not of the entries, but of where they're stored
-		int ending_logical_address;		// not of the entries, but of where they're stored
-		bloom_filter filter;
-		int level;
-		bool being_created;
-		bool being_merged;
-		bool obsolete;
-		set<long> executing_ios;
-		int id;
-		static int id_generator;
-	};
-
-	struct merge {
-		bool check_read(Event const& read, IOScheduler *scheduler);
-		bool check_write(Event const& read);
-		bool is_finished() const {return num_writes_finished == being_created->mapping_pages.size(); }
-		vector<mapping_run*> runs;
-		mapping_run* being_created;
-		int num_writes_issued;
-		int num_writes_finished;
-		map<mapping_run*, queue<int> > pages_to_read;
-	};
-
-	struct buffer {
-		set<int> addresses;
-	};
-
-	struct ongoing_read {
-		unordered_set<int> run_ids_attempted;
-		unordered_set<int> read_ios_submitted;
-		Event* original_read;
-	};
-
-	struct mapping_tree {
-		mapping_tree(IOScheduler*, FtlImpl_Page*);
-		buffer buf;
-		bool flush_in_progress;
-		vector<mapping_run*> runs;
-		vector<merge*> merges;
-		set<ongoing_read*> ongoing_reads;
-		IOScheduler* scheduler;
-		FtlImpl_Page* page_mapping;
-		void flush(double time);
-		long find_prospective_address_for_new_run(int size) const;
-		void check_if_should_merge(double time);
-		void finish_merge(merge* m);
-		void erase_run(mapping_run* run);
-		void attend_ongoing_read(ongoing_read* r, double time);
-	};
-	mapping_tree tree;
-
+	LSM_Tree_Manager::mapping_tree tree;
 };
 
 class FAST : public FtlParent {
