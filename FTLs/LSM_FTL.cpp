@@ -13,19 +13,23 @@ int LSM_FTL::mapping_run::id_generator = 0;
 
 LSM_FTL::LSM_FTL(Ssd *ssd, Block_manager_parent* bm) :
 		FtlParent(ssd, bm),
-		page_mapping(FtlImpl_Page(ssd, bm)),
-		buffer(),
-		flush_in_progress(false)
+		page_mapping(new FtlImpl_Page(ssd, bm)),
+		tree(mapping_tree(scheduler, page_mapping))
 
 {
 	IS_FTL_PAGE_MAPPING = true;
 }
 
 LSM_FTL::LSM_FTL() :
-		FtlParent(),
-		flush_in_progress(false)
+		page_mapping(),
+		tree(mapping_tree(NULL, NULL)),
+		FtlParent()
 {
 	IS_FTL_PAGE_MAPPING = true;
+}
+
+void LSM_FTL::set_scheduler(IOScheduler* sched) {
+	scheduler = tree.scheduler = sched;
 }
 
 LSM_FTL::~LSM_FTL(void)
@@ -35,25 +39,25 @@ LSM_FTL::~LSM_FTL(void)
 void LSM_FTL::read(Event *event)
 {
 	if (event->is_original_application_io()) {
-		if (buffer.addresses.count(event->get_logical_address()) == 1) {
+		if (tree.buf.addresses.count(event->get_logical_address()) == 1) {
 			scheduler->schedule_event(event);
 		}
 		else {
 			//print_detailed();
 			ongoing_read* r = new ongoing_read();
 			r->original_read = event;
-			ongoing_reads.insert(r);
-			attend_ongoing_read(r, event->get_current_time());
+			tree.ongoing_reads.insert(r);
+			tree.attend_ongoing_read(r, event->get_current_time());
 		}
 	}
 
 }
 
-void LSM_FTL::attend_ongoing_read(ongoing_read* r, double time) {
-	for (int i = mapping_tree.runs.size() - 1; i >= 0; i--) {
-		mapping_run* run = mapping_tree.runs[i];
+void LSM_FTL::mapping_tree::attend_ongoing_read(ongoing_read* r, double time) {
+	for (int i = runs.size() - 1; i >= 0; i--) {
+		mapping_run* run = runs[i];
 		int la = r->original_read->get_logical_address();
-		if (!run->being_created && !run->obsolete && r->run_ids_attempted.count(run->id) == 0 && (/*run->contains(la) ||*/ mapping_tree.runs[i]->filter.contains(la))) {
+		if (!run->being_created && !run->obsolete && r->run_ids_attempted.count(run->id) == 0 && (/*run->contains(la) ||*/ runs[i]->filter.contains(la))) {
 			// in which page is it?
 			r->run_ids_attempted.insert(run->id);
 			int mapping_address_to_read = UNDEFINED;
@@ -81,11 +85,11 @@ void LSM_FTL::attend_ongoing_read(ongoing_read* r, double time) {
 void LSM_FTL::register_read_completion(Event const& event, enum status result) {
 	collect_stats(event);
 	if (event.is_mapping_op()) {
-		for (auto& m : merges) {
+		for (auto& m : tree.merges) {
 			m->check_read(event, scheduler);
 		}
 		ongoing_read* ongoing = NULL;
-		for (auto& r : ongoing_reads) {
+		for (auto& r : tree.ongoing_reads) {
 			if (r->read_ios_submitted.count(event.get_application_io_id())) {
 				ongoing = r;
 				break;
@@ -97,7 +101,7 @@ void LSM_FTL::register_read_completion(Event const& event, enum status result) {
 
 		int mapping_la = event.get_logical_address();
 		mapping_run* run = NULL;
-		for (auto& r : mapping_tree.runs) {
+		for (auto& r : tree.runs) {
 			if (r->starting_logical_address <= mapping_la && r->ending_logical_address >= mapping_la) {
 				run = r;
 			}
@@ -121,15 +125,15 @@ void LSM_FTL::register_read_completion(Event const& event, enum status result) {
 			}
 		}
 
-		erase_run(run);
+		tree.erase_run(run);
 		if (!found_address) {
-			attend_ongoing_read(ongoing, event.get_current_time());
+			tree.attend_ongoing_read(ongoing, event.get_current_time());
 		}
 		else {
 			Event* original_read = ongoing->original_read;
-			Address addr = page_mapping.get_physical_address(original_read->get_logical_address());
+			Address addr = page_mapping->get_physical_address(original_read->get_logical_address());
 			original_read->set_address(addr);
-			ongoing_reads.erase(ongoing);
+			tree.ongoing_reads.erase(ongoing);
 			delete ongoing;
 			scheduler->schedule_event(original_read);
 		}
@@ -141,9 +145,9 @@ void LSM_FTL::register_read_completion(Event const& event, enum status result) {
 void LSM_FTL::write(Event *event)
 {
 	if (event->is_original_application_io()) {
-		buffer.addresses.insert(event->get_logical_address());
-		if (buffer.addresses.size() >= buffer_threshold) {
-			flush(event->get_current_time());
+		tree.buf.addresses.insert(event->get_logical_address());
+		if (tree.buf.addresses.size() >= buffer_threshold) {
+			tree.flush(event->get_current_time());
 		}
 	}
 	scheduler->schedule_event(event);
@@ -151,15 +155,15 @@ void LSM_FTL::write(Event *event)
 
 void LSM_FTL::register_write_completion(Event const& event, enum status result) {
 	collect_stats(event);
-	page_mapping.register_write_completion(event, result);
+	page_mapping->register_write_completion(event, result);
 	if (event.is_original_application_io()) {
 		return;
 	}
 
 	if (event.is_mapping_op()) {
-		for (auto& m : merges) {
+		for (auto& m : tree.merges) {
 			if (m->check_write(event) && m->is_finished()) {
-				finish_merge(m);
+				tree.finish_merge(m);
 				//print();
 				//printf("mapping writes: %d\n", stats.num_mapping_writes);
 				//stats.num_mapping_writes = 0;
@@ -167,7 +171,7 @@ void LSM_FTL::register_write_completion(Event const& event, enum status result) 
 			}
 		}
 
-		for (auto& run : mapping_tree.runs) {
+		for (auto& run : tree.runs) {
 			// end of flush
 			if (run->being_created && run->level == 1 && run->executing_ios.count(event.get_application_io_id())) {
 				run->executing_ios.erase(event.get_application_io_id());
@@ -175,8 +179,8 @@ void LSM_FTL::register_write_completion(Event const& event, enum status result) 
 				print();
 				//printf("mapping writes: %d\n", stats.num_mapping_writes);
 				//stats.num_mapping_writes = 0;
-				check_if_should_merge(event.get_current_time());
-				flush_in_progress = false;
+				tree.check_if_should_merge(event.get_current_time());
+				tree.flush_in_progress = false;
 
 			}
 		}
@@ -191,29 +195,29 @@ void LSM_FTL::trim(Event *event)
 }
 
 void LSM_FTL::register_trim_completion(Event & event) {
-	page_mapping.register_trim_completion(event);
+	page_mapping->register_trim_completion(event);
 }
 
 long LSM_FTL::get_logical_address(uint physical_address) const {
-	return page_mapping.get_logical_address(physical_address);
+	return page_mapping->get_logical_address(physical_address);
 }
 
 Address LSM_FTL::get_physical_address(uint logical_address) const {
-	return page_mapping.get_physical_address(logical_address);
+	return page_mapping->get_physical_address(logical_address);
 }
 
 void LSM_FTL::set_replace_address(Event& event) const {
-	page_mapping.set_replace_address(event);
+	page_mapping->set_replace_address(event);
 }
 
 void LSM_FTL::set_read_address(Event& event) const {
-	page_mapping.set_read_address(event);
+	page_mapping->set_read_address(event);
 }
 
 // used for debugging
 void LSM_FTL::print() const {
 	int total_pages = 0;
-	for (auto& run : mapping_tree.runs) {
+	for (auto& run : tree.runs) {
 		printf("level: %d   num pages: %d    id: %d    starting: %d   ending %d\t", run->level, run->mapping_pages.size(), run->id, run->starting_logical_address, run->ending_logical_address);
 		if (run->being_created) {
 			printf("being created\t");
@@ -235,7 +239,7 @@ void LSM_FTL::print() const {
 }
 
 void LSM_FTL::print_detailed() const {
-	for (auto& run : mapping_tree.runs) {
+	for (auto& run : tree.runs) {
 		printf("level: %d   num pages: %d    id: %d    starting: %d   ending %d\n", run->level, run->mapping_pages.size(), run->id, run->starting_logical_address, run->ending_logical_address);
 		//printf("\t");
 		for (auto& page : run->mapping_pages) {
@@ -246,12 +250,16 @@ void LSM_FTL::print_detailed() const {
 	printf("\n");
 }
 
-long LSM_FTL::find_prospective_address_for_new_run(int size) const {
+LSM_FTL::mapping_tree::mapping_tree(IOScheduler* sched, FtlImpl_Page* mapping) :
+	flush_in_progress(false), scheduler(sched), page_mapping(mapping) { }
+
+
+long LSM_FTL::mapping_tree::find_prospective_address_for_new_run(int size) const {
 	int prospective_addr = NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR + 1;
 	bool found = true;
 	do {
 		found = true;
-		for (auto& mapping_run : mapping_tree.runs) {
+		for (auto& mapping_run : runs) {
 			// if prospective adress is
 			bool try1 = prospective_addr >= mapping_run->starting_logical_address;
 			if ((prospective_addr >= mapping_run->starting_logical_address && mapping_run->ending_logical_address >= prospective_addr)
@@ -289,7 +297,7 @@ void LSM_FTL::mapping_run::create_bloom_filter() {
 	}
 }
 
-void LSM_FTL::flush(double time) {
+void LSM_FTL::mapping_tree::flush(double time) {
 	if (flush_in_progress) {
 		return;
 	}
@@ -310,12 +318,12 @@ void LSM_FTL::flush(double time) {
 	run->obsolete = false;
 	run->executing_ios.insert(event->get_application_io_id());
 	mapping_page* p = new mapping_page();
-	p->addresses = buffer.addresses;
+	p->addresses = buf.addresses;
 	p->first_key = *p->addresses.begin();
 	p->last_key = *p->addresses.rbegin();
-	buffer.addresses.clear();
+	buf.addresses.clear();
 	run->mapping_pages.push_back(p);
-	mapping_tree.runs.push_back(run);
+	runs.push_back(run);
 	run->create_bloom_filter();
 }
 
@@ -347,16 +355,16 @@ bool LSM_FTL::merge::check_write(Event const& write) {
 	return false;
 }
 
-void LSM_FTL::erase_run(mapping_run* run) {
+void LSM_FTL::mapping_tree::erase_run(mapping_run* run) {
 	if (run->executing_ios.size() == 0 && run->obsolete) {
 		for (auto& page : run->mapping_pages) {
 			delete page;
 		}
-		mapping_tree.runs.erase(std::find(mapping_tree.runs.begin(), mapping_tree.runs.end(), run));
+		runs.erase(std::find(runs.begin(), runs.end(), run));
 	}
 }
 
-void LSM_FTL::finish_merge(merge* m) {
+void LSM_FTL::mapping_tree::finish_merge(merge* m) {
 	merges.erase(std::find(merges.begin(), merges.end(), m));
 	m->being_created->being_created = false;
 	for (auto& run : m->runs) {
@@ -366,10 +374,10 @@ void LSM_FTL::finish_merge(merge* m) {
 	}
 }
 
-void LSM_FTL::check_if_should_merge(double time) {
+void LSM_FTL::mapping_tree::check_if_should_merge(double time) {
 	map<int, int> levels;
 	map<int, int> levels_sizes;
-	for (auto& mapping_run : mapping_tree.runs) {
+	for (auto& mapping_run : runs) {
 		if (!mapping_run->being_created && !mapping_run->being_merged && !mapping_run->obsolete) {
 			levels[mapping_run->level]++;
 			levels_sizes[mapping_run->level] += mapping_run->mapping_pages.size();
@@ -393,7 +401,7 @@ void LSM_FTL::check_if_should_merge(double time) {
 
 	merge* m = new merge();
 	merges.push_back(m);
-	for (auto& mapping_run : mapping_tree.runs) {
+	for (auto& mapping_run : runs) {
 		if (!mapping_run->being_created && !mapping_run->being_merged && !mapping_run->obsolete && (highest_level_to_merge >= mapping_run->level || mapping_run->level == 1)) {
 			m->runs.push_back(mapping_run);
 		}
@@ -448,7 +456,7 @@ void LSM_FTL::check_if_should_merge(double time) {
 	run->ending_logical_address = starting_address + run->mapping_pages.size() - 1;
 	assert(run->starting_logical_address < NUMBER_OF_ADDRESSABLE_PAGES() + 1);
 	assert(run->ending_logical_address < NUMBER_OF_ADDRESSABLE_PAGES() + 1);
-	mapping_tree.runs.push_back(run);
+	runs.push_back(run);
 
 	for (auto& run : m->runs) {
 		for (int i = run->starting_logical_address; i <= run->ending_logical_address; i++) {
@@ -456,7 +464,7 @@ void LSM_FTL::check_if_should_merge(double time) {
 		}
 		Event* read = new Event(READ, run->starting_logical_address, 1, time);
 		read->set_mapping_op(true);
-		Address physical_addr_of_translation_page = page_mapping.get_physical_address(run->starting_logical_address);
+		Address physical_addr_of_translation_page = page_mapping->get_physical_address(run->starting_logical_address);
 		read->set_address(physical_addr_of_translation_page);
 		scheduler->schedule_event(read);
 	}

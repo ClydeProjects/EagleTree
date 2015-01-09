@@ -810,7 +810,7 @@ class FtlParent
 public:
 	FtlParent(Ssd *ssd, Block_manager_parent* bm);
 	FtlParent() : ssd(NULL), scheduler(NULL), bm(NULL), normal_stats("normal_stats", 50000) {};
-	inline void set_scheduler(IOScheduler* sched) { scheduler = sched; }
+	virtual void set_scheduler(IOScheduler* sched) { scheduler = sched; }
 	virtual ~FtlParent ();
 	virtual void read(Event *event) = 0;
 	virtual void write(Event *event) = 0;
@@ -971,11 +971,78 @@ private:
 	dftl_statistics dftl_stats;
 };
 
+/*class LSM_Tree_Manager {
+public:
+	FtlImpl_Page* page_mapping;
+
+		struct mapping_page {
+			int first_key;
+			int last_key;
+			set<int> addresses;
+		};
+		struct mapping_run {
+			mapping_run() : id(id_generator++) {}
+			void create_bloom_filter();
+			bool contains(int addr);
+			vector<mapping_page*> mapping_pages;
+			int starting_logical_address;	// not of the entries, but of where they're stored
+			int ending_logical_address;		// not of the entries, but of where they're stored
+			bloom_filter filter;
+			int level;
+			bool being_created;
+			bool being_merged;
+			bool obsolete;
+			set<long> executing_ios;
+			int id;
+			static int id_generator;
+		};
+
+		struct merge {
+			bool check_read(Event const& read, IOScheduler *scheduler);
+			bool check_write(Event const& read);
+			bool is_finished() const {return num_writes_finished == being_created->mapping_pages.size(); }
+			vector<mapping_run*> runs;
+			mapping_run* being_created;
+			int num_writes_issued;
+			int num_writes_finished;
+			map<mapping_run*, queue<int> > pages_to_read;
+		};
+
+		struct buffer {
+			set<int> addresses;
+		};
+
+		struct ongoing_read {
+			unordered_set<int> run_ids_attempted;
+			unordered_set<int> read_ios_submitted;
+			Event* original_read;
+		};
+
+		struct mapping_tree {
+			mapping_tree(IOScheduler*, FtlImpl_Page*);
+			buffer buf;
+			bool flush_in_progress;
+			vector<mapping_run*> runs;
+			vector<merge*> merges;
+			set<ongoing_read*> ongoing_reads;
+			IOScheduler* scheduler;
+			FtlImpl_Page* page_mapping;
+			void flush(double time);
+			long find_prospective_address_for_new_run(int size) const;
+			void check_if_should_merge(double time);
+			void finish_merge(merge* m);
+			void erase_run(mapping_run* run);
+			void attend_ongoing_read(ongoing_read* r, double time);
+		};
+		static map<string, mapping_tree> trees;
+};*/
+
 class LSM_FTL : public FtlParent {
 public:
 	LSM_FTL(Ssd *ssd, Block_manager_parent* bm);
 	LSM_FTL();
 	~LSM_FTL();
+	void set_scheduler(IOScheduler* sched);
 	void read(Event *event);
 	void write(Event *event);
 	void trim(Event *event);
@@ -992,10 +1059,7 @@ public:
 	static int SIZE_RATIO;
 private:
 
-	void flush(double time);
-	long find_prospective_address_for_new_run(int size) const;
-	void check_if_should_merge(double time);
-	FtlImpl_Page page_mapping;
+	FtlImpl_Page* page_mapping;
 
 	struct mapping_page {
 		int first_key;
@@ -1018,10 +1082,7 @@ private:
 		int id;
 		static int id_generator;
 	};
-	struct mapping_tree {
-		vector<mapping_run*> runs;
-	};
-	mapping_tree mapping_tree;
+
 	struct merge {
 		bool check_read(Event const& read, IOScheduler *scheduler);
 		bool check_write(Event const& read);
@@ -1032,21 +1093,35 @@ private:
 		int num_writes_finished;
 		map<mapping_run*, queue<int> > pages_to_read;
 	};
-	vector<merge*> merges;
+
 	struct buffer {
 		set<int> addresses;
 	};
-	void finish_merge(merge* m);
-	buffer buffer;
+
 	struct ongoing_read {
 		unordered_set<int> run_ids_attempted;
 		unordered_set<int> read_ios_submitted;
 		Event* original_read;
 	};
-	set<ongoing_read*> ongoing_reads;
-	void attend_ongoing_read(ongoing_read* r, double time);
-	void erase_run(mapping_run* run);
-	bool flush_in_progress;
+
+	struct mapping_tree {
+		mapping_tree(IOScheduler*, FtlImpl_Page*);
+		buffer buf;
+		bool flush_in_progress;
+		vector<mapping_run*> runs;
+		vector<merge*> merges;
+		set<ongoing_read*> ongoing_reads;
+		IOScheduler* scheduler;
+		FtlImpl_Page* page_mapping;
+		void flush(double time);
+		long find_prospective_address_for_new_run(int size) const;
+		void check_if_should_merge(double time);
+		void finish_merge(merge* m);
+		void erase_run(mapping_run* run);
+		void attend_ongoing_read(ongoing_read* r, double time);
+	};
+	mapping_tree tree;
+
 };
 
 class FAST : public FtlParent {
