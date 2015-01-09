@@ -971,8 +971,13 @@ private:
 	dftl_statistics dftl_stats;
 };
 
-class LSM_Tree_Manager {
+class LSM_Tree_Manager_Listener {
 public:
+	virtual void event_finished(int key, int value) = 0;
+};
+
+class LSM_Tree_Manager {
+private:
 		struct mapping_page {
 			int first_key;
 			int last_key;
@@ -1015,9 +1020,20 @@ public:
 			unordered_set<int> read_ios_submitted;
 			Event* original_read;
 		};
-
+public:
 		struct mapping_tree {
+		public:
 			mapping_tree(IOScheduler*, FtlImpl_Page*);
+			void create_ongoing_read(Event* e);
+			void attend_ongoing_read(ongoing_read* r, double time);
+			void print() const;
+			void register_read_completion(Event const&);
+			void register_write_completion(Event const&);
+			void insert(int element, double time);
+			bool in_buffer(int element);
+			void set_listener(LSM_Tree_Manager_Listener*);
+			void set_scheduler(IOScheduler*);
+		private:
 			buffer buf;
 			bool flush_in_progress;
 			vector<mapping_run*> runs;
@@ -1025,21 +1041,20 @@ public:
 			set<ongoing_read*> ongoing_reads;
 			IOScheduler* scheduler;
 			FtlImpl_Page* page_mapping;
+			LSM_Tree_Manager_Listener* listener;
 			void flush(double time);
 			long find_prospective_address_for_new_run(int size) const;
 			void check_if_should_merge(double time);
 			void finish_merge(merge* m);
 			void erase_run(mapping_run* run);
-			void create_ongoing_read(Event* e);
-			void attend_ongoing_read(ongoing_read* r, double time);
-			void print() const;
 		};
 		//static map<string, mapping_tree> trees;
 		static int buffer_threshold;
 		static int SIZE_RATIO;
 };
 
-class LSM_FTL : public FtlParent {
+
+class LSM_FTL : public FtlParent, LSM_Tree_Manager_Listener {
 public:
 	LSM_FTL(Ssd *ssd, Block_manager_parent* bm);
 	LSM_FTL();
@@ -1057,7 +1072,7 @@ public:
 	void set_read_address(Event& event) const;
 	void print() const;
 	void print_detailed() const;
-
+	void event_finished(int key, int value);
 private:
 	FtlImpl_Page* page_mapping;
 	LSM_Tree_Manager::mapping_tree tree;
