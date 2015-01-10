@@ -7,21 +7,22 @@
 
 using namespace ssd;
 
-
-
 LSM_FTL::LSM_FTL(Ssd *ssd, Block_manager_parent* bm) :
 		FtlParent(ssd, bm),
 		page_mapping(new FtlImpl_Page(ssd, bm)),
-		tree(LSM_Tree_Manager::mapping_tree(NULL, page_mapping))
+		tree(LSM_Tree_Manager<int, Event*>::mapping_tree(NULL, page_mapping))
 
 {
+
 	tree.set_listener(this);
 	IS_FTL_PAGE_MAPPING = true;
+
+
 }
 
 LSM_FTL::LSM_FTL() :
 		page_mapping(),
-		tree(LSM_Tree_Manager::mapping_tree(NULL, NULL)),
+		tree(LSM_Tree_Manager<int, Event*>::mapping_tree(NULL, NULL)),
 		FtlParent()
 {
 	tree.set_listener(this);
@@ -44,7 +45,7 @@ void LSM_FTL::read(Event *event) {
 			scheduler->schedule_event(event);
 		}
 		else {
-			tree.create_ongoing_read(event);
+			tree.create_ongoing_read(event->get_logical_address(), event, event->get_current_time());
 		}
 	}
 }
@@ -119,6 +120,10 @@ void LSM_FTL::print() const {
 	printf("\n");
 }*/
 
-void LSM_FTL::event_finished(int key, int value) {
-	printf("event finished\n");
+void LSM_FTL::event_finished(int key, int value, Event* original_read) {
+	//printf("event finished   %d   %d   ", key, value);
+	//original_read->print();
+	Address addr = page_mapping->get_physical_address(original_read->get_logical_address());
+	original_read->set_address(addr);
+	scheduler->schedule_event(original_read);
 }

@@ -49,6 +49,7 @@
 #include "block_management.h"
 #include "scheduler.h"
 #include "Operating_System.h"
+#include "lsm_tree_manager.h"
 
 #ifndef _SSD_H
 #define _SSD_H
@@ -309,6 +310,7 @@ struct Address_Range;
 class Flexible_Reader;
 
 class MTRand_int32;
+
 
 /* Class to manage physical addresses for the SSD.  It was designed to have
  * public members like a struct for quick access but also have checking,
@@ -971,17 +973,27 @@ private:
 	dftl_statistics dftl_stats;
 };
 
-class LSM_Tree_Manager_Listener {
+template <class T, class V> class LSM_Tree_Manager_Listener {
 public:
-	virtual void event_finished(int key, int value) = 0;
+	virtual void event_finished(int key, T value, V temp_data) = 0;
 };
 
-class LSM_Tree_Manager {
+struct scheduler_wrapper {
+public:
+	scheduler_wrapper(IOScheduler* s) : scheduler(s) {}
+	void schedule_event(Event* event);
+private:
+	IOScheduler* scheduler;
+};
+
+
+
+template <class T, class V> class LSM_Tree_Manager {
 private:
 		struct mapping_page {
 			int first_key;
 			int last_key;
-			set<int> addresses;
+			map<int, T> addresses;
 		};
 		struct mapping_run {
 			mapping_run() : id(id_generator++) {}
@@ -1001,7 +1013,7 @@ private:
 		};
 
 		struct merge {
-			bool check_read(Event const& read, IOScheduler *scheduler);
+			bool check_read(Event const& read, scheduler_wrapper scheduler);
 			bool check_write(Event const& read);
 			bool is_finished() const {return num_writes_finished == being_created->mapping_pages.size(); }
 			vector<mapping_run*> runs;
@@ -1012,26 +1024,27 @@ private:
 		};
 
 		struct buffer {
-			set<int> addresses;
+			map<int, T> addresses;
 		};
 
 		struct ongoing_read {
 			unordered_set<int> run_ids_attempted;
 			unordered_set<int> read_ios_submitted;
-			Event* original_read;
+			int key;
+			V temp;
 		};
 public:
 		struct mapping_tree {
 		public:
 			mapping_tree(IOScheduler*, FtlImpl_Page*);
-			void create_ongoing_read(Event* e);
+			void create_ongoing_read(int key, V temp_data, double time);
 			void attend_ongoing_read(ongoing_read* r, double time);
 			void print() const;
 			void register_read_completion(Event const&);
 			void register_write_completion(Event const&);
 			void insert(int element, double time);
 			bool in_buffer(int element);
-			void set_listener(LSM_Tree_Manager_Listener*);
+			void set_listener(LSM_Tree_Manager_Listener<T, V>* );
 			void set_scheduler(IOScheduler*);
 		private:
 			buffer buf;
@@ -1039,9 +1052,9 @@ public:
 			vector<mapping_run*> runs;
 			vector<merge*> merges;
 			set<ongoing_read*> ongoing_reads;
-			IOScheduler* scheduler;
+			scheduler_wrapper scheduler;
 			FtlImpl_Page* page_mapping;
-			LSM_Tree_Manager_Listener* listener;
+			LSM_Tree_Manager_Listener<T, V>* listener;
 			void flush(double time);
 			long find_prospective_address_for_new_run(int size) const;
 			void check_if_should_merge(double time);
@@ -1054,7 +1067,7 @@ public:
 };
 
 
-class LSM_FTL : public FtlParent, LSM_Tree_Manager_Listener {
+class LSM_FTL : public FtlParent, LSM_Tree_Manager_Listener<int, Event*> {
 public:
 	LSM_FTL(Ssd *ssd, Block_manager_parent* bm);
 	LSM_FTL();
@@ -1072,10 +1085,10 @@ public:
 	void set_read_address(Event& event) const;
 	void print() const;
 	void print_detailed() const;
-	void event_finished(int key, int value);
+	void event_finished(int key, int value, Event* read);
 private:
 	FtlImpl_Page* page_mapping;
-	LSM_Tree_Manager::mapping_tree tree;
+	LSM_Tree_Manager<int, Event*>::mapping_tree tree;
 };
 
 class FAST : public FtlParent {
