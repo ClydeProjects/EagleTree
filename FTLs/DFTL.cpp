@@ -40,8 +40,7 @@ DFTL::~DFTL(void)
 }
 
 
-void DFTL::read(Event *event)
-{
+void DFTL::read(Event *event) {
 	long la = event->get_logical_address();
 	// If the logical address is in the cached mapping table, submit the IO
 	if (cached_mapping_table.count(la) == 1) {
@@ -57,6 +56,7 @@ void DFTL::read(Event *event)
 	// If the mapping entry does not exist in cache and there is no translation page in flash, cancel the read
 	if (global_translation_directory[translation_page_id].valid == NONE) {
 		event->set_noop(true);
+		scheduler->schedule_event(event);
 		return;
 	}
 
@@ -72,13 +72,6 @@ void DFTL::read(Event *event)
 
 void DFTL::register_read_completion(Event const& event, enum status result) {
 	page_mapping.register_read_completion(event, result);
-	if (event.is_mapping_op()) {
-		//event.print();
-	}
-	if (event.get_logical_address() == 1048259) {
-		int i = 0;
-		i++;
-	}
 
 	// if normal application read, do nothing
 	if (ongoing_mapping_operations.count(event.get_logical_address()) == 0) {
@@ -104,42 +97,42 @@ void DFTL::register_read_completion(Event const& event, enum status result) {
 	application_ios_waiting_for_translation.erase(translation_page_id);
 	for (auto e : waiting_events) {
 		if (e->is_mapping_op()) {
-			if (ongoing_mapping_operations.count(e->get_logical_address()) == 1) {
-				assert(false);
-				delete e;
-				continue;
-			}
-			//printf("now submitting mapping write  %d\n", translation_page_id);
 			ongoing_mapping_operations.insert(e->get_logical_address());
 		}
 		else  {
-			long fixed = 0;
-			if (cached_mapping_table.count(e->get_logical_address()) == 0) {
-				entry entry;
-				entry.hotness++;
-				fixed = 0;
-				if (e->get_logical_address() > NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR) {
-					e->print();
-					assert(false);
-				}
-				cached_mapping_table[e->get_logical_address()] = entry;
-			}
-			else {
-				entry& entry = cached_mapping_table.at(e->get_logical_address());
-				entry.hotness++;
-				fixed = entry.fixed;
-			}
-			if (e->get_event_type() == WRITE && fixed == 0) {
-				entry& entry = cached_mapping_table.at(e->get_logical_address());
-				entry.fixed++;
-			}
+			insert_to_cache_due_to_mapping_read_finished(e);
 		}
 		scheduler->schedule_event(e);
 	}
 
 	// Made sure we don't overuse RAM
-	try_clear_space_in_mapping_cache(event.get_current_time());
+	//if (!event.is_mapping_op()) {
+		try_clear_space_in_mapping_cache(event.get_current_time());
+	//}
+}
 
+void DFTL::insert_to_cache_due_to_mapping_read_finished(Event* e) {
+	long fixed = 0;
+	if (cached_mapping_table.count(e->get_logical_address()) == 0) {
+		entry entry;
+		entry.hotness++;
+		fixed = 0;
+		cached_mapping_table[e->get_logical_address()] = entry;
+		if (entry.dirty) {
+			eviction_queue_dirty.push(e->get_logical_address());
+		} else  {
+			eviction_queue_clean.push(e->get_logical_address());
+		}
+	}
+	else {
+		entry& entry = cached_mapping_table.at(e->get_logical_address());
+		entry.hotness++;
+		fixed = entry.fixed;
+	}
+	if (e->get_event_type() == WRITE && fixed == 0) {
+		entry& entry = cached_mapping_table.at(e->get_logical_address());
+		entry.fixed++;
+	}
 }
 
 void DFTL::write(Event *event)
@@ -159,25 +152,17 @@ void DFTL::write(Event *event)
 		entry& e = cached_mapping_table.at(la);
 		e.hotness++;
 		e.fixed++;
-		scheduler->schedule_event(event);
-		return;
 	}
-
-	// find which translation page is the logical address is on
-	//long translation_page_id = la / ENTRIES_PER_TRANSLATION_PAGE;
-
-	//if (global_translation_directory[translation_page_id].valid == NONE) {
-	if (!event->is_mapping_op()) {
+	else if (!event->is_mapping_op()) {
 		entry e;
 		e.fixed = 1;
 		e.hotness = 1;
-		if (event->get_logical_address() > NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR) {
-			event->print();
-			assert(false);
-		}
 		cached_mapping_table[la] = e;
-		scheduler->schedule_event(event);
 	}
+	else {
+		assert(false);
+	}
+	scheduler->schedule_event(event);
 		//try_clear_space_in_mapping_cache(event->get_current_time());
 		//return;
 	//}
@@ -193,29 +178,11 @@ void DFTL::write(Event *event)
 
 void DFTL::register_write_completion(Event const& event, enum status result) {
 	page_mapping.register_write_completion(event, result);
-	//collect_stats(event);
-	if (event.is_mapping_op()) {
-		//event.print();
-	}
-	if (		StatisticsGatherer::get_global_instance()->total_writes() > 2000000
-			&& 	StatisticsGatherer::get_global_instance()->total_writes() < 2000000 + 2
-			) {
-		//print();
-		dftl_stats.cleans_histogram.clear();
-		/*for (auto& i : cached_mapping_table) {
-			if (i.second)
-		}*/
-		//cached_mapping_table.clear();
-		//print();
 
-		//StateVisualiser::print_page_valid_histogram();
-		//StateVisualiser::print_page_status();
+	if (event.get_id() == 1190484) {
+		int i =0;
+		i++;
 	}
-
-	/*if (StatisticsGatherer::get_global_instance()->total_writes() > NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR &&
-			StatisticsGatherer::get_global_instance()->total_writes() % 50000 == 0) {
-		print();
-	}*/
 
 	if (event.get_noop()) {
 		return;
@@ -228,20 +195,16 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 			entry e;
 			e.timestamp = event.get_current_time();
 			e.dirty = true;
-			if (event.get_logical_address() > NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR) {
-				event.print();
-				assert(false);
-			}
 			cached_mapping_table[event.get_logical_address()] = e;
 			eviction_queue_dirty.push(event.get_logical_address());
 		}
 		else {
-
 			entry& e = cached_mapping_table.at(event.get_logical_address());
 			e.dirty = true;
 			e.timestamp = event.get_current_time();
 			e.fixed = 0;
 		}
+		//try_clear_space_in_mapping_cache(event.get_current_time());
 		return;
 	}
 
@@ -257,9 +220,6 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 		e.dirty = true;
 		eviction_queue_dirty.push(event.get_logical_address());
 		e.timestamp = event.get_current_time();
-		/*if (num_dirty_cached_entries == CACHED_ENTRIES_THRESHOLD) {
-			flush_mapping(event.get_current_time());
-		}*/
 		try_clear_space_in_mapping_cache(event.get_current_time());
 		return;
 	}
@@ -276,18 +236,23 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 	mark_clean(translation_page_id, event);
 
 	// really, we should not be exceeding the threshold here, but just in case we are, evict entries
-	try_clear_space_in_mapping_cache(event.get_current_time());
 
 	// schedule all operations
 	vector<Event*> waiting_events = application_ios_waiting_for_translation[translation_page_id];
 	application_ios_waiting_for_translation.erase(translation_page_id);
 	for (auto e : waiting_events) {
-		if (e->get_event_type() == READ) {
+		if (e->is_mapping_op() && !e->is_garbage_collection_op()) {
+			delete e;
+			//scheduler->schedule_event(e);
+		}
+		else if (e->get_event_type() == READ) {
 			read(e);
-		} else {
+		}
+		else {
 			write(e);
 		}
 	}
+	try_clear_space_in_mapping_cache(event.get_current_time());
 }
 
 void DFTL::trim(Event *event)
@@ -380,7 +345,7 @@ void DFTL::mark_clean(long translation_page_id, Event const& event) {
 
 	dftl_stats.address_hits[translation_page_id]++;
 
-	if (StatisticsGatherer::get_global_instance()->total_writes() > 2000000) {
+	if (StatisticsGatherer::get_global_instance()->total_writes() > 750000) {
 		//printf("mapping write %d cleans: %d   num dirty: %d   cache size: %d    size limit: %d\n", translation_page_id, num_dirty_entries, get_num_dirty_entries(), cached_mapping_table.size(), CACHED_ENTRIES_THRESHOLD);
 	}
 
@@ -493,10 +458,13 @@ bool DFTL::flush_mapping(double time, bool allow_flushing_dirty) {
 	//printf("flush  %d\n", translation_page_id);
 	if (ongoing_mapping_operations.count(NUM_PAGES_IN_SSD - translation_page_id) == 1) {
 		//printf("Ongoing flush already targeting this address\n");
-		eviction_queue_dirty.push(victim);
+		if (victim_entry.dirty) {
+			eviction_queue_dirty.push(victim);
+		}else {
+			eviction_queue_clean.push(victim);
+		}
 		return false;
 	}
-
 
 	// create mapping write
 	Event* mapping_event = new Event(WRITE, NUM_PAGES_IN_SSD - translation_page_id, 1, time);

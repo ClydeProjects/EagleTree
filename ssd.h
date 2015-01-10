@@ -820,11 +820,11 @@ public:
 	virtual void register_write_completion(Event const& event, enum status result) = 0;
 	virtual void register_read_completion(Event const& event, enum status result) = 0;
 	virtual void register_trim_completion(Event & event) = 0;
-	virtual void register_erase_completion(Event & event) {};
 	virtual long get_logical_address(uint physical_address) const = 0;
 	virtual Address get_physical_address(uint logical_address) const = 0;
 	virtual void set_replace_address(Event& event) const = 0;
 	virtual void set_read_address(Event& event) const = 0;
+	virtual void register_erase_completion(Event & event) {};
 	virtual void print() const {};
 
 	void set_block_manager(Block_manager_parent* b) { bm = b; }
@@ -901,7 +901,40 @@ private:
 };
 
 
-//
+/*class ftl_cache {
+public:
+	void register_write_arrival(Event* app_write);
+	void handle_waited_IO(Event* event);
+	void try_clear_space_in_mapping_cache(double time);
+	//void mark_clean(long translation_page_id, Event const& event);
+	int get_num_dirty_entries() const;
+
+
+	bool flush_mapping(double time, bool allow_flushing_dirty);
+	void iterate(long& victim_key, entry& victim_entry, bool allow_choosing_dirty);
+
+
+	struct entry {
+		entry() : dirty(false), fixed(false), hotness(0), timestamp(numeric_limits<double>::infinity()) {}
+		bool dirty;
+		int fixed;
+		short hotness;
+		double timestamp; // when was the entry added to the cache
+	    friend class boost::serialization::access;
+	    template<class Archive> void
+	    serialize(Archive & ar, const unsigned int version) {
+	    	ar & dirty;
+	    	ar & fixed;
+	    	ar & hotness;
+	    	ar & timestamp;
+	    }
+	};
+
+	unordered_map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
+	queue<long> eviction_queue_dirty;
+	queue<long> eviction_queue_clean;
+};*/
+
 class DFTL : public FtlParent {
 public:
 	DFTL(Ssd *ssd, Block_manager_parent* bm);
@@ -911,6 +944,7 @@ public:
 	void write(Event *event);
 	void trim(Event *event);
 	void register_write_completion(Event const& event, enum status result);
+	void insert_to_cache_due_to_mapping_read_finished(Event* e);
 	void register_read_completion(Event const& event, enum status result);
 	void register_trim_completion(Event & event);
 	long get_logical_address(uint physical_address) const;
