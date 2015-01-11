@@ -904,12 +904,14 @@ private:
 class ftl_cache {
 public:
 	void register_write_arrival(Event* app_write);
+	bool register_read_arrival(Event* app_read);
 	void register_write_completion(Event const& app_write);
-	void handle_mapping_dependency(Event *event);
+	void handle_read_dependency(Event* event);
 	void clear_clean_entries(double time);
 	int choose_dirty_victim(double time);
 	//void mark_clean(long translation_page_id, Event const& event);
 	int get_num_dirty_entries() const;
+	bool mark_clean(int key, double time);
 
 	int erase_victim(double time, bool allow_flushing_dirty);
 	static int CACHED_ENTRIES_THRESHOLD;
@@ -930,10 +932,10 @@ public:
 	    }
 	};
 	unordered_map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
-private:
-	void iterate(long& victim_key, entry& victim_entry, bool allow_choosing_dirty);
 	queue<long> eviction_queue_dirty;
 	queue<long> eviction_queue_clean;
+private:
+	void iterate(long& victim_key, entry& victim_entry, bool allow_choosing_dirty);
 };
 
 class DFTL : public FtlParent {
@@ -945,7 +947,6 @@ public:
 	void write(Event *event);
 	void trim(Event *event);
 	void register_write_completion(Event const& event, enum status result);
-	void insert_to_cache_due_to_mapping_read_finished(Event* e);
 	void register_read_completion(Event const& event, enum status result);
 	void register_trim_completion(Event & event);
 	long get_logical_address(uint physical_address) const;
@@ -959,43 +960,21 @@ public:
     void serialize(Archive & ar, const unsigned int version)
     {
     	ar & boost::serialization::base_object<FtlParent>(*this);
-    	//ar & cached_mapping_table;
     	ar & global_translation_directory;
     	ar & ongoing_mapping_operations;
     	ar & NUM_PAGES_IN_SSD;
     	ar & page_mapping;
-    	ar & CACHED_ENTRIES_THRESHOLD;
     	ar & ENTRIES_PER_TRANSLATION_PAGE;
     }
-	static int CACHED_ENTRIES_THRESHOLD;
 	static int ENTRIES_PER_TRANSLATION_PAGE;
 	static bool SEPERATE_MAPPING_PAGES;
 private:
-	struct entry {
-		entry() : dirty(false), fixed(false), hotness(0), timestamp(numeric_limits<double>::infinity()) {}
-		bool dirty;
-		int fixed;
-		short hotness;
-		double timestamp; // when was the entry added to the cache
-	    friend class boost::serialization::access;
-	    template<class Archive> void
-	    serialize(Archive & ar, const unsigned int version) {
-	    	ar & dirty;
-	    	ar & fixed;
-	    	ar & hotness;
-	    	ar & timestamp;
-	    }
-	};
-
-	int get_num_dirty_entries() const;
-	bool flush_mapping(double time, bool allow_flushing_dirty);
-	void iterate(long& victim_key, entry& victim_entry, bool allow_choosing_dirty);
+	ftl_cache cache;
+	//bool flush_mapping(double time, bool allow_flushing_dirty);
+	//void iterate(long& victim_key, ftl_cache::entry& victim_entry, bool allow_choosing_dirty);
 	void create_mapping_read(long translation_page_id, double time, Event* dependant);
 	void mark_clean(long translation_page_id, Event const& event);
 	void try_clear_space_in_mapping_cache(double time);
-	unordered_map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
-	queue<long> eviction_queue_dirty;
-	queue<long> eviction_queue_clean;
 	vector<Address> global_translation_directory; // tracks where translation pages are
 	set<long> ongoing_mapping_operations; // contains the logical addresses of ongoing mapping IOs
 	unordered_map<long, vector<Event*> > application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation

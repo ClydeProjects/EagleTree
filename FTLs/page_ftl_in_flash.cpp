@@ -35,6 +35,29 @@ void ftl_cache::register_write_arrival(Event *event)
 	}
 }
 
+void ftl_cache::handle_read_dependency(Event* e) {
+	if (cached_mapping_table.count(e->get_logical_address()) == 0) {
+		ftl_cache::entry entry;
+		entry.hotness++;
+		cached_mapping_table[e->get_logical_address()] = entry;
+		eviction_queue_clean.push(e->get_logical_address());
+	}
+	else {
+		ftl_cache::entry& entry = cached_mapping_table.at(e->get_logical_address());
+		entry.hotness++;
+	}
+}
+
+bool ftl_cache::register_read_arrival(Event* app_read) {
+	int la = app_read->get_logical_address();
+	if (cached_mapping_table.count(la) == 1) {
+		ftl_cache::entry& e = cached_mapping_table.at(la);
+		e.hotness++;
+		return true;
+	}
+	return false;
+}
+
 void ftl_cache::register_write_completion(Event const& event) {
 	if (event.is_garbage_collection_op() && !event.is_original_application_io() && !event.is_mapping_op()) {
 		if (cached_mapping_table.count(event.get_logical_address()) == 0) {
@@ -59,30 +82,6 @@ void ftl_cache::register_write_completion(Event const& event) {
 		e.timestamp = event.get_current_time();
 	}
 	//try_clear_space_in_mapping_cache(event.get_current_time());
-}
-
-void ftl_cache::handle_mapping_dependency(Event *e) {
-	long fixed = 0;
-	if (cached_mapping_table.count(e->get_logical_address()) == 0) {
-		entry entry;
-		entry.hotness++;
-		fixed = 0;
-		cached_mapping_table[e->get_logical_address()] = entry;
-		if (entry.dirty) {
-			eviction_queue_dirty.push(e->get_logical_address());
-		} else  {
-			eviction_queue_clean.push(e->get_logical_address());
-		}
-	}
-	else {
-		entry& entry = cached_mapping_table.at(e->get_logical_address());
-		entry.hotness++;
-		fixed = entry.fixed;
-	}
-	if (e->get_event_type() == WRITE && fixed == 0) {
-		entry& entry = cached_mapping_table.at(e->get_logical_address());
-		entry.fixed++;
-	}
 }
 
 void ftl_cache::iterate(long& victim_key, entry& victim_entry, bool allow_choosing_dirty) {
@@ -120,6 +119,22 @@ int ftl_cache::choose_dirty_victim(double time) {
 	return erase_victim(time, true);
 }
 
+bool ftl_cache::mark_clean(int key, double time) {
+	if (cached_mapping_table.count(key) == 0) {
+		return false;
+	}
+	ftl_cache::entry& e = cached_mapping_table.at(key);
+	bool was_dirty = e.dirty;
+	assert(e.fixed >= 0);
+	if (e.timestamp <= time && e.hotness == 0 && e.fixed == 0) {
+		cached_mapping_table.erase(key);
+	}
+	else if (e.timestamp <= time && e.dirty) {
+		e.dirty = false;
+	}
+	return was_dirty;
+}
+
 // Uses a clock entry replacement policy
 int ftl_cache::erase_victim(double time, bool allow_flushing_dirty) {
 	//printf("flush called. num dirty: %d     cache size: %d\n", get_num_dirty_entries(), cached_mapping_table.size());
@@ -143,4 +158,14 @@ int ftl_cache::erase_victim(double time, bool allow_flushing_dirty) {
 		return victim;
 	}
 	return victim;
+}
+
+int ftl_cache::get_num_dirty_entries() const {
+	int num_dirty = 0;
+	for (auto i : cached_mapping_table) {
+		if (i.second.dirty) {
+			num_dirty++;
+		}
+	}
+	return num_dirty;
 }
