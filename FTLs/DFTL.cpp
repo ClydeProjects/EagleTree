@@ -179,18 +179,12 @@ void DFTL::write(Event *event)
 void DFTL::register_write_completion(Event const& event, enum status result) {
 	page_mapping.register_write_completion(event, result);
 
-	if (event.get_id() == 1190484) {
-		int i =0;
-		i++;
-	}
-
 	if (event.get_noop()) {
 		return;
 	}
 
 	// assume that the logical address of a GCed page is in the out of bound area of the page, so we can use it to update the mapping
 	if (event.is_garbage_collection_op() && !event.is_original_application_io() && !event.is_mapping_op()) {
-
 		if (cached_mapping_table.count(event.get_logical_address()) == 0) {
 			entry e;
 			e.timestamp = event.get_current_time();
@@ -209,7 +203,7 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 	}
 
 	// If normal IO
-	if (ongoing_mapping_operations.count(event.get_logical_address()) == 0 && !event.is_mapping_op()) {
+	if (event.is_original_application_io()) {
 		if (cached_mapping_table.count(event.get_logical_address()) == 0) {
 			printf("The entry was not in the cache \n");
 			event.print();

@@ -901,18 +901,18 @@ private:
 };
 
 
-/*class ftl_cache {
+class ftl_cache {
 public:
 	void register_write_arrival(Event* app_write);
-	void handle_waited_IO(Event* event);
-	void try_clear_space_in_mapping_cache(double time);
+	void register_write_completion(Event const& app_write);
+	void handle_mapping_dependency(Event *event);
+	void clear_clean_entries(double time);
+	int choose_dirty_victim(double time);
 	//void mark_clean(long translation_page_id, Event const& event);
 	int get_num_dirty_entries() const;
 
-
-	bool flush_mapping(double time, bool allow_flushing_dirty);
-	void iterate(long& victim_key, entry& victim_entry, bool allow_choosing_dirty);
-
+	int erase_victim(double time, bool allow_flushing_dirty);
+	static int CACHED_ENTRIES_THRESHOLD;
 
 	struct entry {
 		entry() : dirty(false), fixed(false), hotness(0), timestamp(numeric_limits<double>::infinity()) {}
@@ -929,11 +929,12 @@ public:
 	    	ar & timestamp;
 	    }
 	};
-
 	unordered_map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
+private:
+	void iterate(long& victim_key, entry& victim_entry, bool allow_choosing_dirty);
 	queue<long> eviction_queue_dirty;
 	queue<long> eviction_queue_clean;
-};*/
+};
 
 class DFTL : public FtlParent {
 public:
