@@ -971,11 +971,8 @@ private:
 	void create_mapping_read(long translation_page_id, double time, Event* dependant);
 	void mark_clean(long translation_page_id, Event const& event);
 	void try_clear_space_in_mapping_cache(double time);
-	vector<Address> global_translation_directory; // tracks where translation pages are
 	set<long> ongoing_mapping_operations; // contains the logical addresses of ongoing mapping IOs
 	unordered_map<long, vector<Event*> > application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
-	int NUM_PAGES_IN_SSD;
-
 	struct dftl_statistics {
 		map<int, int> cleans_histogram;
 		map<int, int> address_hits;

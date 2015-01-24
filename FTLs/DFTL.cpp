@@ -10,20 +10,16 @@ bool DFTL::SEPERATE_MAPPING_PAGES = true;
 
 DFTL::DFTL(Ssd *ssd, Block_manager_parent* bm) :
 		flash_resident_page_ftl(ssd, bm),
-		global_translation_directory((NUMBER_OF_ADDRESSABLE_PAGES() / ENTRIES_PER_TRANSLATION_PAGE) + 1, Address()),
 		ongoing_mapping_operations(),
-		application_ios_waiting_for_translation(),
-		NUM_PAGES_IN_SSD(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE)
+		application_ios_waiting_for_translation()
 {
 	IS_FTL_PAGE_MAPPING = true;
 }
 
 DFTL::DFTL() :
 		flash_resident_page_ftl(),
-		global_translation_directory(),
 		ongoing_mapping_operations(),
-		application_ios_waiting_for_translation(),
-		NUM_PAGES_IN_SSD(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE)
+		application_ios_waiting_for_translation()
 {
 	IS_FTL_PAGE_MAPPING = true;
 }
@@ -49,14 +45,15 @@ void DFTL::read(Event *event) {
 	long translation_page_id = la / ENTRIES_PER_TRANSLATION_PAGE;
 
 	// If the mapping entry does not exist in cache and there is no translation page in flash, cancel the read
-	if (global_translation_directory[translation_page_id].valid == NONE) {
+	if (page_mapping->get_physical_address(la).valid == NONE) {
+		assert(page_mapping->get_physical_address(la).valid == NONE);
 		event->set_noop(true);
 		scheduler->schedule_event(event);
 		return;
 	}
 
 	// If there is no mapping IO currently targeting the translation page, create on. Otherwise, invoke current event when ongoing mapping IO finishes.
-	if (ongoing_mapping_operations.count(NUM_PAGES_IN_SSD - translation_page_id) == 1) {
+	if (ongoing_mapping_operations.count(NUMBER_OF_ADDRESSABLE_PAGES() - translation_page_id) == 1) {
 		application_ios_waiting_for_translation[translation_page_id].push_back(event);
 	}
 	else {
@@ -76,7 +73,7 @@ void DFTL::register_read_completion(Event const& event, enum status result) {
 	ongoing_mapping_operations.erase(event.get_logical_address());
 
 	// identify translation page we finished reading
-	long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
+	long translation_page_id = - (event.get_logical_address() - NUMBER_OF_ADDRESSABLE_PAGES());
 
 	// Insert all entries into cached mapping table with hotness 0
 	/*for (int i = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE; i < (translation_page_id + 1) * ENTRIES_PER_TRANSLATION_PAGE; i++) {
@@ -148,10 +145,7 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 	}
 
 	ongoing_mapping_operations.erase(event.get_logical_address());
-	long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
-
-	//printf("finished mapping write %d\n", translation_page_id);
-	global_translation_directory[translation_page_id] = event.get_address();
+	long translation_page_id = - (event.get_logical_address() - NUMBER_OF_ADDRESSABLE_PAGES());
 
 	// mark all pages included as clean
 	mark_clean(translation_page_id, event);
@@ -187,16 +181,15 @@ Address DFTL::get_physical_address(uint logical_address) const {
 
 void DFTL::set_replace_address(Event& event) const {
 	if (event.is_mapping_op()) {
-		long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
-		Address ra = global_translation_directory[translation_page_id];
+		Address ra = page_mapping->get_physical_address(event.get_logical_address());
 		event.set_replace_address(ra);
 	}
 	// We are garbage collecting a mapping IO, we can infer it by the page's logical address
-	else if (event.is_garbage_collection_op() && event.get_logical_address() >= NUM_PAGES_IN_SSD - global_translation_directory.size()) {
-		long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
-		Address ra = global_translation_directory[translation_page_id];
+	else if (event.is_garbage_collection_op() && event.get_logical_address() >= NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR) {
+		Address ra = page_mapping->get_physical_address(event.get_logical_address());
 		event.set_replace_address(ra);
 		event.set_mapping_op(true);
+		assert(event.is_original_application_io());
 		if (SEPERATE_MAPPING_PAGES) {
 			int tag = BLOCK_MANAGER_ID == 5 ? NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR + 1 : 1;
 			event.set_tag(tag);
@@ -209,14 +202,12 @@ void DFTL::set_replace_address(Event& event) const {
 
 void DFTL::set_read_address(Event& event) const {
 	if (event.is_mapping_op()) {
-		long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
-		Address ra = global_translation_directory[translation_page_id];
+		Address ra = page_mapping->get_physical_address(event.get_logical_address());
 		event.set_address(ra);
 	}
 	// We are garbage collecting a mapping IO, we can infer it by the page's logical address
-	else if (event.is_garbage_collection_op() && event.get_logical_address() >= NUM_PAGES_IN_SSD - global_translation_directory.size()) {
-		long translation_page_id = - (event.get_logical_address() - NUM_PAGES_IN_SSD);
-		Address ra = global_translation_directory[translation_page_id];
+	else if (event.is_garbage_collection_op() && event.get_logical_address() >= NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR) {
+		Address ra = page_mapping->get_physical_address(event.get_logical_address());
 		event.set_address(ra);
 		event.set_mapping_op(true);
 	}
@@ -285,13 +276,13 @@ void DFTL::try_clear_space_in_mapping_cache(double time) {
 	//victim_entry.hotness = SHRT_MAX;
 
 	long translation_page_id = victim / ENTRIES_PER_TRANSLATION_PAGE;
-		if (ongoing_mapping_operations.count(NUM_PAGES_IN_SSD - translation_page_id) == 1) {
+		if (ongoing_mapping_operations.count(NUMBER_OF_ADDRESSABLE_PAGES() - translation_page_id) == 1) {
 			cache->eviction_queue_dirty.push(victim);
 			return;
 		}
 
 		// create mapping write
-		Event* mapping_event = new Event(WRITE, NUM_PAGES_IN_SSD - translation_page_id, 1, time);
+		Event* mapping_event = new Event(WRITE, NUMBER_OF_ADDRESSABLE_PAGES() - translation_page_id, 1, time);
 		mapping_event->set_mapping_op(true);
 		if (SEPERATE_MAPPING_PAGES) {
 			int tag = BLOCK_MANAGER_ID == 5 ? NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR + 1 : 1;
@@ -299,7 +290,7 @@ void DFTL::try_clear_space_in_mapping_cache(double time) {
 		}
 
 		// If a translation page on flash does not exist yet, we can flush without a read first
-		if( global_translation_directory[translation_page_id].valid == NONE ) {
+		if( page_mapping->get_physical_address(NUMBER_OF_ADDRESSABLE_PAGES() - translation_page_id).valid == NONE ) {
 			application_ios_waiting_for_translation[translation_page_id] = vector<Event*>();
 			ongoing_mapping_operations.insert(mapping_event->get_logical_address());
 			scheduler->schedule_event(mapping_event);
@@ -332,13 +323,13 @@ void DFTL::try_clear_space_in_mapping_cache(double time) {
 }
 
 void DFTL::create_mapping_read(long translation_page_id, double time, Event* dependant) {
-	Event* mapping_event = new Event(READ, NUM_PAGES_IN_SSD - translation_page_id, 1, time);
+	Event* mapping_event = new Event(READ, NUMBER_OF_ADDRESSABLE_PAGES() - translation_page_id, 1, time);
 	if (mapping_event->get_logical_address() == 1048259) {
 		int i = 0;
 		i++;
 	}
 	mapping_event->set_mapping_op(true);
-	Address physical_addr_of_translation_page = global_translation_directory[translation_page_id];
+	Address physical_addr_of_translation_page = page_mapping->get_physical_address(mapping_event->get_logical_address());
 	mapping_event->set_address(physical_addr_of_translation_page);
 	application_ios_waiting_for_translation[translation_page_id] = vector<Event*>();
 	application_ios_waiting_for_translation[translation_page_id].push_back(dependant);
@@ -365,7 +356,6 @@ void DFTL::print_short() const {
 	printf("total: %d\tdirty: %d\tclean: %d\tfixed: %d\tcold: %d\thot: %d\tvery hot: %d\tnum ios: %d\n", cache->cached_mapping_table.size(), num_dirty, num_clean, num_fixed, num_cold, num_hot, num_super_hot, StatisticsGatherer::get_global_instance()->total_writes());
 	printf("clean queue: %d \t dirty queue %d \n", cache->eviction_queue_clean.size(), cache->eviction_queue_dirty.size());
 	printf("threshold: %d\t cache: %d\n", ftl_cache::CACHED_ENTRIES_THRESHOLD, cache->cached_mapping_table.size());
-	printf("num mapping pages: %d\t", global_translation_directory.size());
 }
 
 // used for debugging
