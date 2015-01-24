@@ -12,7 +12,7 @@ Garbage_Collector_Greedy::Garbage_Collector_Greedy(Ssd* ssd, Block_manager_paren
 	   gc_candidates(SSD_SIZE, vector<set<long> >(PACKAGE_SIZE, set<long>()))
 {}
 
-void Garbage_Collector_Greedy::commit_choice_of_victim(Address const& phys_address) {
+void Garbage_Collector_Greedy::commit_choice_of_victim(Address const& phys_address, double time) {
 	gc_candidates[phys_address.package][phys_address.die].erase(phys_address.get_linear_address());
 }
 

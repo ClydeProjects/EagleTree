@@ -42,14 +42,26 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::set_list
 }
 
 template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::set_scheduler(IOScheduler* s) {
-	scheduler = s;
+	scheduler.set_scheduler(s);
 }
 
-template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::insert(int element, double time) {
-	buf.addresses[element] = 1;
+template <class T, class V> void LSM_Tree_Manager<T, V>::mapping_tree::set_page_mapping(FtlImpl_Page* new_page_mapping) {
+	page_mapping = new_page_mapping;
+}
+
+template <class T, class V> T& LSM_Tree_Manager<T, V>::mapping_tree::get_from_buffer(int key) {
+	return buf.addresses[key];
+}
+
+template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::insert(int element, T value, double time) {
+	buf.addresses[element] = value;
 	if (buf.addresses.size() >= LSM_Tree_Manager::buffer_threshold) {
 		flush(time);
 	}
+}
+
+template <class T, class V>  int LSM_Tree_Manager<T, V>::mapping_tree::get_num_levels() const {
+	return runs.size();
 }
 
 // used for debugging
@@ -80,7 +92,7 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register
 	for (auto& m : merges) {
 		if (m->check_write(event) && m->is_finished()) {
 			finish_merge(m);
-			//print();
+			print();
 			//printf("mapping writes: %d\n", stats.num_mapping_writes);
 			//stats.num_mapping_writes = 0;
 			//printf("finished merge\n");
@@ -92,7 +104,8 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register
 		if (run->being_created && run->level == 1 && run->executing_ios.count(event.get_application_io_id())) {
 			run->executing_ios.erase(event.get_application_io_id());
 			run->being_created = false;
-			//print();
+			event.print();
+			print();
 			//printf("mapping writes: %d\n", stats.num_mapping_writes);
 			//stats.num_mapping_writes = 0;
 			check_if_should_merge(event.get_current_time());
@@ -273,6 +286,7 @@ template <class T, class V> bool LSM_Tree_Manager<T, V>::merge::check_read(Event
 template <class T, class V> bool LSM_Tree_Manager<T, V>::merge::check_write(Event const& write) {
 	long la = write.get_logical_address();
 	if (la >= being_created->starting_logical_address && la <= being_created->ending_logical_address) {
+		write.print();
 		num_writes_finished++;
 		return true;
 	}
@@ -339,7 +353,7 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::check_if
 	//run->executing_ios.insert(event->get_application_io_id());
 
 
-	map<int, int> addresses_set;
+	map<int, T> addresses_set;
 	for (auto& run : m->runs) {
 		run->being_merged = true;
 		for (auto& page : run->mapping_pages) {
@@ -347,7 +361,7 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::check_if
 		}
 	}
 
-	vector<pair<int, int> > addresses;
+	vector<pair<int, T> > addresses;
 	addresses.insert(addresses.begin(), addresses_set.begin(), addresses_set.end());
 	vector<mapping_page*> mapping_pages_of_new_run;
 	int steps = 0;

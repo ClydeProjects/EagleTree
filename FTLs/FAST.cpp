@@ -435,7 +435,7 @@ void FAST::garbage_collect(int block_id, log_block* log_block, double time) {
 	}
 
 	Address& old_addr = translation_table[block_id];
-	migrator->update_structures(old_addr);
+	migrator->update_structures(old_addr, time);
 	bm->subtract_from_available_for_new_writes(BLOCK_SIZE);
 	translation_table[block_id] = new_addr;
 	Event* first_read = gc_queue[block_id].front();

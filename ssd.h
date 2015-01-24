@@ -296,6 +296,7 @@ class Wearwolf;
 class Sequential_Locality_BM;
 class Wear_Leveling_Strategy;
 class Garbage_Collector;
+class flash_resident_ftl_garbage_collection;
 class Migrator;
 
 class Sequential_Pattern_Detector;
@@ -866,7 +867,6 @@ protected:
 		void collect_stats(Event const& event);
 	};
 	stats normal_stats;
-
 };
 
 class FtlImpl_Page : public FtlParent
@@ -893,12 +893,11 @@ public:
     	ar & logical_to_physical_map;
     	ar & physical_to_logical_map;
     }
-
 private:
-
 	vector<long> logical_to_physical_map;
 	vector<long> physical_to_logical_map;
 };
+
 
 
 class ftl_cache {
@@ -909,27 +908,19 @@ public:
 	void handle_read_dependency(Event* event);
 	void clear_clean_entries(double time);
 	int choose_dirty_victim(double time);
-	//void mark_clean(long translation_page_id, Event const& event);
 	int get_num_dirty_entries() const;
 	bool mark_clean(int key, double time);
-
 	int erase_victim(double time, bool allow_flushing_dirty);
+	bool contains(int key) const;
 	static int CACHED_ENTRIES_THRESHOLD;
 
 	struct entry {
-		entry() : dirty(false), fixed(false), hotness(0), timestamp(numeric_limits<double>::infinity()) {}
+		entry() : dirty(false), synch_flag(false), fixed(false), hotness(0), timestamp(numeric_limits<double>::infinity()) {}
 		bool dirty;
+		bool synch_flag;
 		int fixed;
 		short hotness;
 		double timestamp; // when was the entry added to the cache
-	    friend class boost::serialization::access;
-	    template<class Archive> void
-	    serialize(Archive & ar, const unsigned int version) {
-	    	ar & dirty;
-	    	ar & fixed;
-	    	ar & hotness;
-	    	ar & timestamp;
-	    }
 	};
 	unordered_map<long, entry> cached_mapping_table; // maps logical addresses to physical addresses
 	queue<long> eviction_queue_dirty;
@@ -938,7 +929,22 @@ private:
 	void iterate(long& victim_key, entry& victim_entry, bool allow_choosing_dirty);
 };
 
-class DFTL : public FtlParent {
+class flash_resident_page_ftl : public FtlParent {
+public:
+	flash_resident_page_ftl(Ssd *ssd, Block_manager_parent* bm) :
+		FtlParent(ssd, bm), cache(new ftl_cache()), page_mapping(new FtlImpl_Page(ssd, bm)), gc(NULL) {}
+	flash_resident_page_ftl() : FtlParent() {}
+	ftl_cache* get_cache() { return cache; }
+	void set_gc(flash_resident_ftl_garbage_collection* new_gc) { gc = new_gc; }
+	FtlImpl_Page* get_page_mapping() { return page_mapping; }
+protected:
+	ftl_cache* cache;
+	FtlImpl_Page* page_mapping;
+	flash_resident_ftl_garbage_collection* gc;
+};
+
+
+class DFTL : public flash_resident_page_ftl {
 public:
 	DFTL(Ssd *ssd, Block_manager_parent* bm);
 	DFTL();
@@ -955,21 +961,11 @@ public:
 	void set_read_address(Event& event) const;
 	void print() const;
 	void print_short() const;
-    friend class boost::serialization::access;
-    template<class Archive>
-    void serialize(Archive & ar, const unsigned int version)
-    {
-    	ar & boost::serialization::base_object<FtlParent>(*this);
-    	ar & global_translation_directory;
-    	ar & ongoing_mapping_operations;
-    	ar & NUM_PAGES_IN_SSD;
-    	ar & page_mapping;
-    	ar & ENTRIES_PER_TRANSLATION_PAGE;
-    }
 	static int ENTRIES_PER_TRANSLATION_PAGE;
 	static bool SEPERATE_MAPPING_PAGES;
+
 private:
-	ftl_cache cache;
+	void notify_garbage_collector(int translation_page_id, double time);
 	//bool flush_mapping(double time, bool allow_flushing_dirty);
 	//void iterate(long& victim_key, ftl_cache::entry& victim_entry, bool allow_choosing_dirty);
 	void create_mapping_read(long translation_page_id, double time, Event* dependant);
@@ -979,7 +975,7 @@ private:
 	set<long> ongoing_mapping_operations; // contains the logical addresses of ongoing mapping IOs
 	unordered_map<long, vector<Event*> > application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
 	int NUM_PAGES_IN_SSD;
-	FtlImpl_Page page_mapping;
+
 	struct dftl_statistics {
 		map<int, int> cleans_histogram;
 		map<int, int> address_hits;
@@ -996,6 +992,7 @@ struct scheduler_wrapper {
 public:
 	scheduler_wrapper(IOScheduler* s) : scheduler(s) {}
 	void schedule_event(Event* event);
+	void set_scheduler(IOScheduler* s) { scheduler = s; }
 private:
 	IOScheduler* scheduler;
 };
@@ -1056,10 +1053,13 @@ public:
 			void print() const;
 			void register_read_completion(Event const&);
 			void register_write_completion(Event const&);
-			void insert(int element, double time);
+			void insert(int element, T value, double time);
 			bool in_buffer(int element);
+			T& get_from_buffer(int key);
 			void set_listener(LSM_Tree_Manager_Listener<T, V>* );
 			void set_scheduler(IOScheduler*);
+			void set_page_mapping(FtlImpl_Page*);
+			int get_num_levels() const;
 		private:
 			buffer buf;
 			bool flush_in_progress;
@@ -1081,7 +1081,7 @@ public:
 };
 
 
-class LSM_FTL : public FtlParent, LSM_Tree_Manager_Listener<int, Event*> {
+class LSM_FTL : public flash_resident_page_ftl, LSM_Tree_Manager_Listener<int, Event*> {
 public:
 	LSM_FTL(Ssd *ssd, Block_manager_parent* bm);
 	LSM_FTL();
@@ -1101,7 +1101,6 @@ public:
 	void print_detailed() const;
 	void event_finished(int key, int value, Event* read);
 private:
-	FtlImpl_Page* page_mapping;
 	LSM_Tree_Manager<int, Event*>::mapping_tree tree;
 };
 

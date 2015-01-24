@@ -12,7 +12,7 @@ Garbage_Collector_LRU::Garbage_Collector_LRU(Ssd* ssd, Block_manager_parent* bm)
 	   gc_candidates(SSD_SIZE, vector<int>(PACKAGE_SIZE, PLANE_SIZE))
 {}
 
-void Garbage_Collector_LRU::commit_choice_of_victim(Address const& phys_address) {
+void Garbage_Collector_LRU::commit_choice_of_victim(Address const& phys_address, double time) {
 	int package = phys_address.package;
 	int die = phys_address.die;
 	gc_candidates[package][die] = phys_address.block - 1;

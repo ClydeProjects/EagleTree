@@ -9,31 +9,28 @@ int DFTL::ENTRIES_PER_TRANSLATION_PAGE = 1024;
 bool DFTL::SEPERATE_MAPPING_PAGES = true;
 
 DFTL::DFTL(Ssd *ssd, Block_manager_parent* bm) :
-		FtlParent(ssd, bm),
-		cache(),
+		flash_resident_page_ftl(ssd, bm),
 		global_translation_directory((NUMBER_OF_ADDRESSABLE_PAGES() / ENTRIES_PER_TRANSLATION_PAGE) + 1, Address()),
 		ongoing_mapping_operations(),
 		application_ios_waiting_for_translation(),
-		NUM_PAGES_IN_SSD(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE),
-		page_mapping(FtlImpl_Page(ssd, bm))
+		NUM_PAGES_IN_SSD(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE)
 {
 	IS_FTL_PAGE_MAPPING = true;
 }
 
 DFTL::DFTL() :
-		FtlParent(),
-		cache(),
+		flash_resident_page_ftl(),
 		global_translation_directory(),
 		ongoing_mapping_operations(),
 		application_ios_waiting_for_translation(),
-		NUM_PAGES_IN_SSD(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE),
-		page_mapping()
+		NUM_PAGES_IN_SSD(NUMBER_OF_ADDRESSABLE_BLOCKS() * BLOCK_SIZE)
 {
 	IS_FTL_PAGE_MAPPING = true;
 }
 
 DFTL::~DFTL(void)
 {
+	delete cache;
 	assert(application_ios_waiting_for_translation.size() == 0);
 	print();
 }
@@ -43,7 +40,7 @@ void DFTL::read(Event *event) {
 
 	long la = event->get_logical_address();
 	// If the logical address is in the cached mapping table, submit the IO
-	if (cache.register_read_arrival(event)) {
+	if (cache->register_read_arrival(event)) {
 		scheduler->schedule_event(event);
 		return;
 	}
@@ -69,7 +66,7 @@ void DFTL::read(Event *event) {
 }
 
 void DFTL::register_read_completion(Event const& event, enum status result) {
-	page_mapping.register_read_completion(event, result);
+	page_mapping->register_read_completion(event, result);
 
 	// if normal application read, do nothing
 	if (ongoing_mapping_operations.count(event.get_logical_address()) == 0) {
@@ -99,7 +96,7 @@ void DFTL::register_read_completion(Event const& event, enum status result) {
 		}
 		else  {
 			assert(e->get_event_type() == READ);
-			cache.handle_read_dependency(e);
+			cache->handle_read_dependency(e);
 		}
 		scheduler->schedule_event(e);
 	}
@@ -107,6 +104,23 @@ void DFTL::register_read_completion(Event const& event, enum status result) {
 	try_clear_space_in_mapping_cache(event.get_current_time());
 }
 
+void DFTL::notify_garbage_collector(int translation_page_id, double time) {
+	if (gc == NULL) {
+		return;
+	}
+	long first_key_in_translation_page = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE;
+	for (int i = first_key_in_translation_page;
+			i < first_key_in_translation_page + ENTRIES_PER_TRANSLATION_PAGE; ++i) {
+
+		if (cache->contains(i) && cache->cached_mapping_table[i].synch_flag == false) {
+			Address a = Address();
+			a.set_linear_address(i, PAGE);
+			gc->invalid_address_notification(a, time);
+			cache->cached_mapping_table[i].synch_flag = true;
+		}
+	}
+
+}
 
 void DFTL::write(Event *event)
 {
@@ -114,18 +128,21 @@ void DFTL::write(Event *event)
 	if (SEPERATE_MAPPING_PAGES) {
 		event->set_tag(0);
 	}
-	cache.register_write_arrival(event);
+	if (gc != NULL && cache->contains(event->get_logical_address())) {
+		Address pa = page_mapping->get_physical_address(event->get_logical_address());
+		gc->invalid_address_notification(pa, event->get_current_time());
+	}
+	cache->register_write_arrival(event);
 	scheduler->schedule_event(event);
 }
 
 void DFTL::register_write_completion(Event const& event, enum status result) {
-	page_mapping.register_write_completion(event, result);
-
+	page_mapping->register_write_completion(event, result);
 	if (event.get_noop()) {
 		return;
 	}
 	if (!event.is_mapping_op()) {
-		cache.register_write_completion(event);
+		cache->register_write_completion(event);
 		try_clear_space_in_mapping_cache(event.get_current_time());
 		return;
 	}
@@ -144,7 +161,7 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 	application_ios_waiting_for_translation.erase(translation_page_id);
 	for (auto e : waiting_events) {
 		assert(!e->is_mapping_op() && e->get_event_type() == READ && e->is_original_application_io());
-		cache.handle_read_dependency(e);
+		cache->handle_read_dependency(e);
 		scheduler->schedule_event(e);
 	}
 	//try_clear_space_in_mapping_cache(event.get_current_time());
@@ -157,15 +174,15 @@ void DFTL::trim(Event *event)
 }
 
 void DFTL::register_trim_completion(Event & event) {
-	page_mapping.register_trim_completion(event);
+	page_mapping->register_trim_completion(event);
 }
 
 long DFTL::get_logical_address(uint physical_address) const {
-	return page_mapping.get_logical_address(physical_address);
+	return page_mapping->get_logical_address(physical_address);
 }
 
 Address DFTL::get_physical_address(uint logical_address) const {
-	return page_mapping.get_physical_address(logical_address);
+	return page_mapping->get_physical_address(logical_address);
 }
 
 void DFTL::set_replace_address(Event& event) const {
@@ -186,7 +203,7 @@ void DFTL::set_replace_address(Event& event) const {
 		}
 	}
 	else {
-		page_mapping.set_replace_address(event);
+		page_mapping->set_replace_address(event);
 	}
 }
 
@@ -204,7 +221,7 @@ void DFTL::set_read_address(Event& event) const {
 		event.set_mapping_op(true);
 	}
 	else {
-		page_mapping.set_read_address(event);
+		page_mapping->set_read_address(event);
 	}
 }
 
@@ -214,7 +231,7 @@ void DFTL::mark_clean(long translation_page_id, Event const& event) {
 	for (int i = first_key_in_translation_page;
 			i < first_key_in_translation_page + ENTRIES_PER_TRANSLATION_PAGE; ++i) {
 
-		if (cache.mark_clean(i, event.get_current_time())) {
+		if (cache->mark_clean(i, event.get_current_time())) {
 			num_dirty_entries++;
 		}
 	}
@@ -233,7 +250,7 @@ void DFTL::mark_clean(long translation_page_id, Event const& event) {
 
 	StatisticData::register_statistic("dftl_cache_size", {
 			new Integer(StatisticsGatherer::get_global_instance()->total_writes()),
-			new Integer(cache.cached_mapping_table.size()),
+			new Integer(cache->cached_mapping_table.size()),
 			new Integer(ftl_cache::CACHED_ENTRIES_THRESHOLD)
 	});
 
@@ -253,12 +270,12 @@ void DFTL::mark_clean(long translation_page_id, Event const& event) {
 
 void DFTL::try_clear_space_in_mapping_cache(double time) {
 	//while (cache.cached_mapping_table.size() >= CACHED_ENTRIES_THRESHOLD && flush_mapping(time, false));
-	cache.clear_clean_entries(time);
-	if (cache.cached_mapping_table.size() <= ftl_cache::CACHED_ENTRIES_THRESHOLD) {
+	cache->clear_clean_entries(time);
+	if (cache->cached_mapping_table.size() <= ftl_cache::CACHED_ENTRIES_THRESHOLD) {
 		return;
 	}
 	//flush_mapping(time, true);
-	long victim = cache.choose_dirty_victim(time);
+	long victim = cache->choose_dirty_victim(time);
 
 	if (victim == UNDEFINED) {
 		return;
@@ -269,7 +286,7 @@ void DFTL::try_clear_space_in_mapping_cache(double time) {
 
 	long translation_page_id = victim / ENTRIES_PER_TRANSLATION_PAGE;
 		if (ongoing_mapping_operations.count(NUM_PAGES_IN_SSD - translation_page_id) == 1) {
-			cache.eviction_queue_dirty.push(victim);
+			cache->eviction_queue_dirty.push(victim);
 			return;
 		}
 
@@ -337,7 +354,7 @@ void DFTL::print_short() const {
 	int num_cold = 0;
 	int num_hot = 0;
 	int num_super_hot = 0;
-	for (auto i : cache.cached_mapping_table) {
+	for (auto i : cache->cached_mapping_table) {
 		if (i.second.dirty) num_dirty++;
 		if (!i.second.dirty) num_clean++;
 		if (i.second.fixed) num_fixed++;
@@ -345,9 +362,9 @@ void DFTL::print_short() const {
 		if (i.second.hotness == 1) num_hot++;
 		if (i.second.hotness > 1) num_super_hot++;
 	}
-	printf("total: %d\tdirty: %d\tclean: %d\tfixed: %d\tcold: %d\thot: %d\tvery hot: %d\tnum ios: %d\n", cache.cached_mapping_table.size(), num_dirty, num_clean, num_fixed, num_cold, num_hot, num_super_hot, StatisticsGatherer::get_global_instance()->total_writes());
-	printf("clean queue: %d \t dirty queue %d \n", cache.eviction_queue_clean.size(), cache.eviction_queue_dirty.size());
-	printf("threshold: %d\t cache: %d\n", ftl_cache::CACHED_ENTRIES_THRESHOLD, cache.cached_mapping_table.size());
+	printf("total: %d\tdirty: %d\tclean: %d\tfixed: %d\tcold: %d\thot: %d\tvery hot: %d\tnum ios: %d\n", cache->cached_mapping_table.size(), num_dirty, num_clean, num_fixed, num_cold, num_hot, num_super_hot, StatisticsGatherer::get_global_instance()->total_writes());
+	printf("clean queue: %d \t dirty queue %d \n", cache->eviction_queue_clean.size(), cache->eviction_queue_dirty.size());
+	printf("threshold: %d\t cache: %d\n", ftl_cache::CACHED_ENTRIES_THRESHOLD, cache->cached_mapping_table.size());
 	printf("num mapping pages: %d\t", global_translation_directory.size());
 }
 
@@ -367,7 +384,7 @@ void DFTL::print() const {
 
 	// cluster by mapping page
 	map<int, int> bins;
-	for (auto i : cache.cached_mapping_table) {
+	for (auto i : cache->cached_mapping_table) {
 		//long translation_page_id = la / ENTRIES_PER_TRANSLATION_PAGE;
 		bins[i.first / ENTRIES_PER_TRANSLATION_PAGE]++;
 	}

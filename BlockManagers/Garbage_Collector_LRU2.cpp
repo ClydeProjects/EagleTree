@@ -22,7 +22,7 @@ void Garbage_Collector_LRU2::register_event_completion(Event const& event) {
 	}
 }
 
-void Garbage_Collector_LRU2::commit_choice_of_victim(Address const& phys_address) {
+void Garbage_Collector_LRU2::commit_choice_of_victim(Address const& phys_address, double time) {
 	int package = phys_address.package;
 	int die = phys_address.die;
 	assert(phys_address.block == gc_candidates[package][die].front());

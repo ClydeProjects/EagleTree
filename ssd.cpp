@@ -16,7 +16,8 @@ Ssd::Ssd():
 	data(),
 	last_io_submission_time(0.0),
 	os(NULL),
-	large_events_map()
+	large_events_map(),
+	ftl(NULL)
 {
 	for(uint i = 0; i < SSD_SIZE; i++) {
 		int a = PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE * i;
@@ -50,16 +51,30 @@ Ssd::Ssd():
 	}*/
 	StatisticsGatherer::init();
 	Block_manager_parent* bm = Block_manager_parent::get_new_instance();
+	Garbage_Collector* gc = NULL;
 	Migrator* migrator = new Migrator();
 
-	if (FTL_DESIGN == 0) {
-		ftl = new FtlImpl_Page(this, bm);
-	} else if (FTL_DESIGN == 1) {
-		ftl = new DFTL(this, bm);
-	} else if (FTL_DESIGN == 2) {
-		ftl = new FAST(this, bm, migrator);
-	} else {
-		ftl = new LSM_FTL(this, bm);
+	if (ftl == NULL && gc == NULL && (FTL_DESIGN == 1 || FTL_DESIGN == 3) && GARBAGE_COLLECTION_POLICY == 3) {
+		flash_resident_page_ftl* new_ftl = NULL;
+		if (FTL_DESIGN == 1)
+			new_ftl = new DFTL(this, bm);
+		else if (FTL_DESIGN == 3)
+			new_ftl = new LSM_FTL(this, bm);
+		flash_resident_ftl_garbage_collection* new_gc = new Logarithmic_Gecko(this, bm);
+		new_ftl->set_gc(new_gc);
+		new_gc->set_ftl(new_ftl);
+		gc = new_gc;
+		ftl = new_ftl;
+	}
+
+	if (ftl == NULL) {
+		switch (FTL_DESIGN) {
+		case 0: ftl = new FtlImpl_Page(this, bm); break;
+		case 1: ftl = new DFTL(this, bm); break;
+		case 2: ftl = new FAST(this, bm, migrator); break;
+		case 3: ftl = new LSM_FTL(this, bm); break;
+		default: ftl = new FtlImpl_Page(this, bm); break;
+		}
 	}
 
 	scheduler = new IOScheduler();
@@ -67,16 +82,19 @@ Ssd::Ssd():
 	Free_Space_Meter::init();
 	Free_Space_Per_LUN_Meter::init();
 
-	ftl->set_scheduler(scheduler);
 
-	Garbage_Collector* gc = NULL;
-	if (GARBAGE_COLLECTION_POLICY == 0) {
-		gc = new Garbage_Collector_Greedy(this, bm);
-	} else if (GARBAGE_COLLECTION_POLICY == 0) {
-		gc = new Garbage_Collector_LRU(this, bm);
-	} else {
-		gc = new Garbage_Collector_LRU2(this, bm);
+
+	if (gc == NULL) {
+		switch (GARBAGE_COLLECTION_POLICY) {
+		case 0: gc = new Garbage_Collector_Greedy(this, bm); break;
+		case 1: gc = new Garbage_Collector_LRU(this, bm); break;
+		case 2: gc = new Garbage_Collector_LRU2(this, bm); break;
+		default: gc = new Garbage_Collector_Greedy(this, bm); break;
+		}
 	}
+
+	ftl->set_scheduler(scheduler);
+	gc->set_scheduler(scheduler);
 
 	Wear_Leveling_Strategy* wl = new Wear_Leveling_Strategy(this, migrator);
 

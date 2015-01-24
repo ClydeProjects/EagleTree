@@ -21,7 +21,7 @@ public:
 	void init(IOScheduler*, Block_manager_parent*, Garbage_Collector*, Wear_Leveling_Strategy*, FtlParent*, Ssd*);
 	void schedule_gc(double time, int package, int die, int block, int klass);
 	vector<deque<Event*> > migrate(Event * gc_event);
-	void update_structures(Address const& a);
+	void update_structures(Address const& a, double time);
 	void print_pending_migrations();
 	deque<Event*> trigger_next_migration(Event * gc_read);
 	bool more_migrations(Event * gc_read);
@@ -480,8 +480,9 @@ public:
 	virtual ~Garbage_Collector() {}
 	virtual void register_event_completion(Event const& event) {};
 	virtual Block* choose_gc_victim(int package_id, int die_id, int klass) const = 0;
-	virtual void commit_choice_of_victim(Address const& phys_address) = 0;
+	virtual void commit_choice_of_victim(Address const& phys_address, double time) = 0;
 	void set_block_manager(Block_manager_parent* b) { bm = b; }
+	virtual void set_scheduler(IOScheduler*) {}
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
@@ -514,7 +515,7 @@ public:
 	// Called by the block manager to ask the garbage-collector for a good block to garbage-collect in a given package, die, and with a certain age.
 	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
 	// Called by the block manager when a GC operation for a certain block has been issued. This block is removed from the gc_candidates structure.
-	void commit_choice_of_victim(Address const& phys_address);
+	void commit_choice_of_victim(Address const& phys_address, double time);
 	friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
@@ -531,12 +532,8 @@ class Garbage_Collector_LRU : public Garbage_Collector {
 public:
 	Garbage_Collector_LRU();
 	Garbage_Collector_LRU(Ssd* ssd, Block_manager_parent* bm);
-	// Called by the block manager after any page in the SSD is invalidated, as a result of a trim or a write.
-	// This is used to keep the gc_candidates structure updated.
-	// Called by the block manager to ask the garbage-collector for a good block to garbage-collect in a given package, die, and with a certain age.
 	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
-	// Called by the block manager when a GC operation for a certain block has been issued. This block is removed from the gc_candidates structure.
-	void commit_choice_of_victim(Address const& phys_address);
+	void commit_choice_of_victim(Address const& phys_address, double time);
 	friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
@@ -552,13 +549,9 @@ class Garbage_Collector_LRU2 : public Garbage_Collector {
 public:
 	Garbage_Collector_LRU2();
 	Garbage_Collector_LRU2(Ssd* ssd, Block_manager_parent* bm);
-	// Called by the block manager after any page in the SSD is invalidated, as a result of a trim or a write.
-	// This is used to keep the gc_candidates structure updated.
 	virtual void register_event_completion(Event const& event);
-	// Called by the block manager to ask the garbage-collector for a good block to garbage-collect in a given package, die, and with a certain age.
 	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
-	// Called by the block manager when a GC operation for a certain block has been issued. This block is removed from the gc_candidates structure.
-	void commit_choice_of_victim(Address const& phys_address);
+	void commit_choice_of_victim(Address const& phys_address, double time);
 	friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive & ar, const unsigned int version)
@@ -568,6 +561,39 @@ public:
     }
 private:
 	vector<vector<queue<int> > > gc_candidates;  // for each die, a queue of blocks to be erased
+};
+
+class flash_resident_ftl_garbage_collection : public Garbage_Collector {
+public:
+	flash_resident_ftl_garbage_collection(Ssd* ssd, Block_manager_parent* bm) : Garbage_Collector(ssd, bm), ftl(NULL) {}
+	flash_resident_ftl_garbage_collection() : Garbage_Collector(), ftl(NULL) {}
+	virtual void invalid_address_notification(Address const& a, double time) = 0;
+	virtual void set_ftl(flash_resident_page_ftl* new_ftl) { new_ftl = ftl; }
+protected:
+	flash_resident_page_ftl* ftl;
+
+};
+
+struct logarithmic_gecko_index_entry {
+	vector<bool> bitmap;
+	bool erase_flag;
+};
+
+class Logarithmic_Gecko : public flash_resident_ftl_garbage_collection, public LSM_Tree_Manager_Listener<logarithmic_gecko_index_entry, int>  {
+public:
+	Logarithmic_Gecko();
+	Logarithmic_Gecko(Ssd* ssd, Block_manager_parent* bm);
+	virtual void register_event_completion(Event const& event);
+	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
+	void commit_choice_of_victim(Address const& phys_address, double time);
+	void invalid_address_notification(Address const& a, double time);
+	void set_scheduler(IOScheduler*);
+	void event_finished(int key, logarithmic_gecko_index_entry value, int temp_data);
+	void set_ftl(flash_resident_page_ftl* new_ftl);
+private:
+	vector<vector<queue<int> > > gc_candidates;  // for each die, a queue of blocks to be erased
+	LSM_Tree_Manager<logarithmic_gecko_index_entry, int>::mapping_tree tree;
+	vector<vector< map<int, logarithmic_gecko_index_entry> > > gc_cache;
 };
 
 enum write_amp_choice {greedy, prob, opt};

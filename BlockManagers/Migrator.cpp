@@ -219,9 +219,9 @@ void Migrator::register_ECC_check_on(uint logical_address) {
 	page_copy_back_count.erase(logical_address);
 }
 
-void Migrator::update_structures(Address const& a) {
+void Migrator::update_structures(Address const& a, double time) {
 	Block* victim = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);
-	gc->commit_choice_of_victim(a);
+	gc->commit_choice_of_victim(a, time);
 	blocks_being_garbage_collected[victim->get_physical_address()] = victim->get_pages_valid();
 	num_blocks_being_garbaged_collected_per_LUN[a.package][a.die]++;
 	StatisticsGatherer::get_global_instance()->register_executed_gc(*victim);
@@ -297,7 +297,7 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 		return migrations;
 	}
 
-	update_structures(addr);
+	update_structures(addr, gc_event->get_current_time());
 	//printf("blocks being gced %d\n", blocks_being_garbage_collected.size());
 	bm->subtract_from_available_for_new_writes(victim->get_pages_valid());
 

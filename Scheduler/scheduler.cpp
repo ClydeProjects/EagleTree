@@ -645,7 +645,7 @@ void IOScheduler::handle_finished_event(Event *event) {
 	stats.register_IO_completion(event);
 	VisualTracer::register_completed_event(*event);
 	StatisticsGatherer::get_global_instance()->register_completed_event(*event);
-	migrator->register_event_completion(event);
+
 	current_events->register_event_compeltion(event);
 	overdue_events->register_event_compeltion(event);
 	if (event->get_event_type() == WRITE || event->get_event_type() == COPY_BACK) {
@@ -667,6 +667,7 @@ void IOScheduler::handle_finished_event(Event *event) {
 		printf("LOOK HERE ");
 		event->print();
 	}
+	migrator->register_event_completion(event);
 }
 
 void IOScheduler::init_event(Event* event) {

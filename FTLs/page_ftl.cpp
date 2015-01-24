@@ -27,16 +27,16 @@ using namespace ssd;
 
 FtlImpl_Page::FtlImpl_Page(Ssd *ssd, Block_manager_parent* bm):
 	FtlParent(ssd, bm),
-	logical_to_physical_map(NUMBER_OF_ADDRESSABLE_PAGES(), UNDEFINED),
-	physical_to_logical_map(NUMBER_OF_ADDRESSABLE_PAGES(), UNDEFINED)
+	logical_to_physical_map(NUMBER_OF_ADDRESSABLE_PAGES() + 1, UNDEFINED),
+	physical_to_logical_map(NUMBER_OF_ADDRESSABLE_PAGES() + 1, UNDEFINED)
 {
 	IS_FTL_PAGE_MAPPING = true;
 }
 
 FtlImpl_Page::FtlImpl_Page() :
 	FtlParent(),
-	logical_to_physical_map(NUMBER_OF_ADDRESSABLE_PAGES(), UNDEFINED),
-	physical_to_logical_map(NUMBER_OF_ADDRESSABLE_PAGES(), UNDEFINED)
+	logical_to_physical_map(NUMBER_OF_ADDRESSABLE_PAGES() + 1, UNDEFINED),
+	physical_to_logical_map(NUMBER_OF_ADDRESSABLE_PAGES() + 1, UNDEFINED)
 {
 	IS_FTL_PAGE_MAPPING = true;
 }
@@ -64,6 +64,7 @@ void FtlImpl_Page::register_write_completion(Event const& event, enum status res
 	if (event.get_noop()) {
 		return;
 	}
+
 	long new_phys_addr = event.get_address().get_linear_address();
 
 	long logi_addr = event.get_logical_address();
@@ -92,7 +93,7 @@ long FtlImpl_Page::get_logical_address(uint physical_address) const {
 }
 
 Address FtlImpl_Page::get_physical_address(uint logical_address) const {
-	assert(logical_address < logical_to_physical_map.size());
+	assert(logical_address <= logical_to_physical_map.size());
 	long phys_addr = logical_to_physical_map[logical_address];
 	return phys_addr == UNDEFINED ? Address() : Address(phys_addr, PAGE);
 }

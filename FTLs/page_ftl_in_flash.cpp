@@ -28,6 +28,7 @@ void ftl_cache::register_write_arrival(Event *event)
 		entry e;
 		e.fixed = 1;
 		e.hotness = 1;
+		e.synch_flag = false;
 		cached_mapping_table[la] = e;
 	}
 	else {
@@ -133,6 +134,10 @@ bool ftl_cache::mark_clean(int key, double time) {
 		e.dirty = false;
 	}
 	return was_dirty;
+}
+
+bool ftl_cache::contains(int key) const {
+	return cached_mapping_table.count(key) == 1;
 }
 
 // Uses a clock entry replacement policy

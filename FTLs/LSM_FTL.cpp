@@ -8,22 +8,16 @@
 using namespace ssd;
 
 LSM_FTL::LSM_FTL(Ssd *ssd, Block_manager_parent* bm) :
-		FtlParent(ssd, bm),
-		page_mapping(new FtlImpl_Page(ssd, bm)),
+		flash_resident_page_ftl(ssd, bm),
 		tree(LSM_Tree_Manager<int, Event*>::mapping_tree(NULL, page_mapping))
-
 {
-
 	tree.set_listener(this);
 	IS_FTL_PAGE_MAPPING = true;
-
-
 }
 
 LSM_FTL::LSM_FTL() :
-		page_mapping(),
-		tree(LSM_Tree_Manager<int, Event*>::mapping_tree(NULL, NULL)),
-		FtlParent()
+		flash_resident_page_ftl(),
+		tree(LSM_Tree_Manager<int, Event*>::mapping_tree(NULL, NULL))
 {
 	tree.set_listener(this);
 	IS_FTL_PAGE_MAPPING = true;
@@ -41,7 +35,7 @@ LSM_FTL::~LSM_FTL(void)
 
 void LSM_FTL::read(Event *event) {
 	if (event->is_original_application_io()) {
-		if (tree.in_buffer(event->get_logical_address())) {
+		if (tree.in_buffer(event->get_logical_address() /* or if its in the normal cache */ )) {
 			scheduler->schedule_event(event);
 		}
 		else {
@@ -59,7 +53,7 @@ void LSM_FTL::register_read_completion(Event const& event, enum status result) {
 
 void LSM_FTL::write(Event *event) {
 	if (event->is_original_application_io()) {
-		tree.insert(event->get_logical_address(), event->get_current_time());
+		tree.insert(event->get_logical_address(), 1, event->get_current_time());
 	}
 	scheduler->schedule_event(event);
 }
