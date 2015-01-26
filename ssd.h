@@ -973,6 +973,10 @@ private:
 	void try_clear_space_in_mapping_cache(double time);
 	set<long> ongoing_mapping_operations; // contains the logical addresses of ongoing mapping IOs
 	unordered_map<long, vector<Event*> > application_ios_waiting_for_translation; // maps translation page ids to application IOs awaiting translation
+	struct mapping_page {
+		map<int, Address> entries;
+	};
+	vector<mapping_page> mapping_pages;
 	struct dftl_statistics {
 		map<int, int> cleans_histogram;
 		map<int, int> address_hits;
@@ -982,7 +986,9 @@ private:
 
 template <class T, class V> class LSM_Tree_Manager_Listener {
 public:
-	virtual void event_finished(int key, T value, V temp_data) = 0;
+	virtual ~LSM_Tree_Manager_Listener() {}
+	virtual bool event_finished(bool found, int key, T value, V temp_data) = 0;
+	virtual T merge_entries(T& e1, T& e2) { return e1; }
 };
 
 struct scheduler_wrapper {
@@ -1047,7 +1053,7 @@ public:
 			mapping_tree(IOScheduler*, FtlImpl_Page*);
 			void create_ongoing_read(int key, V temp_data, double time);
 			void attend_ongoing_read(ongoing_read* r, double time);
-			void print() const;
+			void print(bool print_pages = false) const;
 			void register_read_completion(Event const&);
 			void register_write_completion(Event const&);
 			void insert(int element, T value, double time);
@@ -1057,7 +1063,7 @@ public:
 			void set_scheduler(IOScheduler*);
 			void set_page_mapping(FtlImpl_Page*);
 			int get_num_levels() const;
-		private:
+		//private:
 			buffer buf;
 			bool flush_in_progress;
 			vector<mapping_run*> runs;
@@ -1096,7 +1102,7 @@ public:
 	void set_read_address(Event& event) const;
 	void print() const;
 	void print_detailed() const;
-	void event_finished(int key, int value, Event* read);
+	bool event_finished(bool found, int key, int value, Event* read);
 private:
 	LSM_Tree_Manager<int, Event*>::mapping_tree tree;
 };

@@ -44,9 +44,7 @@ void Migrator::register_event_completion(Event* event) {
 	else if (event->get_event_type() == TRIM || (event->get_event_type() == WRITE && event->get_replace_address().valid != NONE)) {
 		handle_trim_completion(event);
 	}
-	if (event->get_event_type() == WRITE) {
-		gc->register_event_completion(*event);
-	}
+	gc->register_event_completion(*event);
 }
 
 void Migrator::handle_erase_completion(Event* event) {

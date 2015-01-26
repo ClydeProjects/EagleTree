@@ -40,6 +40,7 @@ void ftl_cache::handle_read_dependency(Event* e) {
 	if (cached_mapping_table.count(e->get_logical_address()) == 0) {
 		ftl_cache::entry entry;
 		entry.hotness++;
+		entry.synch_flag = true;
 		cached_mapping_table[e->get_logical_address()] = entry;
 		eviction_queue_clean.push(e->get_logical_address());
 	}

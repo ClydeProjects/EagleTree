@@ -65,7 +65,7 @@ template <class T, class V>  int LSM_Tree_Manager<T, V>::mapping_tree::get_num_l
 }
 
 // used for debugging
-template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::print() const {
+template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::print(bool print_pages) const {
 	int total_pages = 0;
 	for (auto& run : runs) {
 		printf("level: %d   num pages: %d    id: %d    starting: %d   ending %d\t", run->level, run->mapping_pages.size(), run->id, run->starting_logical_address, run->ending_logical_address);
@@ -82,6 +82,13 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::print() 
 			}
 		}
 		printf("\n");
+		if (print_pages) {
+			for (auto& page : run->mapping_pages) {
+				printf("\t %d  %d\n", page->first_key, page->last_key);
+			}
+			//printf("\n");
+		}
+
 		total_pages += run->mapping_pages.size();
 	}
 	printf("total pages: %d\n", total_pages);
@@ -92,7 +99,7 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register
 	for (auto& m : merges) {
 		if (m->check_write(event) && m->is_finished()) {
 			finish_merge(m);
-			print();
+			//print();
 			//printf("mapping writes: %d\n", stats.num_mapping_writes);
 			//stats.num_mapping_writes = 0;
 			//printf("finished merge\n");
@@ -104,8 +111,8 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register
 		if (run->being_created && run->level == 1 && run->executing_ios.count(event.get_application_io_id())) {
 			run->executing_ios.erase(event.get_application_io_id());
 			run->being_created = false;
-			event.print();
-			print();
+			//event.print();
+			//print();
 			//printf("mapping writes: %d\n", stats.num_mapping_writes);
 			//stats.num_mapping_writes = 0;
 			check_if_should_merge(event.get_current_time());
@@ -137,6 +144,7 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register
 		return;
 	}
 
+	// Look for the run in the tree that the read was addressing
 	int mapping_la = event.get_logical_address();
 	LSM_Tree_Manager<T, V>::mapping_run* run = NULL;
 	for (auto& r : runs) {
@@ -153,29 +161,36 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register
 	ongoing->read_ios_submitted.erase(event.get_application_io_id());
 	assert(run->executing_ios.count(event.get_application_io_id()) == 0);
 
+	// Look in the mapping page
 	assert(run != NULL);
 	bool found_address = false;
 	T value;
 	int orig_la = ongoing->key;
 	for (auto& page : run->mapping_pages) {
-		if (page->first_key <= orig_la && page->last_key >= orig_la && page->addresses.count(orig_la) == 1) {
-			found_address = true;
-			value = page->addresses.at(orig_la);
-			break;
-		}
+		//if (page->first_key <= orig_la) {
+		//	if (page->last_key >= orig_la) {
+				if (page->addresses.count(orig_la) == 1) {
+					found_address = true;
+					value = page->addresses.at(orig_la);
+					break;
+				}
+		//	}
+
+		//}
 	}
 
 	// this code is meant to erase a run if there were still pending reads to it
 	erase_run(run);
-	if (!found_address) {
+	bool continue_searching = false;
+	if (found_address && listener != NULL) {
+		continue_searching = listener->event_finished(true, ongoing->key, value, ongoing->temp);
+	}
+	if (!found_address || continue_searching) {
 		attend_ongoing_read(ongoing, event.get_current_time());
 	}
 	else {
-		ongoing_reads.erase(ongoing);
 		delete ongoing;
-		if (listener != NULL) {
-			listener->event_finished(ongoing->key, value, ongoing->temp);
-		}
+		ongoing_reads.erase(ongoing);
 	}
 }
 
@@ -286,7 +301,7 @@ template <class T, class V> bool LSM_Tree_Manager<T, V>::merge::check_read(Event
 template <class T, class V> bool LSM_Tree_Manager<T, V>::merge::check_write(Event const& write) {
 	long la = write.get_logical_address();
 	if (la >= being_created->starting_logical_address && la <= being_created->ending_logical_address) {
-		write.print();
+		//write.print();
 		num_writes_finished++;
 		return true;
 	}
@@ -345,6 +360,17 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::check_if
 		}
 	}
 
+	std::sort(m->runs.begin(), m->runs.end(),
+	    [](mapping_run const*const& a, mapping_run const*const& b) {
+	        return a->level < b->level;
+	    });
+
+	for (int i = 1; i < m->runs.size(); i++) {
+		int l1 = m->runs[i-1]->level;
+		int l2 = m->runs[i]->level;
+		assert(l1 <= l2);
+	}
+
 	mapping_run* run = new mapping_run();
 	m->being_created = run;
 	run->being_merged = false;
@@ -352,12 +378,23 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::check_if
 	run->obsolete = false;
 	//run->executing_ios.insert(event->get_application_io_id());
 
-
 	map<int, T> addresses_set;
 	for (auto& run : m->runs) {
 		run->being_merged = true;
 		for (auto& page : run->mapping_pages) {
-			addresses_set.insert(page->addresses.begin(), page->addresses.end());
+			for (auto& entry : page->addresses) {
+				int key = entry.first;
+				if (addresses_set.count(key) == 1) {
+					T e1 = addresses_set.at(key);
+					T e2 = entry.second;
+					T e3 = listener->merge_entries(e1, e2);
+					addresses_set[key] = e3;
+				}
+				else {
+					addresses_set[key] = entry.second;
+				}
+			}
+			//addresses_set.insert(page->addresses.begin(), page->addresses.end());
 		}
 	}
 
@@ -373,7 +410,7 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::check_if
 			//addresses.erase(addresses.begin(), addresses.begin() + buffer_threshold);
 		}
 		else {
-			mp->addresses.insert(addresses.begin(), addresses.end());
+			mp->addresses.insert(addresses.begin() + steps * buffer_threshold, addresses.end());
 			//addresses.erase(addresses.begin(), addresses.end());
 		}
 		mp->first_key = (*mp->addresses.begin()).first;
@@ -441,6 +478,11 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::attend_o
 			}
 		}
 	}
+	if (listener != NULL) {
+		listener->event_finished(false, r->key, T(), V());
+	}
+	ongoing_reads.erase(r);
+	delete r;
 }
 
 };

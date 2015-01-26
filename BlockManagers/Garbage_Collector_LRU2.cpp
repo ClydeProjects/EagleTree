@@ -13,6 +13,9 @@ Garbage_Collector_LRU2::Garbage_Collector_LRU2(Ssd* ssd, Block_manager_parent* b
 {}
 
 void Garbage_Collector_LRU2::register_event_completion(Event const& event) {
+	if (event.get_event_type() != WRITE) {
+		return;
+	}
 	Address const& a = event.get_address();
 	if (a.page == BLOCK_SIZE - 1) {
 		/*printf("push ");

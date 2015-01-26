@@ -11,7 +11,8 @@ bool DFTL::SEPERATE_MAPPING_PAGES = true;
 DFTL::DFTL(Ssd *ssd, Block_manager_parent* bm) :
 		flash_resident_page_ftl(ssd, bm),
 		ongoing_mapping_operations(),
-		application_ios_waiting_for_translation()
+		application_ios_waiting_for_translation(),
+		mapping_pages(NUMBER_OF_ADDRESSABLE_PAGES() / ENTRIES_PER_TRANSLATION_PAGE)
 {
 	IS_FTL_PAGE_MAPPING = true;
 }
@@ -75,6 +76,7 @@ void DFTL::register_read_completion(Event const& event, enum status result) {
 	// identify translation page we finished reading
 	long translation_page_id = - (event.get_logical_address() - NUMBER_OF_ADDRESSABLE_PAGES());
 
+	notify_garbage_collector(translation_page_id, event.get_current_time());
 	// Insert all entries into cached mapping table with hotness 0
 	/*for (int i = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE; i < (translation_page_id + 1) * ENTRIES_PER_TRANSLATION_PAGE; i++) {
 		if (cache.cached_mapping_table.count(i) == 0) {
@@ -108,11 +110,13 @@ void DFTL::notify_garbage_collector(int translation_page_id, double time) {
 	long first_key_in_translation_page = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE;
 	for (int i = first_key_in_translation_page;
 			i < first_key_in_translation_page + ENTRIES_PER_TRANSLATION_PAGE; ++i) {
-
 		if (cache->contains(i) && cache->cached_mapping_table[i].synch_flag == false) {
-			Address a = Address();
-			a.set_linear_address(i, PAGE);
-			gc->invalid_address_notification(a, time);
+			Address old_address = mapping_pages[translation_page_id].entries[i];
+			if (old_address.valid == PAGE) {
+				Address current_address = page_mapping->get_physical_address(i);
+				assert(old_address.compare(current_address) != PAGE);
+				gc->invalid_address_notification(old_address, time);
+			}
 			cache->cached_mapping_table[i].synch_flag = true;
 		}
 	}
@@ -144,11 +148,23 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 		return;
 	}
 
+	if (ongoing_mapping_operations.count(event.get_logical_address()) == 0) {
+		return;
+	}
 	ongoing_mapping_operations.erase(event.get_logical_address());
 	long translation_page_id = - (event.get_logical_address() - NUMBER_OF_ADDRESSABLE_PAGES());
 
 	// mark all pages included as clean
 	mark_clean(translation_page_id, event);
+
+	mapping_pages[translation_page_id].entries.clear();
+	long first_key_in_translation_page = translation_page_id * ENTRIES_PER_TRANSLATION_PAGE;
+	for (int i = first_key_in_translation_page;
+			i < first_key_in_translation_page + ENTRIES_PER_TRANSLATION_PAGE; ++i) {
+		Address a = page_mapping->get_physical_address(i);
+		mapping_pages[translation_page_id].entries[i] = a;
+	}
+
 
 	// schedule all operations
 	vector<Event*> waiting_events = application_ios_waiting_for_translation[translation_page_id];

@@ -50,6 +50,9 @@ Block* Garbage_Collector_Greedy::choose_gc_victim(int package_id, int die_id, in
 }
 
 void Garbage_Collector_Greedy::register_event_completion(Event const& event) {
+	if (event.get_event_type() != WRITE) {
+		return;
+	}
 	Address ra = event.get_replace_address();
 	if (ra.valid == NONE) {
 		return;

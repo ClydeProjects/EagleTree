@@ -114,10 +114,11 @@ void LSM_FTL::print() const {
 	printf("\n");
 }*/
 
-void LSM_FTL::event_finished(int key, int value, Event* original_read) {
+bool LSM_FTL::event_finished(bool found, int key, int value, Event* original_read) {
 	//printf("event finished   %d   %d   ", key, value);
 	//original_read->print();
 	Address addr = page_mapping->get_physical_address(original_read->get_logical_address());
 	original_read->set_address(addr);
 	scheduler->schedule_event(original_read);
+	return false;
 }
