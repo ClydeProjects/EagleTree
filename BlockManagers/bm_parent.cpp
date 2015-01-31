@@ -125,6 +125,9 @@ void Block_manager_parent::register_erase_outcome(Event& event, enum status stat
 	a.page = 0;
 	//Block* b = &ssd->get_package()[a.package]->get_die()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
 
+	printf("erased %d\n", a.get_block_id());
+	//StatisticsGatherer::get_global_instance()->print();
+
 	wl->register_erase_completion(event);
 
 	if (USE_ERASE_QUEUE) {

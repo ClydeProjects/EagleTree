@@ -937,6 +937,7 @@ public:
 	ftl_cache* get_cache() { return cache; }
 	void set_gc(flash_resident_ftl_garbage_collection* new_gc) { gc = new_gc; }
 	FtlImpl_Page* get_page_mapping() { return page_mapping; }
+	void update_bitmap(vector<bool>& bitmap, int block_id);
 protected:
 	ftl_cache* cache;
 	FtlImpl_Page* page_mapping;
@@ -1047,6 +1048,13 @@ private:
 			int key;
 			V temp;
 		};
+
+		struct tree_stats {
+			int merge_reads;
+			int merge_writes;
+			int lookup_reads;
+			int num_lookups;
+		};
 public:
 		struct mapping_tree {
 		public:
@@ -1072,11 +1080,14 @@ public:
 			scheduler_wrapper scheduler;
 			FtlImpl_Page* page_mapping;
 			LSM_Tree_Manager_Listener<T, V>* listener;
+			tree_stats stats;
+			bool use_bloom_filters;
 			void flush(double time);
 			long find_prospective_address_for_new_run(int size) const;
 			void check_if_should_merge(double time);
 			void finish_merge(merge* m);
 			void erase_run(mapping_run* run);
+			void print_stats();
 		};
 		//static map<string, mapping_tree> trees;
 		static int buffer_threshold;

@@ -141,6 +141,20 @@ bool ftl_cache::contains(int key) const {
 	return cached_mapping_table.count(key) == 1;
 }
 
+void flash_resident_page_ftl::update_bitmap(vector<bool>& bitmap, int block_id) {
+	for (int i = 0; i < BLOCK_SIZE; i++) {
+		int log_addr = page_mapping->get_logical_address(block_id * BLOCK_SIZE + i);
+		if (log_addr == UNDEFINED && bitmap[i] == true) {
+			bitmap[i] = false;
+		}
+		if (log_addr != UNDEFINED) {
+			bool bit = bitmap[i];
+			assert(bit == true);
+		}
+	}
+
+}
+
 // Uses a clock entry replacement policy
 int ftl_cache::erase_victim(double time, bool allow_flushing_dirty) {
 	//printf("flush called. num dirty: %d     cache size: %d\n", get_num_dirty_entries(), cached_mapping_table.size());

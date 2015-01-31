@@ -580,6 +580,12 @@ struct logarithmic_gecko_index_entry {
 	void print() const;
 };
 
+struct logarithmic_gecko_cached_entry {
+	vector<bool> bitmap;
+	bool up_to_date;
+	void print() const;
+};
+
 class Logarithmic_Gecko : public flash_resident_ftl_garbage_collection, public LSM_Tree_Manager_Listener<logarithmic_gecko_index_entry, int>  {
 public:
 	Logarithmic_Gecko();
@@ -593,9 +599,10 @@ public:
 	bool event_finished(bool found, int key, logarithmic_gecko_index_entry value, int temp_data);
 	void set_ftl(flash_resident_page_ftl* new_ftl);
 private:
+	void sanity_check(Block*, vector<bool>& bitmap);
 	vector<vector<queue<int> > > gc_candidates;  // for each die, a queue of blocks to be erased
 	LSM_Tree_Manager<logarithmic_gecko_index_entry, int>::mapping_tree tree;
-	vector<vector< map<int, logarithmic_gecko_index_entry> > > gc_cache;  // maps block ids to cached entries
+	vector<vector< map<int, logarithmic_gecko_cached_entry> > > gc_cache;  // maps block ids to cached entries
 	vector<vector<int> > next_target;
 };
 

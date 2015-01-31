@@ -49,7 +49,7 @@ int main()
 	printf("Running EagleTree\n");
 	set_small_SSD_config();
 	FTL_DESIGN = 1;
-	GARBAGE_COLLECTION_POLICY = 0;
+	GARBAGE_COLLECTION_POLICY = 3;
 	SCHEDULING_SCHEME = 7;
 	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 16;

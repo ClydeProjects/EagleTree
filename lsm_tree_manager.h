@@ -35,7 +35,7 @@ template <class T, class V> bool LSM_Tree_Manager<T, V>::mapping_tree::in_buffer
 }
 
 template <class T, class V> LSM_Tree_Manager<T, V>::mapping_tree::mapping_tree(IOScheduler* sched, FtlImpl_Page* mapping) :
-			flush_in_progress(false), scheduler(sched), page_mapping(mapping), listener(NULL) { }
+			flush_in_progress(false), scheduler(sched), page_mapping(mapping), listener(NULL), stats(), use_bloom_filters(false) { }
 
 template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::set_listener(LSM_Tree_Manager_Listener<T, V>* l) {
 	listener = l;
@@ -97,12 +97,16 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::print(bo
 
 template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register_write_completion(Event const& event) {
 	for (auto& m : merges) {
-		if (m->check_write(event) && m->is_finished()) {
-			finish_merge(m);
-			//print();
-			//printf("mapping writes: %d\n", stats.num_mapping_writes);
-			//stats.num_mapping_writes = 0;
-			//printf("finished merge\n");
+		if (m->check_write(event)) {
+			stats.merge_writes++;
+			if (m->is_finished()) {
+				finish_merge(m);
+				print();
+				print_stats();
+				//printf("mapping writes: %d\n", stats.num_mapping_writes);
+				//stats.num_mapping_writes = 0;
+				//printf("finished merge\n");
+			}
 		}
 	}
 
@@ -111,8 +115,10 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register
 		if (run->being_created && run->level == 1 && run->executing_ios.count(event.get_application_io_id())) {
 			run->executing_ios.erase(event.get_application_io_id());
 			run->being_created = false;
+			stats.merge_writes++;
 			//event.print();
-			//print();
+			print();
+			print_stats();
 			//printf("mapping writes: %d\n", stats.num_mapping_writes);
 			//stats.num_mapping_writes = 0;
 			check_if_should_merge(event.get_current_time());
@@ -126,12 +132,15 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::create_o
 	r->key = key;
 	r->temp = temp_data;
 	ongoing_reads.insert(r);
+	stats.num_lookups++;
 	attend_ongoing_read(r, time);
 }
 
 template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register_read_completion(Event const& event) {
 	for (auto& m : merges) {
-		m->check_read(event, scheduler);
+		if (m->check_read(event, scheduler)) {
+			stats.merge_reads++;
+		}
 	}
 	LSM_Tree_Manager<T, V>::ongoing_read* ongoing = NULL;
 	for (auto& r : ongoing_reads) {
@@ -143,7 +152,7 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register
 	if (ongoing == NULL) {
 		return;
 	}
-
+	stats.lookup_reads++;
 	// Look for the run in the tree that the read was addressing
 	int mapping_la = event.get_logical_address();
 	LSM_Tree_Manager<T, V>::mapping_run* run = NULL;
@@ -189,6 +198,7 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register
 		attend_ongoing_read(ongoing, event.get_current_time());
 	}
 	else {
+		printf("num reads per lookup  %d   %d\n", ongoing->read_ios_submitted.size(), ongoing->run_ids_attempted.size());
 		delete ongoing;
 		ongoing_reads.erase(ongoing);
 	}
@@ -306,6 +316,13 @@ template <class T, class V> bool LSM_Tree_Manager<T, V>::merge::check_write(Even
 		return true;
 	}
 	return false;
+}
+
+template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::print_stats() {
+	printf("num lookups:\t%d\n", stats.num_lookups);
+	printf("lookup reads:\t%d\n", stats.lookup_reads);
+	printf("merge reads:\t%d\n", stats.merge_reads);
+	printf("merge writes:\t%d\n", stats.merge_writes);
 }
 
 template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::erase_run(mapping_run* run) {
@@ -455,7 +472,10 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::attend_o
 	for (int i = runs.size() - 1; i >= 0; i--) {
 		mapping_run* run = runs[i];
 		int la = r->key;
-		if (!run->being_created && !run->obsolete && r->run_ids_attempted.count(run->id) == 0 && (/*run->contains(la) ||*/ runs[i]->filter.contains(la))) {
+		if (!run->being_created && !run->obsolete && r->run_ids_attempted.count(run->id) == 0) {  // can add an optional condition not to search in runs that are newer than the run.
+			if (use_bloom_filters && !runs[i]->filter.contains(la)) {
+				continue;
+			}
 			// in which page is it?
 			r->run_ids_attempted.insert(run->id);
 			int mapping_address_to_read = UNDEFINED;
@@ -481,6 +501,7 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::attend_o
 	if (listener != NULL) {
 		listener->event_finished(false, r->key, T(), V());
 	}
+	printf("num reads per lookup  %d   %d\n", r->read_ios_submitted.size(), r->run_ids_attempted.size());
 	ongoing_reads.erase(r);
 	delete r;
 }
