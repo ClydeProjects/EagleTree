@@ -49,20 +49,12 @@ int main()
 	printf("Running EagleTree\n");
 	set_small_SSD_config();
 	FTL_DESIGN = 1;
-	GARBAGE_COLLECTION_POLICY = 3;
 	SCHEDULING_SCHEME = 7;
 	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 16;
-	//BLOCK_MANAGER_ID = 5;
 	DFTL::SEPERATE_MAPPING_PAGES = true;
 	ftl_cache::CACHED_ENTRIES_THRESHOLD = pow(2,15);		// SRAM fitting 256 kb, or 2^25 entries,
 	DFTL::ENTRIES_PER_TRANSLATION_PAGE = 128;
-	//LSM_Tree_Manager::buffer_threshold = 128;
-	//LSM_Tree_Manager::SIZE_RATIO = 9;
-	Block_Manager_Groups::detector_type = 3;
-	Block_Manager_Groups::prioritize_groups_that_need_blocks = true;
-	Block_Manager_Groups::garbage_collection_policy_within_groups = 1;
-	bloom_detector::min_num_groups = 2;
 	group::overprov_allocation_strategy = 1;
 	string name  = "/demo_output/";
 	Experiment::create_base_folder(name.c_str());

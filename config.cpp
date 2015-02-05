@@ -253,7 +253,7 @@ void set_small_SSD_config() {
 	SSD_SIZE = 4;
 	PACKAGE_SIZE = 2;
 	DIE_SIZE = 1;
-	PLANE_SIZE = 128;
+	PLANE_SIZE = 1024;
 	BLOCK_SIZE = 128;
 
 	PAGE_READ_DELAY = 5;
