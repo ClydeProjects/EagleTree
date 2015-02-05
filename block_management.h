@@ -589,32 +589,6 @@ struct logarithmic_gecko_cached_entry {
 	void print() const;
 };
 
-class Logarithmic_Gecko : public flash_resident_ftl_garbage_collection, public LSM_Tree_Manager_Listener<logarithmic_gecko_index_entry, int>  {
-public:
-	Logarithmic_Gecko();
-	Logarithmic_Gecko(Ssd* ssd, Block_manager_parent* bm);
-	virtual void register_event_completion(Event const& event);
-	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
-	void commit_choice_of_victim(Address const& phys_address, double time);
-	void check_if_should_continue_searching(double time);
-	void print_gc_cache() const;
-	int get_num_entries_in_gc_cache() const;
-	void invalid_address_notification(Address const& a, double time);
-	void set_scheduler(IOScheduler*);
-	logarithmic_gecko_index_entry merge_entries(int key, logarithmic_gecko_index_entry& e1, logarithmic_gecko_index_entry& e2);
-	bool event_finished(bool found, int key, logarithmic_gecko_index_entry value, int temp_data);
-	void set_ftl(flash_resident_page_ftl* new_ftl);
-private:
-	void find_where_key_is(int key) const;
-	bool sanity_check(Block const*const, vector<bool> const& bitmap) const;
-	void handle_erase(Event const& event);
-	vector<vector<queue<int> > > gc_candidates;  // for each die, a queue of blocks to be erased
-	LSM_Tree_Manager<logarithmic_gecko_index_entry, int>::mapping_tree tree;
-	vector<vector< map<int, logarithmic_gecko_cached_entry> > > gc_cache;  // maps block ids to cached entries
-	vector<vector<int> > next_target;
-	static int cache_size_per_die;
-};
-
 enum write_amp_choice {greedy, prob, opt};
 
 struct group_def {

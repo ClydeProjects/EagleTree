@@ -1003,7 +1003,3 @@ void IOScheduler::stats::IO_type_recorder::register_io(Event* e) {
 double IOScheduler::stats::IO_type_recorder::get_iterations_per_io() {
 	return total_iterations / (double)total_IOs;
 }
-
-void scheduler_wrapper::schedule_event(Event* event) {
-	scheduler->schedule_event(event);
-}
