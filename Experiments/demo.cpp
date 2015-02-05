@@ -48,14 +48,12 @@ int main()
 {
 	printf("Running EagleTree\n");
 	set_small_SSD_config();
-	FTL_DESIGN = 1;
+	FTL_DESIGN = 1;	// using DFTL
 	SCHEDULING_SCHEME = 7;
 	PRINT_LEVEL = 0;
 	MAX_SSD_QUEUE_SIZE = 16;
-	DFTL::SEPERATE_MAPPING_PAGES = true;
 	ftl_cache::CACHED_ENTRIES_THRESHOLD = pow(2,15);		// SRAM fitting 256 kb, or 2^25 entries,
 	DFTL::ENTRIES_PER_TRANSLATION_PAGE = 128;
-	group::overprov_allocation_strategy = 1;
 	string name  = "/demo_output/";
 	Experiment::create_base_folder(name.c_str());
 	Experiment* e = new Experiment();
