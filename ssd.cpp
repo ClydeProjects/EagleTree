@@ -54,25 +54,11 @@ Ssd::Ssd():
 	Garbage_Collector* gc = NULL;
 	Migrator* migrator = new Migrator();
 
-	if (ftl == NULL && gc == NULL && (FTL_DESIGN == 1 || FTL_DESIGN == 3) && GARBAGE_COLLECTION_POLICY == 3) {
-		flash_resident_page_ftl* new_ftl = NULL;
-		if (FTL_DESIGN == 1)
-			new_ftl = new DFTL(this, bm);
-		else if (FTL_DESIGN == 3)
-			new_ftl = new LSM_FTL(this, bm);
-		flash_resident_ftl_garbage_collection* new_gc = new Logarithmic_Gecko(this, bm);
-		new_ftl->set_gc(new_gc);
-		new_gc->set_ftl(new_ftl);
-		gc = new_gc;
-		ftl = new_ftl;
-	}
-
 	if (ftl == NULL) {
 		switch (FTL_DESIGN) {
 		case 0: ftl = new FtlImpl_Page(this, bm); break;
 		case 1: ftl = new DFTL(this, bm); break;
 		case 2: ftl = new FAST(this, bm, migrator); break;
-		case 3: ftl = new LSM_FTL(this, bm); break;
 		default: ftl = new FtlImpl_Page(this, bm); break;
 		}
 	}
