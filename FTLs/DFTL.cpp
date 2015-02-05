@@ -125,19 +125,42 @@ void DFTL::notify_garbage_collector(int translation_page_id, double time) {
 
 void DFTL::write(Event *event)
 {
+	if (event->get_application_io_id() == 248151) {
+		int i = 0;
+		i++;
+	}
 	long la = event->get_logical_address();
 	if (SEPERATE_MAPPING_PAGES) {
 		event->set_tag(0);
 	}
-	if (gc != NULL && cache->contains(event->get_logical_address())) {
-		Address pa = page_mapping->get_physical_address(event->get_logical_address());
-		gc->invalid_address_notification(pa, event->get_current_time());
-	}
-	cache->register_write_arrival(event);
+	//if (gc != NULL && cache->contains(event->get_logical_address())) {
+	//	Address pa = page_mapping->get_physical_address(event->get_logical_address());
+	//	gc->invalid_address_notification(pa, event->get_current_time());
+	//}
+	//cache->register_write_arrival(event);
 	scheduler->schedule_event(event);
 }
 
 void DFTL::register_write_completion(Event const& event, enum status result) {
+
+	if (event.get_application_io_id() == 216593) {
+		int i = 0;
+		i++;
+	}
+	if (event.get_application_io_id() == 332686) {
+		int i = 0;
+		i++;
+	}
+	if (event.is_original_application_io() && gc != NULL && cache->contains(event.get_logical_address())) {
+		Address pa = page_mapping->get_physical_address(event.get_logical_address());
+		gc->invalid_address_notification(pa, event.get_current_time());
+	}
+	if (event.is_original_application_io()) {
+		cache->register_write_arrival(event);	// caution. Moved this here from the write method. may lead to other problems.
+	}
+	if (event.is_garbage_collection_op()) {
+		cache->set_synchronized(event.get_logical_address());
+	}
 	page_mapping->register_write_completion(event, result);
 	if (event.get_noop()) {
 		return;
@@ -170,7 +193,7 @@ void DFTL::register_write_completion(Event const& event, enum status result) {
 	vector<Event*> waiting_events = application_ios_waiting_for_translation[translation_page_id];
 	application_ios_waiting_for_translation.erase(translation_page_id);
 	for (auto e : waiting_events) {
-		assert(!e->is_mapping_op() && e->get_event_type() == READ && e->is_original_application_io());
+		//assert(!e->is_mapping_op() && e->get_event_type() == READ && e->is_original_application_io());
 		cache->handle_read_dependency(e);
 		scheduler->schedule_event(e);
 	}
@@ -197,15 +220,14 @@ Address DFTL::get_physical_address(uint logical_address) const {
 
 void DFTL::set_replace_address(Event& event) const {
 	if (event.is_mapping_op()) {
-		Address ra = page_mapping->get_physical_address(event.get_logical_address());
-		event.set_replace_address(ra);
+		page_mapping->set_replace_address(event);
 	}
 	// We are garbage collecting a mapping IO, we can infer it by the page's logical address
 	else if (event.is_garbage_collection_op() && event.get_logical_address() >= NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR) {
 		Address ra = page_mapping->get_physical_address(event.get_logical_address());
 		event.set_replace_address(ra);
 		event.set_mapping_op(true);
-		assert(event.is_original_application_io());
+		//assert(event.is_original_application_io());
 		if (SEPERATE_MAPPING_PAGES) {
 			int tag = BLOCK_MANAGER_ID == 5 ? NUMBER_OF_ADDRESSABLE_PAGES() * OVER_PROVISIONING_FACTOR + 1 : 1;
 			event.set_tag(tag);

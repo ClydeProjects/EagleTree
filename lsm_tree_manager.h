@@ -65,6 +65,20 @@ template <class T, class V>  int LSM_Tree_Manager<T, V>::mapping_tree::get_num_l
 }
 
 // used for debugging
+template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::print_ongoing_reads() const {
+	printf("printing ongoing IOs\n");
+	for (auto& r : ongoing_reads) {
+		printf(" \t %d  %d  %d \n", r->key, r->run_ids_attempted.size(), r->read_ios_submitted.size());
+		for (auto i : r->run_ids_attempted) {
+			printf("\t\t%d\n", i);
+		}
+		for (auto i : r->read_ios_submitted) {
+			printf("\t\tongoing: %d\n", i);
+		}
+	}
+}
+
+// used for debugging
 template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::print(bool print_pages) const {
 	int total_pages = 0;
 	for (auto& run : runs) {
@@ -101,8 +115,8 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register
 			stats.merge_writes++;
 			if (m->is_finished()) {
 				finish_merge(m);
-				print();
-				print_stats();
+				//print();
+				//print_stats();
 				//printf("mapping writes: %d\n", stats.num_mapping_writes);
 				//stats.num_mapping_writes = 0;
 				//printf("finished merge\n");
@@ -117,8 +131,8 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register
 			run->being_created = false;
 			stats.merge_writes++;
 			//event.print();
-			print();
-			print_stats();
+			//print();
+			//print_stats();
 			//printf("mapping writes: %d\n", stats.num_mapping_writes);
 			//stats.num_mapping_writes = 0;
 			check_if_should_merge(event.get_current_time());
@@ -133,6 +147,10 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::create_o
 	r->temp = temp_data;
 	ongoing_reads.insert(r);
 	stats.num_lookups++;
+	if (listener != NULL && buf.addresses.count(key) == 1) {
+		T value = buf.addresses[key];
+		listener->event_finished(true, key, value, temp_data);
+	}
 	attend_ongoing_read(r, time);
 }
 
@@ -188,6 +206,11 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register
 		//}
 	}
 
+	if (ongoing->key == 6109) {
+		printf("mapping 6109:  ");
+		event.print();
+	}
+
 	// this code is meant to erase a run if there were still pending reads to it
 	erase_run(run);
 	bool continue_searching = false;
@@ -198,7 +221,7 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::register
 		attend_ongoing_read(ongoing, event.get_current_time());
 	}
 	else {
-		printf("num reads per lookup  %d   %d\n", ongoing->read_ios_submitted.size(), ongoing->run_ids_attempted.size());
+		//printf("num reads per lookup  %d   %d\n", ongoing->read_ios_submitted.size(), ongoing->run_ids_attempted.size());
 		delete ongoing;
 		ongoing_reads.erase(ongoing);
 	}
@@ -332,6 +355,12 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::erase_ru
 		}
 		runs.erase(std::find(runs.begin(), runs.end(), run));
 	}
+	else if (run->executing_ios.size() >= 0 && run->obsolete) {
+		/*printf("not deleting run %d\n", run->id);
+		for (auto i : run->executing_ios) {
+			printf("\t%d\n", i);
+		}*/
+	}
 }
 
 template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::finish_merge(merge* m) {
@@ -377,16 +406,36 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::check_if
 		}
 	}
 
+	/*printf("merging: ");
+	for (auto& i : m->runs) {
+		printf("(%d  %d)\t", i->id, i->level);
+	}
+	printf("\n");*/
+
 	std::sort(m->runs.begin(), m->runs.end(),
 	    [](mapping_run const*const& a, mapping_run const*const& b) {
-	        return a->level < b->level;
+			if (a->level != b->level) {
+				return a->level < b->level;
+			}
+	        return a->id > b->id;
 	    });
+
+	/*printf("merging: ");
+	for (auto& i : m->runs) {
+		printf("(%d  %d)\t", i->id, i->level);
+	}
+	printf("\n");*/
 
 	for (int i = 1; i < m->runs.size(); i++) {
 		int l1 = m->runs[i-1]->level;
 		int l2 = m->runs[i]->level;
+		int id1 = m->runs[i-1]->id;
+		int id2 = m->runs[i]->id;
 		assert(l1 <= l2);
+		assert(id1 > id2);
 	}
+
+
 
 	mapping_run* run = new mapping_run();
 	m->being_created = run;
@@ -404,7 +453,7 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::check_if
 				if (addresses_set.count(key) == 1) {
 					T e1 = addresses_set.at(key);
 					T e2 = entry.second;
-					T e3 = listener->merge_entries(e1, e2);
+					T e3 = listener->merge_entries(key, e1, e2);
 					addresses_set[key] = e3;
 				}
 				else {
@@ -501,7 +550,7 @@ template <class T, class V>  void LSM_Tree_Manager<T, V>::mapping_tree::attend_o
 	if (listener != NULL) {
 		listener->event_finished(false, r->key, T(), V());
 	}
-	printf("num reads per lookup  %d   %d\n", r->read_ios_submitted.size(), r->run_ids_attempted.size());
+	//printf("num reads per lookup  %d   %d\n", r->read_ios_submitted.size(), r->run_ids_attempted.size());
 	ongoing_reads.erase(r);
 	delete r;
 }

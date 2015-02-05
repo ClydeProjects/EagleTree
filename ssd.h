@@ -509,7 +509,7 @@ public:
 class Page 
 {
 public:
-	inline Page() : state(EMPTY) {}
+	inline Page() : state(EMPTY), logical_addr(-1) {}
 	inline ~Page() {}
 	enum status _read(Event &event);
 	enum status _write(Event &event);
@@ -521,8 +521,11 @@ public:
     {
         ar & state;
     }
+    void set_logical_addr(int l) { logical_addr = l;}
+    int get_logical_addr() const { return logical_addr; }
 private:
 	enum page_state state;
+	int logical_addr;
 };
 
 /* The block is the data storage hardware unit where erases are implemented.
@@ -902,7 +905,7 @@ private:
 
 class ftl_cache {
 public:
-	void register_write_arrival(Event* app_write);
+	void register_write_arrival(Event const&  app_write);
 	bool register_read_arrival(Event* app_read);
 	void register_write_completion(Event const& app_write);
 	void handle_read_dependency(Event* event);
@@ -912,6 +915,7 @@ public:
 	bool mark_clean(int key, double time);
 	int erase_victim(double time, bool allow_flushing_dirty);
 	bool contains(int key) const;
+	void set_synchronized(int key);
 	static int CACHED_ENTRIES_THRESHOLD;
 
 	struct entry {
@@ -933,11 +937,12 @@ class flash_resident_page_ftl : public FtlParent {
 public:
 	flash_resident_page_ftl(Ssd *ssd, Block_manager_parent* bm) :
 		FtlParent(ssd, bm), cache(new ftl_cache()), page_mapping(new FtlImpl_Page(ssd, bm)), gc(NULL) {}
-	flash_resident_page_ftl() : FtlParent() {}
+	flash_resident_page_ftl() : FtlParent(), gc(NULL), cache(new ftl_cache()), page_mapping(NULL) {}
 	ftl_cache* get_cache() { return cache; }
 	void set_gc(flash_resident_ftl_garbage_collection* new_gc) { gc = new_gc; }
 	FtlImpl_Page* get_page_mapping() { return page_mapping; }
-	void update_bitmap(vector<bool>& bitmap, int block_id);
+	void update_bitmap(vector<bool>& bitmap, Address block_addr);
+	void set_synchronized(int logical_address);
 protected:
 	ftl_cache* cache;
 	FtlImpl_Page* page_mapping;
@@ -989,7 +994,7 @@ template <class T, class V> class LSM_Tree_Manager_Listener {
 public:
 	virtual ~LSM_Tree_Manager_Listener() {}
 	virtual bool event_finished(bool found, int key, T value, V temp_data) = 0;
-	virtual T merge_entries(T& e1, T& e2) { return e1; }
+	virtual T merge_entries(int key, T& e1, T& e2) { return e1; }
 };
 
 struct scheduler_wrapper {
@@ -1062,6 +1067,7 @@ public:
 			void create_ongoing_read(int key, V temp_data, double time);
 			void attend_ongoing_read(ongoing_read* r, double time);
 			void print(bool print_pages = false) const;
+			void print_ongoing_reads() const;
 			void register_read_completion(Event const&);
 			void register_write_completion(Event const&);
 			void insert(int element, T value, double time);

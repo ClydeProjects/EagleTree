@@ -238,6 +238,7 @@ void IOScheduler::handle(vector<Event*>& events) {
 }
 
 void IOScheduler::handle(Event* event) {
+
 	event->increment_iteration_count();
 	event_type type = event->get_event_type();
 	if (type == WRITE || type == COPY_BACK) {
@@ -275,8 +276,19 @@ void IOScheduler::handle_event(Event* event) {
 }
 
 void IOScheduler::handle_read(Event* event) {
+
+	if (event->get_application_io_id() == 1693276) {
+		int i = 0;
+		i++;
+	}
+
 	double time = bm->in_how_long_can_this_event_be_scheduled(event->get_address(), event->get_current_time());
 	bool can_schedule = bm->can_schedule_on_die(event->get_address(), event->get_event_type(), event->get_application_io_id());
+
+	if (event->get_application_io_id() == 1622620) {
+		int i = 0;
+		i++;
+	}
 
 	if (!can_schedule) {
 		event->incr_bus_wait_time(BUS_DATA_DELAY + BUS_CTRL_DELAY + time);
@@ -474,6 +486,7 @@ void IOScheduler::inform_FTL_of_noop_completion(Event* event) {
 	else if (event->get_event_type() == WRITE) {
 		ftl->register_write_completion(*event, SUCCESS);
 	}
+	migrator->get_garbage_collector()->register_event_completion(*event);
 }
 
 void IOScheduler::promote_to_gc(Event* event_to_promote) {
@@ -527,10 +540,20 @@ enum status IOScheduler::execute_next(Event* event) {
 		}
 	}
 
-	/*if (event->get_event_type() == WRITE && event->get_address().package == 0 && event->get_address().die == 0 && event->get_address().block == 186) {
-		event->print();
+	if (event->get_logical_address() == 17569) {
+		//event->print();
+	}
+	if (event->get_logical_address() == 9181 && event->get_event_type() == WRITE) {
+		//event->print();
 	}
 
+	/*if (event->is_garbage_collection_op() && event->get_event_type() == READ_TRANSFER && event->get_address().package == 2 && event->get_address().die == 1 && event->get_address().block == 991) {
+		printf("%f  ", event->get_current_time());
+		event->print();
+	}*/
+
+
+/*
 	if (event->get_event_type() == WRITE && event->get_replace_address().package == 0 && event->get_replace_address().die == 0 && event->get_replace_address().block == 186) {
 		event->print();
 	}
@@ -827,6 +850,10 @@ void IOScheduler::remove_redundant_events(Event* new_event) {
 		remove_event_from_current_events(existing_event); // Remove old event from current_events; it's added again when independent event (the copy back) finishes
 	}
 	else */
+	if (new_event->get_logical_address() == 37796 || existing_event->get_logical_address() == 37796) {
+		int i = 0;
+		i++;
+	}
 
 	if (IS_FTL_PAGE_MAPPING && new_event->is_garbage_collection_op() && scheduled_op_code == WRITE) {
 		promote_to_gc(existing_event);

@@ -55,6 +55,7 @@ enum status Block::_erase(Event &event)
 	{
 		//assert(data[i].get_state() == INVALID);
 		data[i].set_state(EMPTY);
+		data[i].set_logical_addr(UNDEFINED);
 	}
 
 	event.incr_execution_time(BLOCK_ERASE_DELAY);

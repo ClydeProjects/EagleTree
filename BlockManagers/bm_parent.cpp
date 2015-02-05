@@ -21,7 +21,7 @@ Block_manager_parent::Block_manager_parent(int num_age_classes)
  : ssd(NULL),
    ftl(NULL),
    free_block_pointers(SSD_SIZE, vector<Address>(PACKAGE_SIZE)),
-   free_blocks(SSD_SIZE, vector<vector<vector<Address> > >(PACKAGE_SIZE, vector<vector<Address> >(num_age_classes, vector<Address>(0)) )),
+   free_blocks(SSD_SIZE, vector<vector<deque<Address> > >(PACKAGE_SIZE, vector<deque<Address> >(num_age_classes, deque<Address>(0)) )),
    all_blocks(0),
    num_age_classes(num_age_classes),
    num_free_pages(SSD_SIZE * PACKAGE_SIZE * DIE_SIZE * PLANE_SIZE * BLOCK_SIZE),
@@ -124,8 +124,6 @@ void Block_manager_parent::register_erase_outcome(Event& event, enum status stat
 	a.valid = PAGE;
 	a.page = 0;
 	//Block* b = &ssd->get_package()[a.package]->get_die()[a.die].getPlanes()[a.plane].getBlocks()[a.block];
-
-	printf("erased %d\n", a.get_block_id());
 	//StatisticsGatherer::get_global_instance()->print();
 
 	wl->register_erase_completion(event);
@@ -252,6 +250,19 @@ int Block_manager_parent::get_num_free_blocks() const {
 		}
 	}
 	return sum;
+}
+
+void Block_manager_parent::print_free_blocks() const {
+	for (int i = 0; i < SSD_SIZE; i++) {
+		for (int j = 0; j < PACKAGE_SIZE; j++) {
+			for (int k = 0; k < num_age_classes; k++) {
+				for (auto& q : free_blocks[i][j][k]) {
+					q.print();
+					printf("\n");
+				}
+			}
+		}
+	}
 }
 
 int Block_manager_parent::get_num_free_blocks(int package, int die) const {

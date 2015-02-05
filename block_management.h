@@ -132,6 +132,8 @@ public:
 	Address find_free_unused_block(enum age age, double time);
 	pair<bool, pair<int, int> > get_free_block_pointer_with_shortest_IO_queue(vector<vector<Address> > const& dies) const;
 	void return_unfilled_block(Address block_address, double current_time, bool give_to_block_pointers);
+	int get_num_free_blocks() const;
+	void print_free_blocks() const;
 protected:
 	virtual Address choose_best_address(Event& write) = 0;
 	virtual Address choose_any_address(Event const& write) = 0;
@@ -147,8 +149,8 @@ protected:
 	IOScheduler *scheduler;
 	vector<vector<Address> > free_block_pointers;
 	Migrator* migrator;
-	vector<vector<vector<vector<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
-	int get_num_free_blocks() const;
+	vector<vector<vector<deque<Address> > > > free_blocks;  // package -> die -> class -> list of such free blocks
+
 	int get_num_free_blocks(int package, int die) const;
 	int get_num_pointers_with_free_space() const;
 	int get_num_available_pages_for_new_writes() const { return num_available_pages_for_new_writes; }
@@ -581,6 +583,7 @@ struct logarithmic_gecko_index_entry {
 };
 
 struct logarithmic_gecko_cached_entry {
+	logarithmic_gecko_cached_entry();
 	vector<bool> bitmap;
 	bool up_to_date;
 	void print() const;
@@ -593,17 +596,23 @@ public:
 	virtual void register_event_completion(Event const& event);
 	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
 	void commit_choice_of_victim(Address const& phys_address, double time);
+	void check_if_should_continue_searching(double time);
+	void print_gc_cache() const;
+	int get_num_entries_in_gc_cache() const;
 	void invalid_address_notification(Address const& a, double time);
 	void set_scheduler(IOScheduler*);
-	logarithmic_gecko_index_entry merge_entries(logarithmic_gecko_index_entry& e1, logarithmic_gecko_index_entry& e2);
+	logarithmic_gecko_index_entry merge_entries(int key, logarithmic_gecko_index_entry& e1, logarithmic_gecko_index_entry& e2);
 	bool event_finished(bool found, int key, logarithmic_gecko_index_entry value, int temp_data);
 	void set_ftl(flash_resident_page_ftl* new_ftl);
 private:
-	void sanity_check(Block*, vector<bool>& bitmap);
+	void find_where_key_is(int key) const;
+	bool sanity_check(Block const*const, vector<bool> const& bitmap) const;
+	void handle_erase(Event const& event);
 	vector<vector<queue<int> > > gc_candidates;  // for each die, a queue of blocks to be erased
 	LSM_Tree_Manager<logarithmic_gecko_index_entry, int>::mapping_tree tree;
 	vector<vector< map<int, logarithmic_gecko_cached_entry> > > gc_cache;  // maps block ids to cached entries
 	vector<vector<int> > next_target;
+	static int cache_size_per_die;
 };
 
 enum write_amp_choice {greedy, prob, opt};

@@ -37,6 +37,7 @@ enum status Page::_write(Event &event)
 		printf("You are trying to overwrite a page that is not free. This is illegal. The operations is: \n");
 		event.print();
 	}
+	logical_addr = event.get_logical_address();
 	assert(state == EMPTY);
 	state = VALID;
 	return SUCCESS;

@@ -16,15 +16,15 @@ using namespace ssd;
 
 int ftl_cache::CACHED_ENTRIES_THRESHOLD = 10000;
 
-void ftl_cache::register_write_arrival(Event *event)
+void ftl_cache::register_write_arrival(Event const& event)
 {
-	int la = event->get_logical_address();
+	int la = event.get_logical_address();
 	if (cached_mapping_table.count(la) == 1) {
 		entry& e = cached_mapping_table.at(la);
 		e.hotness++;
 		e.fixed++;
 	}
-	else if (!event->is_mapping_op()) {
+	else if (!event.is_mapping_op()) {
 		entry e;
 		e.fixed = 1;
 		e.hotness = 1;
@@ -61,11 +61,13 @@ bool ftl_cache::register_read_arrival(Event* app_read) {
 }
 
 void ftl_cache::register_write_completion(Event const& event) {
-	if (event.is_garbage_collection_op() && !event.is_original_application_io() && !event.is_mapping_op()) {
+	assert(!event.is_mapping_op());
+	if (event.is_garbage_collection_op() && !event.is_original_application_io()) {
 		if (cached_mapping_table.count(event.get_logical_address()) == 0) {
 			entry e;
 			e.timestamp = event.get_current_time();
 			e.dirty = true;
+			e.synch_flag = true;
 			cached_mapping_table[event.get_logical_address()] = e;
 			eviction_queue_dirty.push(event.get_logical_address());
 		}
@@ -82,6 +84,9 @@ void ftl_cache::register_write_completion(Event const& event) {
 		e.dirty = true;
 		eviction_queue_dirty.push(event.get_logical_address());
 		e.timestamp = event.get_current_time();
+	}
+	else {
+		assert(false);  // just since I'm not immediately sure what should happen here
 	}
 	//try_clear_space_in_mapping_cache(event.get_current_time());
 }
@@ -141,18 +146,41 @@ bool ftl_cache::contains(int key) const {
 	return cached_mapping_table.count(key) == 1;
 }
 
-void flash_resident_page_ftl::update_bitmap(vector<bool>& bitmap, int block_id) {
+void ftl_cache::set_synchronized(int key) {
+	if (cached_mapping_table.count(key) == 1) {
+		ftl_cache::entry& e = cached_mapping_table.at(key);
+		e.synch_flag = true;
+	}
+}
+
+void flash_resident_page_ftl::update_bitmap(vector<bool>& bitmap, Address block_addr) {
+	int block_id = block_addr.get_block_id();
+	Block* block = ssd->get_package(block_addr.package)->get_die(block_addr.die)->get_plane(block_addr.plane)->get_block(block_addr.block);
 	for (int i = 0; i < BLOCK_SIZE; i++) {
 		int log_addr = page_mapping->get_logical_address(block_id * BLOCK_SIZE + i);
+		int orig_logical_addr = block->get_page(i).get_logical_addr();
 		if (log_addr == UNDEFINED && bitmap[i] == true) {
 			bitmap[i] = false;
+
+
+			cache->set_synchronized(orig_logical_addr);
+			//printf("orig log addr: %d \n", orig_logical_addr);
 		}
 		if (log_addr != UNDEFINED) {
 			bool bit = bitmap[i];
+			if (bit != true) {
+				printf("warning: address %d is still valid, yet the bit for it is false.   block id: %d  page offset: %d\n", log_addr, block_id, i);
+			}
 			assert(bit == true);
 		}
+
 	}
 
+}
+
+void flash_resident_page_ftl::set_synchronized(int logical_address) {
+	assert(cache->contains(logical_address));
+	cache->set_synchronized(logical_address);
 }
 
 // Uses a clock entry replacement policy

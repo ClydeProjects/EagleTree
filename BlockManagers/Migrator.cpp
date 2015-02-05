@@ -241,6 +241,11 @@ vector<deque<Event*> > Migrator::migrate(Event* gc_event) {
 
 	bool is_wear_leveling_op = gc_event->is_wear_leveling_op();
 
+	if (gc_event->get_id() == 2332741) {
+		int i = 0;
+		i++;
+	}
+
 	Block * victim;
 	if (a.valid == BLOCK) {
 		victim = ssd->get_package(a.package)->get_die(a.die)->get_plane(a.plane)->get_block(a.block);

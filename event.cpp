@@ -37,8 +37,9 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	num_iterations_in_scheduler(0),
 	ssd_id(UNDEFINED)
 {
-	if (id == 3177316) {
-		int i =0;
+
+	if (application_io_id == 1693276) {
+		int i = 0;
 		i++;
 	}
 	assert(start_time >= 0.0);
@@ -141,6 +142,9 @@ void Event::print(FILE *stream) const
 	}
 	if (original_application_io) {
 		fprintf(stream, " APP");
+	}
+	if (noop) {
+		fprintf(stream, " NOOP");
 	}
 	if (type == GARBAGE_COLLECTION) {
 		fprintf(stream, " age class: %d", age_class);
