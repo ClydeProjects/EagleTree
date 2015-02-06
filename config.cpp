@@ -188,6 +188,9 @@ int READ_TRANSFER_DEADLINE = 10000000;
 // This is to be ignored for now
 int PAGE_HOTNESS_MEASURER = 0;
 
+// The amount of SRAM available to the FTL in bytes
+int SRAM;
+
 void load_entry(char *name, double value, uint line_number) {
 	/* cheap implementation - go through all possibilities and match entry */
 	if (!strcmp(name, "BUS_CTRL_DELAY"))

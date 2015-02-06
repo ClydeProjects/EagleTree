@@ -181,6 +181,8 @@ extern int READ_TRANSFER_DEADLINE;
 extern int FTL_DESIGN;
 extern bool IS_FTL_PAGE_MAPPING;
 
+extern int SRAM;
+
 /*
  * Controls the level of detail of output
  */
@@ -1076,11 +1078,8 @@ public:
 	Ssd ();
 	~Ssd();
 	void submit(Event* event);
-	void event_arrive(enum event_type type, ulong logical_address, uint size, double start_time);
-	void event_arrive(enum event_type type, ulong logical_address, uint size, double start_time, void *buffer);
 	void progress_since_os_is_waiting();
 	void register_event_completion(Event * event);
-	void *get_result_buffer();
 	inline Package* get_package(int i) { return &data[i]; }
 	void set_operating_system(OperatingSystem* os);
 	FtlParent* get_ftl() const;
@@ -1099,9 +1098,6 @@ public:
     void execute_all_remaining_events();
 private:
     void submit_to_ftl(Event* event);
-	enum status read(Event &event);
-	enum status write(Event &event);
-	enum status erase(Event &event);
 	Package &get_data();
 	vector<Package> data;
 	double last_io_submission_time;
