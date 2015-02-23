@@ -453,21 +453,12 @@ bool Block_manager_parent::can_schedule_write_immediately(Address const& prospec
 	return free_pages && die_not_busy && no_copy_back && can_be_scheduled_now;
 }
 
-// puts free blocks at the very end of the queue
-struct block_valid_pages_comparator_wearwolf {
-	bool operator () (const Block * i, const Block * j)
-	{
-		return i->get_pages_invalid() > j->get_pages_invalid();
-	}
-};
-
 void Block_manager_parent::register_trim_making_gc_redundant(Event* trim) {
 	if (PRINT_LEVEL > 1) {
 		printf("a trim made a gc event redundant\n");
+		//printf("%d   %d\n", num_available_pages_for_new_writes, num_free_pages);
 	}
-
 	num_available_pages_for_new_writes++;
-	//printf("%d   %d\n", num_available_pages_for_new_writes, num_free_pages);
 	Free_Space_Meter::register_num_free_pages_for_app_writes(num_available_pages_for_new_writes, trim->get_current_time());
 }
 

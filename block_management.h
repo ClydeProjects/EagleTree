@@ -189,7 +189,6 @@ private:
 class Wear_Leveling_Strategy {
 public:
 	Wear_Leveling_Strategy();
-	//Wear_Leveling_Strategy(Wear_Leveling_Strategy&);
 	Wear_Leveling_Strategy(Ssd* ssd, Migrator*);
 	~Wear_Leveling_Strategy() {};
 	void register_erase_completion(Event const& event);
