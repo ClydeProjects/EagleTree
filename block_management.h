@@ -534,23 +534,6 @@ class Garbage_Collector_LRU : public Garbage_Collector {
 public:
 	Garbage_Collector_LRU();
 	Garbage_Collector_LRU(Ssd* ssd, Block_manager_parent* bm);
-	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
-	void commit_choice_of_victim(Address const& phys_address, double time);
-	friend class boost::serialization::access;
-    template<class Archive>
-    void serialize(Archive & ar, const unsigned int version)
-    {
-    	ar & boost::serialization::base_object<Garbage_Collector>(*this);
-    	ar & gc_candidates;
-    }
-private:
-	vector<vector<int> > gc_candidates;  // each age class has a vector of candidates for GC
-};
-
-class Garbage_Collector_LRU2 : public Garbage_Collector {
-public:
-	Garbage_Collector_LRU2();
-	Garbage_Collector_LRU2(Ssd* ssd, Block_manager_parent* bm);
 	virtual void register_event_completion(Event const& event);
 	Block* choose_gc_victim(int package_id, int die_id, int klass) const;
 	void commit_choice_of_victim(Address const& phys_address, double time);

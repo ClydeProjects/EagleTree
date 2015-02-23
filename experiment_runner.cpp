@@ -467,7 +467,7 @@ void Experiment::save_state(OperatingSystem* os, string file_name) {
 	oa.register_type<MTRand_open>();
 	oa.register_type<MTRand53>();
 	oa.register_type<Garbage_Collector_Greedy>();
-	oa.register_type<Garbage_Collector_LRU>();
+	//oa.register_type<Garbage_Collector_LRU>();
 	oa << os;
 	oa << threads;
 	file.close();
@@ -499,7 +499,7 @@ OperatingSystem* Experiment::load_state(string name) {
 	ia.register_type<MTRand_open>();
 	ia.register_type<MTRand53>();
 	ia.register_type<Garbage_Collector_Greedy>();
-	ia.register_type<Garbage_Collector_LRU>();
+	//ia.register_type<Garbage_Collector_LRU>();
 	OperatingSystem* os;
 	ia >> os;
 	vector<Thread*> threads;

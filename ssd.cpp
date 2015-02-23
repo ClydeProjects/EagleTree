@@ -47,12 +47,10 @@ Ssd::Ssd():
 	Free_Space_Meter::init();
 	Free_Space_Per_LUN_Meter::init();
 
-
 	if (gc == NULL) {
 		switch (GARBAGE_COLLECTION_POLICY) {
 		case 0: gc = new Garbage_Collector_Greedy(this, bm); break;
 		case 1: gc = new Garbage_Collector_LRU(this, bm); break;
-		case 2: gc = new Garbage_Collector_LRU2(this, bm); break;
 		default: gc = new Garbage_Collector_Greedy(this, bm); break;
 		}
 	}
