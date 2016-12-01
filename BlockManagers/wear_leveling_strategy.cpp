@@ -90,7 +90,7 @@ void Wear_Leveling_Strategy::register_erase_completion(Event const& event) {
 	int age = data.age - 1;
 	if (age_distribution.count(age - 1) == 1) {
 		age_distribution[age - 1]--;
-		age_distribution[age]--;
+		age_distribution[age]++;
 		if (age_distribution[age - 1] == 0) {
 			age_distribution.erase(age - 1);
 		}
